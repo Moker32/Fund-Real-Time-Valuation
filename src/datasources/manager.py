@@ -51,14 +51,16 @@ class DataSourceManager:
         self._type_sources: Dict[DataSourceType, List[str]] = {
             DataSourceType.FUND: [],
             DataSourceType.COMMODITY: [],
-            DataSourceType.NEWS: []
+            DataSourceType.NEWS: [],
+            DataSourceType.SECTOR: []
         }
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self._enable_load_balancing = enable_load_balancing
         self._round_robin_index: Dict[DataSourceType, int] = {
             DataSourceType.FUND: 0,
             DataSourceType.COMMODITY: 0,
-            DataSourceType.NEWS: 0
+            DataSourceType.NEWS: 0,
+            DataSourceType.SECTOR: 0
         }
         self._request_history: List[Dict[str, Any]] = []
         self._max_history = 1000
@@ -497,6 +499,7 @@ def create_default_manager() -> DataSourceManager:
     from .fund_source import FundDataSource, SinaFundDataSource
     from .commodity_source import AKShareCommoditySource, YFinanceCommoditySource
     from .news_source import SinaNewsDataSource
+    from .sector_source import SinaSectorDataSource
 
     manager = DataSourceManager()
 
@@ -508,9 +511,17 @@ def create_default_manager() -> DataSourceManager:
     commodity_source = AKShareCommoditySource()
     manager.register(commodity_source)
 
+    # 注册 YFinance 商品数据源（国际商品）
+    yfinance_commodity_source = YFinanceCommoditySource()
+    manager.register(yfinance_commodity_source)
+
     # 注册新闻数据源
     news_source = SinaNewsDataSource()
     manager.register(news_source)
+
+    # 注册行业板块数据源
+    sector_source = SinaSectorDataSource()
+    manager.register(sector_source)
 
     return manager
 

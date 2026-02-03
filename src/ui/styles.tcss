@@ -30,19 +30,88 @@
     text-style: bold;
 }
 
-/* 主表格样式 */
-.main-table {
+/* ==================== 三栏布局样式 ==================== */
+
+/* 主网格容器 - 三栏并排 */
+.main-grid {
     width: 100%;
     height: auto;
+    layout: grid;
+    grid-size: 3;
+    grid-columns: 1fr 1.2fr 0.8fr;
+    grid-rows: 1fr;
+    grid-gutter: 1;
+}
+
+/* 列容器 */
+.column {
+    width: 100%;
+    height: 100%;
+    layout: vertical;
+}
+
+/* 左侧基金列 */
+.fund-column {
+    width: 40%;
+}
+
+/* 中间商品列 - 包含商品和板块 */
+.commodity-column {
+    width: 35%;
+}
+
+/* 右侧新闻列 */
+.news-column {
+    width: 25%;
+}
+
+/* 列标题 */
+.column-header {
+    height: auto;
+    color: cyan;
+    text-style: bold;
+    padding: 0 1;
+    margin-bottom: 1;
+}
+
+/* 基金表格样式 */
+.fund-table {
+    width: 100%;
+    height: 100%;
     border: solid gray;
 }
 
+/* 商品表格样式 */
+.commodity-table {
+    width: 100%;
+    height: 100%;
+    border: solid gray;
+}
+
+/* 行业板块表格样式 */
+.sector-table {
+    width: 100%;
+    height: 100%;
+    border: solid gray;
+    margin-top: 1;
+}
+
 /* 新闻列表样式 */
-.main-list {
+.news-list {
     width: 100%;
     height: 100%;
     border: solid gray;
     background: #16213e;
+}
+
+/* 帮助面板 */
+.help-panel {
+    width: 50;
+    height: auto;
+    background: #16213e;
+    border: solid cyan;
+    padding: 1;
+    dock: top;
 }
 
 /* 帮助内容 */

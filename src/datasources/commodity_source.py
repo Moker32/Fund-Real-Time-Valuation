@@ -8,6 +8,7 @@
 """
 
 import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from .base import (
     DataSource,
@@ -101,15 +102,27 @@ class YFinanceCommoditySource(CommodityDataSource):
                     metadata={"commodity_type": commodity_type}
                 )
 
+            # 转换时间戳为可读格式
+            market_time = info.get('regularMarketTime')
+            if market_time:
+                try:
+                    time_str = datetime.fromtimestamp(market_time).strftime('%Y-%m-%d %H:%M:%S')
+                except (ValueError, TypeError, OSError):
+                    time_str = str(market_time)
+            else:
+                time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
             data = {
                 "commodity": commodity_type,
+                "symbol": ticker,  # 添加 ticker symbol
                 "name": self._get_name(commodity_type),
                 "price": float(price),
                 "change": float(change) if change else 0.0,
-                "change_percent": float(change_percent * 100) if change_percent else 0.0,
+                # yfinance 返回的 change_percent 已经是百分比格式（如 3.37 表示 3.37%）
+                "change_percent": float(change_percent) if change_percent else 0.0,
                 "currency": info.get('currency', 'USD'),
                 "exchange": info.get('exchange', ''),
-                "time": info.get('regularMarketTime', ''),
+                "time": time_str,
             }
 
             # 缓存数据
@@ -276,6 +289,7 @@ class AKShareCommoditySource(CommodityDataSource):
             latest = df.iloc[0]
             return {
                 "commodity": "gold_cny",
+                "symbol": "Au99.99",  # 添加 symbol
                 "name": "Au99.99 (上海黄金)",
                 "price": float(latest.get("早盘价", latest.get("晚盘价", 0))),
                 "change_percent": 0.0,  # API 不提供涨跌幅

@@ -44,6 +44,19 @@ class NewsData:
     url: str        # 链接
 
 
+@dataclass
+class SectorData:
+    """行业板块数据结构"""
+    code: str           # 板块代码
+    name: str           # 板块名称
+    category: str       # 板块类别
+    current: float      # 当前点位
+    change_pct: float   # 涨跌幅 (%)
+    change: float = 0.0     # 涨跌值 (可选)
+    trading_status: str = ""  # 交易状态 (可选)
+    time: str = ""           # 更新时间 (可选)
+
+
 # ==================== 自定义组件 ====================
 
 class FundTable(DataTable):
@@ -220,18 +233,17 @@ class HelpPanel(Static):
         help_content = """
 [操作说明]
 
-[Tab]     - 切换视图
 [a]       - 添加基金
 [d]       - 删除基金
 [r]       - 手动刷新
 [F1]      - 显示帮助
 [Ctrl+C]  - 退出应用
 
-[视图说明]
+[布局说明]
 
-[1] 基金视图 - 显示基金列表
-[2] 商品视图 - 显示商品行情
-[3] 新闻视图 - 显示财经新闻
+左侧 50%  - 基金列表 (自选/持仓)
+中间 25%  - 商品行情 (贵金属/能源)
+右侧 25%  - 财经新闻 (实时资讯)
 """
         self.query_one("#help-content", Static).update(help_content)
 
@@ -243,3 +255,70 @@ class ThemeToggle(Button):
         super().__init__(*args, **kwargs)
         self.label = "主题"
         self.variant = "default"
+
+
+class SectorTable(DataTable):
+    """行业板块数据表格组件"""
+
+    BINDINGS = [
+        ("c", "filter_category", "筛选类别"),
+    ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cursor_type = "row"
+        self.zebra_stripes = True
+        self.current_category: Optional[str] = None
+
+    def on_mount(self):
+        """组件挂载时初始化列"""
+        self.add_column("板块", width=16)
+        self.add_column("类别", width=10)
+        self.add_column("点位", width=12)
+        self.add_column("涨跌", width=10)
+        self.add_column("状态", width=8)
+
+    def update_sectors(self, sectors: List[SectorData], category: Optional[str] = None):
+        """更新板块数据"""
+        self.clear()
+        self.current_category = category
+
+        # 按类别筛选
+        filtered_sectors = sectors
+        if category:
+            filtered_sectors = [s for s in sectors if s.category == category]
+
+        for sector in filtered_sectors:
+            change_color = "green" if sector.change_pct >= 0 else "red"
+            status_color = "yellow" if sector.trading_status == "竞价" else "green" if sector.trading_status == "交易" else "grey"
+
+            self.add_row(
+                sector.name,
+                sector.category,
+                f"{sector.current:.2f}",
+                f"{sector.change_pct:+.2f}%",
+                sector.trading_status,
+            )
+
+    def filter_by_category(self, category: str):
+        """按类别筛选（预留方法）"""
+        pass
+
+
+class SectorCategoryFilter(Static):
+    """板块类别筛选面板"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.categories = ["全部", "消费", "新能源", "医药", "科技", "金融", "周期", "制造"]
+        self.current_filter = "全部"
+
+    def compose(self):
+        yield Static(id="category-filter-content")
+
+    def update_filter(self, selected: str):
+        """更新筛选状态"""
+        if selected in self.categories:
+            self.current_filter = selected
+            content = f"[类别筛选]: {selected}"
+            self.query_one("#category-filter-content", Static).update(content)

@@ -15,6 +15,7 @@ class DataSourceType(Enum):
     FUND = "fund"
     COMMODITY = "commodity"
     NEWS = "news"
+    SECTOR = "sector"
 
 
 class DataSourceError(Exception):
