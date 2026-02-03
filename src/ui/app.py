@@ -19,7 +19,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from .widgets import FundTable, CommodityTable, NewsList, FundData, CommodityData, NewsData, StatPanel, StatusBar, SectorData, SectorTable
+from .widgets import FundTable, CommodityTable, NewsList, FundData, CommodityData, NewsData, StatPanel, StatusBar, SectorData, SectorTable, AddFundDialog, HoldingDialog
 from .screens import FundScreen, CommodityScreen, NewsScreen, HelpScreen
 from datasources.manager import DataSourceManager, create_default_manager
 from datasources.base import DataSourceType
@@ -44,6 +44,9 @@ class FundTUIApp(App):
         ("F1", "toggle_help", "帮助"),
         ("r", "refresh", "刷新"),
         ("t", "toggle_theme", "切换主题"),
+        ("a", "add_fund", "添加基金"),
+        ("d", "delete_fund", "删除基金"),
+        ("h", "set_holding", "持仓设置"),
     ]
 
     def __init__(self):
@@ -181,6 +184,99 @@ class FundTUIApp(App):
             self.dark_theme = False
         self.update_status_bar()
 
+    def action_add_fund(self) -> None:
+        """添加基金"""
+        from .widgets import AddFundDialog
+        # 挂载对话框
+        self.mount(AddFundDialog())
+
+    def action_delete_fund(self) -> None:
+        """删除基金"""
+        table = self.query_one("#fund-table", FundTable)
+        cursor_row = table.cursor_row
+
+        if cursor_row >= len(self.funds):
+            self.notify("请先选择要删除的基金", severity="warning")
+            return
+
+        fund = self.funds[cursor_row]
+        from config.manager import ConfigManager
+        config_manager = ConfigManager()
+
+        # 从配置中移除
+        if config_manager.remove_watchlist(fund.code):
+            self.notify(f"已从自选移除: {fund.name}", severity="information")
+            # 从基金代码列表中移除
+            if fund.code in self._fund_codes:
+                self._fund_codes.remove(fund.code)
+                # 刷新数据
+                asyncio.create_task(self.load_fund_data())
+        else:
+            self.notify("基金不在自选列表中", severity="warning")
+
+    def action_set_holding(self) -> None:
+        """设置持仓"""
+        table = self.query_one("#fund-table", FundTable)
+        cursor_row = table.cursor_row
+
+        if cursor_row >= len(self.funds):
+            self.notify("请先选择要设置持仓的基金", severity="warning")
+            return
+
+        fund = self.funds[cursor_row]
+
+        # 获取当前持仓信息
+        current_shares = fund.hold_shares if hasattr(fund, 'hold_shares') else 0.0
+        current_cost = fund.cost if hasattr(fund, 'cost') else 0.0
+
+        from .widgets import HoldingDialog
+        # 挂载对话框
+        self.mount(HoldingDialog(fund.code, fund.name, current_shares, current_cost))
+
+    # ==================== 对话框消息处理 ====================
+
+    def on_add_fund_dialog_confirm(self, event: AddFundDialog.Confirm) -> None:
+        """处理添加基金确认"""
+        dialog = self.query_one("#add-fund-dialog", AddFundDialog)
+        if dialog.result_code and dialog.result_name:
+            # 添加到配置
+            from config.manager import ConfigManager
+            from config.models import Fund
+            config_manager = ConfigManager()
+            fund = Fund(code=dialog.result_code, name=dialog.result_name)
+            if config_manager.add_watchlist(fund):
+                self.notify(f"已添加基金: {dialog.result_name}", severity="information")
+                # 添加到基金代码列表并刷新
+                if dialog.result_code not in self._fund_codes:
+                    self._fund_codes.append(dialog.result_code)
+                    asyncio.create_task(self.load_fund_data())
+            else:
+                self.notify("基金已存在于自选列表中", severity="warning")
+
+    def on_holding_dialog_confirm(self, event: HoldingDialog.Confirm) -> None:
+        """处理持仓设置确认"""
+        dialog = self.query_one("#holding-dialog", HoldingDialog)
+        # 更新持仓配置
+        from config.manager import ConfigManager
+        from config.models import Holding
+        config_manager = ConfigManager()
+
+        if dialog.is_holding:
+            holding = Holding(
+                code=dialog.fund_code,
+                name=dialog.fund_name,
+                shares=dialog.result_shares,
+                cost=dialog.result_cost
+            )
+            if config_manager.add_holding(holding):
+                self.notify(f"已设置持仓: {dialog.fund_name}", severity="information")
+        else:
+            if config_manager.remove_holding(dialog.fund_code):
+                self.notify(f"已取消持仓: {dialog.fund_name}", severity="information")
+
+        # 刷新数据
+        asyncio.create_task(self.load_fund_data())
+
     # ==================== 数据刷新 ====================
 
     async def auto_refresh(self) -> None:
@@ -273,25 +369,37 @@ class FundTUIApp(App):
             self.load_sample_funds()
 
     def _get_holding_info(self, fund_code: str) -> Dict[str, float]:
-        """获取基金持仓信息"""
-        default_shares = 1000.0
-        default_cost = 1.0
+        """获取基金持仓信息，从配置文件加载"""
+        try:
+            from config.manager import ConfigManager
+            config_manager = ConfigManager()
+            funds_config = config_manager.load_funds()
 
-        holding_configs = {
-            "161039": {"shares": 1000.0, "cost": 1.15},
-            "161725": {"shares": 500.0, "cost": 1.08},
-            "110022": {"shares": 2000.0, "cost": 2.89},
-        }
+            # 查找持仓
+            holding = funds_config.get_holding(fund_code)
+            if holding:
+                # 计算持仓盈亏
+                profit = 0.0
+                # 需要从基金数据中获取当前净值来计算
+                for fund in self.funds:
+                    if fund.code == fund_code:
+                        if holding.shares > 0 and holding.cost > 0:
+                            profit = (fund.net_value - holding.cost) * holding.shares
+                        break
 
-        config = holding_configs.get(fund_code, {"shares": default_shares, "cost": default_cost})
-        hold_shares = config.get("shares", default_shares)
-        cost = config.get("cost", default_cost)
-        profit = 0.0
+                return {
+                    "hold_shares": holding.shares,
+                    "cost": holding.cost,
+                    "profit": profit
+                }
+        except Exception as e:
+            self.log(f"加载持仓配置失败: {e}")
 
+        # 默认值
         return {
-            "hold_shares": hold_shares,
-            "cost": cost,
-            "profit": profit
+            "hold_shares": 0.0,
+            "cost": 0.0,
+            "profit": 0.0
         }
 
     def load_sample_funds(self) -> None:
