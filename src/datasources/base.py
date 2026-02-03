@@ -16,6 +16,9 @@ class DataSourceType(Enum):
     COMMODITY = "commodity"
     NEWS = "news"
     SECTOR = "sector"
+    STOCK = "stock"    # 股票行情
+    BOND = "bond"      # 债券数据
+    CRYPTO = "crypto"  # 加密货币
 
 
 class DataSourceError(Exception):

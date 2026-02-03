@@ -4,6 +4,7 @@
 提供多类型数据源的统一访问接口:
 - 基金数据源 (fund_source)
 - 商品数据源 (commodity_source)
+- 债券数据源 (bond_source)
 - 新闻数据源 (news_source)
 - 数据源管理器 (manager)
 
@@ -51,10 +52,31 @@ from .news_source import (
     NewsAggregatorDataSource
 )
 
+from .bond_source import (
+    SinaBondDataSource,
+    AKShareBondSource,
+    EastMoneyBondSource
+)
+
 from .manager import (
     DataSourceManager,
     DataSourceConfig,
     create_default_manager
+)
+
+from .aggregator import (
+    DataAggregator,
+    SameSourceAggregator,
+    LoadBalancedAggregator,
+    AggregatorSourceInfo
+)
+
+from .portfolio import (
+    AssetType,
+    PortfolioPosition,
+    PortfolioAllocation,
+    PortfolioResult,
+    PortfolioAnalyzer
 )
 
 __all__ = [
@@ -80,6 +102,24 @@ __all__ = [
     # 新闻数据源
     "SinaNewsDataSource",
     "NewsAggregatorDataSource",
+
+    # 债券数据源
+    "SinaBondDataSource",
+    "AKShareBondSource",
+    "EastMoneyBondSource",
+
+    # 数据聚合器
+    "DataAggregator",
+    "SameSourceAggregator",
+    "LoadBalancedAggregator",
+    "AggregatorSourceInfo",
+
+    # 组合分析器
+    "AssetType",
+    "PortfolioPosition",
+    "PortfolioAllocation",
+    "PortfolioResult",
+    "PortfolioAnalyzer",
 
     # 管理器
     "DataSourceManager",

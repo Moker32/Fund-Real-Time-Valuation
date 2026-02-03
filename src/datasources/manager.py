@@ -52,7 +52,10 @@ class DataSourceManager:
             DataSourceType.FUND: [],
             DataSourceType.COMMODITY: [],
             DataSourceType.NEWS: [],
-            DataSourceType.SECTOR: []
+            DataSourceType.SECTOR: [],
+            DataSourceType.STOCK: [],
+            DataSourceType.BOND: [],
+            DataSourceType.CRYPTO: []
         }
         self._semaphore = asyncio.Semaphore(max_concurrent)
         self._enable_load_balancing = enable_load_balancing
@@ -60,7 +63,10 @@ class DataSourceManager:
             DataSourceType.FUND: 0,
             DataSourceType.COMMODITY: 0,
             DataSourceType.NEWS: 0,
-            DataSourceType.SECTOR: 0
+            DataSourceType.SECTOR: 0,
+            DataSourceType.STOCK: 0,
+            DataSourceType.BOND: 0,
+            DataSourceType.CRYPTO: 0
         }
         self._request_history: List[Dict[str, Any]] = []
         self._max_history = 1000
@@ -568,6 +574,21 @@ def create_default_manager() -> DataSourceManager:
     # 注册东方财富板块数据源 (预留接口)
     eastmoney_sector_source = EastMoneySectorSource()
     manager.register(eastmoney_sector_source)
+
+    # === 新增股票数据源 ===
+    from .stock_source import SinaStockDataSource, YahooStockSource
+    manager.register(SinaStockDataSource())
+    manager.register(YahooStockSource())
+
+    # === 新增债券数据源 ===
+    from .bond_source import SinaBondDataSource, AKShareBondSource
+    manager.register(SinaBondDataSource())
+    manager.register(AKShareBondSource())
+
+    # === 新增加密货币数据源 ===
+    from .crypto_source import BinanceCryptoSource, CoinGeckoCryptoSource
+    manager.register(BinanceCryptoSource())
+    manager.register(CoinGeckoCryptoSource())
 
     return manager
 
