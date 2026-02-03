@@ -5,7 +5,7 @@
 
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical, Horizontal, Grid
-from textual.widgets import Static, DataTable, Button, Footer, Label
+from textual.widgets import Static, DataTable, Button, Label
 from textual import events, on
 from textual.color import Color
 from datetime import datetime
@@ -19,7 +19,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from .widgets import FundTable, CommodityTable, NewsList, FundData, CommodityData, NewsData, StatPanel, StatusBar, SectorData, SectorTable, AddFundDialog, HoldingDialog, ChartDialog, FundHistoryData
+from .widgets import FundTable, CommodityPairView, NewsList, FundData, CommodityData, NewsData, StatPanel, SectorData, SectorTable, AddFundDialog, HoldingDialog, ChartDialog, FundHistoryData
 from .screens import FundScreen, CommodityScreen, NewsScreen, HelpScreen
 from src.datasources.manager import DataSourceManager, create_default_manager
 from src.datasources.base import DataSourceType
@@ -85,36 +85,36 @@ class FundTUIApp(App):
         """构建应用 UI - 三栏布局"""
         # 顶部标题栏
         yield Horizontal(
-            Static("[b]基金实时估值系统[/b]", id="app-title"),
-            Static("[b]📊 基金[/b] | 📈 商品 | 📰 新闻", id="view-indicator"),
+            Static("[b]Fund Real-Time Valuation[/b]", id="app-title"),
+            Static("[F1]帮助  [F2]刷新  [Tab]切换视图  [Ctrl+C]退出", id="header-hints"),
             classes="top-bar"
         )
 
-        # 统计面板
+        # 视图切换标签
         yield Horizontal(
-            StatPanel(id="stat-panel", classes="stat-panel"),
-            classes="stats-container"
+            Static("[b]📊 基金[/b]  📈 商品  📰 新闻", id="view-tabs"),
+            classes="view-tabs"
         )
 
         # 三栏主内容区
         yield Grid(
-            # 左侧：基金列表 (40%)
+            # 左侧：基金列表 (50%)
             Container(
                 Static("📊 基金列表", classes="column-header"),
                 FundTable(id="fund-table", classes="fund-table"),
                 id="fund-column",
                 classes="column fund-column"
             ),
-            # 中间：商品和板块 (30%)
+            # 中间：商品和板块 (25%)
             Container(
                 Static("📈 商品行情", classes="column-header"),
-                CommodityTable(id="commodity-table", classes="commodity-table"),
+                CommodityPairView(id="commodity-table", classes="commodity-table"),
                 Static("🏭 行业板块", classes="column-header"),
                 SectorTable(id="sector-table", classes="sector-table"),
                 id="commodity-column",
                 classes="column commodity-column"
             ),
-            # 右侧：新闻列表 (30%)
+            # 右侧：新闻列表 (25%)
             Container(
                 Static("📰 财经新闻", classes="column-header"),
                 NewsList(id="news-list", classes="news-list"),
@@ -125,11 +125,11 @@ class FundTUIApp(App):
             classes="main-grid"
         )
 
-        # 底部状态栏
-        yield StatusBar(id="status-bar", classes="status-bar")
-
-        # 底部导航提示
-        yield Footer()
+        # 底部统计行
+        yield Horizontal(
+            StatPanel(id="stat-panel", classes="stat-panel"),
+            classes="stats-container"
+        )
 
     # ==================== 生命周期方法 ====================
 
@@ -522,9 +522,9 @@ class FundTUIApp(App):
                 ))
 
         self.commodities = commodities
-        # 更新表格
-        table = self.query_one("#commodity-table", CommodityTable)
-        table.update_commodities(self.commodities)
+        # 更新商品对比视图
+        view = self.query_one("#commodity-table", CommodityPairView)
+        view.update_commodities(self.commodities)
 
     async def load_news_data(self) -> None:
         """从真实新闻源加载财经新闻"""
@@ -702,18 +702,15 @@ class FundTUIApp(App):
         stat_panel.update_stats(
             total_profit=self.total_profit,
             fund_count=len(self.funds),
-            avg_change=self.avg_change
+            avg_change=self.avg_change,
+            data_source="新浪财经",
+            last_update=self.last_update_time
         )
 
     def update_status_bar(self) -> None:
-        """更新状态栏"""
-        status_bar = self.query_one("#status-bar", StatusBar)
-        theme = "dark" if self.is_dark_theme else "light"
-        status_bar.update_status(
-            last_update=self.last_update_time,
-            theme=theme,
-            auto_refresh=True
-        )
+        """更新状态栏 - 保留兼容，已合并到 StatPanel"""
+        # 状态栏功能已合并到底部统计行
+        pass
 
     # ==================== 图表功能 ====================
 

@@ -132,6 +132,63 @@ class CommodityTable(DataTable):
             )
 
 
+class CommodityPairView(Static):
+    """商品横向对比视图 - 以成对形式显示商品"""
+
+    DEFAULT_CSS = """
+    CommodityPairView {
+        height: auto;
+        layout: vertical;
+    }
+    CommodityPairView .pair-row {
+        height: auto;
+        margin-bottom: 0;
+    }
+    CommodityPairView .pair-separator {
+        color: gray;
+        margin: 0 1;
+    }
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.commodities: List[CommodityData] = []
+
+    def compose(self):
+        yield Static(id="commodity-pairs")
+
+    def update_commodities(self, commodities: List[CommodityData]):
+        """更新商品数据，以横向对比格式显示"""
+        self.commodities = commodities
+
+        if not commodities:
+            self.query_one("#commodity-pairs", Static).update("暂无商品数据")
+            return
+
+        # 将商品配对显示
+        pairs = []
+        for i in range(0, len(commodities), 2):
+            left = commodities[i]
+            right = commodities[i + 1] if i + 1 < len(commodities) else None
+
+            left_str = self._format_commodity(left)
+            if right:
+                right_str = self._format_commodity(right)
+                pair_row = f"{left_str}  ←→  {right_str}"
+            else:
+                pair_row = left_str
+            pairs.append(pair_row)
+
+        content = "\n".join(pairs)
+        self.query_one("#commodity-pairs", Static).update(content)
+
+    def _format_commodity(self, commodity: CommodityData) -> str:
+        """格式化单个商品"""
+        change_str = f"{commodity.change_pct:+.2f}%" if commodity.change_pct else "N/A"
+        color = "green" if commodity.change_pct >= 0 else "red" if commodity.change_pct else "gray"
+        return f"[{color}]{commodity.name}[/] {commodity.price:.2f} {change_str}"
+
+
 class NewsList(ListView):
     """新闻列表组件"""
 
@@ -176,30 +233,31 @@ class NewsItem(ListItem):
 
 
 class StatPanel(Static):
-    """统计信息面板"""
+    """统计信息面板 / 底部状态行"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.total_profit = 0.0
         self.fund_count = 0
+        self.avg_change = 0.0
+        self.data_source = "新浪财经"
+        self.last_update = ""
 
     def compose(self):
         yield Static(id="stat-content")
 
-    def update_stats(self, total_profit: float, fund_count: int, avg_change: float):
+    def update_stats(self, total_profit: float, fund_count: int, avg_change: float, data_source: str = "新浪财经", last_update: str = ""):
         """更新统计数据"""
         self.total_profit = total_profit
         self.fund_count = fund_count
+        self.avg_change = avg_change
+        self.data_source = data_source
+        self.last_update = last_update
 
         profit_color = "green" if total_profit >= 0 else "red"
         change_color = "green" if avg_change >= 0 else "red"
 
-        content = f"""
-[统计信息]
-基金数量: {fund_count}
-总收益: [{profit_color}]{total_profit:+.2f}[/]
-平均涨跌: [{change_color}]{avg_change:+.2f}%[/]
-"""
+        content = f"总收益: [{profit_color}]{total_profit:+.2f}[/] ([{change_color}]{avg_change:+.2f}%[/])  数据源: {data_source}  最后刷新: {last_update}"
         self.query_one("#stat-content", Static).update(content)
 
 
