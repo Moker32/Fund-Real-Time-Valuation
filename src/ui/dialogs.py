@@ -1,14 +1,13 @@
 # -*- coding: UTF-8 -*-
 """对话框组件模块"""
 
-from textual.widget import Widget
-from textual.message import Message
-from textual.widgets import DataTable, Static, Button, Input
-from textual.containers import Container, Vertical, Horizontal
+from textual.widgets import Static, Button, Input
+from textual.containers import Vertical, Horizontal
+from textual.dialog import Dialog
 from typing import Optional
 
 
-class AddFundDialog(Container):
+class AddFundDialog(Dialog):
     """添加基金对话框"""
 
     DEFAULT_CSS = """
@@ -28,6 +27,11 @@ class AddFundDialog(Container):
     }
     """
 
+    BINDINGS = [
+        ("escape", "cancel", "取消"),
+        ("enter", "confirm", "确认"),
+    ]
+
     def __init__(self):
         super().__init__(id="add-fund-dialog")
         self.result_code: Optional[str] = None
@@ -45,31 +49,31 @@ class AddFundDialog(Container):
             )
         )
 
+    def action_confirm(self) -> None:
+        """确认添加"""
+        code_input = self.query_one("#fund-code-input", Input)
+        name_input = self.query_one("#fund-name-input", Input)
+        code = code_input.value.strip()
+        name = name_input.value.strip()
+        if code and name:
+            self.result_code = code
+            self.result_name = name
+            self.dismiss(True)
+        else:
+            self.notify("请填写完整的基金信息", severity="warning")
+
+    def action_cancel(self) -> None:
+        """取消"""
+        self.dismiss(False)
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "confirm-btn":
-            code_input = self.query_one("#fund-code-input", Input)
-            name_input = self.query_one("#fund-name-input", Input)
-            code = code_input.value.strip()
-            name = name_input.value.strip()
-            if code and name:
-                self.result_code = code
-                self.result_name = name
-                self.remove()
-                self.post_message(self.Confirm())
-            else:
-                self.notify("请填写完整的基金信息", severity="warning")
+            self.action_confirm()
         else:
-            self.remove()
-            self.post_message(self.Cancel())
-
-    class Confirm(Message):
-        pass
-
-    class Cancel(Message):
-        pass
+            self.action_cancel()
 
 
-class HoldingDialog(Container):
+class HoldingDialog(Dialog):
     """持仓设置对话框"""
 
     DEFAULT_CSS = """
@@ -88,6 +92,10 @@ class HoldingDialog(Container):
         align: right middle;
     }
     """
+
+    BINDINGS = [
+        ("escape", "cancel", "取消"),
+    ]
 
     def __init__(self, fund_code: str, fund_name: str, current_shares: float = 0.0, current_cost: float = 0.0):
         super().__init__(id="holding-dialog")
@@ -112,35 +120,34 @@ class HoldingDialog(Container):
             )
         )
 
+    def action_confirm(self) -> None:
+        """确认设置"""
+        shares_input = self.query_one("#shares-input", Input)
+        cost_input = self.query_one("#cost-input", Input)
+        shares_str = shares_input.value.strip()
+        cost_str = cost_input.value.strip()
+        if shares_str:
+            try:
+                shares = float(shares_str)
+                cost = float(cost_str) if cost_str else 0.0
+                self.result_shares = shares
+                self.result_cost = cost
+                self.is_holding = True
+                self.dismiss(True)
+            except ValueError:
+                self.notify("请输入有效的数字", severity="error")
+        else:
+            self.result_shares = 0.0
+            self.result_cost = 0.0
+            self.is_holding = False
+            self.dismiss(False)
+
+    def action_cancel(self) -> None:
+        """取消"""
+        self.dismiss(False)
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "confirm-btn":
-            shares_input = self.query_one("#shares-input", Input)
-            cost_input = self.query_one("#cost-input", Input)
-            shares_str = shares_input.value.strip()
-            cost_str = cost_input.value.strip()
-            if shares_str:
-                try:
-                    shares = float(shares_str)
-                    cost = float(cost_str) if cost_str else 0.0
-                    self.result_shares = shares
-                    self.result_cost = cost
-                    self.is_holding = True
-                    self.remove()
-                    self.post_message(self.Confirm())
-                except ValueError:
-                    self.notify("请输入有效的数字", severity="error")
-            else:
-                self.result_shares = 0.0
-                self.result_cost = 0.0
-                self.is_holding = False
-                self.remove()
-                self.post_message(self.Confirm())
+            self.action_confirm()
         else:
-            self.remove()
-            self.post_message(self.Cancel())
-
-    class Confirm(Message):
-        pass
-
-    class Cancel(Message):
-        pass
+            self.action_cancel()

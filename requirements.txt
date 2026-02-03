@@ -1,5 +1,5 @@
 # Core dependencies
-textual>=0.50.0
+textual>=1.0.0
 httpx>=0.24.0
 akshare>=1.10.0
 yfinance>=0.2.0
