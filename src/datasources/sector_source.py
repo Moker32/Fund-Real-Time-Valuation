@@ -21,6 +21,10 @@ from .base import (
 class SinaSectorDataSource(DataSource):
     """新浪财经行业板块数据源"""
 
+    def log(self, message: str) -> None:
+        """简单的日志方法"""
+        print(f"[SinaSectorDataSource] {message}")
+
     # 主要行业板块配置
     # 使用新浪财经的行业指数代码
     SECTOR_CONFIG = [
