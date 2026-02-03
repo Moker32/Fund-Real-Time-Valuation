@@ -1,0 +1,19 @@
+# 商品关注列表配置示例
+# 配置文件路径: ~/.fund-tui/commodities.yaml
+
+commodities:
+  - symbol: "XAUUSD"
+    name: "国际金价"
+    source: "alpha_vantage"
+  - symbol: "AUG9999"
+    name: "Au99.99"
+    source: "akshare"
+  - symbol: "WTI"
+    name: "WTI原油"
+    source: "akshare"
+  - symbol: "BRENT"
+    name: "布伦特原油"
+    source: "akshare"
+  - symbol: "XAGUSD"
+    name: "国际银价"
+    source: "alpha_vantage"

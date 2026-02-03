@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+ENV/
+
+# macOS
+.DS_Store
+*.swp
+*.swo
+~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# 临时文件
+*.tmp
+*.log
+
+# 项目特定
+*.bak

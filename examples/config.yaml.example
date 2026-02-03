@@ -1,0 +1,9 @@
+# 基金实时估值 TUI - 主配置示例
+# 配置文件路径: ~/.fund-tui/config.yaml
+
+refresh_interval: 30  # 刷新频率（秒）
+theme: dark           # 主题: light 或 dark
+default_fund_source: sina  # 默认基金数据源
+max_history_points: 100    # 历史数据最大点数
+enable_auto_refresh: true  # 是否启用自动刷新
+show_profit_loss: true     # 是否显示盈亏
