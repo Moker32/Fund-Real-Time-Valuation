@@ -14,9 +14,6 @@ from .models import FundData, CommodityData, NewsData, SectorData, FundHistoryDa
 
 from .tables import FundTable, CommodityTable, SectorTable
 
-# 从对话框模块导入对话框类
-from .dialogs import AddFundDialog, HoldingDialog
-
 # 从图表模块导入图表组件
 from .charts import ChartDialog, ChartPreview
 

@@ -26,7 +26,6 @@ from .tables import FundTable
 from .widgets import CommodityPairView, NewsList, StatPanel
 from .charts import ChartDialog
 from .dialogs import AddFundDialog, HoldingDialog
-from src.datasources.manager import DataSourceManager, create_default_manager
 from src.datasources.base import DataSourceType
 from src.datasources.fund_source import FundDataSource, FundHistorySource
 
@@ -353,14 +352,19 @@ class FundTUIApp(App):
 
     def watch_active_view(self, view: str) -> None:
         """切换活动视图时更新样式"""
+        # 视图标签的原始文本
+        tab_texts = {
+            "fund": "📊 基金",
+            "commodity": "📈 商品",
+            "news": "📰 新闻"
+        }
         for tab_id, tab_view in [("tab-fund", "fund"), ("tab-commodity", "commodity"), ("tab-news", "news")]:
             tab = self._safe_query(f"#{tab_id}", Static)
             if tab:
                 if tab_view == view:
-                    tab.update(f"[b]{tab.renderable}[/b]")
+                    tab.update(f"[b]{tab_texts[tab_view]}[/b]")
                 else:
-                    text = str(tab.renderable).replace("[b]", "").replace("[/b]", "")
-                    tab.update(text)
+                    tab.update(f"  {tab_texts[tab_view]}  ")
 
     # ==================== 对话框消息处理 ====================
 
