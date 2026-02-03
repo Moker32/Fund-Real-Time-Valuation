@@ -1,33 +1,42 @@
 # -*- coding: UTF-8 -*-
-"""UI 模块导出"""
+"""UI 模块 - 基金实时估值 TUI 界面层"""
 
 from .app import FundTUIApp
-from .screens import FundScreen, CommodityScreen, NewsScreen, HelpScreen
 from .widgets import (
     FundTable,
-    CommodityTable,
+    CommodityPairView,
     NewsList,
+    NewsItem,
     StatPanel,
     StatusBar,
     HelpPanel,
-    FundData,
-    CommodityData,
-    NewsData,
+    ThemeToggle,
+    SectorCategoryFilter,
 )
+from .tables import FundTable, CommodityTable, SectorTable
+from .dialogs import AddFundDialog, HoldingDialog
+from .charts import ChartDialog, ChartPreview
+from .models import FundData, CommodityData, NewsData, SectorData, FundHistoryData
 
 __all__ = [
     "FundTUIApp",
-    "FundScreen",
-    "CommodityScreen",
-    "NewsScreen",
-    "HelpScreen",
     "FundTable",
     "CommodityTable",
+    "CommodityPairView",
     "NewsList",
+    "NewsItem",
     "StatPanel",
     "StatusBar",
     "HelpPanel",
+    "ThemeToggle",
+    "SectorCategoryFilter",
+    "AddFundDialog",
+    "HoldingDialog",
+    "ChartDialog",
+    "ChartPreview",
     "FundData",
     "CommodityData",
     "NewsData",
+    "SectorData",
+    "FundHistoryData",
 ]

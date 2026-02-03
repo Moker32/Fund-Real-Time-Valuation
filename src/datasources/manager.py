@@ -541,7 +541,7 @@ def create_default_manager() -> DataSourceManager:
     from .fund_source import FundDataSource, SinaFundDataSource
     from .commodity_source import AKShareCommoditySource, YFinanceCommoditySource
     from .news_source import SinaNewsDataSource
-    from .sector_source import SinaSectorDataSource
+    from .sector_source import SinaSectorDataSource, EastMoneySectorSource
 
     manager = DataSourceManager()
 
@@ -553,7 +553,7 @@ def create_default_manager() -> DataSourceManager:
     commodity_source = AKShareCommoditySource()
     manager.register(commodity_source)
 
-    # 注册 YFinance 商品数据源（国际商品）
+    # 注册 YFinance 商品数据源（国际商品 + 贵金属/基本金属预留）
     yfinance_commodity_source = YFinanceCommoditySource()
     manager.register(yfinance_commodity_source)
 
@@ -564,6 +564,10 @@ def create_default_manager() -> DataSourceManager:
     # 注册行业板块数据源
     sector_source = SinaSectorDataSource()
     manager.register(sector_source)
+
+    # 注册东方财富板块数据源 (预留接口)
+    eastmoney_sector_source = EastMoneySectorSource()
+    manager.register(eastmoney_sector_source)
 
     return manager
 

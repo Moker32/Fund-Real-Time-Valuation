@@ -4,32 +4,45 @@
 /* 顶部标题栏 */
 .top-bar {
     height: 2;
-    background: darkblue;
-    color: white;
+    background: $surface;
+    color: $foreground;
     padding: 0 2;
 }
 
 /* 快捷键提示 */
 #header-hints {
-    color: #a0a0a0;
-    offset-x: auto;
+    color: $foreground-muted;
 }
 
 /* 视图切换标签 */
 .view-tabs {
     height: 1;
-    background: #0f3460;
-    color: #a0a0a0;
+    background: $panel;
+    color: $foreground-muted;
     padding: 0 2;
+}
+
+.view-tab {
+    padding: 0 1;
+    color: $foreground-muted;
+}
+
+.view-tab.active {
+    color: $primary;
+    text-style: bold;
+}
+
+.view-tab:hover {
+    color: $foreground;
 }
 
 /* 统计面板 / 底部状态行 */
 .stat-panel {
     height: 1;
-    background: #0f3460;
-    color: #a0a0a0;
+    background: $panel;
+    color: $foreground-muted;
     padding: 0 2;
-    border: solid #1a4a7a;
+    border: solid $panel;
 }
 
 /* 通用屏幕容器 */
@@ -47,30 +60,47 @@
 
 /* ==================== 三栏布局样式 ==================== */
 
-/* 主网格容器 - 三栏并排 (50% : 25% : 25%) */
-.main-grid {
+/* 内容容器 */
+.content-container {
     width: 100%;
-    height: 1fr;
-    layout: grid;
-    grid-columns: 2fr 1fr 1fr;
-    grid-rows: 1fr;
-    grid-gutter: 1;
+    height: 100%;
+    layout: horizontal;
 }
 
 /* 列容器 */
 .column {
-    width: 100%;
+    width: 1fr;
     height: 100%;
     layout: vertical;
 }
 
+/* 基金列 */
+.fund-column {
+    border: solid gray;
+    border-right: solid gray;
+}
+
+/* 商品列 */
+.commodity-column {
+    border: solid gray;
+    border-right: solid gray;
+    border-left: none;
+}
+
+/* 新闻列 */
+.news-column {
+    border: solid gray;
+    border-left: none;
+}
+
 /* 列标题 */
-.column-header {
+.column-title {
     height: auto;
-    color: cyan;
+    color: $primary;
     text-style: bold;
     padding: 0 1;
-    margin-bottom: 1;
+    background: $surface;
+    border-bottom: solid $panel;
 }
 
 /* 基金表格样式 */
@@ -85,9 +115,7 @@
     width: 100%;
     height: auto;
     border: solid gray;
-    padding: 1;
-    font-family: monospace;
-    font-size: 9;
+    min-height: 3;
 }
 
 /* 行业板块表格样式 */
@@ -103,15 +131,15 @@
     width: 100%;
     height: 100%;
     border: solid gray;
-    background: #16213e;
+    background: $surface;
 }
 
 /* 帮助面板 */
 .help-panel {
     width: 50;
     height: auto;
-    background: #16213e;
-    border: solid cyan;
+    background: $surface;
+    border: solid $primary;
     padding: 1;
     dock: top;
 }
@@ -162,8 +190,8 @@ DataTable {
 
 /* 通知样式 */
 Notification {
-    background: #16213e;
-    border: solid cyan;
+    background: $surface;
+    border: solid $primary;
 }
 
 /* 图表对话框样式 */
@@ -172,7 +200,7 @@ ChartDialog {
     width: 80;
     height: auto;
     max-height: 35;
-    border: solid cyan;
+    border: solid $primary;
     background: $surface;
     padding: 1;
 }
@@ -180,24 +208,20 @@ ChartDialog {
 ChartDialog .chart-title {
     margin-bottom: 1;
     text-align: center;
-    color: cyan;
+    color: $primary;
 }
 
 ChartDialog .chart-content {
     margin-bottom: 1;
-    font-family: monospace;
-    font-size: 8;
 }
 
 ChartDialog .chart-legend {
     margin-top: 1;
     color: gray;
-    font-size: 8;
 }
 
 ChartDialog .dialog-buttons {
     margin-top: 1;
-    align: right;
 }
 
 ChartDialog .period-selector {
@@ -212,6 +236,4 @@ ChartPreview {
 }
 
 ChartPreview .preview-content {
-    font-family: monospace;
-    font-size: 6;
 }

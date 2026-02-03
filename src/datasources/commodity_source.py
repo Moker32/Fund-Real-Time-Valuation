@@ -47,12 +47,21 @@ class YFinanceCommoditySource(CommodityDataSource):
 
     # 商品 ticker 映射
     COMMODITY_TICKERS = {
-        "gold": "GC=F",      # COMEX 黄金
-        "gold_cny": "SG=f",  # 上海黄金
-        "wti": "CL=F",       # WTI 原油
-        "brent": "BZ=F",     # 布伦特原油
-        "silver": "SI=F",    # 白银
+        # 国际期货
+        "gold": "GC=F",       # COMEX 黄金
+        "gold_cny": "SG=f",   # 上海黄金
+        "wti": "CL=F",        # WTI 原油
+        "brent": "BZ=F",      # 布伦特原油
+        "silver": "SI=F",     # 白银
         "natural_gas": "NG=F",  # 天然气
+        # 贵金属 (预留)
+        "platinum": "PT=F",   # 铂金
+        "palladium": "PA=F",  # 钯金
+        # 基本金属 (预留)
+        "copper": "HG=F",     # 铜
+        "aluminum": "AL=f",   # 铝
+        "zinc": "ZN=f",       # 锌
+        "nickel": "NI=f",     # 镍
     }
 
     def __init__(self, timeout: float = 15.0):
@@ -195,6 +204,14 @@ class YFinanceCommoditySource(CommodityDataSource):
             "brent": "布伦特原油",
             "silver": "白银",
             "natural_gas": "天然气",
+            # 贵金属 (预留)
+            "platinum": "铂金",
+            "palladium": "钯金",
+            # 基本金属 (预留)
+            "copper": "铜",
+            "aluminum": "铝",
+            "zinc": "锌",
+            "nickel": "镍",
         }
         return names.get(commodity_type, commodity_type)
 
@@ -215,6 +232,9 @@ class YFinanceCommoditySource(CommodityDataSource):
         status["cache_size"] = len(self._cache)
         status["cache_timeout"] = self._cache_timeout
         status["supported_commodities"] = list(self.COMMODITY_TICKERS.keys())
+        # 标记预留商品
+        reserved = ["platinum", "palladium", "copper", "aluminum", "zinc", "nickel"]
+        status["reserved_commodities"] = reserved
         return status
 
     async def close(self):

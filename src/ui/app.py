@@ -8,6 +8,8 @@ from textual.containers import Container, Vertical, Horizontal, Grid
 from textual.widgets import Static, DataTable, Button, Label
 from textual import events, on
 from textual.color import Color
+from textual.reactive import reactive
+from textual.theme import Theme
 from datetime import datetime
 from typing import List, Optional, Dict
 import asyncio
@@ -19,11 +21,47 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from .widgets import FundTable, CommodityPairView, NewsList, FundData, CommodityData, NewsData, StatPanel, SectorData, SectorTable, AddFundDialog, HoldingDialog, ChartDialog, FundHistoryData
-from .screens import FundScreen, CommodityScreen, NewsScreen, HelpScreen
+from .models import FundData, CommodityData, NewsData, FundHistoryData
+from .tables import FundTable
+from .widgets import CommodityPairView, NewsList, StatPanel
+from .charts import ChartDialog
+from .dialogs import AddFundDialog, HoldingDialog
 from src.datasources.manager import DataSourceManager, create_default_manager
 from src.datasources.base import DataSourceType
 from src.datasources.fund_source import FundDataSource, FundHistorySource
+
+
+# ==================== 自定义主题定义 ====================
+
+DARK_THEME = Theme(
+    name="fund_dark",
+    primary="#00D4FF",
+    secondary="#00BFFF",
+    accent="#FF6B6B",
+    foreground="#E8E8E8",
+    background="#0A1628",
+    success="#4ADE80",
+    warning="#FBBF24",
+    error="#EF4444",
+    surface="#1E3A5F",
+    panel="#0F3460",
+    dark=True,
+)
+
+LIGHT_THEME = Theme(
+    name="fund_light",
+    primary="#0066CC",
+    secondary="#0099FF",
+    accent="#FF4757",
+    foreground="#1A1A2E",
+    background="#F5F7FA",
+    success="#22C55E",
+    warning="#F59E0B",
+    error="#EF4444",
+    surface="#FFFFFF",
+    panel="#E8EEF2",
+    dark=False,
+)
 
 
 class FundTUIApp(App):
@@ -48,7 +86,21 @@ class FundTUIApp(App):
         ("d", "delete_fund", "删除基金"),
         ("h", "set_holding", "持仓设置"),
         ("g", "show_chart", "净值图表"),
+        ("tab", "next_view", "下一个视图"),
+        ("shift+tab", "prev_view", "上一个视图"),
+        ("1", "switch_view('fund')", "基金视图"),
+        ("2", "switch_view('commodity')", "商品视图"),
+        ("3", "switch_view('news')", "新闻视图"),
     ]
+
+    def _safe_query(self, selector: str, widget_type=None):
+        """安全查询组件，如果不存在返回 None"""
+        try:
+            if widget_type:
+                return self.query_one(selector, widget_type)
+            return self.query_one(selector)
+        except:
+            return None
 
     def __init__(self):
         super().__init__()
@@ -62,22 +114,26 @@ class FundTUIApp(App):
         self.refresh_interval = 30  # 秒
         self.auto_refresh_task = None
 
-        # 统计数据
-        self.total_profit = 0.0
-        self.avg_change = 0.0
-
         # 基金数据列表
-        self.funds: List[FundData] = []
         self._fund_codes = ["161039", "161725", "110022"]  # 默认基金列表
 
-        # 商品数据列表
-        self.commodities: List[CommodityData] = []
+    # ==================== 响应式属性 ====================
 
-        # 行业板块数据列表
-        self.sectors: List[SectorData] = []
+    # 基金数据列表
+    funds = reactive([])
 
-        # 新闻数据列表
-        self.news_list: List[NewsData] = []
+    # 商品数据列表
+    commodities = reactive([])
+
+    # 新闻数据列表
+    news_list = reactive([])
+
+    # 统计数据
+    total_profit = reactive(0.0)
+    avg_change = reactive(0.0)
+
+    # 当前活动视图
+    active_view = reactive("fund")
 
     # ==================== 组件组合 ====================
 
@@ -86,43 +142,40 @@ class FundTUIApp(App):
         # 顶部标题栏
         yield Horizontal(
             Static("[b]Fund Real-Time Valuation[/b]", id="app-title"),
-            Static("[F1]帮助  [F2]刷新  [Tab]切换视图  [Ctrl+C]退出", id="header-hints"),
+            Static("[F1]帮助  [r]刷新  [Tab]切换视图  [Ctrl+C]退出", id="header-hints"),
             classes="top-bar"
         )
 
         # 视图切换标签
         yield Horizontal(
-            Static("[b]📊 基金[/b]  📈 商品  📰 新闻", id="view-tabs"),
+            Static("[b]📊 基金[/b]", id="tab-fund", classes="view-tab active"),
+            Static("  📈 商品  ", id="tab-commodity", classes="view-tab"),
+            Static("  📰 新闻  ", id="tab-news", classes="view-tab"),
             classes="view-tabs"
         )
 
-        # 三栏主内容区
-        yield Grid(
-            # 左侧：基金列表 (50%)
-            Container(
-                Static("📊 基金列表", classes="column-header"),
+        # 三栏主内容区 - 使用 Horizontal 实现三列并排
+        yield Horizontal(
+            # 左侧：基金列表
+            Vertical(
+                Static("自选基金 (3)", classes="column-title"),
                 FundTable(id="fund-table", classes="fund-table"),
-                id="fund-column",
                 classes="column fund-column"
             ),
-            # 中间：商品和板块 (25%)
-            Container(
-                Static("📈 商品行情", classes="column-header"),
+            # 中间：大宗商品
+            Vertical(
+                Static("大宗商品 (5)", classes="column-title"),
                 CommodityPairView(id="commodity-table", classes="commodity-table"),
-                Static("🏭 行业板块", classes="column-header"),
-                SectorTable(id="sector-table", classes="sector-table"),
-                id="commodity-column",
                 classes="column commodity-column"
             ),
-            # 右侧：新闻列表 (25%)
-            Container(
-                Static("📰 财经新闻", classes="column-header"),
+            # 右侧：财经新闻
+            Vertical(
+                Static("财经新闻 (3)", classes="column-title"),
                 NewsList(id="news-list", classes="news-list"),
-                id="news-column",
                 classes="column news-column"
             ),
-            id="main-grid",
-            classes="main-grid"
+            id="content-container",
+            classes="content-container"
         )
 
         # 底部统计行
@@ -144,9 +197,6 @@ class FundTUIApp(App):
         # 加载真实商品数据
         self.call_after_refresh(self.load_commodity_data)
 
-        # 加载行业板块数据
-        self.call_after_refresh(self.load_sector_data)
-
         # 加载真实新闻数据
         self.call_after_refresh(self.load_news_data)
 
@@ -166,23 +216,30 @@ class FundTUIApp(App):
 
     def action_toggle_help(self) -> None:
         """切换帮助面板显示"""
-        # 如果帮助面板已存在，则移除
-        existing_help = self.query_one_or_none("#help-panel")
-        if existing_help:
-            existing_help.remove()
-        else:
-            # 显示帮助
-            from .widgets import HelpPanel
-            self.mount(HelpPanel(id="help-panel", classes="help-panel"))
+        help_content = """
+[操作说明]
+
+[a]       - 添加基金
+[d]       - 删除基金
+[g]       - 净值图表
+[h]       - 持仓设置
+[r]       - 手动刷新
+[t]       - 切换主题
+[F1]      - 显示帮助
+[1/2/3]   - 切换视图
+[Tab]     - 视图切换
+[Ctrl+C]  - 退出应用
+    """
+        self.notify(help_content, title="操作说明", severity="information")
 
     def action_toggle_theme(self) -> None:
         """切换深色/浅色主题"""
         self.is_dark_theme = not self.is_dark_theme
-        # 使用 CSS 类切换主题
         if self.is_dark_theme:
-            self.dark_theme = True
+            self.theme = "fund_dark"
         else:
-            self.dark_theme = False
+            self.theme = "fund_light"
+        self.notify(f"已切换至{'深色' if self.is_dark_theme else '浅色'}主题", severity="information")
         self.update_status_bar()
 
     def action_add_fund(self) -> None:
@@ -248,6 +305,63 @@ class FundTUIApp(App):
         # 异步加载历史数据并显示图表
         asyncio.create_task(self._show_fund_chart(fund.code, fund.name))
 
+    # ==================== 视图切换动作 ====================
+
+    def action_next_view(self) -> None:
+        """切换到下一个视图"""
+        views = ["fund", "commodity", "news"]
+        current_idx = views.index(self.active_view)
+        next_idx = (current_idx + 1) % len(views)
+        self.active_view = views[next_idx]
+
+    def action_prev_view(self) -> None:
+        """切换到上一个视图"""
+        views = ["fund", "commodity", "news"]
+        current_idx = views.index(self.active_view)
+        prev_idx = (current_idx - 1) % len(views)
+        self.active_view = views[prev_idx]
+
+    def action_switch_view(self, view: str) -> None:
+        """切换到指定视图"""
+        self.active_view = view
+
+    # ==================== 响应式属性监视器 ====================
+
+    def watch_funds(self, new_funds: list) -> None:
+        """当 funds 变化时自动更新表格"""
+        table = self._safe_query("#fund-table", FundTable)
+        if table:
+            table.update_funds(new_funds)
+        self.calculate_stats()
+        self.update_stats()
+
+    def watch_commodities(self, new_commodities: list) -> None:
+        """当 commodities 变化时自动更新"""
+        view = self._safe_query("#commodity-table", CommodityPairView)
+        if view:
+            view.update_commodities(new_commodities)
+
+    def watch_news_list(self, new_news: list) -> None:
+        """当 news_list 变化时自动更新"""
+        news_widget = self._safe_query("#news-list", NewsList)
+        if news_widget:
+            news_widget.update_news(new_news)
+
+    def watch_total_profit(self, value: float) -> None:
+        """总收益变化时更新"""
+        self.update_stats()
+
+    def watch_active_view(self, view: str) -> None:
+        """切换活动视图时更新样式"""
+        for tab_id, tab_view in [("tab-fund", "fund"), ("tab-commodity", "commodity"), ("tab-news", "news")]:
+            tab = self._safe_query(f"#{tab_id}", Static)
+            if tab:
+                if tab_view == view:
+                    tab.update(f"[b]{tab.renderable}[/b]")
+                else:
+                    text = str(tab.renderable).replace("[b]", "").replace("[/b]", "")
+                    tab.update(text)
+
     # ==================== 对话框消息处理 ====================
 
     def on_add_fund_dialog_confirm(self, event: AddFundDialog.Confirm) -> None:
@@ -312,8 +426,6 @@ class FundTUIApp(App):
             await self.load_fund_data()
             # 刷新商品数据
             await self.load_commodity_data()
-            # 刷新板块数据
-            await self.load_sector_data()
             # 刷新新闻数据
             await self.load_news_data()
         except Exception as e:
@@ -367,11 +479,6 @@ class FundTUIApp(App):
             if funds:
                 self.funds = funds
                 self.notify(f"成功加载 {len(funds)} 只基金数据", severity="information")
-                # 更新表格
-                table = self.query_one("#fund-table", FundTable)
-                table.update_funds(self.funds)
-                self.calculate_stats()
-                self.update_stats()
             else:
                 self.notify("未能获取到任何基金数据", severity="warning")
                 # 加载失败时使用示例数据
@@ -451,11 +558,6 @@ class FundTUIApp(App):
                 cost=2.89
             ),
         ]
-        # 更新表格
-        table = self.query_one("#fund-table", FundTable)
-        table.update_funds(self.funds)
-        self.calculate_stats()
-        self.update_stats()
 
     async def load_commodity_data(self) -> None:
         """从真实数据源加载商品数据"""
@@ -522,9 +624,6 @@ class FundTUIApp(App):
                 ))
 
         self.commodities = commodities
-        # 更新商品对比视图
-        view = self.query_one("#commodity-table", CommodityPairView)
-        view.update_commodities(self.commodities)
 
     async def load_news_data(self) -> None:
         """从真实新闻源加载财经新闻"""
@@ -549,9 +648,6 @@ class FundTUIApp(App):
 
                 self.news_list = news_list
                 self.notify(f"成功加载 {len(news_list)} 条财经新闻", severity="information")
-                # 更新列表
-                news_widget = self.query_one("#news-list", NewsList)
-                news_widget.update_news(self.news_list)
             else:
                 self.load_sample_news()
         except Exception as e:
@@ -577,106 +673,6 @@ class FundTUIApp(App):
                 url="https://finance.sina.com.cn/news/3"
             ),
         ]
-        # 更新列表
-        news_widget = self.query_one("#news-list", NewsList)
-        news_widget.update_news(self.news_list)
-
-    async def load_sector_data(self) -> None:
-        """从真实数据源加载行业板块数据"""
-        try:
-            result = await self.data_source_manager.fetch(
-                DataSourceType.SECTOR
-            )
-
-            if result.success and result.data:
-                sectors = []
-                for sector_item in result.data:
-                    sectors.append(SectorData(
-                        code=sector_item.get("code", ""),
-                        name=sector_item.get("name", ""),
-                        category=sector_item.get("category", ""),
-                        current=sector_item.get("current", 0.0),
-                        change_pct=sector_item.get("change_pct", 0.0),
-                        change=sector_item.get("change", 0.0),
-                        trading_status=sector_item.get("trading_status", ""),
-                        time=sector_item.get("time", "")
-                    ))
-
-                self.sectors = sectors
-                self.notify(f"成功加载 {len(sectors)} 个行业板块", severity="information")
-                # 更新表格
-                table = self.query_one("#sector-table", SectorTable)
-                table.update_sectors(self.sectors)
-            else:
-                self.load_sample_sectors()
-        except Exception as e:
-            self.log(f"加载板块数据失败: {e}")
-            self.load_sample_sectors()
-
-    def load_sample_sectors(self):
-        """加载示例板块数据（备用）"""
-        import random
-        self.sectors = [
-            SectorData(
-                code="bk04151",
-                name="白酒",
-                category="消费",
-                current=round(random.uniform(5000, 8000), 2),
-                change_pct=round(random.uniform(-2, 2), 2),
-                trading_status="交易"
-            ),
-            SectorData(
-                code="bk04758",
-                name="新能源车",
-                category="新能源",
-                current=round(random.uniform(3000, 5000), 2),
-                change_pct=round(random.uniform(-2, 2), 2),
-                trading_status="交易"
-            ),
-            SectorData(
-                code="bk00269",
-                name="医药",
-                category="医药",
-                current=round(random.uniform(4000, 6000), 2),
-                change_pct=round(random.uniform(-2, 2), 2),
-                trading_status="交易"
-            ),
-            SectorData(
-                code="bk04537",
-                name="半导体",
-                category="科技",
-                current=round(random.uniform(6000, 9000), 2),
-                change_pct=round(random.uniform(-2, 2), 2),
-                trading_status="交易"
-            ),
-            SectorData(
-                code="bk04360",
-                name="人工智能",
-                category="科技",
-                current=round(random.uniform(2000, 4000), 2),
-                change_pct=round(random.uniform(-2, 2), 2),
-                trading_status="交易"
-            ),
-            SectorData(
-                code="bk04804",
-                name="银行",
-                category="金融",
-                current=round(random.uniform(3000, 5000), 2),
-                change_pct=round(random.uniform(-1, 1), 2),
-                trading_status="交易"
-            ),
-            SectorData(
-                code="bk04479",
-                name="军工",
-                category="制造",
-                current=round(random.uniform(4000, 7000), 2),
-                change_pct=round(random.uniform(-2, 2), 2),
-                trading_status="交易"
-            ),
-        ]
-        # 更新表格
-        table = self.query_one("#sector-table", SectorTable)
-        table.update_sectors(self.sectors)
 
     # ==================== 统计信息 ====================
 

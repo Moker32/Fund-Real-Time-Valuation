@@ -453,6 +453,14 @@ class SectorDataAggregator(DataSource):
         status["sources"] = [s.name for s in self._sources]
         return status
 
+    async def fetch_batch(self, sector_codes: List[str]) -> List[DataSourceResult]:
+        """批量获取板块数据"""
+        results = []
+        for code in sector_codes:
+            result = await self.fetch(code)
+            results.append(result)
+        return results
+
     async def close(self):
         """关闭所有数据源"""
         for source in self._sources:
@@ -464,4 +472,453 @@ class SectorDataAggregator(DataSource):
 
 
 # 导出类
-__all__ = ["SinaSectorDataSource", "SectorDataAggregator"]
+__all__ = [
+    "SinaSectorDataSource",
+    "SectorDataAggregator",
+    "EastMoneySectorSource",           # AKShare 东方财富板块
+    "EastMoneyIndustryDetailSource",   # 行业板块详情
+    "EastMoneyConceptDetailSource",    # 概念板块详情
+]
+
+
+# ============================================================
+# AKShare 东方财富板块数据源
+# ============================================================
+
+class EastMoneySectorSource(DataSource):
+    """
+    东方财富板块数据源
+
+    功能:
+    - 获取行业板块列表及涨跌幅
+    - 获取概念板块列表及涨跌幅
+
+    接口:
+    - stock_board_industry_name_em() - 行业板块
+    - stock_board_concept_name_em() - 概念板块
+    """
+
+    def __init__(self, timeout: float = 15.0):
+        super().__init__(
+            name="sector_eastmoney_akshare",
+            source_type=DataSourceType.SECTOR,
+            timeout=timeout
+        )
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache_timeout = 60.0
+
+    async def fetch(self, sector_type: str = "industry") -> DataSourceResult:
+        """
+        获取板块数据
+
+        Args:
+            sector_type: 板块类型 ("industry" 行业板块, "concept" 概念板块)
+
+        Returns:
+            DataSourceResult: 板块数据结果
+        """
+        cache_key = sector_type
+        if self._is_cache_valid(cache_key):
+            return DataSourceResult(
+                success=True,
+                data=self._cache[cache_key],
+                timestamp=self._cache[cache_key].get("_cache_time", time.time()),
+                source=self.name,
+                metadata={"sector_type": sector_type, "from_cache": True}
+            )
+
+        try:
+            import akshare as ak
+
+            if sector_type == "industry":
+                data = await self._fetch_industry(ak)
+            elif sector_type == "concept":
+                data = await self._fetch_concept(ak)
+            else:
+                return DataSourceResult(
+                    success=False,
+                    error=f"不支持的板块类型: {sector_type}",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"sector_type": sector_type}
+                )
+
+            if data:
+                data["_cache_time"] = time.time()
+                self._cache[cache_key] = data
+                self._record_success()
+                return DataSourceResult(
+                    success=True,
+                    data=data,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"sector_type": sector_type}
+                )
+
+            return DataSourceResult(
+                success=False,
+                error="获取板块数据为空",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_type": sector_type}
+            )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 未安装，请运行: pip install akshare",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_type": sector_type, "error_type": "ImportError"}
+            )
+        except Exception as e:
+            return self._handle_error(e, self.name)
+
+    async def _fetch_industry(self, ak) -> Optional[Dict[str, Any]]:
+        """获取行业板块数据"""
+        try:
+            df = ak.stock_board_industry_name_em()
+            if df is not None and not df.empty:
+                sectors = []
+                for _, row in df.iterrows():
+                    sectors.append({
+                        "rank": row.get("排名", 0),
+                        "name": row.get("板块名称", ""),
+                        "code": row.get("板块代码", ""),
+                        "price": row.get("最新价", 0),
+                        "change": row.get("涨跌额", 0),
+                        "change_percent": row.get("涨跌幅", 0),
+                        "total_market": row.get("总市值", ""),
+                        "turnover": row.get("换手率", ""),
+                        "up_count": row.get("上涨家数", 0),
+                        "down_count": row.get("下跌家数", 0),
+                        "lead_stock": row.get("领涨股票", ""),
+                        "lead_change": row.get("领涨股票-涨跌幅", 0),
+                    })
+                return {
+                    "type": "industry",
+                    "sectors": sectors,
+                    "count": len(sectors)
+                }
+        except Exception as e:
+            pass
+        return None
+
+    async def _fetch_concept(self, ak) -> Optional[Dict[str, Any]]:
+        """获取概念板块数据"""
+        try:
+            df = ak.stock_board_concept_name_em()
+            if df is not None and not df.empty:
+                sectors = []
+                for _, row in df.iterrows():
+                    sectors.append({
+                        "rank": row.get("排名", 0),
+                        "name": row.get("板块名称", ""),
+                        "code": row.get("板块代码", ""),
+                        "price": row.get("最新价", 0),
+                        "change": row.get("涨跌额", 0),
+                        "change_percent": row.get("涨跌幅", 0),
+                        "total_market": row.get("总市值", ""),
+                        "turnover": row.get("换手率", ""),
+                        "up_count": row.get("上涨家数", 0),
+                        "down_count": row.get("下跌家数", 0),
+                        "lead_stock": row.get("领涨股票", ""),
+                        "lead_change": row.get("领涨股票-涨跌幅", 0),
+                    })
+                return {
+                    "type": "concept",
+                    "sectors": sectors,
+                    "count": len(sectors)
+                }
+        except Exception as e:
+            pass
+        return None
+
+    async def fetch_batch(self, sector_types: List[str]) -> List[DataSourceResult]:
+        """批量获取板块数据"""
+        async def fetch_one(stype: str) -> DataSourceResult:
+            return await self.fetch(stype)
+
+        tasks = [fetch_one(stype) for stype in sector_types]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append(
+                    DataSourceResult(
+                        success=False,
+                        error=str(result),
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"sector_type": sector_types[i]}
+                    )
+                )
+            else:
+                processed_results.append(result)
+        return processed_results
+
+    def _is_cache_valid(self, cache_key: str) -> bool:
+        """检查缓存是否有效"""
+        if cache_key not in self._cache:
+            return False
+        cache_time = self._cache[cache_key].get("_cache_time", 0)
+        return (time.time() - cache_time) < self._cache_timeout
+
+    def clear_cache(self):
+        """清空缓存"""
+        self._cache.clear()
+
+    def get_status(self) -> Dict[str, Any]:
+        """获取数据源状态"""
+        status = super().get_status()
+        status["cache_size"] = len(self._cache)
+        status["cache_timeout"] = self._cache_timeout
+        status["supported_types"] = ["industry", "concept"]
+        return status
+
+
+class EastMoneyIndustryDetailSource(DataSource):
+    """
+    行业板块详情数据源
+
+    功能: 获取行业板块的成份股列表
+
+    接口: stock_board_industry_cons_em(symbol)
+    """
+
+    def __init__(self, timeout: float = 15.0):
+        super().__init__(
+            name="sector_industry_detail_akshare",
+            source_type=DataSourceType.SECTOR,
+            timeout=timeout
+        )
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache_timeout = 60.0
+
+    async def fetch(self, sector_name: str = "") -> DataSourceResult:
+        """获取行业板块成份股"""
+        if not sector_name:
+            return DataSourceResult(
+                success=False,
+                error="请指定板块名称",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_name": sector_name}
+            )
+
+        cache_key = sector_name
+        if self._is_cache_valid(cache_key):
+            return DataSourceResult(
+                success=True,
+                data=self._cache[cache_key],
+                timestamp=self._cache[cache_key].get("_cache_time", time.time()),
+                source=self.name,
+                metadata={"sector_name": sector_name, "from_cache": True}
+            )
+
+        try:
+            import akshare as ak
+
+            df = ak.stock_board_industry_cons_em(symbol=sector_name)
+            if df is not None and not df.empty:
+                stocks = []
+                for _, row in df.iterrows():
+                    stocks.append({
+                        "rank": row.get("序号", 0),
+                        "code": row.get("代码", ""),
+                        "name": row.get("名称", ""),
+                        "price": row.get("最新价", 0),
+                        "change_percent": row.get("涨跌幅", 0),
+                    })
+
+                data = {
+                    "sector_name": sector_name,
+                    "stocks": stocks,
+                    "count": len(stocks)
+                }
+                data["_cache_time"] = time.time()
+                self._cache[cache_key] = data
+                self._record_success()
+
+                return DataSourceResult(
+                    success=True,
+                    data=data,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"sector_name": sector_name}
+                )
+
+            return DataSourceResult(
+                success=False,
+                error=f"未获取到板块 {sector_name} 的成份股",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_name": sector_name}
+            )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 未安装",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_name": sector_name}
+            )
+        except Exception as e:
+            return self._handle_error(e, self.name)
+
+    async def fetch_batch(self, sector_names: List[str]) -> List[DataSourceResult]:
+        async def fetch_one(name: str) -> DataSourceResult:
+            return await self.fetch(name)
+
+        tasks = [fetch_one(name) for name in sector_names]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append(
+                    DataSourceResult(
+                        success=False,
+                        error=str(result),
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"sector_name": sector_names[i]}
+                    )
+                )
+            else:
+                processed_results.append(result)
+        return processed_results
+
+    def _is_cache_valid(self, cache_key: str) -> bool:
+        if cache_key not in self._cache:
+            return False
+        cache_time = self._cache[cache_key].get("_cache_time", 0)
+        return (time.time() - cache_time) < self._cache_timeout
+
+    def clear_cache(self):
+        self._cache.clear()
+
+
+class EastMoneyConceptDetailSource(DataSource):
+    """
+    概念板块详情数据源
+
+    功能: 获取概念板块的成份股列表
+
+    接口: stock_board_concept_cons_em(symbol)
+    """
+
+    def __init__(self, timeout: float = 15.0):
+        super().__init__(
+            name="sector_concept_detail_akshare",
+            source_type=DataSourceType.SECTOR,
+            timeout=timeout
+        )
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache_timeout = 60.0
+
+    async def fetch(self, sector_name: str = "") -> DataSourceResult:
+        """获取概念板块成份股"""
+        if not sector_name:
+            return DataSourceResult(
+                success=False,
+                error="请指定板块名称",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_name": sector_name}
+            )
+
+        cache_key = sector_name
+        if self._is_cache_valid(cache_key):
+            return DataSourceResult(
+                success=True,
+                data=self._cache[cache_key],
+                timestamp=self._cache[cache_key].get("_cache_time", time.time()),
+                source=self.name,
+                metadata={"sector_name": sector_name, "from_cache": True}
+            )
+
+        try:
+            import akshare as ak
+
+            df = ak.stock_board_concept_cons_em(symbol=sector_name)
+            if df is not None and not df.empty:
+                stocks = []
+                for _, row in df.iterrows():
+                    stocks.append({
+                        "rank": row.get("序号", 0),
+                        "code": row.get("代码", ""),
+                        "name": row.get("名称", ""),
+                        "price": row.get("最新价", 0),
+                        "change_percent": row.get("涨跌幅", 0),
+                    })
+
+                data = {
+                    "sector_name": sector_name,
+                    "stocks": stocks,
+                    "count": len(stocks)
+                }
+                data["_cache_time"] = time.time()
+                self._cache[cache_key] = data
+                self._record_success()
+
+                return DataSourceResult(
+                    success=True,
+                    data=data,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"sector_name": sector_name}
+                )
+
+            return DataSourceResult(
+                success=False,
+                error=f"未获取到板块 {sector_name} 的成份股（接口可能不稳定）",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_name": sector_name}
+            )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 未安装",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_name": sector_name}
+            )
+        except Exception as e:
+            return self._handle_error(e, self.name)
+
+    async def fetch_batch(self, sector_names: List[str]) -> List[DataSourceResult]:
+        async def fetch_one(name: str) -> DataSourceResult:
+            return await self.fetch(name)
+
+        tasks = [fetch_one(name) for name in sector_names]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append(
+                    DataSourceResult(
+                        success=False,
+                        error=str(result),
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"sector_name": sector_names[i]}
+                    )
+                )
+            else:
+                processed_results.append(result)
+        return processed_results
+
+    def _is_cache_valid(self, cache_key: str) -> bool:
+        if cache_key not in self._cache:
+            return False
+        cache_time = self._cache[cache_key].get("_cache_time", 0)
+        return (time.time() - cache_time) < self._cache_timeout
+
+    def clear_cache(self):
+        self._cache.clear()
