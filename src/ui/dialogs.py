@@ -36,7 +36,7 @@ class AddFundDialog(Container):
     def compose(self):
         yield Vertical(
             Static("请输入基金代码和名称:", classes="dialog-label"),
-            Input(placeholder="基金代码 (如: 161039)", id="fund-code-input", maxlength=10),
+            Input(placeholder="基金代码 (如: 161039)", id="fund-code-input"),
             Input(placeholder="基金名称 (如: 富国中证新能源汽车指数)", id="fund-name-input"),
             Horizontal(
                 Button("取消", id="cancel-btn", variant="default"),
