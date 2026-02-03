@@ -26,3 +26,6 @@ ENV/
 
 # 项目特定
 *.bak
+
+# Git worktrees
+.worktrees/
