@@ -234,6 +234,7 @@ class DataSourceManager:
         source_type: DataSourceType,
         params_list: List[Dict[str, Any]],
         *args,
+        parallel: bool = True,
         **kwargs
     ) -> List[DataSourceResult]:
         """
@@ -243,6 +244,7 @@ class DataSourceManager:
             source_type: 数据源类型
             params_list: 参数列表，每个元素包含 args 和 kwargs
             *args: 通用位置参数
+            parallel: 是否并行执行请求
             **kwargs: 通用关键字参数
 
         Returns:
@@ -260,9 +262,32 @@ class DataSourceManager:
             ] * len(params_list)
 
         primary_source = sources[0]
-        results = []
 
-        for params in params_list:
+        if not parallel:
+            # 串行执行（兼容旧行为）
+            results = []
+            for params in params_list:
+                async with self._semaphore:
+                    try:
+                        result = await primary_source.fetch(
+                            *params.get("args", args),
+                            **kwargs,
+                            **params.get("kwargs", {})
+                        )
+                        results.append(result)
+                    except Exception as e:
+                        results.append(
+                            DataSourceResult(
+                                success=False,
+                                error=str(e),
+                                timestamp=time.time(),
+                                source=primary_source.name
+                            )
+                        )
+            return results
+
+        # 并行执行 - 使用信号量限制并发数
+        async def fetch_one(params: Dict[str, Any]) -> DataSourceResult:
             async with self._semaphore:
                 try:
                     result = await primary_source.fetch(
@@ -270,18 +295,35 @@ class DataSourceManager:
                         **kwargs,
                         **params.get("kwargs", {})
                     )
-                    results.append(result)
+                    return result
                 except Exception as e:
-                    results.append(
-                        DataSourceResult(
-                            success=False,
-                            error=str(e),
-                            timestamp=time.time(),
-                            source=primary_source.name
-                        )
+                    return DataSourceResult(
+                        success=False,
+                        error=str(e),
+                        timestamp=time.time(),
+                        source=primary_source.name
                     )
 
-        return results
+        # 使用 gather 并行执行所有请求
+        tasks = [fetch_one(params) for params in params_list]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 处理异常情况
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append(
+                    DataSourceResult(
+                        success=False,
+                        error=str(result),
+                        timestamp=time.time(),
+                        source=primary_source.name
+                    )
+                )
+            else:
+                processed_results.append(result)
+
+        return processed_results
 
     def _get_ordered_sources(self, source_type: DataSourceType) -> List[DataSource]:
         """

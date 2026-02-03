@@ -7,6 +7,7 @@
 - Au99.99: AKShare (spot_golden_benchmark_sge)
 """
 
+import asyncio
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -23,11 +24,22 @@ class CommodityDataSource(DataSource):
     """商品数据源基类"""
 
     def __init__(self, name: str, timeout: float = 15.0):
+        """
+        初始化商品数据源
+
+        Args:
+            name: 数据源名称
+            timeout: 请求超时时间(秒)
+        """
         super().__init__(
             name=name,
             source_type=DataSourceType.COMMODITY,
             timeout=timeout
         )
+
+    async def close(self):
+        """关闭数据源（子类应重写此方法）"""
+        pass
 
 
 class YFinanceCommoditySource(CommodityDataSource):
@@ -151,8 +163,6 @@ class YFinanceCommoditySource(CommodityDataSource):
 
     async def fetch_batch(self, commodity_types: List[str]) -> List[DataSourceResult]:
         """批量获取商品数据"""
-        import asyncio
-
         async def fetch_one(ctype: str) -> DataSourceResult:
             return await self.fetch(ctype)
 
@@ -300,8 +310,6 @@ class AKShareCommoditySource(CommodityDataSource):
 
     async def fetch_batch(self, commodity_types: List[str]) -> List[DataSourceResult]:
         """批量获取商品数据"""
-        import asyncio
-
         tasks = [self.fetch(ctype) for ctype in commodity_types]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -330,6 +338,10 @@ class AKShareCommoditySource(CommodityDataSource):
 
     def clear_cache(self):
         self._cache.clear()
+
+    async def close(self):
+        """关闭数据源"""
+        pass
 
 
 class CommodityDataAggregator(CommodityDataSource):
@@ -385,8 +397,6 @@ class CommodityDataAggregator(CommodityDataSource):
 
     async def fetch_batch(self, commodity_types: List[str]) -> List[DataSourceResult]:
         """批量获取商品数据"""
-        import asyncio
-
         tasks = [self.fetch(ctype) for ctype in commodity_types]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -414,3 +424,12 @@ class CommodityDataAggregator(CommodityDataSource):
         status["primary_source"] = self._primary_source.name if self._primary_source else None
         status["sources"] = [s.name for s in self._sources]
         return status
+
+    async def close(self):
+        """关闭所有数据源"""
+        for source in self._sources:
+            if hasattr(source, 'close'):
+                try:
+                    await source.close()
+                except Exception:
+                    pass

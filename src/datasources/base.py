@@ -43,6 +43,11 @@ class DataSourceUnavailableError(DataSourceError):
     pass
 
 
+class TimeoutError(DataSourceError):
+    """请求超时异常"""
+    pass
+
+
 @dataclass
 class DataSourceResult:
     """数据源返回结果封装"""

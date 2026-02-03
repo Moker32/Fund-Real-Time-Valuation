@@ -8,6 +8,7 @@ import re
 import json
 import time
 import asyncio
+import httpx
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from .base import (
@@ -91,13 +92,25 @@ class SinaSectorDataSource(DataSource):
             )
 
         try:
+            # 并行获取所有板块数据
+            async def fetch_one(config: Dict) -> Optional[Dict[str, Any]]:
+                return await self._fetch_sector(config["code"], config["name"], config["category"])
+
+            # 过滤需要获取的板块
+            configs_to_fetch = [
+                config for config in self.SECTOR_CONFIG
+                if sector_code is None or config["code"] == sector_code
+            ]
+
+            # 并行执行所有请求
+            tasks = [fetch_one(config) for config in configs_to_fetch]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # 收集有效结果
             sectors = []
-            for config in self.SECTOR_CONFIG:
-                if sector_code and config["code"] != sector_code:
-                    continue
-                sector_data = await self._fetch_sector(config["code"], config["name"], config["category"])
-                if sector_data:
-                    sectors.append(sector_data)
+            for result in results:
+                if isinstance(result, dict) and result:
+                    sectors.append(result)
 
             if sectors:
                 # 更新缓存
@@ -168,12 +181,25 @@ class SinaSectorDataSource(DataSource):
             DataSourceResult: 指定类别的板块数据
         """
         try:
+            # 并行获取指定类别的板块
+            async def fetch_one(config: Dict) -> Optional[Dict[str, Any]]:
+                return await self._fetch_sector(config["code"], config["name"], config["category"])
+
+            # 过滤指定类别的板块
+            configs_to_fetch = [
+                config for config in self.SECTOR_CONFIG
+                if config["category"] == category
+            ]
+
+            # 并行执行所有请求
+            tasks = [fetch_one(config) for config in configs_to_fetch]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # 收集有效结果
             sectors = []
-            for config in self.SECTOR_CONFIG:
-                if config["category"] == category:
-                    sector_data = await self._fetch_sector(config["code"], config["name"], config["category"])
-                    if sector_data:
-                        sectors.append(sector_data)
+            for result in results:
+                if isinstance(result, dict) and result:
+                    sectors.append(result)
 
             return DataSourceResult(
                 success=True,
@@ -427,9 +453,15 @@ class SectorDataAggregator(DataSource):
         status["sources"] = [s.name for s in self._sources]
         return status
 
+    async def close(self):
+        """关闭所有数据源"""
+        for source in self._sources:
+            if hasattr(source, 'close'):
+                try:
+                    await source.close()
+                except Exception:
+                    pass
+
 
 # 导出类
 __all__ = ["SinaSectorDataSource", "SectorDataAggregator"]
-
-
-import httpx

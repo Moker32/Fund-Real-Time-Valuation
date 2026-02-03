@@ -7,6 +7,7 @@ import re
 import json
 import time
 import asyncio
+import httpx
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
@@ -98,6 +99,22 @@ class SinaNewsDataSource(DataSource):
                 metadata={"category": category}
             )
 
+        except httpx.HTTPStatusError as e:
+            return DataSourceResult(
+                success=False,
+                error=f"新闻请求失败，状态码: {e.response.status_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"category": category, "status_code": e.response.status_code}
+            )
+        except httpx.RequestError as e:
+            return DataSourceResult(
+                success=False,
+                error=f"新闻请求网络错误: {str(e)}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"category": category, "error_type": "RequestError"}
+            )
         except Exception as e:
             return self._handle_error(e, self.name)
 
@@ -368,9 +385,15 @@ class NewsAggregatorDataSource(DataSource):
         status["sources"] = [s.name for s in self._sources]
         return status
 
+    async def close(self):
+        """关闭所有数据源"""
+        for source in self._sources:
+            if hasattr(source, 'close'):
+                try:
+                    await source.close()
+                except Exception:
+                    pass
+
 
 # 导出类
 __all__ = ["SinaNewsDataSource", "NewsAggregatorDataSource"]
-
-
-import httpx

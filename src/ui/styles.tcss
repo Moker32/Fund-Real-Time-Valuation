@@ -170,3 +170,53 @@ Footer {
     background: darkblue;
     color: white;
 }
+
+/* 图表对话框样式 */
+ChartDialog {
+    align: center middle;
+    width: 80;
+    height: auto;
+    max-height: 35;
+    border: solid cyan;
+    background: $surface;
+    padding: 1;
+}
+
+ChartDialog .chart-title {
+    margin-bottom: 1;
+    text-align: center;
+    color: cyan;
+}
+
+ChartDialog .chart-content {
+    margin-bottom: 1;
+    font-family: monospace;
+    font-size: 8;
+}
+
+ChartDialog .chart-legend {
+    margin-top: 1;
+    color: gray;
+    font-size: 8;
+}
+
+ChartDialog .dialog-buttons {
+    margin-top: 1;
+    align: right;
+}
+
+ChartDialog .period-selector {
+    margin-bottom: 1;
+}
+
+/* 图表预览样式 */
+ChartPreview {
+    height: auto;
+    border: solid gray;
+    padding: 1;
+}
+
+ChartPreview .preview-content {
+    font-family: monospace;
+    font-size: 6;
+}

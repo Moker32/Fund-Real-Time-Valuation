@@ -6,6 +6,7 @@
 import re
 import json
 import time
+import asyncio
 import httpx
 from typing import Any, Dict, List, Optional
 from datetime import datetime
@@ -134,8 +135,6 @@ class FundDataSource(DataSource):
         Returns:
             List[DataSourceResult]: 每个基金的结果列表
         """
-        import asyncio
-
         async def fetch_one(code: str) -> DataSourceResult:
             return await self.fetch(code)
 
@@ -257,12 +256,22 @@ class FundDataSource(DataSource):
 class SinaFundDataSource(DataSource):
     """新浪基金数据源 - 备用数据源"""
 
-    def __init__(self, timeout: float = 10.0):
+    def __init__(self, timeout: float = 10.0, max_retries: int = 3, retry_delay: float = 1.0):
+        """
+        初始化新浪基金数据源
+
+        Args:
+            timeout: 请求超时时间
+            max_retries: 最大重试次数
+            retry_delay: 重试间隔(秒)
+        """
         super().__init__(
             name="fund_sina",
             source_type=DataSourceType.FUND,
             timeout=timeout
         )
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
         self.client = httpx.AsyncClient(
             timeout=timeout,
             headers={
@@ -272,31 +281,57 @@ class SinaFundDataSource(DataSource):
 
     async def fetch(self, fund_code: str) -> DataSourceResult:
         """获取基金数据 - 新浪接口"""
-        try:
-            # 新浪基金接口
-            url = f"https://finance.sina.com.cn/fund/qqjl/{fund_code}.shtml"
-            response = await self.client.get(url)
-            response.raise_for_status()
+        for attempt in range(self.max_retries):
+            try:
+                # 新浪基金接口
+                url = f"https://finance.sina.com.cn/fund/qqjl/{fund_code}.shtml"
+                response = await self.client.get(url)
+                response.raise_for_status()
 
-            # 从 HTML 中提取数据
-            data = self._parse_html(response.text, fund_code)
+                # 从 HTML 中提取数据
+                data = self._parse_html(response.text, fund_code)
 
-            self._record_success()
-            return DataSourceResult(
-                success=True,
-                data=data,
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code}
-            )
+                self._record_success()
+                return DataSourceResult(
+                    success=True,
+                    data=data,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code}
+                )
 
-        except Exception as e:
-            return self._handle_error(e, self.name)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    return DataSourceResult(
+                        success=False,
+                        error=f"基金不存在: {fund_code}",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"fund_code": fund_code, "status_code": 404}
+                    )
+                await self._handle_retry_delay(attempt)
+
+            except httpx.RequestError as e:
+                await self._handle_retry_delay(attempt)
+
+            except Exception as e:
+                return self._handle_error(e, self.name)
+
+        return DataSourceResult(
+            success=False,
+            error=f"获取基金数据失败，已重试 {self.max_retries} 次",
+            timestamp=time.time(),
+            source=self.name,
+            metadata={"fund_code": fund_code}
+        )
+
+    async def _handle_retry_delay(self, attempt: int):
+        """处理重试延迟"""
+        if attempt < self.max_retries - 1:
+            await asyncio.sleep(self.retry_delay * (attempt + 1))
 
     async def fetch_batch(self, fund_codes: List[str]) -> List[DataSourceResult]:
         """批量获取基金数据"""
-        import asyncio
-
         async def fetch_one(code: str) -> DataSourceResult:
             return await self.fetch(code)
 
@@ -335,7 +370,219 @@ class SinaFundDataSource(DataSource):
 
 
 # 导出类
-__all__ = ["FundDataSource", "SinaFundDataSource"]
+__all__ = ["FundDataSource", "SinaFundDataSource", "FundHistorySource", "FundHistoryYFinanceSource"]
 
 
-import asyncio
+class FundHistorySource(DataSource):
+    """基金历史数据源 - 使用 akshare 获取基金净值历史数据"""
+
+    def __init__(self, timeout: float = 30.0):
+        """
+        初始化基金历史数据源
+
+        Args:
+            timeout: 请求超时时间
+        """
+        super().__init__(
+            name="fund_history_akshare",
+            source_type=DataSourceType.FUND,
+            timeout=timeout
+        )
+
+    async def fetch(self, fund_code: str, period: str = "近一年") -> DataSourceResult:
+        """
+        获取基金历史净值数据
+
+        Args:
+            fund_code: 基金代码 (6位数字)
+            period: 时间周期，可选值: "近一周", "近一月", "近三月", "近六月", "近一年", "近三年", "近五年", "成立以来"
+
+        Returns:
+            DataSourceResult: 包含历史净值数据的结果
+        """
+        if not self._validate_fund_code(fund_code):
+            return DataSourceResult(
+                success=False,
+                error=f"无效的基金代码: {fund_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        try:
+            # 在异步上下文中使用 akshare
+            import akshare as ak
+
+            # 天天基金净值
+            fund_df = ak.fund_ggmz(symbol=fund_code)
+
+            if fund_df is None or fund_df.empty:
+                return DataSourceResult(
+                    success=False,
+                    error="未获取到基金历史数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code}
+                )
+
+            # 解析数据
+            history_data = []
+            for _, row in fund_df.iterrows():
+                date = row.get("日期", "")
+                net_value = row.get("单位净值", None)
+                accumulated_net = row.get("累计净值", None)
+
+                if net_value is not None:
+                    try:
+                        history_data.append({
+                            "date": str(date),
+                            "net_value": float(net_value),
+                            "accumulated_net": float(accumulated_net) if accumulated_net else None
+                        })
+                    except (ValueError, TypeError):
+                        continue
+
+            # 按日期排序
+            history_data.sort(key=lambda x: x["date"])
+
+            self._record_success()
+            return DataSourceResult(
+                success=True,
+                data={
+                    "fund_code": fund_code,
+                    "history": history_data,
+                    "count": len(history_data)
+                },
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code, "period": period}
+            )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 库未安装，请运行: pip install akshare",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+        except Exception as e:
+            self._request_count += 1
+            self._error_count += 1
+            return DataSourceResult(
+                success=False,
+                error=f"获取基金历史数据失败: {str(e)}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+    async def fetch_async(self, fund_code: str, period: str = "近一年") -> DataSourceResult:
+        """
+        异步获取基金历史净值数据（推荐使用）
+
+        Args:
+            fund_code: 基金代码 (6位数字)
+            period: 时间周期
+
+        Returns:
+            DataSourceResult: 包含历史净值数据的结果
+        """
+        # akshare 本身是同步的，我们在异步任务中运行
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, lambda: self.fetch(fund_code, period))
+
+    def _validate_fund_code(self, fund_code: str) -> bool:
+        """验证基金代码格式"""
+        return bool(re.match(r"^\d{6}$", str(fund_code)))
+
+
+class FundHistoryYFinanceSource(DataSource):
+    """基金历史数据源 - 使用 yfinance 获取历史数据（备用方案）"""
+
+    def __init__(self, timeout: float = 30.0):
+        super().__init__(
+            name="fund_history_yfinance",
+            source_type=DataSourceType.FUND,
+            timeout=timeout
+        )
+
+    async def fetch(self, fund_code: str, period: str = "1y") -> DataSourceResult:
+        """
+        使用 yfinance 获取基金历史数据
+
+        Args:
+            fund_code: 基金代码 (对于中国基金，需要添加 .SS 后缀)
+            period: 时间周期: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
+
+        Returns:
+            DataSourceResult: 包含历史数据的结果
+        """
+        try:
+            import yfinance as yf
+
+            # 构建 ticker 符号
+            ticker_symbol = f"{fund_code}.SS" if fund_code.isdigit() else fund_code
+
+            ticker = yf.Ticker(ticker_symbol)
+            hist = ticker.history(period=period)
+
+            if hist is None or hist.empty:
+                return DataSourceResult(
+                    success=False,
+                    error="未获取到基金历史数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code}
+                )
+
+            history_data = []
+            for index, row in hist.iterrows():
+                history_data.append({
+                    "date": index.strftime("%Y-%m-%d"),
+                    "open": row.get("Open"),
+                    "high": row.get("High"),
+                    "low": row.get("Low"),
+                    "close": row.get("Close"),
+                    "volume": row.get("Volume"),
+                    "dividends": row.get("Dividends"),
+                    "stock_splits": row.get("Stock Splits")
+                })
+
+            self._record_success()
+            return DataSourceResult(
+                success=True,
+                data={
+                    "fund_code": fund_code,
+                    "ticker": ticker_symbol,
+                    "history": history_data,
+                    "count": len(history_data)
+                },
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code, "period": period}
+            )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="yfinance 库未安装，请运行: pip install yfinance",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+        except Exception as e:
+            self._request_count += 1
+            self._error_count += 1
+            return DataSourceResult(
+                success=False,
+                error=f"获取历史数据失败: {str(e)}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+    async def fetch_async(self, fund_code: str, period: str = "1y") -> DataSourceResult:
+        """异步获取历史数据"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, lambda: self.fetch(fund_code, period))

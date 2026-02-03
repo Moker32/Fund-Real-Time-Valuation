@@ -19,11 +19,11 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from .widgets import FundTable, CommodityTable, NewsList, FundData, CommodityData, NewsData, StatPanel, StatusBar, SectorData, SectorTable, AddFundDialog, HoldingDialog
+from .widgets import FundTable, CommodityTable, NewsList, FundData, CommodityData, NewsData, StatPanel, StatusBar, SectorData, SectorTable, AddFundDialog, HoldingDialog, ChartDialog, FundHistoryData
 from .screens import FundScreen, CommodityScreen, NewsScreen, HelpScreen
-from datasources.manager import DataSourceManager, create_default_manager
-from datasources.base import DataSourceType
-from datasources.fund_source import FundDataSource
+from src.datasources.manager import DataSourceManager, create_default_manager
+from src.datasources.base import DataSourceType
+from src.datasources.fund_source import FundDataSource, FundHistorySource
 
 
 class FundTUIApp(App):
@@ -47,6 +47,7 @@ class FundTUIApp(App):
         ("a", "add_fund", "添加基金"),
         ("d", "delete_fund", "删除基金"),
         ("h", "set_holding", "持仓设置"),
+        ("g", "show_chart", "净值图表"),
     ]
 
     def __init__(self):
@@ -232,6 +233,20 @@ class FundTUIApp(App):
         from .widgets import HoldingDialog
         # 挂载对话框
         self.mount(HoldingDialog(fund.code, fund.name, current_shares, current_cost))
+
+    def action_show_chart(self) -> None:
+        """显示基金净值走势图"""
+        table = self.query_one("#fund-table", FundTable)
+        cursor_row = table.cursor_row
+
+        if cursor_row >= len(self.funds):
+            self.notify("请先选择要查看图表的基金", severity="warning")
+            return
+
+        fund = self.funds[cursor_row]
+
+        # 异步加载历史数据并显示图表
+        asyncio.create_task(self._show_fund_chart(fund.code, fund.name))
 
     # ==================== 对话框消息处理 ====================
 
@@ -699,3 +714,74 @@ class FundTUIApp(App):
             theme=theme,
             auto_refresh=True
         )
+
+    # ==================== 图表功能 ====================
+
+    async def _show_fund_chart(self, fund_code: str, fund_name: str) -> None:
+        """显示基金净值图表"""
+        try:
+            self.notify(f"正在加载 {fund_name} 的历史数据...", severity="information")
+
+            # 使用 FundHistorySource 获取历史数据
+            history_source = FundHistorySource()
+            result = await history_source.fetch(fund_code, period="近一年")
+
+            if result.success and result.data:
+                history_list = result.data.get("history", [])
+
+                if not history_list:
+                    self.notify("未获取到历史数据", severity="warning")
+                    return
+
+                # 提取日期和净值数据
+                dates = [item["date"] for item in history_list]
+                net_values = [item["net_value"] for item in history_list]
+                accumulated_net = [item.get("accumulated_net") for item in history_list]
+
+                # 创建历史数据对象
+                history_data = FundHistoryData(
+                    fund_code=fund_code,
+                    fund_name=fund_name,
+                    dates=dates,
+                    net_values=net_values,
+                    accumulated_net=accumulated_net if any(accumulated_net) else None
+                )
+
+                # 显示图表对话框
+                self.mount(ChartDialog(fund_code, fund_name, history_data))
+            else:
+                error_msg = result.error or "未知错误"
+                self.notify(f"获取历史数据失败: {error_msg}", severity="warning")
+
+        except Exception as e:
+            self.log(f"显示图表失败: {e}")
+            self.notify(f"显示图表失败: {str(e)}", severity="error")
+
+    async def load_fund_history(self, fund_code: str) -> Optional[FundHistoryData]:
+        """加载基金历史数据（供其他方法使用）"""
+        try:
+            history_source = FundHistorySource()
+            result = await history_source.fetch(fund_code, period="近一年")
+
+            if result.success and result.data:
+                history_list = result.data.get("history", [])
+
+                if not history_list:
+                    return None
+
+                dates = [item["date"] for item in history_list]
+                net_values = [item["net_value"] for item in history_list]
+                accumulated_net = [item.get("accumulated_net") for item in history_list]
+
+                return FundHistoryData(
+                    fund_code=fund_code,
+                    fund_name=result.data.get("fund_name", ""),
+                    dates=dates,
+                    net_values=net_values,
+                    accumulated_net=accumulated_net if any(accumulated_net) else None
+                )
+
+        except Exception as e:
+            self.log(f"加载基金历史数据失败: {e}")
+
+        return None

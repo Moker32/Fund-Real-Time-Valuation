@@ -8,6 +8,8 @@ from textual.containers import Container, Vertical, Horizontal
 from textual.color import Color
 from dataclasses import dataclass
 from typing import List, Optional
+import math
+from datetime import datetime
 
 
 # ==================== 数据结构定义 ====================
@@ -237,7 +239,10 @@ class HelpPanel(Static):
 
 [a]       - 添加基金
 [d]       - 删除基金
+[g]       - 净值图表
+[h]       - 持仓设置
 [r]       - 手动刷新
+[t]       - 切换主题
 [F1]      - 显示帮助
 [Ctrl+C]  - 退出应用
 
@@ -480,3 +485,294 @@ class HoldingDialog(Container):
     class Cancel(Message):
         """取消消息"""
         pass
+
+
+@dataclass
+class FundHistoryData:
+    """基金历史数据结构"""
+    fund_code: str
+    fund_name: str
+    dates: List[str]
+    net_values: List[float]
+    accumulated_net: Optional[List[float]] = None
+
+
+class ChartDialog(Container):
+    """图表对话框 - 显示基金净值走势图"""
+
+    DEFAULT_CSS = """
+    ChartDialog {
+        align: center middle;
+        width: 80;
+        height: auto;
+        max-height: 35;
+        border: solid cyan;
+        background: $surface;
+        padding: 1;
+    }
+    ChartDialog > Vertical {
+        width: 100%;
+    }
+    ChartDialog .chart-title {
+        margin-bottom: 1;
+        text-align: center;
+        color: cyan;
+    }
+    ChartDialog .chart-content {
+        margin-bottom: 1;
+        font-family: monospace;
+        font-size: 8;
+    }
+    ChartDialog .chart-legend {
+        margin-top: 1;
+        color: gray;
+        font-size: 8;
+    }
+    ChartDialog .dialog-buttons {
+        margin-top: 1;
+        align: right;
+    }
+    ChartDialog .period-selector {
+        margin-bottom: 1;
+    }
+    """
+
+    def __init__(self, fund_code: str, fund_name: str, history_data: Optional[FundHistoryData] = None):
+        super().__init__(id="chart-dialog")
+        self.fund_code = fund_code
+        self.fund_name = fund_name
+        self.history_data = history_data
+        self.current_period = "近一年"
+
+    def compose(self):
+        yield Vertical(
+            Static(id="chart-title", classes="chart-title"),
+            Static(id="period-buttons", classes="period-selector"),
+            Static(id="chart-content", classes="chart-content"),
+            Static(id="chart-legend", classes="chart-legend"),
+            Horizontal(
+                Button("关闭", id="close-btn", variant="default"),
+                classes="dialog-buttons"
+            )
+        )
+
+    def on_mount(self) -> None:
+        """组件挂载时初始化"""
+        self._update_title()
+        self._update_period_buttons()
+        self._render_chart()
+
+    def _update_title(self) -> None:
+        """更新标题"""
+        title = f"[b]净值走势图 - {self.fund_name} ({self.fund_code})[/b]"
+        self.query_one("#chart-title", Static).update(title)
+
+    def _update_period_buttons(self) -> None:
+        """更新周期选择按钮"""
+        periods = ["近一月", "近三月", "近六月", "近一年"]
+        buttons = "[周期:] "
+        for i, period in enumerate(periods):
+            if period == self.current_period:
+                buttons += f"[bold][{period}][/]  "
+            else:
+                buttons += f"[{period}]  "
+        self.query_one("#period-buttons", Static).update(buttons)
+
+    def _render_chart(self) -> None:
+        """渲染图表"""
+        if not self.history_data or not self.history_data.net_values:
+            self.query_one("#chart-content", Static).update("暂无历史数据")
+            self.query_one("#chart-legend", Static).update("")
+            return
+
+        # 根据选择的周期筛选数据
+        net_values = self.history_data.net_values
+        dates = self.history_data.dates
+
+        # 根据周期限制数据点数量
+        max_points = {
+            "近一月": 30,
+            "近三月": 90,
+            "近六月": 180,
+            "近一年": 365
+        }.get(self.current_period, 365)
+
+        # 如果数据太多，进行采样
+        if len(net_values) > max_points:
+            step = len(net_values) // max_points
+            net_values = net_values[::step]
+            dates = dates[::step]
+
+        # 生成 ASCII 图表
+        chart_ascii = self._generate_ascii_chart(net_values, dates)
+
+        # 生成图例信息
+        if net_values:
+            first_val = net_values[0]
+            last_val = net_values[-1]
+            change_pct = ((last_val - first_val) / first_val * 100) if first_val != 0 else 0
+            legend = f"起始: {first_val:.4f}  |  最新: {last_val:.4f}  |  涨跌: {change_pct:+.2f}%  |  数据点数: {len(net_values)}"
+        else:
+            legend = ""
+
+        self.query_one("#chart-content", Static).update(chart_ascii)
+        self.query_one("#chart-legend", Static).update(legend)
+
+    def _generate_ascii_chart(self, values: List[float], dates: List[str], width: int = 70, height: int = 12) -> str:
+        """
+        生成 ASCII 格式的折线图
+
+        Args:
+            values: 净值列表
+            dates: 日期列表
+            width: 图表宽度
+            height: 图表高度
+
+        Returns:
+            str: ASCII 图表字符串
+        """
+        if not values or len(values) < 2:
+            return "数据不足，无法生成图表"
+
+        # 计算最小值和最大值
+        min_val = min(values)
+        max_val = max(values)
+
+        # 如果范围太小，稍微扩展以便显示
+        val_range = max_val - min_val
+        if val_range < 0.0001:
+            min_val = min_val * 0.999
+            max_val = max_val * 1.001
+            val_range = max_val - min_val
+
+        # 计算每个数据点在图表中的位置
+        chars = []  # 存储每一行的字符
+        for row in range(height):
+            y = max_val - (row / (height - 1)) * val_range
+            row_chars = []
+            for i, val in enumerate(values):
+                x_val = min_val + (i / (len(values) - 1)) * val_range
+                if abs(val - y) < val_range / (height * 2):
+                    row_chars.append("*")
+                else:
+                    row_chars.append(" ")
+            chars.append("".join(row_chars))
+
+        # 构建最终图表
+        lines = []
+        lines.append(" " + "_" * width)
+
+        for row in chars:
+            lines.append(f"|{row}|")
+
+        lines.append(" " + "-" * width)
+
+        # 添加 Y 轴标签
+        y_labels = []
+        for row in range(height):
+            y = max_val - (row / (height - 1)) * val_range
+            y_labels.append(f"{y:.4f}")
+
+        # 添加 X 轴日期标签（只显示部分日期）
+        x_labels = []
+        step = max(1, len(dates) // 5)
+        for i in range(0, len(dates), step):
+            date_str = dates[i][-5:] if len(dates[i]) > 5 else dates[i]
+            x_labels.append(date_str)
+        while len(x_labels) < 5:
+            x_labels.append("")
+
+        # 输出图表
+        result = []
+        for i, row in enumerate(chars):
+            if i < len(y_labels):
+                result.append(f"{y_labels[i]:>10} |{row}|")
+            else:
+                result.append(f"{'':>10} |{row}|")
+
+        result.append(f"{'':>10} " + "-" * width)
+
+        # 添加日期标签
+        date_line = " " * 10
+        step_x = max(1, len(dates) // 10)
+        for i in range(0, len(dates), step_x):
+            date_str = dates[i][-5:] if len(dates[i]) > 5 else dates[i]
+            date_line += f"{date_str:<7}"
+        result.append(date_line)
+
+        return "\n".join(result)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """处理按钮点击"""
+        if event.button.id == "close-btn":
+            self.remove()
+
+
+class ChartPreview(Static):
+    """图表预览组件 - 显示在主界面中的小图表"""
+
+    DEFAULT_CSS = """
+    ChartPreview {
+        height: auto;
+        border: solid gray;
+        padding: 1;
+    }
+    ChartPreview .preview-content {
+        font-family: monospace;
+        font-size: 6;
+    }
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.history_data: Optional[FundHistoryData] = None
+
+    def compose(self):
+        yield Static(id="preview-content", classes="preview-content")
+
+    def update_preview(self, history_data: FundHistoryData, width: int = 40, height: int = 6) -> None:
+        """更新图表预览"""
+        self.history_data = history_data
+
+        if not history_data or not history_data.net_values:
+            self.query_one("#preview-content", Static).update("暂无数据")
+            return
+
+        values = history_data.net_values[-30:]  # 只显示最近30天
+        dates = history_data.dates[-30:]
+
+        if len(values) < 2:
+            self.query_one("#preview-content", Static).update("数据不足")
+            return
+
+        # 生成简化的 ASCII 图表
+        chart = self._generate_simple_ascii(values, dates, width, height)
+        self.query_one("#preview-content", Static).update(chart)
+
+    def _generate_simple_ascii(self, values: List[float], dates: List[str], width: int, height: int) -> str:
+        """生成简化的 ASCII 图表"""
+        if not values:
+            return ""
+
+        min_val = min(values)
+        max_val = max(values)
+
+        val_range = max_val - min_val
+        if val_range < 0.0001:
+            min_val = min_val * 0.999
+            max_val = max_val * 1.001
+            val_range = max_val - min_val
+
+        lines = []
+        for row in range(height):
+            y = max_val - (row / (height - 1)) * val_range
+            row_chars = []
+            for val in values:
+                x_val = min_val + (values.index(val) / (len(values) - 1)) * val_range if len(values) > 1 else min_val
+                if abs(val - y) < val_range / (height * 2):
+                    row_chars.append("*")
+                else:
+                    row_chars.append(" ")
+            lines.append("".join(row_chars))
+
+        return "\n".join(lines)
