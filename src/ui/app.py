@@ -403,6 +403,48 @@ class FundTUIApp(App):
         """处理持仓设置取消"""
         pass  # 取消时无需处理
 
+    # ==================== 菜单消息处理 ====================
+
+    def on_fund_context_menu_selected(self, event: "FundContextMenu.MenuSelected") -> None:
+        """处理基金菜单选择"""
+        action = event.action
+        fund_code = event.fund_code
+
+        # 查找选中的基金
+        fund = None
+        for f in self.funds:
+            if f.code == fund_code:
+                fund = f
+                break
+
+        if fund is None:
+            return
+
+        # 执行对应操作
+        if action == "view_detail":
+            # 查看详情 - 跳转到基金详情页
+            from .fund_detail_screen import FundDetailScreen
+            self.push_screen(FundDetailScreen(fund))
+        elif action == "show_chart":
+            # 显示图表
+            asyncio.create_task(self._show_fund_chart(fund.code, fund.name))
+        elif action == "set_holding":
+            # 打开持仓对话框
+            current_shares = fund.hold_shares if hasattr(fund, 'hold_shares') else 0.0
+            current_cost = fund.cost if hasattr(fund, 'cost') else 0.0
+            self.mount(HoldingDialog(fund.code, fund.name, current_shares, current_cost))
+        elif action == "delete":
+            # 删除基金
+            from config.manager import ConfigManager
+            config_manager = ConfigManager()
+            if config_manager.remove_watchlist(fund_code):
+                self.notify(f"已从自选移除: {fund.name}", severity="information")
+                if fund_code in self._fund_codes:
+                    self._fund_codes.remove(fund_code)
+                    asyncio.create_task(self.load_fund_data())
+            else:
+                self.notify("基金不在自选列表中", severity="warning")
+
     # ==================== 数据刷新 ====================
 
     async def auto_refresh(self) -> None:

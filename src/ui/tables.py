@@ -10,6 +10,7 @@ class FundTable(DataTable):
     """基金数据表格组件"""
 
     BINDINGS = [
+        ("enter", "view_detail", "查看详情"),
         ("a", "add", "添加"),
         ("d", "delete", "删除"),
     ]
@@ -18,6 +19,7 @@ class FundTable(DataTable):
         super().__init__(*args, **kwargs)
         self.cursor_type = "row"
         self.zebra_stripes = True
+        self.funds: List[FundData] = []
 
     def on_mount(self):
         self.add_column("代码", width=10)
@@ -25,20 +27,49 @@ class FundTable(DataTable):
         self.add_column("净值", width=12)
         self.add_column("估值", width=12)
         self.add_column("涨跌", width=10)
+        self.add_column("持仓", width=8)
         self.add_column("持仓盈亏", width=14)
 
     def update_funds(self, funds: List[FundData]):
         """更新基金数据"""
+        self.funds = funds
         self.clear()
         for fund in funds:
+            # 持仓标记: 有持仓显示"●"，无持仓显示"○"
+            holding_mark = "●" if fund.hold_shares and fund.hold_shares > 0 else "○"
             self.add_row(
                 fund.code,
                 fund.name,
                 f"{fund.net_value:.4f}",
                 f"{fund.est_value:.4f}",
                 f"{fund.change_pct:+.2f}%" if fund.change_pct else "N/A",
+                holding_mark,
                 f"{fund.profit:+.2f}" if fund.profit else "N/A",
             )
+
+    def on_click(self, event):
+        """处理点击事件 - 弹出上下文菜单"""
+        # 延迟弹出菜单，等待事件完成
+        self.app.call_later(self._show_context_menu)
+
+    def _show_context_menu(self):
+        """显示上下文菜单"""
+        cursor_row = self.cursor_row
+        if cursor_row < len(self.funds):
+            fund = self.funds[cursor_row]
+            has_holding = fund.hold_shares and fund.hold_shares > 0
+
+            # 检查是否已存在菜单
+            existing = self.app.query_one("#fund-context-menu", default=None)
+            if existing is not None:
+                try:
+                    existing.remove()
+                except:
+                    pass
+
+            # 挂载菜单
+            from .menus import FundContextMenu
+            self.app.mount(FundContextMenu(fund.code, fund.name, has_holding))
 
 
 class CommodityTable(DataTable):
