@@ -486,12 +486,72 @@ class FundGUIApp:
         self.page.update()
 
     def _show_holding(self, e):
-        """显示持仓设置"""
-        self._show_snackbar("请先选择要设置持仓的基金")
+        """显示持仓设置对话框"""
+        # 获取当前选中的基金
+        selected_code = self._get_selected_fund_code()
+        if not selected_code:
+            self._show_snackbar("请先选择要设置持仓的基金")
+            return
+
+        # 获取基金信息
+        fund = next((f for f in self.funds if f.code == selected_code), None)
+        if not fund:
+            self._show_snackbar("未找到选中的基金信息")
+            return
+
+        dialog = HoldingDialog(self, fund)
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
 
     def _delete_fund(self, e):
         """删除基金"""
-        self._show_snackbar("请先选择要删除的基金")
+        # 获取当前选中的基金
+        selected_code = self._get_selected_fund_code()
+        if not selected_code:
+            self._show_snackbar("请先选择要删除的基金")
+            return
+
+        # 获取基金名称
+        fund_name = next(
+            (f.name for f in self.funds if f.code == selected_code), selected_code
+        )
+
+        # 显示确认对话框
+        dialog = DeleteConfirmDialog(self, selected_code, fund_name)
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
+
+    def _get_selected_fund_code(self) -> Optional[str]:
+        """获取当前选中的基金代码"""
+        # 检查是否有选中行
+        if hasattr(self, "_selected_fund_code") and self._selected_fund_code:
+            return self._selected_fund_code
+        return None
+
+    def _on_fund_table_row_selected(self, e):
+        """处理基金表格行选择事件"""
+        if e.data:
+            self._selected_fund_code = e.data
+            # 高亮显示选中行
+            for i, row in enumerate(self.fund_table.rows):
+                if row.data == e.data:
+                    row.selected = True
+                else:
+                    row.selected = False
+            self.page.update()
+
+    def _on_tab_change(self, e):
+        """处理标签页切换"""
+        self.current_tab = self.tabs.selected_index
+        # 切换到对应标签页时加载数据
+        if self.current_tab == 0:
+            asyncio.create_task(self._load_fund_data())
+        elif self.current_tab == 1:
+            asyncio.create_task(self._load_commodity_data())
+        elif self.current_tab == 2:
+            asyncio.create_task(self._load_news_data())
 
 
 class AddFundDialog(AlertDialog):
@@ -537,6 +597,130 @@ class AddFundDialog(AlertDialog):
         self.open = False
         self.app.page.update()
         self.app._show_snackbar(f"已添加基金: {name}")
+
+
+class HoldingDialog(AlertDialog):
+    """持仓设置对话框"""
+
+    def __init__(self, app: FundGUIApp, fund: FundDisplayData):
+        super().__init__()
+        self.app = app
+        self.fund = fund
+
+        self.shares_field = TextField(
+            label="持有份额",
+            value=str(fund.hold_shares) if fund.hold_shares > 0 else "",
+            hint_text="例如: 1000.00",
+            width=200,
+        )
+        self.cost_field = TextField(
+            label="成本价",
+            value=str(fund.cost) if fund.cost > 0 else "",
+            hint_text="例如: 1.2345",
+            width=200,
+            keyboard_type=ft.KeyboardType.NUMBER,
+        )
+
+        self.modal = True
+        self.title = Text(f"设置持仓 - {fund.name}")
+        self.content = Container(
+            content=Column(
+                [
+                    Text(f"基金代码: {fund.code}", size=12, color=ft.Colors.WHITE70),
+                    Row([self.shares_field, self.cost_field], spacing=10),
+                    Text("成本价用于计算持仓盈亏", size=11, color=ft.Colors.WHITE70),
+                ],
+                spacing=10,
+            ),
+            width=400,
+        )
+        self.actions = [
+            ElevatedButton("取消", on_click=self._cancel),
+            ElevatedButton("保存", on_click=self._confirm),
+        ]
+
+    def _cancel(self, e):
+        self.open = False
+        self.app.page.update()
+
+    def _confirm(self, e):
+        shares_str = self.shares_field.value.strip()
+        cost_str = self.cost_field.value.strip()
+
+        try:
+            shares = float(shares_str) if shares_str else 0.0
+            cost = float(cost_str) if cost_str else 0.0
+
+            # 更新持仓配置
+            self.app.config_dao.update_fund(
+                self.fund.code,
+                shares=shares,
+                cost=cost,
+            )
+
+            # 重新加载基金数据
+            asyncio.create_task(self.app._load_fund_data())
+
+            self.open = False
+            self.app.page.update()
+            self.app._show_snackbar(f"已保存持仓: {self.fund.name}")
+
+        except ValueError:
+            self.app._show_snackbar("请输入有效的数字")
+
+
+class DeleteConfirmDialog(AlertDialog):
+    """删除基金确认对话框"""
+
+    def __init__(self, app: FundGUIApp, fund_code: str, fund_name: str):
+        super().__init__()
+        self.app = app
+        self.fund_code = fund_code
+        self.fund_name = fund_name
+
+        self.modal = True
+        self.title = Text("确认删除")
+        self.content = Container(
+            content=Column(
+                [
+                    Text(f"确定要从自选列表中删除以下基金吗？", size=14),
+                    Text(
+                        f"{fund_name} ({fund_code})",
+                        size=12,
+                        weight=ft.FontWeight.BOLD,
+                        color=ft.Colors.ORANGE,
+                    ),
+                    Text("此操作不可撤销", size=11, color=ft.Colors.RED),
+                ],
+                spacing=10,
+            ),
+            width=400,
+        )
+        self.actions = [
+            ElevatedButton("取消", on_click=self._cancel),
+            ElevatedButton(
+                "删除",
+                on_click=self._confirm,
+                style=ft.ButtonStyle(bgcolor=ft.Colors.RED),
+            ),
+        ]
+
+    def _cancel(self, e):
+        self.open = False
+        self.app.page.update()
+
+    def _confirm(self, e):
+        # 从配置中删除
+        self.app.config_dao.remove_fund(self.fund_code)
+        # 清空选中状态
+        if hasattr(self.app, "_selected_fund_code"):
+            self.app._selected_fund_code = None
+        # 重新加载基金数据
+        asyncio.create_task(self.app._load_fund_data())
+
+        self.open = False
+        self.app.page.update()
+        self.app._show_snackbar(f"已删除基金: {self.fund_name}")
 
 
 def main():
