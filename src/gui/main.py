@@ -107,6 +107,7 @@ class FundGUIApp:
         self.tabs = FletTabs(
             selected_index=0,
             animation_duration=300,
+            on_change=self._on_tab_change,
             tabs=[
                 FletTab(
                     text="📊 基金",

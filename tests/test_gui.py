@@ -239,6 +239,280 @@ class TestUIComponents:
 
         assert AddFundDialog is not None
 
+    def test_holding_dialog_class(self):
+        """测试持仓设置对话框类存在"""
+        from src.gui.main import HoldingDialog
+
+        assert HoldingDialog is not None
+
+    def test_delete_confirm_dialog_class(self):
+        """测试删除确认对话框类存在"""
+        from src.gui.main import DeleteConfirmDialog
+
+        assert DeleteConfirmDialog is not None
+
+    def test_fund_display_data_with_holding(self):
+        """测试带持仓信息的基金数据"""
+        from src.gui.main import FundDisplayData
+
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=1.5000,
+            est_value=1.5200,
+            change_pct=1.33,
+            profit=100.0,
+            hold_shares=1000.0,
+            cost=1.4000,
+        )
+
+        assert fund.code == "TEST001"
+        assert fund.hold_shares == 1000.0
+        assert fund.cost == 1.4000
+        # 验证持仓盈亏计算（使用近似值比较）
+        expected_profit = (fund.net_value - fund.cost) * fund.hold_shares
+        assert abs(fund.profit - expected_profit) < 0.01
+
+    def test_fund_display_data_without_holding(self):
+        """测试不带持仓信息的基金数据"""
+        from src.gui.main import FundDisplayData
+
+        fund = FundDisplayData(
+            code="TEST002",
+            name="测试基金2",
+            net_value=1.0000,
+            est_value=1.0100,
+            change_pct=1.0,
+            profit=0.0,
+            hold_shares=0.0,
+            cost=0.0,
+        )
+
+        assert fund.code == "TEST002"
+        assert fund.hold_shares == 0.0
+        assert fund.cost == 0.0
+        assert fund.profit == 0.0
+
+
+class TestFundChart:
+    """基金图表测试 - 分时图/K线图"""
+
+    def test_fund_chart_dialog_class_exists(self):
+        """测试基金图表对话框类存在"""
+        from src.gui.chart import FundChartDialog
+
+        assert FundChartDialog is not None
+
+    def test_fund_history_data_class_exists(self):
+        """测试基金历史数据类存在"""
+        from src.gui.chart import FundHistoryData
+
+        assert FundHistoryData is not None
+
+    def test_fund_history_data_creation(self):
+        """测试基金历史数据创建"""
+        from src.gui.chart import FundHistoryData
+
+        history = FundHistoryData(
+            fund_code="TEST001",
+            fund_name="测试基金",
+            dates=["2024-01-01", "2024-01-02", "2024-01-03"],
+            open_values=[1.0, 1.01, 1.02],
+            close_values=[1.01, 1.02, 1.03],
+            high_values=[1.02, 1.03, 1.04],
+            low_values=[0.99, 1.00, 1.01],
+            volumes=[1000, 1500, 2000],
+        )
+
+        assert history.fund_code == "TEST001"
+        assert history.fund_name == "测试基金"
+        assert len(history.dates) == 3
+        assert len(history.close_values) == 3
+
+    def test_fund_chart_generation(self):
+        """测试基金图表生成"""
+        from src.gui.chart import FundHistoryData
+        import matplotlib
+
+        matplotlib.use("Agg")  # 使用非交互式后端
+        import matplotlib.pyplot as plt
+
+        history = FundHistoryData(
+            fund_code="TEST001",
+            fund_name="测试基金",
+            dates=[
+                "2024-01-01",
+                "2024-01-02",
+                "2024-01-03",
+                "2024-01-04",
+                "2024-01-05",
+            ],
+            open_values=[1.0, 1.01, 1.02, 1.015, 1.03],
+            close_values=[1.01, 1.02, 1.015, 1.03, 1.04],
+            high_values=[1.02, 1.03, 1.025, 1.035, 1.05],
+            low_values=[0.99, 1.00, 1.01, 1.01, 1.02],
+            volumes=[1000, 1500, 1200, 1800, 2000],
+        )
+
+        # 生成图表
+        fig = FundHistoryData.generate_candlestick_chart(history)
+        assert fig is not None
+        assert isinstance(fig, matplotlib.figure.Figure)
+
+        # 清理
+        plt.close(fig)
+
+    def test_fund_chart_with_ma_lines(self):
+        """测试带均线的基金图表"""
+        from src.gui.chart import FundHistoryData
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        # 创建足够长的历史数据用于计算均线
+        dates = [f"2024-01-{i + 1:02d}" for i in range(30)]
+        close_values = [1.0 + i * 0.01 + (i % 5) * 0.005 for i in range(30)]
+
+        history = FundHistoryData(
+            fund_code="TEST002",
+            fund_name="测试基金2",
+            dates=dates,
+            open_values=close_values,
+            close_values=close_values,
+            high_values=[v * 1.01 for v in close_values],
+            low_values=[v * 0.99 for v in close_values],
+            volumes=[1000] * 30,
+        )
+
+        # 生成带均线的图表
+        fig = FundHistoryData.generate_candlestick_chart(
+            history, show_ma=True, ma_periods=[5, 10, 20]
+        )
+        assert fig is not None
+        plt.close(fig)
+
+
+class TestFundDetail:
+    """基金详情页测试"""
+
+    def test_fund_detail_dialog_class_exists(self):
+        """测试基金详情对话框类存在"""
+        from src.gui.detail import FundDetailDialog
+
+        assert FundDetailDialog is not None
+
+    def test_fund_detail_dialog_creation(self):
+        """测试基金详情对话框创建"""
+        from src.gui.detail import FundDetailDialog
+        from src.gui.main import FundDisplayData
+
+        # 创建模拟的app和fund数据
+        class MockApp:
+            pass
+
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=1.5000,
+            est_value=1.5200,
+            change_pct=1.33,
+            profit=100.0,
+            hold_shares=1000.0,
+            cost=1.4000,
+        )
+
+        app = MockApp()
+        dialog = FundDetailDialog(app, fund)
+
+        assert dialog.fund_code == "TEST001"
+        assert dialog.fund_name == "测试基金"
+        assert dialog.fund.net_value == 1.5000
+        assert dialog.fund.profit == 100.0
+
+    def test_fund_detail_statistics_calculation(self):
+        """测试基金详情统计计算"""
+        from src.gui.detail import FundDetailDialog
+        from src.gui.main import FundDisplayData
+
+        class MockApp:
+            pass
+
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=1.5000,
+            est_value=1.5200,
+            change_pct=1.33,
+            profit=100.0,
+            hold_shares=1000.0,
+            cost=1.4000,
+        )
+
+        app = MockApp()
+        dialog = FundDetailDialog(app, fund)
+
+        # 验证统计信息计算
+        assert dialog._get_profit_rate() == pytest.approx(
+            7.14, abs=0.01
+        )  # (1.5-1.4)/1.4 * 100
+
+    def test_fund_detail_with_no_holding(self):
+        """测试无持仓的基金详情"""
+        from src.gui.detail import FundDetailDialog
+        from src.gui.main import FundDisplayData
+
+        class MockApp:
+            pass
+
+        fund = FundDisplayData(
+            code="TEST002",
+            name="无持仓测试基金",
+            net_value=1.0000,
+            est_value=1.0100,
+            change_pct=1.0,
+            profit=0.0,
+            hold_shares=0.0,
+            cost=0.0,
+        )
+
+        app = MockApp()
+        dialog = FundDetailDialog(app, fund)
+
+        assert dialog.fund.hold_shares == 0.0
+        assert dialog.fund.cost == 0.0
+        assert dialog._get_profit_rate() == 0.0
+
+    def test_fund_chart_with_ma_lines(self):
+        """测试带均线的基金图表"""
+        from src.gui.chart import FundHistoryData
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        # 创建足够长的历史数据用于计算均线
+        dates = [f"2024-01-{i + 1:02d}" for i in range(30)]
+        close_values = [1.0 + i * 0.01 + (i % 5) * 0.005 for i in range(30)]
+
+        history = FundHistoryData(
+            fund_code="TEST002",
+            fund_name="测试基金2",
+            dates=dates,
+            open_values=close_values,
+            close_values=close_values,
+            high_values=[v * 1.01 for v in close_values],
+            low_values=[v * 0.99 for v in close_values],
+            volumes=[1000] * 30,
+        )
+
+        # 生成带均线的图表
+        fig = FundHistoryData.generate_candlestick_chart(
+            history, show_ma=True, ma_periods=[5, 10, 20]
+        )
+        assert fig is not None
+        plt.close(fig)
+
     # SettingsDialog 在 GUI 中暂时未实现
     # def test_settings_dialog_class(self):
     #     """测试设置对话框类存在"""
