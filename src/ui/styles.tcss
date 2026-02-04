@@ -16,20 +16,19 @@
 
 /* ==================== TabbedContent 标签页样式 ==================== */
 
-/* 主标签页容器 - 占满可用空间 */
+/* 主标签页容器 */
 TabbedContent {
     height: 100%;
 }
 
-/* TabPane 容器 - 自适应内容高度 */
-TabPane {
-    height: auto;
+/* 内容切换器 - 必须设置高度 */
+ContentSwitcher {
+    height: 100%;
 }
 
-/* Vertical 容器占满剩余空间 */
-Vertical {
-    height: auto;
-    flex-grow: 1;
+/* TabPane 容器 */
+TabPane {
+    height: 100%;
 }
 
 /* 统计面板 / 底部状态行 */

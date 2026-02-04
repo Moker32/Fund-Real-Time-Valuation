@@ -146,29 +146,8 @@ class FundTUIApp(App):
             classes="top-bar"
         )
 
-        # 标签页内容区
-        with TabbedContent(id="main-tabs", initial="fund"):
-            # 基金标签页
-            with TabPane("📊 基金", id="fund"):
-                yield Vertical(
-                    Static("自选基金", classes="column-title"),
-                    FundTable(id="fund-table", classes="fund-table"),
-                    classes="column fund-column"
-                )
-            # 商品标签页
-            with TabPane("📈 商品", id="commodity"):
-                yield Vertical(
-                    Static("大宗商品", classes="column-title"),
-                    CommodityPairView(id="commodity-table", classes="commodity-table"),
-                    classes="column commodity-column"
-                )
-            # 新闻标签页
-            with TabPane("📰 新闻", id="news"):
-                yield Vertical(
-                    Static("财经新闻", classes="column-title"),
-                    NewsList(id="news-list", classes="news-list"),
-                    classes="column news-column"
-                )
+        # 标签页内容区 - 使用 add_pane 方法添加内容
+        yield TabbedContent(id="main-tabs")
 
         # 底部统计行
         yield Horizontal(
@@ -176,10 +155,34 @@ class FundTUIApp(App):
             classes="stats-container"
         )
 
-    # ==================== 生命周期方法 ====================
+    async def on_mount(self) -> None:
+        """应用挂载时初始化标签页内容"""
+        tabs = self.query_one("#main-tabs")
 
-    def on_mount(self) -> None:
-        """应用挂载时初始化"""
+        # 基金标签页
+        fund_content = Vertical(
+            Static("自选基金", classes="column-title"),
+            FundTable(id="fund-table", classes="fund-table"),
+            classes="column fund-column"
+        )
+        await tabs.add_pane(TabPane("📊 基金", fund_content, id="fund"))
+
+        # 商品标签页
+        commodity_content = Vertical(
+            Static("大宗商品", classes="column-title"),
+            CommodityPairView(id="commodity-table", classes="commodity-table"),
+            classes="column commodity-column"
+        )
+        await tabs.add_pane(TabPane("📈 商品", commodity_content, id="commodity"))
+
+        # 新闻标签页
+        news_content = Vertical(
+            Static("财经新闻", classes="column-title"),
+            NewsList(id="news-list", classes="news-list"),
+            classes="column news-column"
+        )
+        await tabs.add_pane(TabPane("📰 新闻", news_content, id="news"))
+
         # 启动自动刷新
         self.auto_refresh_task = asyncio.create_task(self.auto_refresh())
 
