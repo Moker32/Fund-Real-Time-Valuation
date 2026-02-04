@@ -1,9 +1,25 @@
-# Core dependencies
-textual>=0.50.0
-httpx>=0.24.0
-akshare>=1.10.0
-yfinance>=0.2.0
-pyyaml>=6.0
-python-dateutil>=2.8.2
-beautifulsoup4>=4.12.0
-matplotlib>=3.7.0
+# Fund Real-Time Valuation - GUI Version Dependencies
+# 使用 uv 管理: uv pip install -r requirements.txt
+
+# === GUI 框架 ===
+flet==0.28.3                    # GUI 框架 (Flet 0.28.3 API)
+
+# === 数据源 ===
+akshare>=1.10.0                # 财经数据 API
+yfinance>=0.2.0                # 雅虎金融数据
+httpx>=0.24.0                  # HTTP 客户端
+
+# === 配置与解析 ===
+pyyaml>=6.0                    # YAML 配置
+beautifulsoup4>=4.12.0          # 网页解析
+python-dateutil>=2.8.2          # 日期处理
+
+# === 图表 ===
+matplotlib>=3.7.0               # 图表绘制
+
+# === TUI 框架（原版保留）===
+textual>=0.50.0                 # TUI 框架
+
+# === 无需安装 ===
+# sqlite3: Python 内置
+
