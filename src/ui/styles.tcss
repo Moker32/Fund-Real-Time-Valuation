@@ -227,3 +227,93 @@ ChartPreview {
 
 ChartPreview .preview-content {
 }
+
+/* ==================== 基金详情页样式 ==================== */
+
+#fund-detail-screen {
+    width: 100%;
+    height: 100%;
+}
+
+.detail-title {
+    color: $primary;
+    text-style: bold;
+    font-size: 16;
+}
+
+#detail-header {
+    height: 2;
+    background: $surface;
+    padding: 0 1;
+    align: center middle;
+}
+
+.section-title {
+    color: $primary;
+    text-style: bold;
+    height: auto;
+    margin-bottom: 1;
+}
+
+#detail-content {
+    height: auto;
+    flex-grow: 1;
+}
+
+#left-panel {
+    width: 50%;
+    height: 100%;
+    border: solid $panel;
+    padding: 1;
+}
+
+#right-panel {
+    width: 50%;
+    height: 100%;
+    border: solid $panel;
+    border-left: none;
+    padding: 1;
+}
+
+.info-grid {
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 1fr 1fr;
+    row-gap: 1;
+    column-gap: 1;
+}
+
+.info-grid .label {
+    color: $foreground-muted;
+    width: 10;
+}
+
+.info-grid .value {
+    color: $foreground;
+}
+
+.profit-positive {
+    color: $success;
+}
+
+.profit-negative {
+    color: $error;
+}
+
+.action-buttons {
+    margin-top: 2;
+    align: center middle;
+    spacing: 2;
+}
+
+#detail-footer {
+    height: 1;
+    background: $panel;
+    color: $foreground-muted;
+    padding: 0 2;
+}
+
+.help-hint {
+    color: $foreground-muted;
+    font-size: 8;
+}
