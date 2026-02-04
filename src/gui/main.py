@@ -2,6 +2,7 @@
 """Flet GUI 主应用
 
 基金实时估值图形化界面，基于 Flet 0.28.3 框架开发。
+参考 Apple Stocks + 支付宝基金设计风格。
 """
 
 import flet as ft
@@ -10,23 +11,17 @@ from flet import (
     Row,
     Container,
     Text,
-    DataTable,
-    DataColumn,
-    DataRow,
-    DataCell,
     ElevatedButton,
     TextField,
     ProgressRing,
     Divider,
     AlertDialog,
     SnackBar,
-    Card,
     Tabs as FletTabs,
     Tab as FletTab,
-    margin,
     Icon,
     Icons,
-    Checkbox,
+    IconButton,
     ScrollMode,
 )
 from .detail import FundDetailDialog
@@ -35,8 +30,16 @@ from .theme import (
     get_change_color,
     format_change_text,
 )
+from .components import (
+    FundCard,
+    FundPortfolioCard,
+    MiniChart,
+    SearchBar,
+    QuickActionButton,
+    AppColors,
+)
 from typing import List, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 import asyncio
 import sys
@@ -63,6 +66,7 @@ class FundDisplayData:
     cost: float
     sector: str = ""  # 板块标注
     is_hold: bool = False  # 持有标记
+    chart_data: List[float] = field(default_factory=list)  # 迷你走势图数据
 
 
 class FundGUIApp:
@@ -77,7 +81,8 @@ class FundGUIApp:
         self.funds: List[FundDisplayData] = []
         self.refresh_interval = 30
         self.current_tab = 0
-        self._fund_rows: dict[str, DataRow] = {}  # 缓存基金行对象
+        self._fund_cards: dict[str, FundCard] = {}  # 缓存基金卡片组件
+        self._fund_list: Optional[Column] = None  # 基金列表容器
 
     def run(self, page: ft.Page):
         """运行应用"""
@@ -92,46 +97,55 @@ class FundGUIApp:
         page.update()
 
     def _build_ui(self):
-        """构建 UI"""
-        # 顶部标题
-        header = Container(
+        """构建 UI（Apple Stocks + 支付宝风格）"""
+        # 顶部导航栏（简洁风格）
+        top_bar = Container(
+            padding=ft.padding.only(left=16, right=16, top=12, bottom=8),
             content=Row(
                 [
                     Text(
-                        "基金实时估值",
-                        size=24,
+                        "基金",
+                        size=34,
                         weight=ft.FontWeight.BOLD,
-                        color=ft.Colors.WHITE,
+                        color=AppColors.TEXT_PRIMARY,
                     ),
                     Container(expand=True),
-                    ElevatedButton(
-                        "刷新", icon=Icons.REFRESH, on_click=self._on_refresh
+                    IconButton(
+                        icon=Icons.NOTIFICATIONS_OUTLINED,
+                        icon_color=AppColors.TEXT_PRIMARY,
+                        tooltip="通知",
+                        on_click=self._show_notifications,
+                    ),
+                    IconButton(
+                        icon=Icons.SETTINGS_OUTLINED,
+                        icon_color=AppColors.TEXT_PRIMARY,
+                        tooltip="设置",
+                        on_click=self._show_settings,
                     ),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             ),
-            padding=15,
-            bgcolor=ft.Colors.BLUE_900,
         )
 
-        # 标签页
+        # 标签栏（带动画）
         self.tabs = FletTabs(
             selected_index=0,
-            animation_duration=300,
+            animation_duration=350,  # 稍微延长动画时间，更流畅
             on_change=self._on_tab_change,
             tabs=[
                 FletTab(
-                    text="📊 基金",
-                    icon=Icons.ACCOUNT_BALANCE,
+                    text="自选",
+                    icon=Icons.STAR_BORDER,
                     content=self._build_fund_page(),
                 ),
                 FletTab(
-                    text="📈 商品",
+                    text="商品",
                     icon=Icons.TRENDING_UP,
                     content=self._build_commodity_page(),
                 ),
                 FletTab(
-                    text="📰 新闻",
+                    text="新闻",
                     icon=Icons.NEWSPAPER,
                     content=self._build_news_page(),
                 ),
@@ -143,75 +157,113 @@ class FundGUIApp:
         self.status_bar = Container(
             content=Row(
                 [
-                    Text("等待更新...", size=12, color=ft.Colors.WHITE70),
+                    Text("等待更新...", size=12, color=AppColors.TEXT_SECONDARY),
                     Container(expand=True),
-                    Text("数据源: 新浪财经", size=12, color=ft.Colors.WHITE70),
+                    Text("数据源: 新浪财经", size=12, color=AppColors.TEXT_SECONDARY),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
             padding=10,
-            bgcolor=ft.Colors.SURFACE,
+            bgcolor=AppColors.CARD_DARK,
         )
 
-        self.page.add(header)
+        self.page.add(top_bar)
         self.page.add(self.tabs)
         self.page.add(self.status_bar)
 
-        # 加载初始数据（使用 Flet 的 run_task 确保在正确的事件循环中执行）
+        # 加载初始数据
         self.page.run_task(self._load_fund_data)
 
     def _build_fund_page(self) -> Container:
-        """构建基金页面"""
-        # 基金表格 - 使用自适应列宽
-        self.fund_table = DataTable(
-            columns=[
-                DataColumn(Text(""), numeric=False),  # 复选框列
-                DataColumn(Text("代码"), numeric=False),
-                DataColumn(Container(Text("名称"), expand=True), numeric=False),
-                DataColumn(Text("持有"), numeric=False),
-                DataColumn(Text("板块"), numeric=False),
-                DataColumn(Text("单位净值"), numeric=True),
-                DataColumn(Text("估算净值"), numeric=True),
-                DataColumn(Text("涨跌幅"), numeric=True),
-                DataColumn(Text("持仓盈亏"), numeric=True),
-            ],
-            rows=[],
-            heading_row_color=ft.Colors.BLUE_900,
-            heading_row_height=40,
-            data_row_min_height=40,
-            column_spacing=8,
+        """构建基金页面（卡片式布局）"""
+        # 资产概览卡片
+        self.portfolio_card = FundPortfolioCard(
+            total_assets=0,
+            daily_profit=0,
+            total_profit=0,
+            profit_rate=0,
+            fund_count=0,
+            hold_count=0,
         )
 
-        # 存储选中的基金代码
-        self._selected_funds = set()  # 选中的基金代码集合
-
-        # 操作按钮
+        # 快捷操作按钮
         action_row = Row(
             [
-                ElevatedButton("添加", icon=Icons.ADD, on_click=self._show_add_fund),
-                ElevatedButton("详情", icon=Icons.INFO, on_click=self._show_detail),
-                ElevatedButton("持仓", icon=Icons.EDIT, on_click=self._show_holding),
-                ElevatedButton("持有", icon=Icons.STAR, on_click=self._show_hold),
-                ElevatedButton("板块", icon=Icons.LABEL, on_click=self._show_sector),
-                ElevatedButton("删除", icon=Icons.DELETE, on_click=self._delete_fund),
+                QuickActionButton(
+                    Icons.ADD,
+                    "添加",
+                    self._show_add_fund,
+                    accent_color=AppColors.ACCENT_BLUE,
+                ),
+                QuickActionButton(
+                    Icons.INFO,
+                    "详情",
+                    self._show_detail,
+                    accent_color=AppColors.ACCENT_ORANGE,
+                ),
+                QuickActionButton(
+                    Icons.EDIT,
+                    "持仓",
+                    self._show_holding,
+                    accent_color=AppColors.UP_RED,
+                ),
+                QuickActionButton(
+                    Icons.STAR,
+                    "持有",
+                    self._show_hold,
+                    accent_color=AppColors.DOWN_GREEN,
+                ),
             ],
-            spacing=10,
+            spacing=24,
+            alignment=ft.MainAxisAlignment.CENTER,
         )
 
+        # 搜索栏
+        self.search_bar = SearchBar(
+            on_search=self._on_fund_search,
+            placeholder="搜索基金代码或名称",
+        )
+
+        # 基金列表（使用 Column + Scroll）
+        self._fund_list = Column(
+            spacing=12,
+            scroll=ft.ScrollMode.AUTO,
+            expand=True,
+        )
+
+        # 返回包含所有元素的 Column
         return Container(
             content=Column(
                 [
-                    action_row,
-                    # 使用 SingleChildScrollView 包裹表格以支持横向滚动
+                    # 资产概览卡片
                     Container(
-                        content=self.fund_table,
+                        padding=ft.padding.symmetric(horizontal=16),
+                        content=self.portfolio_card,
+                    ),
+                    Container(height=8),
+                    # 快捷操作
+                    Container(
+                        padding=ft.padding.symmetric(horizontal=16),
+                        content=action_row,
+                    ),
+                    Container(height=8),
+                    # 搜索栏
+                    Container(
+                        padding=ft.padding.symmetric(horizontal=16),
+                        content=self.search_bar,
+                    ),
+                    Container(height=12),
+                    # 基金列表容器 - 需要expand
+                    Container(
                         expand=True,
+                        content=self._fund_list,
                     ),
                 ],
-                spacing=10,
+                spacing=0,
                 expand=True,
             ),
-            padding=10,
+            expand=True,
+            padding=ft.padding.only(top=8),
         )
 
     def _build_commodity_page(self) -> Container:
@@ -257,6 +309,37 @@ class FundGUIApp:
 
         self._show_snackbar("数据已刷新")
 
+    def _show_notifications(self, e):
+        """显示通知"""
+        self._show_snackbar("通知功能开发中")
+
+    def _show_settings(self, e):
+        """显示设置"""
+        self._show_snackbar("设置功能开发中")
+
+    def _on_fund_search(self, query: str):
+        """基金搜索"""
+        if query:
+            filtered = [
+                f
+                for f in self.funds
+                if query.lower() in f.code.lower() or query.lower() in f.name.lower()
+            ]
+            # 过滤显示
+            for code, card in self._fund_cards.items():
+                card.visible = code in {f.code for f in filtered}
+        else:
+            # 显示全部
+            for card in self._fund_cards.values():
+                card.visible = True
+
+        if self._fund_list:
+            self._fund_list.update()
+
+    def _on_fund_click(self, e, fund: FundDisplayData):
+        """基金卡片点击"""
+        self._show_detail(e, fund)
+
     def _show_snackbar(self, message: str):
         """显示提示"""
         sb = SnackBar(Text(message), open=True)
@@ -299,128 +382,108 @@ class FundGUIApp:
                         )
                         self.funds.append(fund_data)
                 except Exception as ex:
-                    print(f"获取基金 {fund.code} 数据失败: {ex}")
+                    pass
 
             self._update_fund_table()
             now = datetime.now().strftime("%H:%M:%S")
-            self.status_bar.content.controls[0].value = f"最后更新: {now}"
+            self.status_bar.content.controls[0].value = f"Last Update: {now}"
+            self.status_bar.content.update()
 
         except Exception as e:
-            self._show_snackbar(f"加载失败: {str(e)}")
+            self._show_snackbar(f"Load failed: {str(e)}")
 
     def _update_fund_table(self):
-        """更新基金表格（增量更新，避免全量重建）"""
+        """更新基金卡片列表（卡片式布局）"""
+        # 计算资产概览数据
+        total_assets = sum(
+            f.net_value * f.hold_shares for f in self.funds if f.hold_shares > 0
+        )
+        total_cost = sum(
+            f.cost * f.hold_shares for f in self.funds if f.hold_shares > 0
+        )
+        daily_profit = sum(f.profit for f in self.funds if f.hold_shares > 0)
+        total_profit = total_assets - total_cost
+        profit_rate = (total_profit / total_cost * 100) if total_cost > 0 else 0
+        hold_count = sum(1 for f in self.funds if f.hold_shares > 0)
+
+        # 更新资产概览卡片
+        if hasattr(self, "portfolio_card") and self.portfolio_card:
+            self.portfolio_card.update_data(
+                total_assets=total_assets,
+                daily_profit=daily_profit,
+                total_profit=total_profit,
+                profit_rate=profit_rate,
+                fund_count=len(self.funds),
+                hold_count=hold_count,
+            )
+
         # 获取当前基金代码集合
         current_codes = {fund.code for fund in self.funds}
-        cached_codes = set(self._fund_rows.keys())
+        cached_codes = (
+            set(self._fund_cards.keys()) if hasattr(self, "_fund_cards") else set()
+        )
 
-        # 1. 移除已删除的基金行
+        # 确保 _fund_cards 存在
+        if not hasattr(self, "_fund_cards"):
+            self._fund_cards = {}
+
+        # 1. 移除已删除的基金卡片
         removed_codes = cached_codes - current_codes
         for code in removed_codes:
-            row = self._fund_rows.pop(code)
-            if row in self.fund_table.rows:
-                self.fund_table.rows.remove(row)
+            if code in self._fund_cards:
+                card = self._fund_cards.pop(code)
+                if self._fund_list and card in self._fund_list.controls:
+                    self._fund_list.controls.remove(card)
 
-        # 2. 更新现有基金行
+        # 2. 更新或创建基金卡片
         for fund in self.funds:
-            if fund.code in self._fund_rows:
-                # 更新已有行的数据
-                self._update_row_data(self._fund_rows[fund.code], fund)
+            if fund.code in self._fund_cards:
+                # 更新已有卡片
+                self._fund_cards[fund.code].update_data(
+                    net_value=fund.net_value,
+                    est_value=fund.est_value,
+                    change_pct=fund.change_pct,
+                    profit=fund.profit,
+                    chart_data=fund.chart_data if fund.chart_data else None,
+                )
             else:
-                # 创建新行
-                row = self._create_row(fund)
-                self._fund_rows[fund.code] = row
-                self.fund_table.rows.append(row)
-
-        self.page.update()
-
-    def _create_row(self, fund: FundDisplayData) -> DataRow:
-        """创建基金数据行"""
-        change_color = get_change_color(fund.change_pct)
-        profit_color = get_change_color(fund.profit)
-        sector_text = fund.sector if fund.sector else "-"
-        sector_color = ft.Colors.ORANGE_300 if fund.sector else ft.Colors.GREY_500
-        hold_text = "[持有]" if fund.is_hold else ""
-        hold_color = ft.Colors.GREEN_400 if fund.is_hold else ft.Colors.GREY_600
-
-        checkbox = Checkbox(
-            value=fund.code in self._selected_funds,
-            on_change=lambda e, code=fund.code: self._on_fund_checkbox_change(e, code),
-        )
-
-        return DataRow(
-            cells=[
-                DataCell(checkbox),
-                DataCell(Text(fund.code)),
-                DataCell(
-                    Text(
-                        fund.name,
-                        max_lines=1,
-                        overflow=ft.TextOverflow.ELLIPSIS,
+                # 创建新卡片
+                fund_code = fund.code  # 闭包修复：复制变量
+                try:
+                    card = FundCard(
+                        code=fund.code,
+                        name=fund.name,
+                        net_value=fund.net_value,
+                        est_value=fund.est_value,
+                        change_pct=fund.change_pct,
+                        profit=fund.profit,
+                        hold_shares=fund.hold_shares,
+                        cost=fund.cost,
+                        sector=fund.sector,
+                        is_hold=fund.is_hold,
+                        chart_data=fund.chart_data if fund.chart_data else None,
+                        on_click=lambda e, f=fund: self._on_fund_click(e, f),
                     )
-                ),
-                DataCell(
-                    Text(
-                        hold_text,
-                        color=hold_color,
-                        size=10,
-                        weight=ft.FontWeight.BOLD,
-                    )
-                ),
-                DataCell(
-                    Text(
-                        sector_text,
-                        color=sector_color,
-                        size=10,
-                        weight=ft.FontWeight.BOLD,
-                    )
-                ),
-                DataCell(Text(f"{fund.net_value:.4f}")),
-                DataCell(Text(f"{fund.est_value:.4f}")),
-                DataCell(
-                    Text(
-                        f"{fund.change_pct:+.2f}%",
-                        color=change_color,
-                        weight=ft.FontWeight.BOLD,
-                    )
-                ),
-                DataCell(
-                    Text(
-                        f"{fund.profit:+.2f}",
-                        color=profit_color,
-                        weight=ft.FontWeight.BOLD,
-                    )
-                ),
-            ],
-            data=fund.code,
-        )
+                except Exception as e:
+                    continue
 
-    def _update_row_data(self, row: DataRow, fund: FundDisplayData):
-        """更新已有行的数据（避免重建）"""
-        change_color = get_change_color(fund.change_pct)
-        profit_color = get_change_color(fund.profit)
-        sector_text = fund.sector if fund.sector else "-"
-        sector_color = ft.Colors.ORANGE_300 if fund.sector else ft.Colors.GREY_500
-        hold_text = "[持有]" if fund.is_hold else ""
-        hold_color = ft.Colors.GREEN_400 if fund.is_hold else ft.Colors.GREY_600
+                self._fund_cards[fund.code] = card
+                if self._fund_list:
+                    self._fund_list.controls.append(card)
 
-        # 更新复选框状态
-        checkbox = row.cells[0].content
-        checkbox.value = fund.code in self._selected_funds
+        # 刷新基金列表
+        if self._fund_list:
+            self._fund_list.update()
 
-        # 更新各单元格文本
-        row.cells[1].content.value = fund.code
-        row.cells[2].content.value = fund.name
-        row.cells[3].content.value = hold_text
-        row.cells[3].content.color = hold_color
-        row.cells[4].content.value = sector_text
-        row.cells[4].content.color = sector_color
-        row.cells[5].content.value = f"{fund.net_value:.4f}"
-        row.cells[6].content.value = f"{fund.est_value:.4f}"
-        row.cells[7].content.value = f"{fund.change_pct:+.2f}%"
-        row.cells[7].content.color = change_color
-        row.cells[8].content.value = f"{fund.profit:+.2f}"
-        row.cells[8].content.color = profit_color
+        # 更新状态栏
+        if self.status_bar and self.status_bar.content:
+            self.status_bar.content.controls[
+                0
+            ].value = f"Last Update: {datetime.now().strftime('%H:%M:%S')}"
+            self.status_bar.content.update()
+
+        if self.page:
+            self.page.update()
 
     async def _load_commodity_data(self):
         """加载商品数据"""

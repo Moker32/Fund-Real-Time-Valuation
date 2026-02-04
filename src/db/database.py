@@ -40,6 +40,8 @@ class FundConfig:
     watchlist: int = 1  # SQLite返回整数，1=True，0=False
     shares: float = 0.0  # 持有份额
     cost: float = 0.0  # 成本价
+    is_hold: int = 0  # 持有标记 (1=持有, 0=不持有)
+    sector: str = ""  # 板块标注
     notes: str = ""  # 备注
     created_at: str = ""
     updated_at: str = ""
@@ -48,6 +50,11 @@ class FundConfig:
     def is_watchlist(self) -> bool:
         """将整数转换为布尔值"""
         return bool(self.watchlist)
+
+    @property
+    def is_holding(self) -> bool:
+        """检查是否标记为持有"""
+        return bool(self.is_hold)
 
 
 @dataclass
@@ -147,11 +154,16 @@ class DatabaseManager:
                     watchlist INTEGER DEFAULT 1,
                     shares REAL DEFAULT 0,
                     cost REAL DEFAULT 0,
+                    is_hold INTEGER DEFAULT 0,
+                    sector TEXT DEFAULT '',
                     notes TEXT DEFAULT '',
                     created_at TEXT,
                     updated_at TEXT
                 )
             """)
+
+            # 执行数据库迁移：检查并添加缺失的列
+            self._migrate_database(cursor)
 
             # 商品配置表
             cursor.execute("""
@@ -211,6 +223,22 @@ class DatabaseManager:
 
             conn.commit()
 
+    def _migrate_database(self, cursor) -> None:
+        """数据库迁移：检查并添加缺失的列"""
+        try:
+            # 检查 fund_config 表是否有 is_hold 列
+            cursor.execute("PRAGMA table_info(fund_config)")
+            columns = [row[1] for row in cursor.fetchall()]
+
+            # 添加 is_hold 列（如果不存在）
+            if "is_hold" not in columns:
+                cursor.execute(
+                    "ALTER TABLE fund_config ADD COLUMN is_hold INTEGER DEFAULT 0"
+                )
+
+        except Exception as e:
+            logger.warning(f"数据库迁移警告: {e}")
+
     def vacuum(self) -> None:
         """清理数据库碎片"""
         with self.get_connection() as conn:
@@ -260,6 +288,8 @@ class ConfigDAO:
         watchlist: bool = True,
         shares: float = 0.0,
         cost: float = 0.0,
+        is_hold: bool = False,
+        sector: str = "",
         notes: str = "",
     ) -> bool:
         """
@@ -271,6 +301,8 @@ class ConfigDAO:
             watchlist: 是否加入自选
             shares: 持有份额
             cost: 成本价
+            is_hold: 是否标记为持有
+            sector: 板块标注
             notes: 备注
 
         Returns:
@@ -283,10 +315,21 @@ class ConfigDAO:
                 cursor.execute(
                     """
                     INSERT OR REPLACE INTO fund_config
-                    (code, name, watchlist, shares, cost, notes, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (code, name, watchlist, shares, cost, is_hold, sector, notes, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                    (code, name, int(watchlist), shares, cost, notes, now, now),
+                    (
+                        code,
+                        name,
+                        int(watchlist),
+                        shares,
+                        cost,
+                        int(is_hold),
+                        sector,
+                        notes,
+                        now,
+                        now,
+                    ),
                 )
                 return True
             except sqlite3.IntegrityError:
@@ -331,9 +374,17 @@ class ConfigDAO:
 
         Args:
             code: 基金代码
-            **kwargs: 更新的字段（name, watchlist, shares, cost, notes）
+            **kwargs: 更新的字段（name, watchlist, shares, cost, is_hold, sector, notes）
         """
-        allowed_fields = {"name", "watchlist", "shares", "cost", "notes"}
+        allowed_fields = {
+            "Name",
+            "watchlist",
+            "shares",
+            "cost",
+            "is_hold",
+            "sector",
+            "notes",
+        }
         updates = {k: v for k, v in kwargs.items() if k in allowed_fields}
         if not updates:
             return False
@@ -363,6 +414,29 @@ class ConfigDAO:
     def add_to_watchlist(self, code: str) -> bool:
         """添加到自选列表"""
         return self.update_fund(code, watchlist=True)
+
+    def toggle_hold(self, code: str, is_hold: bool) -> bool:
+        """切换持有标记"""
+        return self.update_fund(code, is_hold=is_hold)
+
+    def get_hold_funds(self) -> List["FundConfig"]:
+        """获取标记为持有的基金列表"""
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM fund_config WHERE is_hold = 1 ORDER BY updated_at DESC"
+            )
+            return [FundConfig(**row) for row in cursor.fetchall()]
+
+    def get_funds_by_hold(self, holding: bool) -> List["FundConfig"]:
+        """根据持有标记获取基金列表"""
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM fund_config WHERE is_hold = ? ORDER BY updated_at DESC",
+                (1 if holding else 0,),
+            )
+            return [FundConfig(**row) for row in cursor.fetchall()]
 
     # ==================== 商品配置操作 ====================
 
