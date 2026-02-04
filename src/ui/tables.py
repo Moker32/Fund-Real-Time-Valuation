@@ -60,12 +60,12 @@ class FundTable(DataTable):
             has_holding = fund.hold_shares and fund.hold_shares > 0
 
             # 检查是否已存在菜单
-            existing = self.app.query_one("#fund-context-menu", default=None)
-            if existing is not None:
-                try:
+            try:
+                existing = self.app.query_one("#fund-context-menu")
+                if existing is not None:
                     existing.remove()
-                except:
-                    pass
+            except:
+                pass
 
             # 挂载菜单
             from .menus import FundContextMenu
