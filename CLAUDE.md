@@ -15,6 +15,10 @@ python run_tui.py
 
 # 安装依赖
 pip install -r requirements.txt
+
+# 运行测试
+pytest tests/ -v           # 运行所有测试
+pytest tests/ -v --tb=short # 简洁错误输出
 ```
 
 ## 技术栈
@@ -34,15 +38,21 @@ src/
 │   ├── app.py       # 主应用 (FundTUIApp)
 │   ├── widgets.py   # 表格、面板组件
 │   └── screens.py   # 视图屏幕
-├── datasources/     # 数据源层
-│   ├── manager.py   # DataSourceManager (多数据源管理)
-│   ├── base.py      # 数据源抽象基类
-│   ├── fund_source.py
-│   ├── commodity_source.py
-│   └── news_source.py
-└── config/          # 配置层
-    ├── manager.py   # ConfigManager
-    └── models.py    # 数据模型 (Fund, Holding, Commodity 等)
+├── datasources/      # 数据源层
+│   ├── manager.py    # DataSourceManager (多数据源管理)
+│   ├── base.py       # 数据源抽象基类
+│   ├── aggregator.py # 数据聚合器
+│   ├── fund_source.py  # 基金数据源
+│   ├── stock_source.py # 股票数据源
+│   ├── bond_source.py  # 债券数据源
+│   ├── crypto_source.py # 加密货币数据源
+│   ├── sector_source.py # 行业数据源
+│   ├── commodity_source.py # 商品数据源
+│   ├── news_source.py   # 新闻数据源
+│   └── portfolio.py     # 组合分析
+└── config/           # 配置层
+    ├── manager.py    # ConfigManager
+    └── models.py     # 数据模型 (Fund, Holding, Commodity 等)
 ```
 
 ### 数据流
@@ -73,6 +83,10 @@ src/
 - `Commodity` - 商品信息
 - `AppConfig` - 应用配置
 
+### 响应式状态管理
+
+应用使用 Textual 的响应式状态管理，通过 `@式` 装饰器实现 UI 自动更新。
+
 ### UI 快捷键
 
 | 按键 | 功能 |
@@ -83,8 +97,3 @@ src/
 | `t` | 切换主题 |
 | `F1` | 帮助 |
 | `q` / `Ctrl+C` | 退出 |
-
-## 注意事项
-
-- 当前使用模拟数据，实际 API 调用待实现
-- 数据源模块位于 `src/datasources/`，需完善 `fetch` 方法

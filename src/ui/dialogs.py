@@ -1,13 +1,14 @@
 # -*- coding: UTF-8 -*-
 """对话框组件模块"""
 
+from textual.widget import Widget
+from textual.message import Message
 from textual.widgets import Static, Button, Input
-from textual.containers import Vertical, Horizontal
-from textual.dialog import Dialog
+from textual.containers import Container, Vertical, Horizontal
 from typing import Optional
 
 
-class AddFundDialog(Dialog):
+class AddFundDialog(Container):
     """添加基金对话框"""
 
     DEFAULT_CSS = """
@@ -58,13 +59,15 @@ class AddFundDialog(Dialog):
         if code and name:
             self.result_code = code
             self.result_name = name
-            self.dismiss(True)
+            self.remove()
+            self.post_message(self.Confirm())
         else:
             self.notify("请填写完整的基金信息", severity="warning")
 
     def action_cancel(self) -> None:
         """取消"""
-        self.dismiss(False)
+        self.remove()
+        self.post_message(self.Cancel())
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "confirm-btn":
@@ -72,8 +75,16 @@ class AddFundDialog(Dialog):
         else:
             self.action_cancel()
 
+    class Confirm(Message):
+        """确认添加消息"""
+        pass
 
-class HoldingDialog(Dialog):
+    class Cancel(Message):
+        """取消消息"""
+        pass
+
+
+class HoldingDialog(Container):
     """持仓设置对话框"""
 
     DEFAULT_CSS = """
@@ -133,21 +144,32 @@ class HoldingDialog(Dialog):
                 self.result_shares = shares
                 self.result_cost = cost
                 self.is_holding = True
-                self.dismiss(True)
+                self.remove()
+                self.post_message(self.Confirm())
             except ValueError:
                 self.notify("请输入有效的数字", severity="error")
         else:
             self.result_shares = 0.0
             self.result_cost = 0.0
             self.is_holding = False
-            self.dismiss(False)
+            self.remove()
+            self.post_message(self.Confirm())
 
     def action_cancel(self) -> None:
         """取消"""
-        self.dismiss(False)
+        self.remove()
+        self.post_message(self.Cancel())
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "confirm-btn":
             self.action_confirm()
         else:
             self.action_cancel()
+
+    class Confirm(Message):
+        """确认消息"""
+        pass
+
+    class Cancel(Message):
+        """取消消息"""
+        pass

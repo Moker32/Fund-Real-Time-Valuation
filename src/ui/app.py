@@ -28,6 +28,7 @@ from .charts import ChartDialog
 from .dialogs import AddFundDialog, HoldingDialog
 from src.datasources.base import DataSourceType
 from src.datasources.fund_source import FundDataSource, FundHistorySource
+from src.datasources.manager import create_default_manager
 
 
 # ==================== 自定义主题定义 ====================
@@ -368,10 +369,10 @@ class FundTUIApp(App):
 
     # ==================== 对话框消息处理 ====================
 
-    def on_add_fund_dialog_dismiss(self, event: AddFundDialog.Dismiss) -> None:
-        """处理添加基金对话框关闭"""
+    def on_add_fund_dialog_confirm(self, event: AddFundDialog.Confirm) -> None:
+        """处理添加基金确认"""
         dialog = self.query_one("#add-fund-dialog", AddFundDialog)
-        if event.result and dialog.result_code and dialog.result_name:
+        if dialog.result_code and dialog.result_name:
             # 添加到配置
             from config.manager import ConfigManager
             from config.models import Fund
@@ -386,11 +387,12 @@ class FundTUIApp(App):
             else:
                 self.notify("基金已存在于自选列表中", severity="warning")
 
-    def on_holding_dialog_dismiss(self, event: HoldingDialog.Dismiss) -> None:
-        """处理持仓设置对话框关闭"""
-        if not event.result:
-            return
+    def on_add_fund_dialog_cancel(self, event: AddFundDialog.Cancel) -> None:
+        """处理添加基金取消"""
+        pass  # 取消时无需处理
 
+    def on_holding_dialog_confirm(self, event: HoldingDialog.Confirm) -> None:
+        """处理持仓设置确认"""
         dialog = self.query_one("#holding-dialog", HoldingDialog)
         # 更新持仓配置
         from config.manager import ConfigManager
@@ -412,6 +414,10 @@ class FundTUIApp(App):
 
         # 刷新数据
         asyncio.create_task(self.load_fund_data())
+
+    def on_holding_dialog_cancel(self, event: HoldingDialog.Cancel) -> None:
+        """处理持仓设置取消"""
+        pass  # 取消时无需处理
 
     # ==================== 数据刷新 ====================
 
