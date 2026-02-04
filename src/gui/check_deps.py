@@ -7,6 +7,12 @@
 import sys
 from typing import List, Tuple
 
+# Windows 控制台编码修复：设置 stdout 为 UTF-8
+if sys.platform == "win32":
+    import io
+
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
 
 # 必需依赖列表
 REQUIRED_PACKAGES = [
