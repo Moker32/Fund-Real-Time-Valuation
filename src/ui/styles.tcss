@@ -238,7 +238,6 @@ ChartPreview .preview-content {
 .detail-title {
     color: $primary;
     text-style: bold;
-    font-size: 16;
 }
 
 #detail-header {
@@ -257,7 +256,6 @@ ChartPreview .preview-content {
 
 #detail-content {
     height: auto;
-    flex-grow: 1;
 }
 
 #left-panel {
@@ -279,8 +277,6 @@ ChartPreview .preview-content {
     layout: grid;
     grid-size: 2;
     grid-columns: 1fr 1fr;
-    row-gap: 1;
-    column-gap: 1;
 }
 
 .info-grid .label {
@@ -303,7 +299,6 @@ ChartPreview .preview-content {
 .action-buttons {
     margin-top: 2;
     align: center middle;
-    spacing: 2;
 }
 
 #detail-footer {
@@ -315,5 +310,4 @@ ChartPreview .preview-content {
 
 .help-hint {
     color: $foreground-muted;
-    font-size: 8;
 }
