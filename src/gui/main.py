@@ -151,21 +151,21 @@ class FundGUIApp:
 
     def _build_fund_page(self) -> Container:
         """构建基金页面"""
-        # 基金表格
+        # 基金表格 - 使用Container包装Text来控制宽度
         self.fund_table = DataTable(
             columns=[
-                DataColumn(Text("代码"), width=100),
-                DataColumn(Text("名称"), width=250),
-                DataColumn(Text("单位净值"), width=100),
-                DataColumn(Text("估算净值"), width=100),
-                DataColumn(Text("涨跌幅"), width=100),
-                DataColumn(Text("持仓盈亏"), width=120),
+                DataColumn(Container(Text("代码"), width=90)),
+                DataColumn(Container(Text("名称"), width=240)),
+                DataColumn(Container(Text("单位净值"), width=95)),
+                DataColumn(Container(Text("估算净值"), width=95)),
+                DataColumn(Container(Text("涨跌幅"), width=90)),
+                DataColumn(Container(Text("持仓盈亏"), width=110)),
             ],
             rows=[],
             heading_row_color=ft.Colors.BLUE_900,
             heading_row_height=40,
             data_row_min_height=40,
-            column_spacing=10,
+            column_spacing=5,
         )
 
         # 操作按钮
@@ -292,31 +292,37 @@ class FundGUIApp:
 
             row = DataRow(
                 cells=[
-                    DataCell(Text(fund.code, width=95)),
+                    DataCell(Container(Text(fund.code), width=85)),
                     DataCell(
-                        Text(
-                            fund.name,
-                            width=245,
-                            max_lines=1,
-                            overflow=ft.TextOverflow.ELLIPSIS,
+                        Container(
+                            Text(
+                                fund.name,
+                                max_lines=1,
+                                overflow=ft.TextOverflow.ELLIPSIS,
+                            ),
+                            width=235,
                         )
                     ),
-                    DataCell(Text(f"{fund.net_value:.4f}", width=95)),
-                    DataCell(Text(f"{fund.est_value:.4f}", width=95)),
+                    DataCell(Container(Text(f"{fund.net_value:.4f}"), width=90)),
+                    DataCell(Container(Text(f"{fund.est_value:.4f}"), width=90)),
                     DataCell(
-                        Text(
-                            f"{fund.change_pct:+.2f}%",
-                            color=change_color,
-                            weight=ft.FontWeight.BOLD,
-                            width=95,
+                        Container(
+                            Text(
+                                f"{fund.change_pct:+.2f}%",
+                                color=change_color,
+                                weight=ft.FontWeight.BOLD,
+                            ),
+                            width=85,
                         )
                     ),
                     DataCell(
-                        Text(
-                            f"{fund.profit:+.2f}",
-                            color=profit_color,
-                            weight=ft.FontWeight.BOLD,
-                            width=115,
+                        Container(
+                            Text(
+                                f"{fund.profit:+.2f}",
+                                color=profit_color,
+                                weight=ft.FontWeight.BOLD,
+                            ),
+                            width=105,
                         )
                     ),
                 ],

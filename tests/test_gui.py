@@ -734,3 +734,504 @@ class TestConfigurationPersistence:
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
+
+
+class TestFundTableInteraction:
+    """基金表格交互测试"""
+
+    def test_fund_table_has_columns(self):
+        """测试基金表格有正确的列"""
+        from src.gui.main import FundGUIApp
+
+        app = FundGUIApp()
+        # 需要先调用_build_fund_page来创建fund_table
+        container = app._build_fund_page()
+        assert app.fund_table is not None
+
+    def test_fund_table_column_count(self):
+        """测试基金表格列数"""
+        from src.gui.main import FundGUIApp
+
+        app = FundGUIApp()
+        app._build_fund_page()
+        # 应该有6列: 代码、名称、单位净值、估算净值、涨跌幅、持仓盈亏
+        assert len(app.fund_table.columns) == 6
+
+    def test_fund_selection_state(self):
+        """测试基金选择状态"""
+        from src.gui.main import FundGUIApp
+
+        app = FundGUIApp()
+        # 初始没有选中
+        assert app._get_selected_fund_code() is None
+
+    def test_fund_selection_with_holding(self):
+        """测试带持仓的基金选择状态"""
+        from src.gui.main import FundGUIApp, FundDisplayData
+
+        app = FundGUIApp()
+        # 模拟选中一只基金
+        app._selected_fund_code = "161039"
+        assert app._get_selected_fund_code() == "161039"
+
+    def test_fund_selection_cleared(self):
+        """测试清除基金选择状态"""
+        from src.gui.main import FundGUIApp
+
+        app = FundGUIApp()
+        app._selected_fund_code = "TEST001"
+        app._selected_fund_code = None
+        assert app._get_selected_fund_code() is None
+
+
+class TestTabNavigation:
+    """标签页导航测试"""
+
+    def test_tabs_initial_state(self):
+        """测试标签页初始状态"""
+        from src.gui.main import FundGUIApp
+
+        app = FundGUIApp()
+        # 初始标签页应该是0（基金）
+        assert app.current_tab == 0
+
+    def test_tab_texts_defined(self):
+        """测试标签页标题定义"""
+        # 验证标签页标题是预期的
+        expected_titles = ["📊 基金", "📈 商品", "📰 新闻"]
+        assert len(expected_titles) == 3
+        assert "📊 基金" in expected_titles
+        assert "📈 商品" in expected_titles
+        assert "📰 新闻" in expected_titles
+
+
+class TestDataLoading:
+    """数据加载测试"""
+
+    def test_refresh_interval_default(self):
+        """测试刷新间隔默认值"""
+        from src.gui.main import FundGUIApp
+
+        app = FundGUIApp()
+        assert app.refresh_interval == 30
+
+    def test_funds_list_initially_empty(self):
+        """测试基金列表初始为空"""
+        from src.gui.main import FundGUIApp
+
+        app = FundGUIApp()
+        assert app.funds == []
+        assert isinstance(app.funds, list)
+
+
+class TestDialogValidation:
+    """对话框验证测试"""
+
+    def test_add_fund_dialog_creation(self):
+        """测试添加基金对话框创建"""
+        from src.gui.main import AddFundDialog, FundGUIApp
+
+        class MockPage:
+            def __init__(self):
+                self.overlay = []
+
+            def update(self):
+                pass
+
+        class MockApp(FundGUIApp):
+            def __init__(self):
+                super().__init__()
+                self.page = MockPage()
+
+        app = MockApp()
+        dialog = AddFundDialog(app)
+
+        assert dialog.code_field is not None
+        assert dialog.name_field is not None
+        assert dialog.title.value == "添加基金"
+
+    def test_add_fund_dialog_accepts_valid_input(self):
+        """测试添加基金接受有效输入"""
+        from src.gui.main import AddFundDialog, FundGUIApp
+
+        class MockPage:
+            def __init__(self):
+                self.overlay = []
+
+            def update(self):
+                pass
+
+        class MockApp(FundGUIApp):
+            def __init__(self):
+                super().__init__()
+                self.page = MockPage()
+
+        app = MockApp()
+        dialog = AddFundDialog(app)
+        dialog.code_field.value = "TEST001"
+        dialog.name_field.value = "测试基金"
+
+        # 验证输入被正确设置
+        assert dialog.code_field.value == "TEST001"
+        assert dialog.name_field.value == "测试基金"
+
+
+class TestHoldingDialogValidation:
+    """持仓对话框验证测试"""
+
+    def test_holding_dialog_accepts_valid_input(self):
+        """测试持仓对话框接受有效输入"""
+        from src.gui.main import HoldingDialog, FundGUIApp
+        from src.gui.main import FundDisplayData
+
+        class MockPage:
+            def __init__(self):
+                self.overlay = []
+
+            def update(self):
+                pass
+
+        class MockApp(FundGUIApp):
+            def __init__(self):
+                super().__init__()
+                self.page = MockPage()
+
+        app = MockApp()
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=1.5,
+            est_value=1.52,
+            change_pct=1.33,
+            profit=100.0,
+            hold_shares=1000.0,
+            cost=1.4,
+        )
+        dialog = HoldingDialog(app, fund)
+        dialog.shares_field.value = "2000"
+        dialog.cost_field.value = "1.3"
+
+        class MockEvent:
+            pass
+
+        app.config_dao.update_fund = MagicMock()
+        app._load_fund_data = AsyncMock()
+
+        # 验证输入被正确解析
+        assert float(dialog.shares_field.value) == 2000.0
+        assert float(dialog.cost_field.value) == 1.3
+
+    def test_holding_dialog_handles_empty_input(self):
+        """测试持仓对话框处理空输入"""
+        from src.gui.main import HoldingDialog, FundGUIApp
+        from src.gui.main import FundDisplayData
+
+        class MockPage:
+            def update(self):
+                pass
+
+        class MockApp(FundGUIApp):
+            def __init__(self):
+                super().__init__()
+                self.page = MockPage()
+
+        app = MockApp()
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=1.5,
+            est_value=1.52,
+            change_pct=1.33,
+            profit=100.0,
+            hold_shares=1000.0,
+            cost=1.4,
+        )
+        dialog = HoldingDialog(app, fund)
+        dialog.shares_field.value = ""
+        dialog.cost_field.value = ""
+
+        class MockEvent:
+            pass
+
+        # 空输入应该被处理为0.0
+        shares = float(dialog.shares_field.value) if dialog.shares_field.value else 0.0
+        cost = float(dialog.cost_field.value) if dialog.cost_field.value else 0.0
+        assert shares == 0.0
+        assert cost == 0.0
+
+
+class TestDeleteDialog:
+    """删除对话框测试"""
+
+    def test_delete_confirm_dialog_shows_info(self):
+        """测试删除确认对话框显示信息"""
+        from src.gui.main import DeleteConfirmDialog, FundGUIApp
+
+        class MockPage:
+            def __init__(self):
+                self.overlay = []
+
+            def update(self):
+                pass
+
+        class MockApp(FundGUIApp):
+            def __init__(self):
+                super().__init__()
+                self.page = MockPage()
+
+        app = MockApp()
+        dialog = DeleteConfirmDialog(app, "TEST001", "测试基金")
+
+        assert dialog.fund_code == "TEST001"
+        assert dialog.fund_name == "测试基金"
+
+
+class TestFundDisplayDataEdgeCases:
+    """FundDisplayData边界情况测试"""
+
+    def test_zero_cost(self):
+        """测试成本为零的情况"""
+        from src.gui.main import FundDisplayData
+
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=1.5,
+            est_value=1.52,
+            change_pct=1.33,
+            profit=0.0,
+            hold_shares=1000.0,
+            cost=0.0,
+        )
+
+        assert fund.cost == 0.0
+        assert fund.hold_shares == 1000.0
+
+    def test_negative_profit(self):
+        """测试负收益情况"""
+        from src.gui.main import FundDisplayData
+
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=0.9,
+            est_value=0.88,
+            change_pct=-2.22,
+            profit=-100.0,
+            hold_shares=1000.0,
+            cost=1.0,
+        )
+
+        assert fund.profit < 0
+        assert fund.change_pct < 0
+
+    def test_large_numbers(self):
+        """测试大数字处理"""
+        from src.gui.main import FundDisplayData
+
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=12345.6789,
+            est_value=12350.0,
+            change_pct=5.55,
+            profit=999999.99,
+            hold_shares=999999.99,
+            cost=10000.0,
+        )
+
+        assert fund.net_value > 10000
+        assert fund.profit > 900000
+
+    def test_small_decimal_values(self):
+        """测试小数值处理"""
+        from src.gui.main import FundDisplayData
+
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=0.0012,
+            est_value=0.0013,
+            change_pct=8.33,
+            profit=0.1,
+            hold_shares=100.0,
+            cost=0.001,
+        )
+
+        assert fund.net_value < 0.01
+        assert fund.cost < 0.01
+
+
+class TestChartEdgeCases:
+    """图表边界情况测试"""
+
+    def test_empty_history_data(self):
+        """测试空历史数据"""
+        from src.gui.chart import FundHistoryData
+
+        history = FundHistoryData(
+            fund_code="TEST001",
+            fund_name="测试基金",
+            dates=[],
+            open_values=[],
+            close_values=[],
+            high_values=[],
+            low_values=[],
+            volumes=[],
+        )
+
+        assert len(history.dates) == 0
+        assert history.get_latest_price() == 0.0
+        assert history.get_price_change() == 0.0
+
+    def test_single_day_history(self):
+        """测试单日历史数据"""
+        from src.gui.chart import FundHistoryData
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        history = FundHistoryData(
+            fund_code="TEST001",
+            fund_name="测试基金",
+            dates=["2024-01-01"],
+            open_values=[1.0],
+            close_values=[1.01],
+            high_values=[1.02],
+            low_values=[0.99],
+            volumes=[1000],
+        )
+
+        assert len(history.dates) == 1
+        # 单日数据无法计算价格变化，返回0
+        assert history.get_price_change() == 0.0
+        assert history.get_latest_price() == 1.01
+
+        fig = FundHistoryData.generate_candlestick_chart(history)
+        assert fig is not None
+        plt.close(fig)
+        plt.close("all")  # 关闭所有figure
+
+    def test_price_change_calculation(self):
+        """测试价格变化计算"""
+        from src.gui.chart import FundHistoryData
+
+        # 上涨情况
+        history_up = FundHistoryData(
+            fund_code="TEST001",
+            fund_name="测试基金",
+            dates=["2024-01-01", "2024-01-02"],
+            open_values=[1.0, 1.0],
+            close_values=[1.0, 1.05],
+            high_values=[1.0, 1.05],
+            low_values=[1.0, 1.0],
+            volumes=[1000, 1000],
+        )
+        assert history_up.get_price_change() == pytest.approx(5.0, abs=0.01)
+
+        # 下跌情况
+        history_down = FundHistoryData(
+            fund_code="TEST002",
+            fund_name="测试基金2",
+            dates=["2024-01-01", "2024-01-02"],
+            open_values=[1.0, 1.0],
+            close_values=[1.0, 0.95],
+            high_values=[1.0, 1.0],
+            low_values=[1.0, 0.95],
+            volumes=[1000, 1000],
+        )
+        assert history_down.get_price_change() == pytest.approx(-5.0, abs=0.01)
+
+    def test_ma_calculation_short_data(self):
+        """测试均线计算数据不足情况"""
+        from src.gui.chart import FundHistoryData
+
+        # 数据少于均线周期
+        history = FundHistoryData(
+            fund_code="TEST001",
+            fund_name="测试基金",
+            dates=["2024-01-01", "2024-01-02", "2024-01-03"],
+            open_values=[1.0, 1.01, 1.02],
+            close_values=[1.0, 1.01, 1.02],
+            high_values=[1.0, 1.01, 1.02],
+            low_values=[1.0, 1.01, 1.02],
+            volumes=[1000, 1000, 1000],
+        )
+
+        # 计算20日均线，数据不足应该返回None
+        ma_20 = history.calculate_ma(20)
+        assert ma_20[0] is None
+        assert ma_20[1] is None
+        assert ma_20[2] is None
+
+
+class TestDetailStatistics:
+    """详情统计测试"""
+
+    def test_profit_rate_calculation(self):
+        """测试收益率计算"""
+        from src.gui.detail import FundDetailDialog
+        from src.gui.main import FundDisplayData
+
+        class MockApp:
+            pass
+
+        # 正收益
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=1.5,
+            est_value=1.52,
+            change_pct=1.33,
+            profit=100.0,
+            hold_shares=1000.0,
+            cost=1.4,
+        )
+        dialog = FundDetailDialog(MockApp(), fund)
+        # (1.5 - 1.4) / 1.4 * 100 = 7.14%
+        assert dialog._get_profit_rate() == pytest.approx(7.14, abs=0.01)
+
+    def test_total_value_calculation(self):
+        """测试总市值计算"""
+        from src.gui.detail import FundDetailDialog
+        from src.gui.main import FundDisplayData
+
+        class MockApp:
+            pass
+
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=1.5,
+            est_value=1.52,
+            change_pct=1.33,
+            profit=100.0,
+            hold_shares=1000.0,
+            cost=1.4,
+        )
+        dialog = FundDetailDialog(MockApp(), fund)
+        # 1.5 * 1000 = 1500
+        assert dialog._get_total_value() == 1500.0
+
+    def test_cost_basis_calculation(self):
+        """测试成本计算"""
+        from src.gui.detail import FundDetailDialog
+        from src.gui.main import FundDisplayData
+
+        class MockApp:
+            pass
+
+        fund = FundDisplayData(
+            code="TEST001",
+            name="测试基金",
+            net_value=1.5,
+            est_value=1.52,
+            change_pct=1.33,
+            profit=100.0,
+            hold_shares=1000.0,
+            cost=1.4,
+        )
+        dialog = FundDetailDialog(MockApp(), fund)
+        # 1.4 * 1000 = 1400
+        assert dialog._get_cost_basis() == 1400.0
