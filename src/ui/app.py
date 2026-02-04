@@ -5,7 +5,7 @@
 
 from textual.app import App, ComposeResult
 from textual.containers import Container, Vertical, Horizontal, Grid
-from textual.widgets import Static, DataTable, Button, Label
+from textual.widgets import Static, DataTable, Button, Label, TabbedContent, TabPane
 from textual import events, on
 from textual.color import Color
 from textual.reactive import reactive
@@ -138,45 +138,37 @@ class FundTUIApp(App):
     # ==================== 组件组合 ====================
 
     def compose(self) -> ComposeResult:
-        """构建应用 UI - 三栏布局"""
+        """构建应用 UI - 标签页布局"""
         # 顶部标题栏
         yield Horizontal(
             Static("[b]Fund Real-Time Valuation[/b]", id="app-title"),
-            Static("[F1]帮助  [r]刷新  [Tab]切换视图  [Ctrl+C]退出", id="header-hints"),
+            Static("[F1]帮助  [r]刷新  [Tab]切换标签  [Ctrl+C]退出", id="header-hints"),
             classes="top-bar"
         )
 
-        # 视图切换标签
-        yield Horizontal(
-            Static("[b]📊 基金[/b]", id="tab-fund", classes="view-tab active"),
-            Static("  📈 商品  ", id="tab-commodity", classes="view-tab"),
-            Static("  📰 新闻  ", id="tab-news", classes="view-tab"),
-            classes="view-tabs"
-        )
-
-        # 三栏主内容区 - 使用 Horizontal 实现三列并排
-        yield Horizontal(
-            # 左侧：基金列表
-            Vertical(
-                Static("自选基金 (3)", classes="column-title"),
-                FundTable(id="fund-table", classes="fund-table"),
-                classes="column fund-column"
-            ),
-            # 中间：大宗商品
-            Vertical(
-                Static("大宗商品 (5)", classes="column-title"),
-                CommodityPairView(id="commodity-table", classes="commodity-table"),
-                classes="column commodity-column"
-            ),
-            # 右侧：财经新闻
-            Vertical(
-                Static("财经新闻 (3)", classes="column-title"),
-                NewsList(id="news-list", classes="news-list"),
-                classes="column news-column"
-            ),
-            id="content-container",
-            classes="content-container"
-        )
+        # 标签页内容区
+        with TabbedContent(id="main-tabs", initial="fund"):
+            # 基金标签页
+            with TabPane("📊 基金", id="fund"):
+                yield Vertical(
+                    Static("自选基金", classes="column-title"),
+                    FundTable(id="fund-table", classes="fund-table"),
+                    classes="column fund-column"
+                )
+            # 商品标签页
+            with TabPane("📈 商品", id="commodity"):
+                yield Vertical(
+                    Static("大宗商品", classes="column-title"),
+                    CommodityPairView(id="commodity-table", classes="commodity-table"),
+                    classes="column commodity-column"
+                )
+            # 新闻标签页
+            with TabPane("📰 新闻", id="news"):
+                yield Vertical(
+                    Static("财经新闻", classes="column-title"),
+                    NewsList(id="news-list", classes="news-list"),
+                    classes="column news-column"
+                )
 
         # 底部统计行
         yield Horizontal(
@@ -308,22 +300,25 @@ class FundTUIApp(App):
     # ==================== 视图切换动作 ====================
 
     def action_next_view(self) -> None:
-        """切换到下一个视图"""
-        views = ["fund", "commodity", "news"]
-        current_idx = views.index(self.active_view)
-        next_idx = (current_idx + 1) % len(views)
-        self.active_view = views[next_idx]
+        """切换到下一个标签"""
+        self.query_one("#main-tabs", TabbedContent).action_next()
 
     def action_prev_view(self) -> None:
-        """切换到上一个视图"""
-        views = ["fund", "commodity", "news"]
-        current_idx = views.index(self.active_view)
-        prev_idx = (current_idx - 1) % len(views)
-        self.active_view = views[prev_idx]
+        """切换到上一个标签"""
+        self.query_one("#main-tabs", TabbedContent).action_previous()
 
     def action_switch_view(self, view: str) -> None:
-        """切换到指定视图"""
-        self.active_view = view
+        """切换到指定标签"""
+        tabs = self.query_one("#main-tabs", TabbedContent)
+        tabs.active = view
+
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        """Tab切换时更新active_view状态"""
+        # TabbedContent使用 "--content-tab-" 前缀，需要移除
+        tab_id = event.tab.id or ""
+        if tab_id.startswith("--content-tab-"):
+            tab_id = tab_id[len("--content-tab-"):]
+        self.active_view = tab_id
 
     # ==================== 响应式属性监视器 ====================
 
@@ -352,20 +347,9 @@ class FundTUIApp(App):
         self.update_stats()
 
     def watch_active_view(self, view: str) -> None:
-        """切换活动视图时更新样式"""
-        # 视图标签的原始文本
-        tab_texts = {
-            "fund": "📊 基金",
-            "commodity": "📈 商品",
-            "news": "📰 新闻"
-        }
-        for tab_id, tab_view in [("tab-fund", "fund"), ("tab-commodity", "commodity"), ("tab-news", "news")]:
-            tab = self._safe_query(f"#{tab_id}", Static)
-            if tab:
-                if tab_view == view:
-                    tab.update(f"[b]{tab_texts[tab_view]}[/b]")
-                else:
-                    tab.update(f"  {tab_texts[tab_view]}  ")
+        """切换活动视图时更新状态（标签样式由TabbedContent自动处理）"""
+        # TabbedContent 自动处理标签样式，这里只需保持状态同步
+        pass
 
     # ==================== 对话框消息处理 ====================
 

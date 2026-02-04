@@ -14,26 +14,16 @@
     color: $foreground-muted;
 }
 
-/* 视图切换标签 */
-.view-tabs {
-    height: 1;
-    background: $panel;
-    color: $foreground-muted;
-    padding: 0 2;
+/* ==================== TabbedContent 标签页样式 ==================== */
+
+/* 主标签页容器 */
+TabbedContent {
+    height: 100%;
 }
 
-.view-tab {
-    padding: 0 1;
-    color: $foreground-muted;
-}
-
-.view-tab.active {
-    color: $primary;
-    text-style: bold;
-}
-
-.view-tab:hover {
-    color: $foreground;
+/* TabPane 容器 */
+TabPane {
+    height: 100%;
 }
 
 /* 统计面板 / 底部状态行 */
