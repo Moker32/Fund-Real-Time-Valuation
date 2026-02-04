@@ -14,7 +14,6 @@ from .widgets import (
     SectorCategoryFilter,
 )
 from .tables import FundTable, CommodityTable, SectorTable
-from .dialogs import AddFundDialog, HoldingDialog
 from .charts import ChartDialog, ChartPreview
 from .models import FundData, CommodityData, NewsData, SectorData, FundHistoryData
 from .fund_detail_screen import FundDetailScreen
@@ -31,8 +30,6 @@ __all__ = [
     "HelpPanel",
     "ThemeToggle",
     "SectorCategoryFilter",
-    "AddFundDialog",
-    "HoldingDialog",
     "ChartDialog",
     "ChartPreview",
     "FundDetailScreen",

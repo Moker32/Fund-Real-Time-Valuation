@@ -25,7 +25,6 @@ from .models import FundData, CommodityData, NewsData, FundHistoryData
 from .tables import FundTable
 from .widgets import CommodityPairView, NewsList, StatPanel
 from .charts import ChartDialog
-from .dialogs import AddFundDialog, HoldingDialog
 from src.datasources.base import DataSourceType
 from src.datasources.fund_source import FundDataSource, FundHistorySource
 from src.datasources.manager import create_default_manager
@@ -113,6 +112,9 @@ class FundTUIApp(App):
         self.last_update_time = ""
         self.refresh_interval = 30  # 秒
         self.auto_refresh_task = None
+
+        # 对话框状态
+        self._is_opening_dialog = False  # 防止重复打开对话框
 
         # 基金数据列表
         self._fund_codes = ["161039", "161725", "110022"]  # 默认基金列表
@@ -237,11 +239,22 @@ class FundTUIApp(App):
         self.notify(f"已切换至{'深色' if self.is_dark_theme else '浅色'}主题", severity="information")
         self.update_status_bar()
 
-    def action_add_fund(self) -> None:
+    async def action_add_fund(self) -> None:
         """添加基金"""
-        from .widgets import AddFundDialog
+        # 防止重复打开
+        if self._is_opening_dialog:
+            return
+        self._is_opening_dialog = True
+
+        # 检查是否已存在对话框
+        existing = self._safe_query("#add-fund-dialog")
+        if existing:
+            await existing.remove()
+
+        from .dialogs import AddFundDialog
         # 挂载对话框
         self.mount(AddFundDialog())
+        # 不在这里重置，让对话框关闭时重置
 
     def action_delete_fund(self) -> None:
         """删除基金"""
@@ -267,13 +280,19 @@ class FundTUIApp(App):
         else:
             self.notify("基金不在自选列表中", severity="warning")
 
-    def action_set_holding(self) -> None:
+    async def action_set_holding(self) -> None:
         """设置持仓"""
+        # 防止重复打开
+        if self._is_opening_dialog:
+            return
+        self._is_opening_dialog = True
+
         table = self.query_one("#fund-table", FundTable)
         cursor_row = table.cursor_row
 
         if cursor_row >= len(self.funds):
             self.notify("请先选择要设置持仓的基金", severity="warning")
+            self._is_opening_dialog = False
             return
 
         fund = self.funds[cursor_row]
@@ -282,9 +301,15 @@ class FundTUIApp(App):
         current_shares = fund.hold_shares if hasattr(fund, 'hold_shares') else 0.0
         current_cost = fund.cost if hasattr(fund, 'cost') else 0.0
 
-        from .widgets import HoldingDialog
+        # 检查是否已存在对话框
+        existing = self._safe_query("#holding-dialog")
+        if existing:
+            await existing.remove()
+
+        from .dialogs import HoldingDialog
         # 挂载对话框
         self.mount(HoldingDialog(fund.code, fund.name, current_shares, current_cost))
+        # 不在这里重置，让对话框关闭时重置
 
     def action_show_chart(self) -> None:
         """显示基金净值走势图"""
@@ -356,9 +381,16 @@ class FundTUIApp(App):
 
     # ==================== 对话框消息处理 ====================
 
-    def on_add_fund_dialog_confirm(self, event: AddFundDialog.Confirm) -> None:
+    def on_add_fund_dialog_confirm(self, event: "AddFundDialog.Confirm") -> None:
         """处理添加基金确认"""
-        dialog = self.query_one("#add-fund-dialog", AddFundDialog)
+        # 重置对话框状态
+        self._is_opening_dialog = False
+
+        # 使用 _safe_query 获取对话框
+        dialog = self._safe_query("#add-fund-dialog")
+        if dialog is None:
+            return
+
         if dialog.result_code and dialog.result_name:
             # 添加到配置
             from config.manager import ConfigManager
@@ -374,13 +406,21 @@ class FundTUIApp(App):
             else:
                 self.notify("基金已存在于自选列表中", severity="warning")
 
-    def on_add_fund_dialog_cancel(self, event: AddFundDialog.Cancel) -> None:
+    def on_add_fund_dialog_cancel(self, event: "AddFundDialog.Cancel") -> None:
         """处理添加基金取消"""
-        pass  # 取消时无需处理
+        # 重置对话框状态
+        self._is_opening_dialog = False
 
-    def on_holding_dialog_confirm(self, event: HoldingDialog.Confirm) -> None:
+    def on_holding_dialog_confirm(self, event: "HoldingDialog.Confirm") -> None:
         """处理持仓设置确认"""
-        dialog = self.query_one("#holding-dialog", HoldingDialog)
+        # 重置对话框状态
+        self._is_opening_dialog = False
+
+        # 使用 _safe_query 获取对话框
+        dialog = self._safe_query("#holding-dialog")
+        if dialog is None:
+            return
+
         # 更新持仓配置
         from config.manager import ConfigManager
         from config.models import Holding
@@ -402,9 +442,10 @@ class FundTUIApp(App):
         # 刷新数据
         asyncio.create_task(self.load_fund_data())
 
-    def on_holding_dialog_cancel(self, event: HoldingDialog.Cancel) -> None:
+    def on_holding_dialog_cancel(self, event: "HoldingDialog.Cancel") -> None:
         """处理持仓设置取消"""
-        pass  # 取消时无需处理
+        # 重置对话框状态
+        self._is_opening_dialog = False
 
     # ==================== 菜单消息处理 ====================
 
