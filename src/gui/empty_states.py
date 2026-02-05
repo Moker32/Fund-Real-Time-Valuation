@@ -4,7 +4,8 @@
 提供基金、商品、新闻等列表为空时显示的友好提示组件。
 """
 
-from collections.abc import Callable, Any
+from collections.abc import Callable
+from typing import Any
 
 import flet as ft
 from flet import (
