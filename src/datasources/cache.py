@@ -5,10 +5,12 @@
 """
 
 import json
-import shutil
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Union
+
+logger = logging.getLogger(__name__)
 
 
 class DataCache:
@@ -57,7 +59,7 @@ class DataCache:
 
         # 读取缓存创建时间
         try:
-            with open(cache_path, 'r', encoding='utf-8') as f:
+            with open(cache_path, encoding='utf-8') as f:
                 cache_data = json.load(f)
                 created_at = datetime.fromisoformat(cache_data.get('created_at', ''))
                 expires_at = created_at + timedelta(seconds=ttl_seconds)
@@ -66,7 +68,7 @@ class DataCache:
             # 如果读取失败，视为过期
             return True
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Union[Any, None]:
         """
         获取缓存数据
 
@@ -82,7 +84,7 @@ class DataCache:
             return None
 
         try:
-            with open(cache_path, 'r', encoding='utf-8') as f:
+            with open(cache_path, encoding='utf-8') as f:
                 cache_data = json.load(f)
 
                 # 检查是否过期
@@ -126,9 +128,8 @@ class DataCache:
         try:
             with open(cache_path, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
-        except (OSError, TypeError):
-            # 写入失败，静默忽略
-            pass
+        except (OSError, TypeError) as e:
+            logger.warning(f"缓存写入失败 (key={key}): {e}")
 
     def clear(self, key: str = None):
         """
@@ -149,8 +150,8 @@ class DataCache:
         """删除缓存文件"""
         try:
             cache_path.unlink(missing_ok=True)
-        except OSError:
-            pass
+        except OSError as e:
+            logger.warning(f"缓存删除失败 (path={cache_path}): {e}")
 
     def _clear_all(self):
         """清除所有缓存文件"""
@@ -159,10 +160,10 @@ class DataCache:
             for cache_file in self.cache_dir.glob('*.json'):
                 try:
                     cache_file.unlink()
-                except OSError:
-                    pass
-        except OSError:
-            pass
+                except OSError as e:
+                    logger.warning(f"批量清除缓存失败 (file={cache_file}): {e}")
+        except OSError as e:
+            logger.warning(f"批量清除缓存失败 (dir={self.cache_dir}): {e}")
 
     def get_stats(self) -> dict:
         """
@@ -186,7 +187,7 @@ class DataCache:
 
                 # 检查是否过期
                 try:
-                    with open(cache_file, 'r', encoding='utf-8') as f:
+                    with open(cache_file, encoding='utf-8') as f:
                         cache_data = json.load(f)
                         ttl_seconds = cache_data.get('ttl', self.DEFAULT_TTL)
                         created_at = datetime.fromisoformat(cache_data.get('created_at', ''))
@@ -216,7 +217,7 @@ class DataCache:
         try:
             for cache_file in self.cache_dir.glob('*.json'):
                 try:
-                    with open(cache_file, 'r', encoding='utf-8') as f:
+                    with open(cache_file, encoding='utf-8') as f:
                         cache_data = json.load(f)
                         ttl_seconds = cache_data.get('ttl', self.DEFAULT_TTL)
                         created_at = datetime.fromisoformat(cache_data.get('created_at', ''))
@@ -230,8 +231,8 @@ class DataCache:
                     try:
                         cache_file.unlink()
                         cleaned += 1
-                    except OSError:
-                        pass
+                    except OSError as e:
+                        logger.warning(f"清理过期缓存失败 (file={cache_file}): {e}")
         except OSError:
             pass
 
