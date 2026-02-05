@@ -120,7 +120,7 @@ class NotificationDialog(AlertDialog):
                             spacing=8,
                         ),
                         padding=30,
-                        alignment=ft.alignment.center,
+                        alignment=ft.Alignment(0.5, 0.5),
                     ),
                 ],
                 spacing=12,

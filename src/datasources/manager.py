@@ -9,6 +9,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .base import DataSource, DataSourceResult, DataSourceType
+from .health import (
+    DataSourceHealthChecker,
+    HealthCheckInterceptor,
+    HealthCheckResult,
+    HealthStatus
+)
 
 
 @dataclass
@@ -34,13 +40,19 @@ class DataSourceManager:
     - 请求限流
     """
 
-    def __init__(self, max_concurrent: int = 10, enable_load_balancing: bool = False):
+    def __init__(
+        self,
+        max_concurrent: int = 10,
+        enable_load_balancing: bool = False,
+        health_check_interval: int = 60
+    ):
         """
         初始化数据源管理器
 
         Args:
             max_concurrent: 最大并发请求数
             enable_load_balancing: 是否启用负载均衡
+            health_check_interval: 健康检查间隔（秒）
         """
         self._sources: dict[str, DataSource] = {}
         self._source_configs: dict[str, DataSourceConfig] = {}
@@ -67,6 +79,10 @@ class DataSourceManager:
         }
         self._request_history: list[dict[str, Any]] = []
         self._max_history = 1000
+
+        # 健康检查器
+        self._health_checker = DataSourceHealthChecker(check_interval=health_check_interval)
+        self._health_interceptor = HealthCheckInterceptor(self._health_checker)
 
     async def _get_semaphore(self) -> asyncio.Semaphore:
         """延迟初始化 semaphore"""
@@ -144,6 +160,7 @@ class DataSourceManager:
         source_type: DataSourceType,
         *args,
         failover: bool = True,
+        health_aware: bool = True,
         **kwargs
     ) -> DataSourceResult:
         """
@@ -153,6 +170,7 @@ class DataSourceManager:
             source_type: 数据源类型
             *args: 位置参数传递给数据源
             failover: 是否启用故障切换
+            health_aware: 是否启用健康感知选择
             **kwargs: 关键字参数传递给数据源
 
         Returns:
@@ -162,12 +180,26 @@ class DataSourceManager:
             sources = self._get_ordered_sources(source_type)
             errors = []
 
+            # 如果启用健康感知，尝试获取最健康的数据源
+            if health_aware and failover:
+                healthy_source = await self._health_interceptor.get_healthy_source(
+                    sources, prefer_healthy=True
+                )
+                if healthy_source:
+                    # 将健康的数据源排在前面
+                    sources = [healthy_source] + [s for s in sources if s != healthy_source]
+
             for source in sources:
                 if not self._source_configs.get(source.name, DataSourceConfig(
                     source_class=type(source),
                     name=source.name,
                     source_type=source.source_type
                 )).enabled:
+                    continue
+
+                # 如果启用健康感知，跳过不健康的数据源
+                if health_aware and self._health_interceptor.should_skip_source(source.name):
+                    errors.append(f"{source.name}: 数据源不健康")
                     continue
 
                 try:
@@ -177,6 +209,9 @@ class DataSourceManager:
                     self._record_request(source.name, source_type, result)
 
                     if result.success:
+                        # 更新健康检查状态
+                        if health_aware:
+                            await self._health_checker.check_source(source)
                         return result
 
                     errors.append(f"{source.name}: {result.error}")
@@ -378,37 +413,106 @@ class DataSourceManager:
             if not source:
                 return {"status": "unknown", "error": f"数据源不存在: {source_name}"}
 
-            healthy = await source.health_check()
+            result = await self._health_checker.check_source(source)
             return {
                 "source": source_name,
-                "status": "healthy" if healthy else "unhealthy",
-                "details": source.get_status()
+                "status": result.status.value,
+                "response_time_ms": result.response_time_ms,
+                "error_count": result.error_count,
+                "last_check": result.last_check.isoformat(),
+                "message": result.message,
+                "details": result.details
             }
 
         # 检查所有数据源
-        results = {}
-        for name, source in self._sources.items():
-            try:
-                healthy = await source.health_check()
-                results[name] = {
-                    "status": "healthy" if healthy else "unhealthy",
-                    "details": source.get_status()
-                }
-            except Exception as e:
-                results[name] = {
-                    "status": "error",
-                    "error": str(e)
-                }
+        sources = list(self._sources.values())
+        results = await self._health_checker.check_all_sources(sources)
 
-        healthy_count = sum(1 for r in results.values() if r["status"] == "healthy")
-        total_count = len(results)
+        healthy_count = sum(1 for r in results.values() if r.status == HealthStatus.HEALTHY)
+        degraded_count = sum(1 for r in results.values() if r.status == HealthStatus.DEGRADED)
+        unhealthy_count = sum(1 for r in results.values() if r.status == HealthStatus.UNHEALTHY)
 
         return {
-            "total_sources": total_count,
+            "total_sources": len(results),
             "healthy_count": healthy_count,
-            "unhealthy_count": total_count - healthy_count,
-            "sources": results
+            "degraded_count": degraded_count,
+            "unhealthy_count": unhealthy_count,
+            "sources": {
+                name: result.to_dict()
+                for name, result in results.items()
+            }
         }
+
+    async def health_check_all_sources(self) -> dict[str, HealthCheckResult]:
+        """
+        并行检查所有已注册数据源的健康状态
+
+        Returns:
+            Dict[str, HealthCheckResult]: 数据源名称到健康检查结果的映射
+        """
+        sources = list(self._sources.values())
+        return await self._health_checker.check_all_sources(sources)
+
+    def get_source_health(self, source_name: str) -> HealthCheckResult | None:
+        """
+        获取数据源最近健康状态
+
+        Args:
+            source_name: 数据源名称
+
+        Returns:
+            HealthCheckResult: 最近一次检查结果，不存在返回 None
+        """
+        return self._health_checker.get_source_health(source_name)
+
+    def get_health_history(self, source_name: str, limit: int = 10) -> list[HealthCheckResult]:
+        """
+        获取数据源健康历史
+
+        Args:
+            source_name: 数据源名称
+            limit: 返回记录数量限制
+
+        Returns:
+            List[HealthCheckResult]: 健康检查历史列表
+        """
+        return self._health_checker.get_health_history(source_name, limit)
+
+    def get_health_statistics(self) -> dict[str, Any]:
+        """
+        获取健康检查统计数据
+
+        Returns:
+            Dict: 统计数据字典
+        """
+        return self._health_checker.get_statistics()
+
+    def get_unhealthy_sources(self) -> list[str]:
+        """
+        获取所有不健康的数据源名称
+
+        Returns:
+            List[str]: 不健康的数据源名称列表
+        """
+        return self._health_checker.get_unhealthy_sources()
+
+    def get_healthy_sources(self) -> list[str]:
+        """
+        获取所有健康的数据源名称
+
+        Returns:
+            List[str]: 健康的数据源名称列表
+        """
+        return self._health_checker.get_healthy_sources()
+
+    async def start_background_health_check(self):
+        """启动后台健康检查任务"""
+        sources = list(self._sources.values())
+        await self._health_checker.start_background_check(sources)
+
+    def stop_background_health_check(self):
+        """停止后台健康检查任务"""
+        self._health_checker.stop_background_check()
 
     def set_source_enabled(self, source_name: str, enabled: bool):
         """
@@ -597,4 +701,8 @@ def create_default_manager() -> DataSourceManager:
 
 
 # 导出
-__all__ = ["DataSourceManager", "DataSourceConfig", "create_default_manager"]
+__all__ = [
+    "DataSourceManager",
+    "DataSourceConfig",
+    "create_default_manager"
+]

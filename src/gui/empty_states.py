@@ -4,22 +4,25 @@
 提供基金、商品、新闻等列表为空时显示的友好提示组件。
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Any
+
 import flet as ft
 from flet import (
     Column,
     Container,
+    Control,
     ElevatedButton,
     Icon,
     Icons,
     Text,
+    IconData,
 )
 
 from .components import AppColors
 
 
 # 预设空状态配置
-EMPTY_STATES_CONFIG = {
+EMPTY_STATES_CONFIG: dict[str, dict[str, Any]] = {
     "funds": {
         "icon": Icons.STAR_BORDER,
         "message": "暂无自选基金",
@@ -47,7 +50,7 @@ EMPTY_STATES_CONFIG = {
 def empty_funds_state(
     message: str | None = None,
     hint: str | None = None,
-    on_add: Callable[[], None] | None = None,
+    on_add: Callable[[Any], None] | None = None,
 ) -> Container:
     """创建空基金状态组件
 
@@ -73,7 +76,7 @@ def empty_funds_state(
 def empty_commodities_state(
     message: str | None = None,
     hint: str | None = None,
-    on_refresh: Callable[[], None] | None = None,
+    on_refresh: Callable[[Any], None] | None = None,
 ) -> Container:
     """创建空商品状态组件
 
@@ -99,7 +102,7 @@ def empty_commodities_state(
 def empty_news_state(
     message: str | None = None,
     hint: str | None = None,
-    on_refresh: Callable[[], None] | None = None,
+    on_refresh: Callable[[Any], None] | None = None,
 ) -> Container:
     """创建空新闻状态组件
 
@@ -123,12 +126,12 @@ def empty_news_state(
 
 
 def create_empty_state(
-    icon_name: str,
+    icon_name: Icons,
     message: str,
     hint: str = "",
     button_text: str = "",
-    button_icon: str = "",
-    on_button_click: Callable[[], None] | None = None,
+    button_icon: Icons | None = None,
+    on_button_click: Callable[[Any], None] | None = None,
 ) -> Container:
     """创建通用空状态组件
 
@@ -145,7 +148,7 @@ def create_empty_state(
     """
     # 主图标
     icon = Icon(
-        icon_name,
+        icon=icon_name,  # type: ignore
         size=64,
         color=AppColors.TEXT_SECONDARY,
     )
@@ -159,7 +162,7 @@ def create_empty_state(
     )
 
     # 辅助说明
-    hint_text = None
+    hint_text: Text | None = None
     if hint:
         hint_text = Text(
             hint,
@@ -168,16 +171,16 @@ def create_empty_state(
         )
 
     # 按钮
-    button = None
+    button: ElevatedButton | None = None
     if button_text and on_button_click:
         button = ElevatedButton(
             button_text,
-            icon=button_icon if button_icon else None,
+            icon=button_icon,  # type: ignore
             on_click=on_button_click,
         )
 
     # 构建内容列
-    content_controls = [icon, Container(height=16), main_text]
+    content_controls: list[Control] = [icon, Container(height=16), main_text]
     if hint_text:
         content_controls.append(Container(height=8))
         content_controls.append(hint_text)

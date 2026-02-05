@@ -44,7 +44,7 @@ def _get_float(obj: dict | object, key: str, default: float = 0.0) -> float:
         return float(getattr(obj, key, default))
 
 
-def export_funds_to_csv(funds: list[dict | object], filepath: str) -> bool:
+def export_funds_to_csv(funds: list[dict | object], filepath: str | Path) -> bool:
     """导出基金列表到 CSV 文件
 
     Args:
@@ -74,7 +74,7 @@ def export_funds_to_csv(funds: list[dict | object], filepath: str) -> bool:
         return False
 
 
-def export_portfolio_report(holdings: list[dict | object], filepath: str) -> bool:
+def export_portfolio_report(holdings: list[dict | object], filepath: str | Path) -> bool:
     """导出持仓报告到 CSV 文件
 
     Args:

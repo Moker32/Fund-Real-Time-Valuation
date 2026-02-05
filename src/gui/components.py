@@ -87,7 +87,7 @@ class MiniChart(Container):
         self.is_up = is_up
         self.chart_color = AppColors.UP_RED if is_up else AppColors.DOWN_GREEN
 
-        change = 0
+        change: float = 0.0
         if len(self.chart_data) >= 2:
             change = ((self.chart_data[-1] - self.chart_data[0]) / self.chart_data[0]) * 100
 
@@ -118,15 +118,17 @@ class MiniChart(Container):
         self.chart_color = AppColors.UP_RED if is_up else AppColors.DOWN_GREEN
         self.is_up = is_up
 
-        change = 0
+        change: float = 0.0
         if len(self.chart_data) >= 2:
             change = ((self.chart_data[-1] - self.chart_data[0]) / self.chart_data[0]) * 100
 
         arrow = "up" if change >= 0 else "down"
 
-        self.content.controls[0].value = arrow
-        self.content.controls[0].color = self.chart_color
-        self.content.controls[1].bgcolor = f"{self.chart_color}40"
+        # 更新图表内容
+        if self.content is not None and hasattr(self.content, "controls"):
+            self.content.controls[0].value = arrow
+            self.content.controls[0].color = self.chart_color
+            self.content.controls[1].bgcolor = f"{self.chart_color}40"
 
         self.update()
 
@@ -237,9 +239,10 @@ class FundCard(Card):
         )
 
         # 添加点击事件到 Card 的内容
-        if on_click:
-            self.content.on_click = on_click
-            self.content.ink = True
+        if on_click and self.content is not None:
+            # self.content 是 _card_stack，它是 ft.Stack 类型
+            self.content.on_click = on_click  # type: ignore
+            self.content.ink = True  # type: ignore
 
     def _build_content(self) -> Column:
         """Build card content"""
@@ -648,9 +651,9 @@ class QuickActionButton(Column):
 
     def __init__(
         self,
-        icon: str,
+        icon: Icons,
         label: str,
-        on_click: callable,
+        on_click: Callable[..., None],
         accent_color: str = AppColors.ACCENT_BLUE,
     ):
         self.accent_color = accent_color
@@ -665,7 +668,7 @@ class QuickActionButton(Column):
                     ),
                     bgcolor="#FF950026",
                     content=Icon(
-                        icon,
+                        icon=icon,  # type: ignore
                         color=accent_color,
                         size=24,
                     ),
@@ -687,7 +690,7 @@ class QuickActionButton(Column):
 class SearchBar(Container):
     """Search bar component"""
 
-    def __init__(self, on_search: callable = None, placeholder: str = "Search fund code/name"):
+    def __init__(self, on_search: Callable[[str], None] | None = None, placeholder: str = "Search fund code/name"):
         self.on_search = on_search
 
         self.text_field = ft.TextField(

@@ -20,6 +20,8 @@ from flet import (
     SnackBar,
     Tabs as FletTabs,
     Tab as FletTab,
+    TabBar,
+    Tab,
     Icon,
     Icons,
     IconButton,
@@ -147,6 +149,8 @@ class FundGUIApp:
         self._is_loading = False
         self._refresh_button: Optional[IconButton] = None  # 刷新按钮引用
         self._loading_indicator: Optional[ProgressRing] = None  # 加载指示器
+        self._selected_funds: set[str] = set()  # 选中基金集合
+        self._selected_fund_code: Optional[str] = None  # 选中基金代码
 
     @property
     def is_loading(self) -> bool:
@@ -227,69 +231,35 @@ class FundGUIApp:
         commodity_page_content = self._build_commodity_page()
         news_page_content = self._build_news_page()
 
-        # Tab 内容容器 - 直接使用各页面内容
-        fund_tab = Container(
-            expand=True,
-            bgcolor=AppColors.TAB_BG,
-            content=fund_page_content,
-            visible=True,
-        )
-        commodity_tab = Container(
-            expand=True,
-            bgcolor=AppColors.TAB_BG,
-            content=commodity_page_content,
-            visible=False,
-        )
-        news_tab = Container(
-            expand=True,
-            bgcolor=AppColors.TAB_BG,
-            content=news_page_content,
-            visible=False,
-        )
-
-        # 创建 tab 内容 Column
+        # Tab 内容容器 - 使用官方 Tabs 组件的内容区域
         self._tab_contents = Column(
-            controls=[fund_tab, commodity_tab, news_tab],
+            controls=[fund_page_content, commodity_page_content, news_page_content],
             expand=True,
+            scroll=ft.ScrollMode.AUTO,
         )
 
-        # 保存 tab 容器引用以便后续切换可见性
-        self._tab_containers = [fund_tab, commodity_tab, news_tab]
-
-        # 自定义 Tab 栏 (Flet 0.80.5 替代方案)
-        self._tab_buttons = []
-        tab_items = [
-            ("自选", Icons.STAR_BORDER),
-            ("商品", Icons.TRENDING_UP),
-            ("新闻", Icons.NEWSPAPER),
-        ]
-
-        for i, (label, icon) in enumerate(tab_items):
-            btn = Container(
-                content=Row([
-                    Icon(icon, size=20, color=AppColors.TEXT_PRIMARY if i == 0 else AppColors.TEXT_SECONDARY),
-                    Text(label, size=14, color=AppColors.TEXT_PRIMARY if i == 0 else AppColors.TEXT_SECONDARY),
-                ], spacing=6),
-                padding=ft.padding.symmetric(horizontal=16, vertical=12),
-                on_click=lambda e, idx=i: self._on_tab_click(idx),
-                ink=True,
-            )
-            self._tab_buttons.append(btn)
-
-        # Tab 栏容器
-        self._tab_bar = Container(
-            content=Row(
-                self._tab_buttons,
-                spacing=0,
-            ),
-            bgcolor=AppColors.CARD_DARK,
-        )
-
-        # 选中指示器
-        self._tab_indicator = Container(
-            bgcolor=AppColors.ACCENT_BLUE,
-            height=2,
-            width=0,
+        # 官方 TabBar + Tabs API (Flet 0.80.5)
+        # TabBar 负责标签导航，Tab 定义单个标签
+        self._tab_bar = TabBar(
+            tabs=[
+                Tab(
+                    label="自选",
+                    icon=Icons.STAR_BORDER,
+                ),
+                Tab(
+                    label="商品",
+                    icon=Icons.TRENDING_UP,
+                ),
+                Tab(
+                    label="新闻",
+                    icon=Icons.NEWSPAPER,
+                ),
+            ],
+            on_click=self._on_tab_click,
+            tab_alignment=ft.TabAlignment.START,
+            label_color=AppColors.ACCENT_BLUE,
+            unselected_label_color=AppColors.TEXT_SECONDARY,
+            indicator_color=AppColors.ACCENT_BLUE,
         )
 
         # 底部状态栏
@@ -390,7 +360,7 @@ class FundGUIApp:
         )
 
         # 返回包含所有元素的 Column
-        return Column(
+        fund_page_content = Column(
             controls=[
                 # 资产概览卡片
                 Container(
@@ -422,6 +392,9 @@ class FundGUIApp:
             expand=True,
             scroll=ft.ScrollMode.AUTO,
         )
+
+        # 包装成 Container 返回
+        return Container(content=fund_page_content)
 
     def _build_commodity_page(self) -> Container:
         """构建商品页面"""
@@ -991,7 +964,7 @@ class FundGUIApp:
         dialog.open = True
         self.page.update()
 
-    def _show_detail(self, e, fund: FundDisplayData = None):
+    def _show_detail(self, e, fund: FundDisplayData | None = None):
         """显示基金详情对话框"""
         # 如果传入了基金，直接使用；否则从选中代码获取
         if fund is None:
@@ -1123,20 +1096,20 @@ class FundGUIApp:
             # 取消选中
             self._selected_funds.discard(fund_code)
 
-    def _get_selected_fund_code(self) -> Optional[str]:
+    def _get_selected_fund_code(self) -> str | None:
         """获取当前选中的基金代码（单选）"""
         # 优先使用复选框选中的基金
-        if hasattr(self, "_selected_funds") and self._selected_funds:
+        if self._selected_funds:
             # 返回最后一个选中的基金
             return list(self._selected_funds)[-1]
         # 检查是否有选中行（旧方式）
-        if hasattr(self, "_selected_fund_code") and self._selected_fund_code:
+        if self._selected_fund_code:
             return self._selected_fund_code
         return None
 
     def _get_selected_fund_codes(self) -> list[str]:
         """获取所有选中的基金代码（多选）"""
-        return list(getattr(self, "_selected_funds", set()))
+        return list(self._selected_funds)
 
     def _on_fund_table_row_selected(self, e):
         """处理基金表格行选择事件"""
@@ -1150,37 +1123,26 @@ class FundGUIApp:
                     row.selected = False
             self.page.update()
 
-    def _on_tab_click(self, tab_index):
-        """处理标签页点击"""
-        self.current_tab = tab_index
+    def _on_tab_click(self, e):
+        """处理标签页切换 (官方 TabBar on_click 事件)
 
-        # 更新按钮样式
-        for i, btn in enumerate(self._tab_buttons):
-            icon = btn.content.controls[0]
-            text = btn.content.controls[1]
-            if i == tab_index:
-                icon.color = AppColors.ACCENT_BLUE
-                text.color = AppColors.ACCENT_BLUE
-            else:
-                icon.color = AppColors.TEXT_SECONDARY
-                text.color = AppColors.TEXT_SECONDARY
+        Args:
+            e: 事件对象，e.data 包含点击的 tab 索引（字符串格式）
+        """
+        # TabBar 的 on_click 事件通过 e.data 传递选中的 tab 索引
+        self.current_tab = int(e.data)
 
-        # 控制 tab 内容的可见性 - 使用保存的容器引用
-        log_debug(f"切换到 tab {tab_index}")
-        for i, content_container in enumerate(self._tab_containers):
-            was_visible = content_container.visible
-            content_container.visible = (i == tab_index)
-            log_debug(f"  tab {i}: visible={was_visible} -> {content_container.visible}")
+        log_debug(f"切换到 tab {self.current_tab}")
 
-        # 更新页面以反映可见性变化
+        # 更新页面以反映变化
         self.page.update()
 
         # 切换到对应标签页时加载数据
-        if tab_index == 0:
+        if self.current_tab == 0:
             self.page.run_task(self._load_fund_data)
-        elif tab_index == 1:
+        elif self.current_tab == 1:
             self.page.run_task(self._load_commodity_data)
-        elif tab_index == 2:
+        elif self.current_tab == 2:
             self.page.run_task(self._load_news_data)
 
 
