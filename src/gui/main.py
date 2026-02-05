@@ -40,6 +40,13 @@ from .components import (
     QuickActionButton,
     AppColors,
 )
+from .error_handling import (
+    ErrorHandler,
+    ErrorSeverity,
+    show_error_dialog,
+    show_network_error,
+    show_data_error,
+)
 from typing import List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -109,6 +116,10 @@ class FundGUIApp:
 
     def __init__(self):
         self.page: Optional[ft.Page] = None
+
+        # 错误处理器（共享实例）
+        self.error_handler = ErrorHandler.get_shared()
+
         self.data_source_manager = create_default_manager()
         self.db_manager = DatabaseManager()
         self.config_dao = ConfigDAO(self.db_manager)
@@ -126,6 +137,40 @@ class FundGUIApp:
         self.current_tab = 0
         self._fund_cards: dict[str, FundCard] = {}  # 缓存基金卡片组件
         self._fund_list: Optional[Column] = None  # 基金列表容器
+
+        # 加载状态管理
+        self._is_loading = False
+        self._refresh_button: Optional[IconButton] = None  # 刷新按钮引用
+        self._loading_indicator: Optional[ProgressRing] = None  # 加载指示器
+
+    @property
+    def is_loading(self) -> bool:
+        """Get loading state"""
+        return self._is_loading
+
+    @is_loading.setter
+    def is_loading(self, value: bool):
+        """Set loading state"""
+        self._is_loading = value
+        self._update_loading_state()
+
+    def _update_loading_state(self):
+        """Update loading UI state"""
+        # 更新刷新按钮禁用状态
+        if self._refresh_button:
+            self._refresh_button.disabled = self._is_loading
+            if self.page:
+                self.page.update()
+
+        # 更新加载指示器
+        if self._loading_indicator:
+            self._loading_indicator.visible = self._is_loading
+            if self.page:
+                self.page.update()
+
+    def set_loading(self, value: bool):
+        """Set loading state"""
+        self.is_loading = value
 
     def run(self, page: ft.Page):
         """运行应用"""
@@ -390,12 +435,19 @@ class FundGUIApp:
 
     async def _on_refresh(self, e):
         """刷新数据"""
+        # 设置加载状态
+        self.set_loading(True)
+
         if self.current_tab == 0:
             await self._load_fund_data()
         elif self.current_tab == 1:
             await self._load_commodity_data()
         elif self.current_tab == 2:
             await self._load_news_data()
+
+        # 取消加载状态（如果数据加载方法中没有取消）
+        if self.is_loading:
+            self.set_loading(False)
 
         self._show_snackbar("数据已刷新")
 
@@ -458,9 +510,43 @@ class FundGUIApp:
         self.page.overlay.append(sb)
         self.page.update()
 
+    def _show_error(
+        self,
+        message: str,
+        severity: ErrorSeverity = ErrorSeverity.ERROR,
+        title: Optional[str] = None,
+        details: Optional[str] = None,
+    ):
+        """显示错误对话框
+
+        Args:
+            message: 错误信息
+            severity: 错误级别
+            title: 对话框标题
+            details: 详细信息
+        """
+        if self.page is None:
+            log_error(f"Error (no page): {message}")
+            return
+
+        show_error_dialog(
+            page=self.page,
+            message=message,
+            severity=severity,
+            title=title,
+            details=details,
+        )
+
+        # 记录错误
+        self.error_handler.record_error(message, severity, details)
+
     async def _load_fund_data(self):
         """加载基金数据"""
         log_debug("_load_fund_data 开始执行")
+
+        # 设置加载状态
+        self.set_loading(True)
+
         try:
             log_debug("开始加载基金数据...")
             watchlist = self.config_dao.get_watchlist()
@@ -512,7 +598,15 @@ class FundGUIApp:
             import traceback
 
             traceback.print_exc()
-            self._show_snackbar(f"Load failed: {str(e)}")
+            # 使用新的错误处理
+            self._show_error(
+                message=f"加载基金数据失败: {str(e)}",
+                severity=ErrorSeverity.ERROR,
+                details=traceback.format_exc(),
+            )
+        finally:
+            # 取消加载状态
+            self.set_loading(False)
 
     def _update_fund_table(self):
         """更新基金卡片列表（卡片式布局）"""
@@ -614,6 +708,9 @@ class FundGUIApp:
 
     async def _load_commodity_data(self):
         """加载商品数据"""
+        # 设置加载状态
+        self.set_loading(True)
+
         try:
             commodities = self.config_dao.get_commodities(enabled_only=True)
 
@@ -669,10 +766,23 @@ class FundGUIApp:
             self.page.update()
 
         except Exception as e:
-            self._show_snackbar(f"加载商品失败: {str(e)}")
+            log_error(f"加载商品失败: {e}")
+            import traceback
+            traceback.print_exc()
+            self._show_error(
+                message=f"加载商品数据失败: {str(e)}",
+                severity=ErrorSeverity.ERROR,
+                title="商品加载失败",
+            )
+        finally:
+            # 取消加载状态
+            self.set_loading(False)
 
     async def _load_news_data(self):
         """加载新闻数据"""
+        # 设置加载状态
+        self.set_loading(True)
+
         try:
             result = await self.data_source_manager.fetch(DataSourceType.NEWS, "finance")
 
@@ -727,6 +837,9 @@ class FundGUIApp:
             log_error(f"加载新闻失败: {e}")
             self._load_sample_news()
             self.page.update()
+        finally:
+            # 取消加载状态
+            self.set_loading(False)
 
     def _load_sample_news(self):
         """加载示例新闻"""
