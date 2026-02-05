@@ -57,7 +57,8 @@ class DataSourceManager:
             DataSourceType.BOND: [],
             DataSourceType.CRYPTO: []
         }
-        self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._max_concurrent = max_concurrent  # 延迟创建 semaphore
+        self._semaphore: Optional[asyncio.Semaphore] = None  # 延迟初始化
         self._enable_load_balancing = enable_load_balancing
         self._round_robin_index: Dict[DataSourceType, int] = {
             DataSourceType.FUND: 0,
@@ -70,6 +71,12 @@ class DataSourceManager:
         }
         self._request_history: List[Dict[str, Any]] = []
         self._max_history = 1000
+
+    async def _get_semaphore(self) -> asyncio.Semaphore:
+        """延迟初始化 semaphore"""
+        if self._semaphore is None:
+            self._semaphore = asyncio.Semaphore(self._max_concurrent)
+        return self._semaphore
 
     def register(self, source: DataSource, config: Optional[DataSourceConfig] = None):
         """
@@ -155,7 +162,7 @@ class DataSourceManager:
         Returns:
             DataSourceResult: 第一个成功的数据源结果
         """
-        async with self._semaphore:
+        async with await self._get_semaphore():
             sources = self._get_ordered_sources(source_type)
             errors = []
 
@@ -226,7 +233,7 @@ class DataSourceManager:
                 source="manager"
             )
 
-        async with self._semaphore:
+        async with await self._get_semaphore():
             try:
                 result = await source.fetch(*args, **kwargs)
                 self._record_request(source_name, source.source_type, result)
@@ -273,7 +280,7 @@ class DataSourceManager:
             # 串行执行（兼容旧行为）
             results = []
             for params in params_list:
-                async with self._semaphore:
+                async with await self._get_semaphore():
                     try:
                         result = await primary_source.fetch(
                             *params.get("args", args),
@@ -294,7 +301,7 @@ class DataSourceManager:
 
         # 并行执行 - 使用信号量限制并发数
         async def fetch_one(params: Dict[str, Any]) -> DataSourceResult:
-            async with self._semaphore:
+            async with await self._get_semaphore():
                 try:
                     result = await primary_source.fetch(
                         *params.get("args", args),

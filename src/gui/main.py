@@ -11,6 +11,7 @@ from flet import (
     Row,
     Container,
     Text,
+    Card,
     ElevatedButton,
     TextField,
     ProgressRing,
@@ -23,6 +24,7 @@ from flet import (
     Icons,
     IconButton,
     ScrollMode,
+    padding,
 )
 from .detail import FundDetailDialog
 from .theme import (
@@ -43,7 +45,36 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import asyncio
 import sys
+import os
 from pathlib import Path
+
+# 添加日志文件支持
+LOG_FILE = os.path.expanduser("~/.fund-gui/debug.log")
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+def log_debug(msg):
+    """写入调试日志到文件"""
+    timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    log_line = f"[{timestamp}] {msg}\n"
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(log_line)
+            f.flush()  # 立即刷新
+    except Exception:
+        pass  # 忽略日志写入错误
+    print(f"[DEBUG] {msg}", flush=True)  # 使用 flush=True 确保立即输出
+
+def log_error(msg):
+    """写入错误日志到文件"""
+    timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+    log_line = f"[{timestamp}] ERROR: {msg}\n"
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(log_line)
+            f.flush()  # 立即刷新
+    except Exception:
+        pass  # 忽略日志写入错误
+    print(f"[ERROR] {msg}", flush=True)  # 使用 flush=True 确保立即输出
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -89,6 +120,7 @@ class FundGUIApp:
         self.page = page
         page.title = "基金实时估值"
         page.theme_mode = ft.ThemeMode.DARK
+        page.bgcolor = ft.Colors.SURFACE
 
         self.config_dao.init_default_funds()
         self.config_dao.init_default_commodities()
@@ -128,29 +160,74 @@ class FundGUIApp:
             ),
         )
 
-        # 标签栏（带动画）
-        self.tabs = FletTabs(
-            selected_index=0,
-            animation_duration=350,  # 稍微延长动画时间，更流畅
-            on_change=self._on_tab_change,
-            tabs=[
-                FletTab(
-                    text="自选",
-                    icon=Icons.STAR_BORDER,
-                    content=self._build_fund_page(),
-                ),
-                FletTab(
-                    text="商品",
-                    icon=Icons.TRENDING_UP,
-                    content=self._build_commodity_page(),
-                ),
-                FletTab(
-                    text="新闻",
-                    icon=Icons.NEWSPAPER,
-                    content=self._build_news_page(),
-                ),
-            ],
-            expand=1,
+        # 构建各标签页内容
+        fund_page_content = self._build_fund_page()
+        commodity_page_content = self._build_commodity_page()
+        news_page_content = self._build_news_page()
+
+        # Tab 内容容器 - 直接使用各页面内容
+        fund_tab = Container(
+            expand=True,
+            bgcolor=AppColors.TAB_BG,
+            content=fund_page_content,
+            visible=True,
+        )
+        commodity_tab = Container(
+            expand=True,
+            bgcolor=AppColors.TAB_BG,
+            content=commodity_page_content,
+            visible=False,
+        )
+        news_tab = Container(
+            expand=True,
+            bgcolor=AppColors.TAB_BG,
+            content=news_page_content,
+            visible=False,
+        )
+
+        # 创建 tab 内容 Column
+        self._tab_contents = Column(
+            controls=[fund_tab, commodity_tab, news_tab],
+            expand=True,
+        )
+
+        # 保存 tab 容器引用以便后续切换可见性
+        self._tab_containers = [fund_tab, commodity_tab, news_tab]
+
+        # 自定义 Tab 栏 (Flet 0.80.5 替代方案)
+        self._tab_buttons = []
+        tab_items = [
+            ("自选", Icons.STAR_BORDER),
+            ("商品", Icons.TRENDING_UP),
+            ("新闻", Icons.NEWSPAPER),
+        ]
+
+        for i, (label, icon) in enumerate(tab_items):
+            btn = Container(
+                content=Row([
+                    Icon(icon, size=20, color=AppColors.TEXT_PRIMARY if i == 0 else AppColors.TEXT_SECONDARY),
+                    Text(label, size=14, color=AppColors.TEXT_PRIMARY if i == 0 else AppColors.TEXT_SECONDARY),
+                ], spacing=6),
+                padding=ft.padding.symmetric(horizontal=16, vertical=12),
+                on_click=lambda e, idx=i: self._on_tab_click(idx),
+                ink=True,
+            )
+            self._tab_buttons.append(btn)
+
+        # Tab 栏容器
+        self._tab_bar = Container(
+            content=Row(
+                self._tab_buttons,
+                spacing=0,
+            ),
+            bgcolor=AppColors.CARD_DARK,
+        )
+
+        # 选中指示器
+        self._tab_indicator = Container(
+            bgcolor=AppColors.ACCENT_BLUE,
+            height=2,
+            width=0,
         )
 
         # 底部状态栏
@@ -167,8 +244,10 @@ class FundGUIApp:
             bgcolor=AppColors.CARD_DARK,
         )
 
+        # 一次性添加所有控件到页面
         self.page.add(top_bar)
-        self.page.add(self.tabs)
+        self.page.add(self._tab_bar)
+        self.page.add(self._tab_contents)
         self.page.add(self.status_bar)
 
         # 加载初始数据
@@ -232,38 +311,37 @@ class FundGUIApp:
         )
 
         # 返回包含所有元素的 Column
-        return Container(
-            content=Column(
-                [
-                    # 资产概览卡片
-                    Container(
-                        padding=ft.padding.symmetric(horizontal=16),
-                        content=self.portfolio_card,
-                    ),
-                    Container(height=8),
-                    # 快捷操作
-                    Container(
-                        padding=ft.padding.symmetric(horizontal=16),
-                        content=action_row,
-                    ),
-                    Container(height=8),
-                    # 搜索栏
-                    Container(
-                        padding=ft.padding.symmetric(horizontal=16),
-                        content=self.search_bar,
-                    ),
-                    Container(height=12),
-                    # 基金列表容器 - 需要expand
-                    Container(
-                        expand=True,
-                        content=self._fund_list,
-                    ),
-                ],
-                spacing=0,
-                expand=True,
-            ),
+        return Column(
+            controls=[
+                # 资产概览卡片
+                Container(
+                    padding=ft.padding.symmetric(horizontal=16),
+                    content=self.portfolio_card,
+                ),
+                Container(height=8),
+                # 快捷操作
+                Container(
+                    padding=ft.padding.symmetric(horizontal=16),
+                    content=action_row,
+                ),
+                Container(height=8),
+                # 搜索栏
+                Container(
+                    padding=ft.padding.symmetric(horizontal=16),
+                    content=self.search_bar,
+                ),
+                Container(height=12),
+                # 基金列表容器 - 使用浅色背景以便看清卡片
+                Container(
+                    bgcolor=AppColors.TAB_BG,
+                    expand=True,
+                    content=self._fund_list,
+                    padding=ft.padding.symmetric(horizontal=16),
+                ),
+            ],
+            spacing=0,
             expand=True,
-            padding=ft.padding.only(top=8),
+            scroll=ft.ScrollMode.AUTO,
         )
 
     def _build_commodity_page(self) -> Container:
@@ -348,22 +426,24 @@ class FundGUIApp:
 
     async def _load_fund_data(self):
         """加载基金数据"""
+        log_debug("_load_fund_data 开始执行")
         try:
+            log_debug("开始加载基金数据...")
             watchlist = self.config_dao.get_watchlist()
+            log_debug(f"获取到 {len(watchlist)} 个自选基金")
             holdings = self.config_dao.get_holdings()
+            log_debug(f"获取到 {len(holdings)} 个持仓")
 
             self.funds = []
             for fund in watchlist:
                 try:
-                    result = await self.data_source_manager.fetch(
-                        DataSourceType.FUND, fund.code
-                    )
+                    log_debug(f"正在加载基金: {fund.code}")
+                    result = await self.data_source_manager.fetch(DataSourceType.FUND, fund.code)
+                    log_debug(f"基金 {fund.code} 结果: success={result.success}, data={result.data is not None}")
 
                     if result.success and result.data:
                         raw_data = result.data
-                        holding = next(
-                            (h for h in holdings if h.code == fund.code), None
-                        )
+                        holding = next((h for h in holdings if h.code == fund.code), None)
 
                         fund_data = FundDisplayData(
                             code=raw_data.get("fund_code", fund.code),
@@ -381,26 +461,31 @@ class FundGUIApp:
                             is_hold=fund.is_holding if fund else False,
                         )
                         self.funds.append(fund_data)
+                        log_debug(f"基金 {fund.code} 数据添加成功")
                 except Exception as ex:
-                    pass
+                    log_error(f"加载基金 {fund.code} 失败: {ex}")
 
+            log_debug(f"共加载 {len(self.funds)} 个基金")
             self._update_fund_table()
             now = datetime.now().strftime("%H:%M:%S")
-            self.status_bar.content.controls[0].value = f"Last Update: {now}"
-            self.status_bar.content.update()
+            # 安全更新状态栏
+            if hasattr(self, 'status_bar') and self.status_bar and self.status_bar.content:
+                self.status_bar.content.controls[0].value = f"Last Update: {now}"
+                self.status_bar.content.update()
 
         except Exception as e:
+            log_error(f"_load_fund_data 异常: {e}")
+            import traceback
+
+            traceback.print_exc()
             self._show_snackbar(f"Load failed: {str(e)}")
 
     def _update_fund_table(self):
         """更新基金卡片列表（卡片式布局）"""
+        log_debug(f"_update_fund_table 开始执行，funds数量={len(self.funds)}")
         # 计算资产概览数据
-        total_assets = sum(
-            f.net_value * f.hold_shares for f in self.funds if f.hold_shares > 0
-        )
-        total_cost = sum(
-            f.cost * f.hold_shares for f in self.funds if f.hold_shares > 0
-        )
+        total_assets = sum(f.net_value * f.hold_shares for f in self.funds if f.hold_shares > 0)
+        total_cost = sum(f.cost * f.hold_shares for f in self.funds if f.hold_shares > 0)
         daily_profit = sum(f.profit for f in self.funds if f.hold_shares > 0)
         total_profit = total_assets - total_cost
         profit_rate = (total_profit / total_cost * 100) if total_cost > 0 else 0
@@ -419,9 +504,10 @@ class FundGUIApp:
 
         # 获取当前基金代码集合
         current_codes = {fund.code for fund in self.funds}
-        cached_codes = (
-            set(self._fund_cards.keys()) if hasattr(self, "_fund_cards") else set()
-        )
+        log_debug(f"_update_fund_table: {len(self.funds)} funds, current_codes={current_codes}")
+
+        cached_codes = set(self._fund_cards.keys()) if hasattr(self, "_fund_cards") and self._fund_cards else set()
+        log_debug(f"_update_fund_table: cached_codes={cached_codes}")
 
         # 确保 _fund_cards 存在
         if not hasattr(self, "_fund_cards"):
@@ -448,7 +534,6 @@ class FundGUIApp:
                 )
             else:
                 # 创建新卡片
-                fund_code = fund.code  # 闭包修复：复制变量
                 try:
                     card = FundCard(
                         code=fund.code,
@@ -465,11 +550,18 @@ class FundGUIApp:
                         on_click=lambda e, f=fund: self._on_fund_click(e, f),
                     )
                 except Exception as e:
+                    log_error(f"创建基金卡片失败: {fund.code}, 错误: {e}")
                     continue
 
                 self._fund_cards[fund.code] = card
+                log_debug(f"卡片创建成功: {fund.code}")
                 if self._fund_list:
                     self._fund_list.controls.append(card)
+                    log_debug(
+                        f"添加基金卡片到列表: {fund.code}, _fund_list controls count: {len(self._fund_list.controls)}"
+                    )
+                else:
+                    log_debug(f"_fund_list 为 None，无法添加卡片")
 
         # 刷新基金列表
         if self._fund_list:
@@ -483,6 +575,7 @@ class FundGUIApp:
             self.status_bar.content.update()
 
         if self.page:
+            log_debug(f"_update_fund_table: 调用 page.update()")
             self.page.update()
 
     async def _load_commodity_data(self):
@@ -501,9 +594,7 @@ class FundGUIApp:
                     if result.success and result.data:
                         data = result.data
                         change_color = (
-                            ft.Colors.GREEN
-                            if data.get("change_percent", 0) >= 0
-                            else ft.Colors.RED
+                            ft.Colors.GREEN if data.get("change_percent", 0) >= 0 else ft.Colors.RED
                         )
 
                         card = Card(
@@ -535,11 +626,11 @@ class FundGUIApp:
                                 ),
                                 padding=12,
                             ),
-                            margin=margin.only(bottom=4),
+                            margin=padding.only(bottom=4),
                         )
                         self.commodity_list.controls.append(card)
                 except Exception as ex:
-                    print(f"获取商品 {commodity.symbol} 数据失败: {ex}")
+                    log_error(f"获取商品 {commodity.symbol} 数据失败: {ex}")
 
             self.page.update()
 
@@ -549,9 +640,7 @@ class FundGUIApp:
     async def _load_news_data(self):
         """加载新闻数据"""
         try:
-            result = await self.data_source_manager.fetch(
-                DataSourceType.NEWS, "finance"
-            )
+            result = await self.data_source_manager.fetch(DataSourceType.NEWS, "finance")
 
             self.news_list.controls.clear()
 
@@ -592,7 +681,7 @@ class FundGUIApp:
                             ),
                             padding=12,
                         ),
-                        margin=margin.only(bottom=4),
+                        margin=padding.only(bottom=4),
                     )
                     self.news_list.controls.append(card)
             else:
@@ -601,7 +690,7 @@ class FundGUIApp:
             self.page.update()
 
         except Exception as e:
-            print(f"加载新闻失败: {e}")
+            log_error(f"加载新闻失败: {e}")
             self._load_sample_news()
             self.page.update()
 
@@ -625,9 +714,7 @@ class FundGUIApp:
                                         size=12,
                                         color=ft.Colors.WHITE70,
                                     ),
-                                    Text(
-                                        news["time"], size=11, color=ft.Colors.WHITE70
-                                    ),
+                                    Text(news["time"], size=11, color=ft.Colors.WHITE70),
                                     Text(" - "),
                                     Text(
                                         news["source"],
@@ -642,7 +729,7 @@ class FundGUIApp:
                     ),
                     padding=12,
                 ),
-                margin=margin.only(bottom=4),
+                margin=padding.only(bottom=4),
             )
             self.news_list.controls.append(card)
 
@@ -653,19 +740,18 @@ class FundGUIApp:
         dialog.open = True
         self.page.update()
 
-    def _show_detail(self, e):
+    def _show_detail(self, e, fund: FundDisplayData = None):
         """显示基金详情对话框"""
-        # 获取当前选中的基金
-        selected_code = self._get_selected_fund_code()
-        if not selected_code:
-            self._show_snackbar("请先选择要查看详情的基金")
-            return
-
-        # 获取基金信息
-        fund = next((f for f in self.funds if f.code == selected_code), None)
-        if not fund:
-            self._show_snackbar("未找到选中的基金信息")
-            return
+        # 如果传入了基金，直接使用；否则从选中代码获取
+        if fund is None:
+            selected_code = self._get_selected_fund_code()
+            if not selected_code:
+                self._show_snackbar("请先选择要查看详情的基金")
+                return
+            fund = next((f for f in self.funds if f.code == selected_code), None)
+            if not fund:
+                self._show_snackbar("未找到选中的基金信息")
+                return
 
         # 创建详情数据（使用 FundDetailDialog 期望的数据结构）
         from .detail import FundDetailData
@@ -739,9 +825,7 @@ class FundGUIApp:
             return
 
         # 获取基金名称
-        fund_name = next(
-            (f.name for f in self.funds if f.code == selected_code), selected_code
-        )
+        fund_name = next((f.name for f in self.funds if f.code == selected_code), selected_code)
 
         # 显示确认对话框
         dialog = DeleteConfirmDialog(self, selected_code, fund_name)
@@ -815,15 +899,37 @@ class FundGUIApp:
                     row.selected = False
             self.page.update()
 
-    def _on_tab_change(self, e):
-        """处理标签页切换"""
-        self.current_tab = self.tabs.selected_index
+    def _on_tab_click(self, tab_index):
+        """处理标签页点击"""
+        self.current_tab = tab_index
+
+        # 更新按钮样式
+        for i, btn in enumerate(self._tab_buttons):
+            icon = btn.content.controls[0]
+            text = btn.content.controls[1]
+            if i == tab_index:
+                icon.color = AppColors.ACCENT_BLUE
+                text.color = AppColors.ACCENT_BLUE
+            else:
+                icon.color = AppColors.TEXT_SECONDARY
+                text.color = AppColors.TEXT_SECONDARY
+
+        # 控制 tab 内容的可见性 - 使用保存的容器引用
+        log_debug(f"切换到 tab {tab_index}")
+        for i, content_container in enumerate(self._tab_containers):
+            was_visible = content_container.visible
+            content_container.visible = (i == tab_index)
+            log_debug(f"  tab {i}: visible={was_visible} -> {content_container.visible}")
+
+        # 更新页面以反映可见性变化
+        self.page.update()
+
         # 切换到对应标签页时加载数据
-        if self.current_tab == 0:
+        if tab_index == 0:
             self.page.run_task(self._load_fund_data)
-        elif self.current_tab == 1:
+        elif tab_index == 1:
             self.page.run_task(self._load_commodity_data)
-        elif self.current_tab == 2:
+        elif tab_index == 2:
             self.page.run_task(self._load_news_data)
 
 
@@ -849,9 +955,7 @@ class AddFundDialog(AlertDialog):
         self._debounce_task = None  # 防抖任务
 
         # 查询状态图标
-        self.status_icon = Icon(
-            Icons.HELP_OUTLINE, size=20, color=ft.Colors.GREY_400, visible=True
-        )
+        self.status_icon = Icon(Icons.HELP_OUTLINE, size=20, color=ft.Colors.GREY_400, visible=True)
 
         # 基金代码输入框
         self.code_field = TextField(
@@ -881,23 +985,17 @@ class AddFundDialog(AlertDialog):
         )
 
         # 加载状态指示器
-        self.loading_indicator = ProgressRing(
-            width=16, height=16, stroke_width=2, visible=False
-        )
+        self.loading_indicator = ProgressRing(width=16, height=16, stroke_width=2, visible=False)
 
         # 加载提示文本
-        self.loading_text = Text(
-            "查询中...", size=11, color=ft.Colors.BLUE_300, visible=False
-        )
+        self.loading_text = Text("查询中...", size=11, color=ft.Colors.BLUE_300, visible=False)
 
         self.modal = True
         self.title = Row(
             [
                 Text("添加基金", weight=ft.FontWeight.BOLD),
                 Container(expand=True),
-                Text(
-                    "按 Enter 查询，Ctrl+Enter 添加", size=10, color=ft.Colors.WHITE54
-                ),
+                Text("按 Enter 查询，Ctrl+Enter 添加", size=10, color=ft.Colors.WHITE54),
             ],
             alignment=ft.MainAxisAlignment.START,
         )
@@ -1081,9 +1179,7 @@ class AddFundDialog(AlertDialog):
             return
 
         # 添加基金（默认标记为持有）
-        self.app.config_dao.add_fund(
-            code, self._fund_name, watchlist=True, is_hold=True
-        )
+        self.app.config_dao.add_fund(code, self._fund_name, watchlist=True, is_hold=True)
         self.app.page.run_task(self.app._load_fund_data)
 
         self.open = False
@@ -1242,9 +1338,7 @@ SECTOR_OPTIONS = [
 class SetSectorDialog(AlertDialog):
     """设置基金板块标注对话框"""
 
-    def __init__(
-        self, app: FundGUIApp, fund_code: str, fund_name: str, current_sector: str = ""
-    ):
+    def __init__(self, app: FundGUIApp, fund_code: str, fund_name: str, current_sector: str = ""):
         super().__init__()
         self.app = app
         self.fund_code = fund_code
@@ -1409,12 +1503,18 @@ class SetHoldDialog(AlertDialog):
 
 def main():
     """主入口"""
+    log_debug("main() 开始执行")
 
     def _main(page: ft.Page):
+        log_debug("_main 函数开始执行")
         app = FundGUIApp()
+        log_debug("FundGUIApp 创建成功")
         app.run(page)
+        log_debug("app.run() 执行完成")
 
+    log_debug("调用 ft.app()")
     ft.app(target=_main)
+    log_debug("ft.app() 返回")
 
 
 if __name__ == "__main__":

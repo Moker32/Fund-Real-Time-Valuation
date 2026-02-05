@@ -53,7 +53,11 @@ Flet-based GUI components for fund valuation app. Apple Stocks + Alipay design p
 
 ### Tabs
 - Three tabs: "自选" (watchlist), "商品" (commodities), "新闻" (news)
-- Flet Tabs with animation_duration=350
+- Flet 0.80.5 API: Uses `TabBar` + `Tabs` combination
+  - `TabBar(tabs=[Tab(label=...), ...], on_click=handler)`
+  - `Tabs(content=Column([...]), length=N)`
+- Tab click event: `on_click` with `e.data` containing selected index
+- Content visibility: Controls via `_tab_contents.controls[i].visible`
 - Tab content built via `_build_*_page()` methods
 
 ## ANTI-PATTERNS
@@ -64,7 +68,7 @@ Flet-based GUI components for fund valuation app. Apple Stocks + Alipay design p
 
 ## NOTES
 
-- **Flet 0.28.3 API**: Specific imports (Column, Row, Container, not generic widgets)
+- **Flet 0.80.5 API**: Uses `TabBar` + `Tabs` combination (see Tabs section above)
 - **Async pattern**: Data sources async, but GUI sync (Flet limitation)
 - **Component caching**: `_fund_cards` dict prevents full rebuilds
 - **Search**: Filters by code/name, toggles `visible` property

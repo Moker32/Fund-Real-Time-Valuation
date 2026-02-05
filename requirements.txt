@@ -2,7 +2,7 @@
 # 使用 uv 管理: uv pip install -r requirements.txt
 
 # === GUI 框架 ===
-flet==0.28.3                    # GUI 框架 (Flet 0.28.3 API)
+flet>=0.80.5                    # GUI 框架 (Flet 0.80.5 API)
 
 # === 数据源 ===
 akshare>=1.10.0                # 财经数据 API
