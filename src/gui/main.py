@@ -752,6 +752,42 @@ class FundGUIApp:
             log_debug(f"_update_fund_table: 调用 page.update()")
             self.page.update()
 
+        # 检查价格预警
+        self._check_price_alerts()
+
+    def _check_price_alerts(self):
+        """检查价格预警并显示通知"""
+        if not self.page or not self.notification_manager:
+            return
+
+        triggered_alerts = []
+        for fund in self.funds:
+            if fund.net_value > 0:  # 确保有有效价格
+                triggered = self.notification_manager.check_price_alerts(
+                    fund_code=fund.code,
+                    fund_name=fund.name,
+                    current_price=fund.net_value,
+                )
+                triggered_alerts.extend(triggered)
+
+        # 如果有触发的预警，显示通知
+        if triggered_alerts:
+            self._show_alert_notifications(triggered_alerts)
+
+    def _show_alert_notifications(self, triggered_alerts: list):
+        """显示预警触发的通知"""
+        if not self.page:
+            return
+
+        for alert in triggered_alerts:
+            direction_text = "高于" if alert.direction == "above" else "低于"
+            message = f"{alert.fund_name} ({alert.fund_code}) 当前价格 {direction_text} {alert.target_price:.4f}"
+
+            # 使用 snackbar 显示通知
+            self._show_snackbar(f"[预警] {message}")
+
+            log_debug(f"[预警触发] {message}")
+
     async def _load_commodity_data(self):
         """加载商品数据"""
         # 设置加载状态

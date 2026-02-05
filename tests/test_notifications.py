@@ -166,3 +166,57 @@ class TestNotificationManager:
         active = manager.get_active_alerts()
         assert len(active) == 1
         assert active[0].fund_code == "000002"
+
+    def test_batch_alert_check(self):
+        """测试批量检查预警"""
+        config = NotificationConfig()
+        manager = NotificationManager(config)
+
+        # 添加多个预警
+        manager.add_alert("000001", "基金A", 1.5, AlertDirection.ABOVE.value)
+        manager.add_alert("000002", "基金B", 2.0, AlertDirection.BELOW.value)
+        manager.add_alert("000003", "基金C", 3.0, AlertDirection.ABOVE.value)
+
+        # 模拟价格数据
+        prices = {
+            "000001": 1.6,  # 触发
+            "000002": 2.1,  # 不触发 (需要低于2.0)
+            "000003": 3.5,  # 触发
+        }
+
+        triggered_all = []
+        for fund_code, fund_name, price in [
+            ("000001", "基金A", prices["000001"]),
+            ("000002", "基金B", prices["000002"]),
+            ("000003", "基金C", prices["000003"]),
+        ]:
+            triggered = manager.check_price_alerts(fund_code, fund_name, price)
+            triggered_all.extend(triggered)
+
+        # 应该触发2个预警
+        assert len(triggered_all) == 2
+        assert len(manager.get_active_alerts()) == 1
+
+    def test_alert_not_trigger_repeatedly(self):
+        """测试已触发不重复触发"""
+        config = NotificationConfig()
+        manager = NotificationManager(config)
+
+        alert = manager.add_alert("000001", "基金A", 1.5, AlertDirection.ABOVE.value)
+
+        # 第一次触发
+        triggered1 = manager.check_price_alerts("000001", "基金A", 1.6)
+        assert len(triggered1) == 1
+        assert alert.triggered is True
+
+        # 再次检查，不应该再次触发
+        triggered2 = manager.check_price_alerts("000001", "基金A", 1.7)
+        assert len(triggered2) == 0
+
+        # 再次触发，仍然不触发
+        triggered3 = manager.check_price_alerts("000001", "基金A", 1.8)
+        assert len(triggered3) == 0
+
+        # 确认只有1个预警被标记为已触发
+        all_alerts = manager.get_all_alerts()
+        assert len([a for a in all_alerts if a.triggered]) == 1
