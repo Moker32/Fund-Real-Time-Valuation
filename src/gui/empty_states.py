@@ -5,7 +5,7 @@
 """
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Optional
 
 import flet as ft
 from flet import (
@@ -131,8 +131,8 @@ def create_empty_state(
     message: str,
     hint: str = "",
     button_text: str = "",
-    button_icon: Icons | None = None,
-    on_button_click: Callable[[Any], None] | None = None,
+    button_icon: Optional[Icons] = None,
+    on_button_click: Optional[Callable[[Any], None]] = None,
 ) -> Container:
     """创建通用空状态组件
 
