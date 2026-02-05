@@ -15,9 +15,10 @@ from flet import (
     BorderRadius,
     MainAxisAlignment,
     CrossAxisAlignment,
+    ProgressRing,
 )
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Callable
 
 
 class AppColors:
@@ -146,7 +147,7 @@ class FundCard(Card):
         sector: str = "",
         is_hold: bool = False,
         chart_data: Optional[List[float]] = None,
-        on_click: Optional[callable] = None,
+        on_click: Optional[Callable] = None,
     ):
         self.code = code
         self.name = name
@@ -174,6 +175,10 @@ class FundCard(Card):
         # Change icon
         self.change_icon = Icons.ARROW_DROP_UP if change_pct >= 0 else Icons.ARROW_DROP_DOWN
 
+        # Loading state
+        self._loading = False
+        self._loading_progress_ring = None
+
         # Mini chart
         self.mini_chart = MiniChart(
             self.chart_data,
@@ -192,6 +197,24 @@ class FundCard(Card):
                 f"\nholdings: {hold_shares:.2f}\ncost: {cost:.4f}\nprofit: {profit:+.2f}"
             )
 
+        # Create loading progress ring
+        self.progress_ring = ProgressRing(
+            width=40,
+            height=40,
+            stroke_width=3,
+            color=AppColors.ACCENT_BLUE,
+            visible=False,
+        )
+
+        # Loading overlay container
+        self._loading_overlay = Container(
+            content=self.progress_ring,
+            alignment=Alignment(0.5, 0.5),
+            visible=False,
+            bgcolor=f"{AppColors.BACKGROUND_DARK}E6",  # 90% opacity
+            border_radius=BorderRadius(top_left=12, top_right=12, bottom_left=12, bottom_right=12),
+        )
+
         # Card 组件使用 Container 设置背景色和圆角
         card_content = Container(
             bgcolor=AppColors.CARD_DARK,
@@ -200,10 +223,16 @@ class FundCard(Card):
             content=content,
         )
 
+        # Stack: card content + loading overlay
+        self._card_stack = ft.Stack(
+            controls=[card_content, self._loading_overlay],
+            expand=True,
+        )
+
         super().__init__(
             elevation=2,
             tooltip=tooltip_text,
-            content=card_content,
+            content=self._card_stack,
             margin=0,
         )
 
@@ -365,6 +394,39 @@ class FundCard(Card):
             spacing=0,
         )
 
+    @property
+    def loading(self) -> bool:
+        """Get loading state"""
+        return self._loading
+
+    @loading.setter
+    def loading(self, value: bool):
+        """Set loading state"""
+        self._loading = value
+        self._update_loading_state()
+
+    def _update_loading_state(self):
+        """Update loading UI state"""
+        if self._loading_overlay:
+            self._loading_overlay.visible = self._loading
+        if self.progress_ring:
+            self.progress_ring.visible = self._loading
+        # Only update if card is added to page
+        try:
+            if hasattr(self, '_card_stack') and self._card_stack:
+                self._card_stack.update()
+        except RuntimeError:
+            # Card not added to page yet, skip update
+            pass
+
+    def set_loading(self, value: bool):
+        """Set loading state"""
+        self.loading = value
+
+    def toggle_loading(self):
+        """Toggle loading state"""
+        self.loading = not self._loading
+
     def update_data(
         self,
         net_value: float,
@@ -375,7 +437,7 @@ class FundCard(Card):
     ):
         """Update card data - replace content"""
         self.net_value = net_value
-        self.est_value = est_value
+        self.est_value = net_value
         self.change_pct = change_pct
         self.profit = profit
 
