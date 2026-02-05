@@ -4,27 +4,32 @@
 提供全局错误处理功能，包括错误对话框、错误记录和异常处理装饰器。
 """
 
+import sys
+import traceback
+import logging
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Any, Optional
+
 import flet as ft
+
+# 获取模块日志记录器
+logger = logging.getLogger(__name__)
 from flet import (
     AlertDialog,
     Column,
     Container,
-    Text,
-    Row,
-    Icon,
-    Icons,
-    ElevatedButton,
-    IconButton,
     Divider,
-    padding,
+    ElevatedButton,
+    Icon,
+    IconButton,
+    Icons,
+    Row,
+    Text,
 )
-from enum import Enum
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import Optional, Callable, Any
-import traceback
-import sys
-from pathlib import Path
 
 # 添加 src 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -65,8 +70,8 @@ class ErrorRecord:
     message: str
     severity: ErrorSeverity
     timestamp: datetime = field(default_factory=datetime.now)
-    details: Optional[str] = None
-    exception_type: Optional[str] = None
+    details: str | None = None
+    exception_type: str | None = None
 
 
 class ErrorHandler:
@@ -103,8 +108,8 @@ class ErrorHandler:
         self,
         message: str,
         severity: ErrorSeverity = ErrorSeverity.ERROR,
-        details: Optional[str] = None,
-        exception: Optional[Exception] = None,
+        details: str | None = None,
+        exception: Exception | None = None,
     ) -> ErrorRecord:
         """记录一个错误
 
@@ -139,7 +144,7 @@ class ErrorHandler:
 
         return record
 
-    def record_warning(self, message: str, details: Optional[str] = None) -> ErrorRecord:
+    def record_warning(self, message: str, details: str | None = None) -> ErrorRecord:
         """记录一个警告
 
         Args:
@@ -242,9 +247,9 @@ def show_error_dialog(
     page: ft.Page,
     message: str,
     severity: ErrorSeverity = ErrorSeverity.ERROR,
-    title: Optional[str] = None,
-    details: Optional[str] = None,
-    on_dismiss: Optional[Callable] = None,
+    title: str | None = None,
+    details: str | None = None,
+    on_dismiss: Callable | None = None,
 ) -> AlertDialog:
     """显示错误对话框
 
@@ -359,7 +364,7 @@ def show_error_dialog(
 def _close_dialog(
     dialog: AlertDialog,
     page: ft.Page,
-    on_dismiss: Optional[Callable] = None,
+    on_dismiss: Callable | None = None,
 ):
     """关闭对话框"""
     dialog.open = False
@@ -369,14 +374,14 @@ def _close_dialog(
     if on_dismiss:
         try:
             on_dismiss()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"对话框关闭回调执行失败: {e}")
 
 
 def show_network_error(
     page: ft.Page,
     operation: str = "网络请求",
-    error_message: Optional[str] = None,
+    error_message: str | None = None,
 ) -> AlertDialog:
     """显示网络错误对话框
 
@@ -401,7 +406,7 @@ def show_network_error(
 def show_data_error(
     page: ft.Page,
     data_type: str = "数据",
-    error_message: Optional[str] = None,
+    error_message: str | None = None,
 ) -> AlertDialog:
     """显示数据错误对话框
 

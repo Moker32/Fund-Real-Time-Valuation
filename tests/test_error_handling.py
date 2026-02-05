@@ -331,3 +331,78 @@ class TestAppColorsInErrorHandling:
         assert ErrorSeverity.WARNING in ERROR_COLORS
         assert ErrorSeverity.ERROR in ERROR_COLORS
         assert ErrorSeverity.CRITICAL in ERROR_COLORS
+
+
+class TestDialogCallbackErrorLogging:
+    """对话框回调错误日志测试"""
+
+    def test_dialog_callback_error_is_logged(self, caplog):
+        """测试对话框关闭回调异常被记录到日志"""
+        import logging
+        from src.gui.error_handling import show_error_dialog, ErrorSeverity
+        from unittest.mock import MagicMock
+
+        # 设置日志级别
+        caplog.set_level(logging.WARNING)
+
+        # 创建模拟页面
+        mock_page = MagicMock()
+        mock_page.overlay = []
+        mock_page.update = MagicMock()
+
+        # 创建会抛出异常的回调
+        def failing_callback():
+            raise ValueError("回调执行失败")
+
+        # 显示错误对话框
+        show_error_dialog(
+            mock_page,
+            "测试错误信息",
+            ErrorSeverity.ERROR,
+            on_dismiss=failing_callback,
+        )
+
+        # 获取对话框并触发关闭
+        dialog = mock_page.overlay[0]
+
+        # 模拟点击关闭按钮触发回调
+        for action in dialog.actions:
+            if hasattr(action, 'on_click'):
+                action.on_click(MagicMock())
+
+        # 验证警告日志被记录
+        assert "回调执行失败" in caplog.text or "ValueError" in caplog.text
+
+    def test_dialog_callback_success_no_error_logged(self, caplog):
+        """测试成功执行的回调不会产生错误日志"""
+        import logging
+        from src.gui.error_handling import show_error_dialog, ErrorSeverity
+        from unittest.mock import MagicMock
+
+        caplog.set_level(logging.WARNING)
+
+        mock_page = MagicMock()
+        mock_page.overlay = []
+        mock_page.update = MagicMock()
+
+        callback_executed = []
+
+        def success_callback():
+            callback_executed.append(True)
+
+        show_error_dialog(
+            mock_page,
+            "测试错误信息",
+            ErrorSeverity.ERROR,
+            on_dismiss=success_callback,
+        )
+
+        # 触发关闭
+        dialog = mock_page.overlay[0]
+        for action in dialog.actions:
+            if hasattr(action, 'on_click'):
+                action.on_click(MagicMock())
+
+        # 验证回调被调用且没有错误日志
+        assert len(callback_executed) == 1
+        assert "失败" not in caplog.text.lower()
