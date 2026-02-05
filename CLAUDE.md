@@ -13,16 +13,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 python run_gui.py
 ./run_gui.py
 
-# 运行 TUI 应用
-python run_tui.py
-./run_tui.py
-
 # 安装依赖
 uv pip install -r requirements.txt
 
 # 运行测试
-pytest tests/ -v           # 运行所有测试
-pytest tests/ -v --tb=short # 简洁错误输出
+uv run python -m pytest tests/ -v           # 运行所有测试
+uv run python -m pytest tests/ -v --tb=short # 简洁错误输出
 ```
 
 ## 技术栈
@@ -37,16 +33,20 @@ pytest tests/ -v --tb=short # 简洁错误输出
 
 ```
 run_gui.py          # GUI 应用入口
-run_tui.py          # TUI 应用入口
 src/
 ├── gui/              # Flet GUI 界面层
 │   ├── main.py       # 主应用 (FundGUIApp)
 │   ├── components.py # 基金卡片、组合卡片等组件
+│   ├── notifications.py # 通知系统
+│   ├── settings.py   # 设置对话框
+│   ├── error_handling.py # 错误处理
+│   ├── empty_states.py # 空状态组件
 │   ├── detail.py     # 基金详情对话框
 │   ├── theme.py      # 主题和颜色
 │   └── AGENTS.md     # GUI 开发指南
 ├── datasources/      # 数据源层
 │   ├── manager.py    # DataSourceManager (多数据源管理)
+│   ├── cache.py      # 数据缓存层
 │   ├── base.py       # 数据源抽象基类
 │   ├── aggregator.py # 数据聚合器
 │   ├── fund_source.py  # 基金数据源
@@ -57,9 +57,11 @@ src/
 │   ├── commodity_source.py # 商品数据源
 │   ├── news_source.py   # 新闻数据源
 │   └── portfolio.py     # 组合分析
-└── config/           # 配置层
-    ├── manager.py    # ConfigManager
-    └── models.py     # 数据模型 (Fund, Holding, Commodity 等)
+├── config/           # 配置层
+│   ├── manager.py    # ConfigManager
+│   └── models.py     # 数据模型 (Fund, Holding, Commodity, PriceAlert 等)
+└── utils/            # 工具层
+    └── export.py     # 数据导出
 ```
 
 ### GUI 数据流

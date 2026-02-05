@@ -21,18 +21,17 @@ uv pip install -r requirements.txt
 # 运行 GUI
 python run_gui.py
 
-# 或使用 run_tui.py（默认运行 GUI）
-python run_tui.py
+# 或直接执行（需要 uv）
+./run_gui.py
 
 # Web 模式
-python run_tui.py --web
+python run_gui.py --web
 ```
 
 ## 项目结构
 
 ```
-├── run_gui.py              # GUI 专用入口
-├── run_tui.py              # 应用入口（默认运行 GUI）
+├── run_gui.py              # GUI 应用入口
 ├── requirements.txt        # 依赖配置
 ├── src/
 │   ├── gui/               # Flet GUI 界面
