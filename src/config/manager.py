@@ -3,21 +3,16 @@
 统一管理所有配置文件的加载和保存
 """
 
-import os
 from pathlib import Path
-from typing import Optional
 
-from .base import BaseConfigLoader, AppConfigLoader
-from .models import (
-    Fund, Holding, Commodity,
-    FundList, CommodityList, AppConfig
-)
+from .base import AppConfigLoader, BaseConfigLoader
+from .models import AppConfig, Commodity, CommodityList, Fund, FundList, Holding
 
 
 class FundConfigLoader(BaseConfigLoader[FundList]):
     """基金配置加载器"""
 
-    def __init__(self, config_dir: Optional[str] = None):
+    def __init__(self, config_dir: str | None = None):
         super().__init__('funds.yaml', config_dir)
 
     def _parse(self, data: dict) -> FundList:
@@ -60,7 +55,7 @@ class FundConfigLoader(BaseConfigLoader[FundList]):
 class CommodityConfigLoader(BaseConfigLoader[CommodityList]):
     """商品配置加载器"""
 
-    def __init__(self, config_dir: Optional[str] = None):
+    def __init__(self, config_dir: str | None = None):
         super().__init__('commodities.yaml', config_dir)
 
     def _parse(self, data: dict) -> CommodityList:
@@ -92,7 +87,7 @@ class ConfigManager:
     统一管理所有配置文件的加载和保存
     """
 
-    def __init__(self, config_dir: Optional[str] = None):
+    def __init__(self, config_dir: str | None = None):
         """
         初始化配置管理器
 

@@ -5,25 +5,21 @@
 
 import asyncio
 import time
-from typing import Any, Dict, List, Optional, Type
 from dataclasses import dataclass, field
-from .base import (
-    DataSource,
-    DataSourceType,
-    DataSourceResult,
-    DataSourceError
-)
+from typing import Any
+
+from .base import DataSource, DataSourceResult, DataSourceType
 
 
 @dataclass
 class DataSourceConfig:
     """数据源配置"""
-    source_class: Type[DataSource]
+    source_class: type[DataSource]
     name: str
     source_type: DataSourceType
     enabled: bool = True
     priority: int = 0  # 优先级，数值越小优先级越高
-    config: Dict[str, Any] = field(default_factory=dict)
+    config: dict[str, Any] = field(default_factory=dict)
 
 
 class DataSourceManager:
@@ -46,9 +42,9 @@ class DataSourceManager:
             max_concurrent: 最大并发请求数
             enable_load_balancing: 是否启用负载均衡
         """
-        self._sources: Dict[str, DataSource] = {}
-        self._source_configs: Dict[str, DataSourceConfig] = {}
-        self._type_sources: Dict[DataSourceType, List[str]] = {
+        self._sources: dict[str, DataSource] = {}
+        self._source_configs: dict[str, DataSourceConfig] = {}
+        self._type_sources: dict[DataSourceType, list[str]] = {
             DataSourceType.FUND: [],
             DataSourceType.COMMODITY: [],
             DataSourceType.NEWS: [],
@@ -58,9 +54,9 @@ class DataSourceManager:
             DataSourceType.CRYPTO: []
         }
         self._max_concurrent = max_concurrent  # 延迟创建 semaphore
-        self._semaphore: Optional[asyncio.Semaphore] = None  # 延迟初始化
+        self._semaphore: asyncio.Semaphore | None = None  # 延迟初始化
         self._enable_load_balancing = enable_load_balancing
-        self._round_robin_index: Dict[DataSourceType, int] = {
+        self._round_robin_index: dict[DataSourceType, int] = {
             DataSourceType.FUND: 0,
             DataSourceType.COMMODITY: 0,
             DataSourceType.NEWS: 0,
@@ -69,7 +65,7 @@ class DataSourceManager:
             DataSourceType.BOND: 0,
             DataSourceType.CRYPTO: 0
         }
-        self._request_history: List[Dict[str, Any]] = []
+        self._request_history: list[dict[str, Any]] = []
         self._max_history = 1000
 
     async def _get_semaphore(self) -> asyncio.Semaphore:
@@ -78,7 +74,7 @@ class DataSourceManager:
             self._semaphore = asyncio.Semaphore(self._max_concurrent)
         return self._semaphore
 
-    def register(self, source: DataSource, config: Optional[DataSourceConfig] = None):
+    def register(self, source: DataSource, config: DataSourceConfig | None = None):
         """
         注册数据源
 
@@ -119,7 +115,7 @@ class DataSourceManager:
         self._type_sources[source.source_type].remove(source_name)
         self._source_configs.pop(source_name, None)
 
-    def get_source(self, source_name: str) -> Optional[DataSource]:
+    def get_source(self, source_name: str) -> DataSource | None:
         """
         获取指定数据源
 
@@ -131,7 +127,7 @@ class DataSourceManager:
         """
         return self._sources.get(source_name)
 
-    def get_sources_by_type(self, source_type: DataSourceType) -> List[DataSource]:
+    def get_sources_by_type(self, source_type: DataSourceType) -> list[DataSource]:
         """
         按类型获取数据源列表
 
@@ -245,11 +241,11 @@ class DataSourceManager:
     async def fetch_batch(
         self,
         source_type: DataSourceType,
-        params_list: List[Dict[str, Any]],
+        params_list: list[dict[str, Any]],
         *args,
         parallel: bool = True,
         **kwargs
-    ) -> List[DataSourceResult]:
+    ) -> list[DataSourceResult]:
         """
         批量获取数据
 
@@ -300,7 +296,7 @@ class DataSourceManager:
             return results
 
         # 并行执行 - 使用信号量限制并发数
-        async def fetch_one(params: Dict[str, Any]) -> DataSourceResult:
+        async def fetch_one(params: dict[str, Any]) -> DataSourceResult:
             async with await self._get_semaphore():
                 try:
                     result = await primary_source.fetch(
@@ -338,7 +334,7 @@ class DataSourceManager:
 
         return processed_results
 
-    def _get_ordered_sources(self, source_type: DataSourceType) -> List[DataSource]:
+    def _get_ordered_sources(self, source_type: DataSourceType) -> list[DataSource]:
         """
         获取排序后的数据源列表
 
@@ -367,7 +363,7 @@ class DataSourceManager:
         ordered = source_ids[idx:] + source_ids[:idx]
         return [self._sources[sid] for sid in ordered]
 
-    async def health_check(self, source_name: Optional[str] = None) -> Dict[str, Any]:
+    async def health_check(self, source_name: str | None = None) -> dict[str, Any]:
         """
         执行健康检查
 
@@ -445,8 +441,8 @@ class DataSourceManager:
         self,
         source_name: str,
         source_type: DataSourceType,
-        result: Optional[DataSourceResult],
-        error: Optional[str] = None
+        result: DataSourceResult | None,
+        error: str | None = None
     ):
         """
         记录请求历史
@@ -469,7 +465,7 @@ class DataSourceManager:
         if len(self._request_history) > self._max_history:
             self._request_history = self._request_history[-self._max_history:]
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         获取统计数据
 
@@ -481,7 +477,7 @@ class DataSourceManager:
         failed_requests = total_requests - successful_requests
 
         # 按数据源统计
-        source_stats: Dict[str, Dict[str, Any]] = {}
+        source_stats: dict[str, dict[str, Any]] = {}
         for source_name in self._sources:
             source_requests = [r for r in self._request_history if r["source"] == source_name]
             if source_requests:
@@ -517,7 +513,7 @@ class DataSourceManager:
             "max_concurrent": self._semaphore._value if hasattr(self._semaphore, '_value') else None
         }
 
-    def list_sources(self) -> List[Dict[str, Any]]:
+    def list_sources(self) -> list[dict[str, Any]]:
         """
         列出所有已注册的数据源
 
@@ -551,10 +547,10 @@ def create_default_manager() -> DataSourceManager:
     Returns:
         DataSourceManager: 配置好的管理器实例
     """
-    from .fund_source import FundDataSource, SinaFundDataSource
     from .commodity_source import AKShareCommoditySource, YFinanceCommoditySource
+    from .fund_source import FundDataSource
     from .news_source import SinaNewsDataSource
-    from .sector_source import SinaSectorDataSource, EastMoneySectorSource
+    from .sector_source import EastMoneySectorSource, SinaSectorDataSource
 
     manager = DataSourceManager()
 
@@ -588,7 +584,7 @@ def create_default_manager() -> DataSourceManager:
     manager.register(YahooStockSource())
 
     # === 新增债券数据源 ===
-    from .bond_source import SinaBondDataSource, AKShareBondSource
+    from .bond_source import AKShareBondSource, SinaBondDataSource
     manager.register(SinaBondDataSource())
     manager.register(AKShareBondSource())
 

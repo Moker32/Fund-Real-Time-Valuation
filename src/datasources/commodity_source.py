@@ -10,14 +10,9 @@
 import asyncio
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-from .base import (
-    DataSource,
-    DataSourceType,
-    DataSourceResult,
-    DataSourceError,
-    NetworkError
-)
+from typing import Any
+
+from .base import DataSource, DataSourceResult, DataSourceType
 
 
 class CommodityDataSource(DataSource):
@@ -69,7 +64,7 @@ class YFinanceCommoditySource(CommodityDataSource):
             name="yfinance_commodity",
             timeout=timeout
         )
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0  # 缓存60秒
 
     async def fetch(self, commodity_type: str = "gold") -> DataSourceResult:
@@ -170,7 +165,7 @@ class YFinanceCommoditySource(CommodityDataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    async def fetch_batch(self, commodity_types: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, commodity_types: list[str]) -> list[DataSourceResult]:
         """批量获取商品数据"""
         async def fetch_one(ctype: str) -> DataSourceResult:
             return await self.fetch(ctype)
@@ -226,7 +221,7 @@ class YFinanceCommoditySource(CommodityDataSource):
         """清空缓存"""
         self._cache.clear()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取数据源状态（含缓存信息）"""
         status = super().get_status()
         status["cache_size"] = len(self._cache)
@@ -250,7 +245,7 @@ class AKShareCommoditySource(CommodityDataSource):
             name="akshare_commodity",
             timeout=timeout
         )
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0
 
     async def fetch(self, commodity_type: str = "gold_cny") -> DataSourceResult:
@@ -266,7 +261,7 @@ class AKShareCommoditySource(CommodityDataSource):
             )
 
         try:
-            import akshare as ak
+            import akshare as ak  # noqa: F401  # 动态导入检查可用性
 
             if commodity_type == "gold_cny":
                 data = await self._fetch_gold_cny()
@@ -310,7 +305,7 @@ class AKShareCommoditySource(CommodityDataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    async def _fetch_gold_cny(self) -> Optional[Dict[str, Any]]:
+    async def _fetch_gold_cny(self) -> dict[str, Any] | None:
         """获取上海黄金交易所 Au99.99 数据"""
         import akshare as ak
 
@@ -328,7 +323,7 @@ class AKShareCommoditySource(CommodityDataSource):
             }
         return None
 
-    async def fetch_batch(self, commodity_types: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, commodity_types: list[str]) -> list[DataSourceResult]:
         """批量获取商品数据"""
         tasks = [self.fetch(ctype) for ctype in commodity_types]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -372,8 +367,8 @@ class CommodityDataAggregator(CommodityDataSource):
             name="commodity_aggregator",
             timeout=timeout
         )
-        self._sources: List[DataSource] = []
-        self._primary_source: Optional[DataSource] = None
+        self._sources: list[DataSource] = []
+        self._primary_source: DataSource | None = None
 
     def add_source(self, source: DataSource, is_primary: bool = False):
         """添加数据源"""
@@ -415,7 +410,7 @@ class CommodityDataAggregator(CommodityDataSource):
             metadata={"commodity_type": commodity_type, "errors": errors}
         )
 
-    async def fetch_batch(self, commodity_types: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, commodity_types: list[str]) -> list[DataSourceResult]:
         """批量获取商品数据"""
         tasks = [self.fetch(ctype) for ctype in commodity_types]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -437,7 +432,7 @@ class CommodityDataAggregator(CommodityDataSource):
 
         return processed_results
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取聚合器状态"""
         status = super().get_status()
         status["source_count"] = len(self._sources)

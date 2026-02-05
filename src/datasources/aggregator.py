@@ -6,12 +6,12 @@
 - SameSourceAggregator: 同源数据聚合器，支持故障切换
 """
 
-from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Type
-from dataclasses import dataclass, field
 import time
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Any
 
-from .base import DataSource, DataSourceResult, DataSourceType, DataSourceError
+from .base import DataSource, DataSourceResult
 
 
 @dataclass
@@ -37,7 +37,7 @@ class DataAggregator(ABC):
             name: 聚合器名称
         """
         self.name = name
-        self._sources: List[AggregatorSourceInfo] = []
+        self._sources: list[AggregatorSourceInfo] = []
         self._request_count = 0
         self._success_count = 0
         self._failover_count = 0
@@ -73,7 +73,7 @@ class DataAggregator(ABC):
                 return True
         return False
 
-    def get_sources(self) -> List[DataSource]:
+    def get_sources(self) -> list[DataSource]:
         """
         获取所有数据源
 
@@ -82,7 +82,7 @@ class DataAggregator(ABC):
         """
         return [info.source for info in self._sources]
 
-    def get_primary_source(self) -> Optional[DataSource]:
+    def get_primary_source(self) -> DataSource | None:
         """
         获取主数据源
 
@@ -109,7 +109,7 @@ class DataAggregator(ABC):
         pass
 
     @abstractmethod
-    async def fetch_all(self, *args, **kwargs) -> List[DataSourceResult]:
+    async def fetch_all(self, *args, **kwargs) -> list[DataSourceResult]:
         """
         获取所有数据源的数据
 
@@ -122,7 +122,7 @@ class DataAggregator(ABC):
         """
         pass
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         获取聚合器统计信息
 
@@ -164,7 +164,7 @@ class SameSourceAggregator(DataAggregator):
             name: 聚合器名称
         """
         super().__init__(name)
-        self._last_successful_source: Optional[str] = None
+        self._last_successful_source: str | None = None
 
     async def fetch(self, *args, **kwargs) -> DataSourceResult:
         """
@@ -191,7 +191,7 @@ class SameSourceAggregator(DataAggregator):
             )
 
         self._request_count += 1
-        errors: List[str] = []
+        errors: list[str] = []
 
         # 1. 优先尝试主数据源
         primary_source = self.get_primary_source()
@@ -235,7 +235,7 @@ class SameSourceAggregator(DataAggregator):
             metadata={"failover_count": self._failover_count, "errors": errors}
         )
 
-    async def fetch_all(self, *args, **kwargs) -> List[DataSourceResult]:
+    async def fetch_all(self, *args, **kwargs) -> list[DataSourceResult]:
         """
         获取所有数据源的数据
 
@@ -256,7 +256,7 @@ class SameSourceAggregator(DataAggregator):
                 )
             ]
 
-        results: List[DataSourceResult] = []
+        results: list[DataSourceResult] = []
         for info in self._sources:
             try:
                 result = await info.source.fetch(*args, **kwargs)
@@ -287,7 +287,7 @@ class LoadBalancedAggregator(DataAggregator):
         """
         super().__init__(name)
         self._current_index = 0
-        self._source_usage: Dict[str, int] = {}
+        self._source_usage: dict[str, int] = {}
 
     def add_source(self, source: DataSource, is_primary: bool = False, weight: float = 1.0):
         """
@@ -339,7 +339,7 @@ class LoadBalancedAggregator(DataAggregator):
                 if result.success:
                     self._success_count += 1
                     return result
-            except Exception as e:
+            except Exception:
                 self._source_usage[source.name] += 1
 
         return DataSourceResult(
@@ -349,7 +349,7 @@ class LoadBalancedAggregator(DataAggregator):
             source=self.name
         )
 
-    async def fetch_all(self, *args, **kwargs) -> List[DataSourceResult]:
+    async def fetch_all(self, *args, **kwargs) -> list[DataSourceResult]:
         """
         获取所有数据源的数据
 
@@ -370,7 +370,7 @@ class LoadBalancedAggregator(DataAggregator):
                 )
             ]
 
-        results: List[DataSourceResult] = []
+        results: list[DataSourceResult] = []
         for info in self._sources:
             try:
                 result = await info.source.fetch(*args, **kwargs)
@@ -384,7 +384,7 @@ class LoadBalancedAggregator(DataAggregator):
                 ))
         return results
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         获取聚合器统计信息
 

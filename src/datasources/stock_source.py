@@ -12,14 +12,14 @@ import asyncio
 import re
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
 from .base import (
     DataSource,
-    DataSourceType,
     DataSourceResult,
+    DataSourceType,
 )
 
 
@@ -139,7 +139,7 @@ class SinaStockDataSource(DataSource):
         else:
             return 'sh'  # 默认上海
 
-    def _parse_response(self, response_text: str, stock_code: str, market: str) -> Optional[Dict[str, Any]]:
+    def _parse_response(self, response_text: str, stock_code: str, market: str) -> dict[str, Any] | None:
         """解析新浪股票响应
 
         响应格式示例:
@@ -207,7 +207,7 @@ class SinaStockDataSource(DataSource):
 
         return data
 
-    async def fetch_batch(self, stock_codes: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, stock_codes: list[str]) -> list[DataSourceResult]:
         """批量获取股票数据
 
         Args:
@@ -243,7 +243,7 @@ class SinaStockDataSource(DataSource):
         """关闭 HTTP 客户端"""
         await self.client.aclose()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取数据源状态"""
         status = super().get_status()
         status["description"] = "新浪财经 A 股数据源"
@@ -276,7 +276,7 @@ class YahooStockSource(DataSource):
             source_type=DataSourceType.STOCK,
             timeout=timeout
         )
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 30.0  # 缓存 30 秒
 
     async def fetch(self, symbol: str) -> DataSourceResult:
@@ -377,7 +377,7 @@ class YahooStockSource(DataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    def _get_name(self, info: Dict, symbol: str) -> str:
+    def _get_name(self, info: dict, symbol: str) -> str:
         """获取股票名称
 
         Args:
@@ -424,7 +424,7 @@ class YahooStockSource(DataSource):
         cache_time = self._cache[cache_key].get("_cache_time", 0)
         return (time.time() - cache_time) < self._cache_timeout
 
-    async def fetch_batch(self, symbols: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, symbols: list[str]) -> list[DataSourceResult]:
         """批量获取股票数据
 
         Args:
@@ -456,7 +456,7 @@ class YahooStockSource(DataSource):
 
         return processed_results
 
-    async def fetch_history(self, symbol: str, period: str = "1mo") -> Optional[Dict[str, Any]]:
+    async def fetch_history(self, symbol: str, period: str = "1mo") -> dict[str, Any] | None:
         """获取历史数据
 
         Args:
@@ -493,7 +493,7 @@ class YahooStockSource(DataSource):
         """关闭数据源（yfinance 不需要显式关闭）"""
         pass
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取数据源状态"""
         status = super().get_status()
         status["description"] = "Yahoo Finance 股票数据源"
@@ -512,8 +512,8 @@ class StockDataAggregator(DataSource):
             source_type=DataSourceType.STOCK,
             timeout=timeout
         )
-        self._sources: List[DataSource] = []
-        self._primary_source: Optional[DataSource] = None
+        self._sources: list[DataSource] = []
+        self._primary_source: DataSource | None = None
 
     def add_source(self, source: DataSource, is_primary: bool = False):
         """添加数据源
@@ -560,7 +560,7 @@ class StockDataAggregator(DataSource):
             metadata={"symbol": symbol, "errors": errors}
         )
 
-    async def fetch_batch(self, symbols: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, symbols: list[str]) -> list[DataSourceResult]:
         """批量获取股票数据"""
         async def fetch_one(sym: str) -> DataSourceResult:
             return await self.fetch(sym)
@@ -585,7 +585,7 @@ class StockDataAggregator(DataSource):
 
         return processed_results
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取聚合器状态"""
         status = super().get_status()
         status["source_count"] = len(self._sources)

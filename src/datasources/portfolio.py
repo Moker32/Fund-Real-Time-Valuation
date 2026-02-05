@@ -9,10 +9,10 @@
 - PortfolioAnalyzer: 组合分析器
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
-from enum import Enum
 import math
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
 
 
 class AssetType(Enum):
@@ -72,7 +72,7 @@ class PortfolioPosition:
             return 0.0
         return (self.profit_loss / self.cost) * 100
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         转换为字典
 
@@ -128,7 +128,7 @@ class PortfolioAllocation:
             self.commodity_weight = (self.commodity_weight / total) * 100
             self.crypto_weight = (self.crypto_weight / total) * 100
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """
         转换为字典
 
@@ -143,7 +143,7 @@ class PortfolioAllocation:
             "crypto": round(self.crypto_weight, 2)
         }
 
-    def to_percent_dict(self) -> Dict[str, str]:
+    def to_percent_dict(self) -> dict[str, str]:
         """
         转换为百分比字符串字典
 
@@ -205,7 +205,7 @@ class PortfolioResult:
     total_cost: float = 0.0
     total_profit: float = 0.0
     profit_pct: float = 0.0
-    positions: List[PortfolioPosition] = field(default_factory=list)
+    positions: list[PortfolioPosition] = field(default_factory=list)
     allocation: PortfolioAllocation = field(default_factory=PortfolioAllocation)
 
     def __post_init__(self):
@@ -216,7 +216,7 @@ class PortfolioResult:
         if self.total_cost > 0:
             self.profit_pct = (self.total_profit / self.total_cost) * 100
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         转换为字典
 
@@ -233,7 +233,7 @@ class PortfolioResult:
             "diversification_score": self.allocation.get_diversification_score()
         }
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """
         获取摘要信息
 
@@ -265,7 +265,7 @@ class PortfolioAnalyzer:
 
     def __init__(self):
         """初始化分析器"""
-        self.positions: List[PortfolioPosition] = []
+        self.positions: list[PortfolioPosition] = []
 
     def add_position(
         self,
@@ -317,7 +317,7 @@ class PortfolioAnalyzer:
                 return True
         return False
 
-    def get_position(self, symbol: str) -> Optional[PortfolioPosition]:
+    def get_position(self, symbol: str) -> PortfolioPosition | None:
         """
         获取持仓
 
@@ -398,7 +398,7 @@ class PortfolioAnalyzer:
             crypto_weight=(weights[AssetType.CRYPTO] / total_value) * 100
         )
 
-    def get_risk_metrics(self) -> Dict[str, float]:
+    def get_risk_metrics(self) -> dict[str, float]:
         """
         获取风险指标
 
@@ -469,14 +469,14 @@ class PortfolioAnalyzer:
             "sharpe_ratio": round(sharpe_ratio, 2)
         }
 
-    def get_performance_by_type(self) -> Dict[str, Dict[str, float]]:
+    def get_performance_by_type(self) -> dict[str, dict[str, float]]:
         """
         获取各类型资产的表现
 
         Returns:
             Dict: 各类型资产表现字典
         """
-        performance: Dict[str, Dict[str, float]] = {}
+        performance: dict[str, dict[str, float]] = {}
 
         for asset_type in AssetType:
             type_positions = [p for p in self.positions if p.asset_type == asset_type]
@@ -498,7 +498,7 @@ class PortfolioAnalyzer:
 
         return performance
 
-    def get_top_performers(self, n: int = 5) -> List[PortfolioPosition]:
+    def get_top_performers(self, n: int = 5) -> list[PortfolioPosition]:
         """
         获取表现最好的持仓
 
@@ -515,7 +515,7 @@ class PortfolioAnalyzer:
         )
         return sorted_positions[:n]
 
-    def get_worst_performers(self, n: int = 5) -> List[PortfolioPosition]:
+    def get_worst_performers(self, n: int = 5) -> list[PortfolioPosition]:
         """
         获取表现最差的持仓
 

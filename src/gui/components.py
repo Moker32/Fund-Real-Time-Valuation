@@ -1,24 +1,24 @@
 # -*- coding: UTF-8 -*-
 """GUI Components for Fund Real-Time Valuation"""
 
+from collections.abc import Callable
+
 import flet as ft
 from flet import (
-    Container,
-    Column,
-    Row,
-    Text,
-    Card,
-    Icon,
-    Icons,
-    FontWeight,
     Alignment,
     BorderRadius,
-    MainAxisAlignment,
+    Card,
+    Column,
+    Container,
     CrossAxisAlignment,
+    FontWeight,
+    Icon,
+    Icons,
+    MainAxisAlignment,
     ProgressRing,
+    Row,
+    Text,
 )
-from dataclasses import dataclass
-from typing import List, Optional, Callable
 
 
 class AppColors:
@@ -67,8 +67,8 @@ class MiniChart(Container):
 
     def __init__(
         self,
-        data: List[float],
-        is_up: Optional[bool] = None,
+        data: list[float],
+        is_up: bool | None = None,
         width: int = 80,
         height: int = 32,
     ):
@@ -106,7 +106,7 @@ class MiniChart(Container):
             vertical_alignment=CrossAxisAlignment.CENTER,
         )
 
-    def update_data(self, data: List[float], is_up: Optional[bool] = None):
+    def update_data(self, data: list[float], is_up: bool | None = None):
         """Update chart data"""
         self.chart_data = data or [0]
 
@@ -146,8 +146,8 @@ class FundCard(Card):
         cost: float = 0,
         sector: str = "",
         is_hold: bool = False,
-        chart_data: Optional[List[float]] = None,
-        on_click: Optional[Callable] = None,
+        chart_data: list[float] | None = None,
+        on_click: Callable | None = None,
     ):
         self.code = code
         self.name = name
@@ -433,7 +433,7 @@ class FundCard(Card):
         est_value: float,
         change_pct: float,
         profit: float,
-        chart_data: Optional[List[float]] = None,
+        chart_data: list[float] | None = None,
     ):
         """Update card data - replace content"""
         self.net_value = net_value

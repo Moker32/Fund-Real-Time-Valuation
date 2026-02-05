@@ -4,29 +4,32 @@
 管理价格预警和通知功能
 """
 
+from collections.abc import Callable
+from datetime import datetime
+from typing import TYPE_CHECKING
+
 import flet as ft
 from flet import (
     AlertDialog,
     Column,
-    Row,
     Container,
-    Text,
-    Icon,
-    Icons,
-    IconButton,
-    TextField,
-    Dropdown,
-    dropdown,
-    ElevatedButton,
-    TextButton,
     Divider,
-    ListView,
+    Dropdown,
+    ElevatedButton,
+    Icon,
+    IconButton,
+    Icons,
     ListTile,
+    ListView,
+    Row,
+    Text,
+    TextButton,
+    TextField,
+    dropdown,
 )
-from typing import List, Optional, Callable, TYPE_CHECKING
-from datetime import datetime
 
-from src.config.models import PriceAlert, NotificationConfig, AlertDirection
+from src.config.models import AlertDirection, NotificationConfig, PriceAlert
+
 from .components import AppColors
 
 if TYPE_CHECKING:
@@ -39,7 +42,7 @@ class NotificationManager:
     def __init__(self, config: NotificationConfig):
         self.config = config
 
-    def check_price_alerts(self, fund_code: str, fund_name: str, current_price: float) -> List[PriceAlert]:
+    def check_price_alerts(self, fund_code: str, fund_name: str, current_price: float) -> list[PriceAlert]:
         """检查价格预警，返回触发的预警列表"""
         triggered = []
         for alert in self.config.price_alerts:
@@ -66,11 +69,11 @@ class NotificationManager:
         """移除预警"""
         return self.config.remove_alert(fund_code, target_price)
 
-    def get_all_alerts(self) -> List[PriceAlert]:
+    def get_all_alerts(self) -> list[PriceAlert]:
         """获取所有预警"""
         return self.config.price_alerts
 
-    def get_active_alerts(self) -> List[PriceAlert]:
+    def get_active_alerts(self) -> list[PriceAlert]:
         """获取未触发的预警"""
         return [a for a in self.config.price_alerts if not a.triggered]
 
@@ -195,7 +198,7 @@ class AddAlertDialog(AlertDialog):
         fund_code: str,
         fund_name: str,
         current_price: float,
-        on_save: Optional[Callable] = None,
+        on_save: Callable | None = None,
     ):
         super().__init__()
         self.app = app

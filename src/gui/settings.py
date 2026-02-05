@@ -4,27 +4,29 @@
 提供应用配置界面
 """
 
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
 import flet as ft
 from flet import (
     AlertDialog,
     Column,
-    Row,
     Container,
-    Text,
+    Divider,
+    Dropdown,
+    ElevatedButton,
     Icon,
     Icons,
-    TextField,
+    Row,
     Switch,
-    Dropdown,
-    dropdown,
-    ElevatedButton,
+    Text,
     TextButton,
-    Divider,
-    Slider,
+    TextField,
+    dropdown,
 )
-from typing import Callable, TYPE_CHECKING
 
 from src.config.models import AppConfig, Theme
+
 from .components import AppColors
 
 if TYPE_CHECKING:

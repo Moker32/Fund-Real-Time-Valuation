@@ -4,19 +4,15 @@
 - 白酒、新能源、消费、医药、科技等主要行业
 """
 
-import re
-import json
-import time
 import asyncio
-import httpx
-from typing import Any, Dict, List, Optional
+import re
+import time
 from datetime import datetime
-from .base import (
-    DataSource,
-    DataSourceType,
-    DataSourceResult,
-    DataSourceError
-)
+from typing import Any
+
+import httpx
+
+from .base import DataSource, DataSourceResult, DataSourceType
 
 
 class SinaSectorDataSource(DataSource):
@@ -66,11 +62,11 @@ class SinaSectorDataSource(DataSource):
                 "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
             }
         )
-        self._cache: List[Dict[str, Any]] = []
+        self._cache: list[dict[str, Any]] = []
         self._cache_time: float = 0.0
         self._cache_timeout = 60.0  # 缓存60秒
 
-    async def fetch(self, sector_code: Optional[str] = None) -> DataSourceResult:
+    async def fetch(self, sector_code: str | None = None) -> DataSourceResult:
         """
         获取板块数据
 
@@ -93,7 +89,7 @@ class SinaSectorDataSource(DataSource):
 
         try:
             # 并行获取所有板块数据
-            async def fetch_one(config: Dict) -> Optional[Dict[str, Any]]:
+            async def fetch_one(config: dict) -> dict[str, Any] | None:
                 return await self._fetch_sector(config["code"], config["name"], config["category"])
 
             # 过滤需要获取的板块
@@ -138,7 +134,7 @@ class SinaSectorDataSource(DataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    async def fetch_batch(self, *args, **kwargs) -> List[DataSourceResult]:
+    async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
         """
         批量获取板块数据
 
@@ -182,7 +178,7 @@ class SinaSectorDataSource(DataSource):
         """
         try:
             # 并行获取指定类别的板块
-            async def fetch_one(config: Dict) -> Optional[Dict[str, Any]]:
+            async def fetch_one(config: dict) -> dict[str, Any] | None:
                 return await self._fetch_sector(config["code"], config["name"], config["category"])
 
             # 过滤指定类别的板块
@@ -212,7 +208,7 @@ class SinaSectorDataSource(DataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    async def _fetch_sector(self, code: str, name: str, category: str) -> Optional[Dict[str, Any]]:
+    async def _fetch_sector(self, code: str, name: str, category: str) -> dict[str, Any] | None:
         """
         获取单个板块数据
 
@@ -271,7 +267,7 @@ class SinaSectorDataSource(DataSource):
             self.log(f"获取板块 {name} 数据异常: {e}")
             return self._get_mock_sector(code, name, category)
 
-    def _parse_backup(self, data: str, code: str, name: str, category: str) -> Optional[Dict[str, Any]]:
+    def _parse_backup(self, data: str, code: str, name: str, category: str) -> dict[str, Any] | None:
         """备用解析方法"""
         try:
             # 尝试解析JSON数组格式
@@ -300,7 +296,7 @@ class SinaSectorDataSource(DataSource):
 
         return self._get_mock_sector(code, name, category)
 
-    def _get_trading_status(self, sector_info: Dict) -> str:
+    def _get_trading_status(self, sector_info: dict) -> str:
         """判断交易状态"""
         try:
             # 根据时间判断
@@ -322,7 +318,7 @@ class SinaSectorDataSource(DataSource):
         except Exception:
             return "未知"
 
-    def _get_mock_sector(self, code: str, name: str, category: str) -> Dict[str, Any]:
+    def _get_mock_sector(self, code: str, name: str, category: str) -> dict[str, Any]:
         """生成模拟数据（备用）"""
         import random
         change_pct = random.uniform(-3, 3)
@@ -358,7 +354,7 @@ class SinaSectorDataSource(DataSource):
         """关闭HTTP客户端"""
         await self.client.aclose()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取数据源状态"""
         status = super().get_status()
         status["cache_size"] = len(self._cache)
@@ -366,7 +362,7 @@ class SinaSectorDataSource(DataSource):
         status["sector_count"] = len(self.SECTOR_CONFIG)
         return status
 
-    def get_sector_config(self) -> List[Dict[str, str]]:
+    def get_sector_config(self) -> list[dict[str, str]]:
         """获取板块配置"""
         return self.SECTOR_CONFIG
 
@@ -380,8 +376,8 @@ class SectorDataAggregator(DataSource):
             source_type=DataSourceType.SECTOR,
             timeout=timeout
         )
-        self._sources: List[DataSource] = []
-        self._primary_source: Optional[DataSource] = None
+        self._sources: list[DataSource] = []
+        self._primary_source: DataSource | None = None
 
     def add_source(self, source: DataSource, is_primary: bool = False):
         """添加数据源"""
@@ -389,7 +385,7 @@ class SectorDataAggregator(DataSource):
         if is_primary or self._primary_source is None:
             self._primary_source = source
 
-    async def fetch(self, sector_code: Optional[str] = None) -> DataSourceResult:
+    async def fetch(self, sector_code: str | None = None) -> DataSourceResult:
         """获取板块数据"""
         errors = []
 
@@ -445,7 +441,7 @@ class SectorDataAggregator(DataSource):
             source=self.name
         )
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取聚合器状态"""
         status = super().get_status()
         status["source_count"] = len(self._sources)
@@ -453,7 +449,7 @@ class SectorDataAggregator(DataSource):
         status["sources"] = [s.name for s in self._sources]
         return status
 
-    async def fetch_batch(self, sector_codes: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, sector_codes: list[str]) -> list[DataSourceResult]:
         """批量获取板块数据"""
         results = []
         for code in sector_codes:
@@ -504,7 +500,7 @@ class EastMoneySectorSource(DataSource):
             source_type=DataSourceType.SECTOR,
             timeout=timeout
         )
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0
 
     async def fetch(self, sector_type: str = "industry") -> DataSourceResult:
@@ -574,7 +570,7 @@ class EastMoneySectorSource(DataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    async def _fetch_industry(self, ak) -> Optional[Dict[str, Any]]:
+    async def _fetch_industry(self, ak) -> dict[str, Any] | None:
         """获取行业板块数据"""
         try:
             df = ak.stock_board_industry_name_em()
@@ -600,11 +596,11 @@ class EastMoneySectorSource(DataSource):
                     "sectors": sectors,
                     "count": len(sectors)
                 }
-        except Exception as e:
+        except Exception:
             pass
         return None
 
-    async def _fetch_concept(self, ak) -> Optional[Dict[str, Any]]:
+    async def _fetch_concept(self, ak) -> dict[str, Any] | None:
         """获取概念板块数据"""
         try:
             df = ak.stock_board_concept_name_em()
@@ -630,11 +626,11 @@ class EastMoneySectorSource(DataSource):
                     "sectors": sectors,
                     "count": len(sectors)
                 }
-        except Exception as e:
+        except Exception:
             pass
         return None
 
-    async def fetch_batch(self, sector_types: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, sector_types: list[str]) -> list[DataSourceResult]:
         """批量获取板块数据"""
         async def fetch_one(stype: str) -> DataSourceResult:
             return await self.fetch(stype)
@@ -669,7 +665,7 @@ class EastMoneySectorSource(DataSource):
         """清空缓存"""
         self._cache.clear()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取数据源状态"""
         status = super().get_status()
         status["cache_size"] = len(self._cache)
@@ -693,7 +689,7 @@ class EastMoneyIndustryDetailSource(DataSource):
             source_type=DataSourceType.SECTOR,
             timeout=timeout
         )
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0
 
     async def fetch(self, sector_name: str = "") -> DataSourceResult:
@@ -768,7 +764,7 @@ class EastMoneyIndustryDetailSource(DataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    async def fetch_batch(self, sector_names: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, sector_names: list[str]) -> list[DataSourceResult]:
         async def fetch_one(name: str) -> DataSourceResult:
             return await self.fetch(name)
 
@@ -816,7 +812,7 @@ class EastMoneyConceptDetailSource(DataSource):
             source_type=DataSourceType.SECTOR,
             timeout=timeout
         )
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0
 
     async def fetch(self, sector_name: str = "") -> DataSourceResult:
@@ -891,7 +887,7 @@ class EastMoneyConceptDetailSource(DataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    async def fetch_batch(self, sector_names: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, sector_names: list[str]) -> list[DataSourceResult]:
         async def fetch_one(name: str) -> DataSourceResult:
             return await self.fetch(name)
 

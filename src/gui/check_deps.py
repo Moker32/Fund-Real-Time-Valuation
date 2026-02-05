@@ -5,7 +5,6 @@
 """
 
 import sys
-from typing import List, Tuple
 
 # Windows 控制台编码修复：设置 stdout 为 UTF-8
 if sys.platform == "win32":
@@ -27,7 +26,7 @@ REQUIRED_PACKAGES = [
 ]
 
 
-def check_package_version(package_name: str) -> Tuple[bool, str]:
+def check_package_version(package_name: str) -> tuple[bool, str]:
     """
     检查包是否已安装及其版本
 
@@ -46,7 +45,7 @@ def check_package_version(package_name: str) -> Tuple[bool, str]:
         return False, f"检查失败: {e}"
 
 
-def check_required_packages() -> Tuple[bool, List[str]]:
+def check_required_packages() -> tuple[bool, list[str]]:
     """
     检查必需依赖是否已安装
 
@@ -67,7 +66,7 @@ def check_required_packages() -> Tuple[bool, List[str]]:
     return len(missing) == 0, missing
 
 
-def check_optional_packages() -> Tuple[bool, List[str]]:
+def check_optional_packages() -> tuple[bool, list[str]]:
     """
     检查可选依赖状态
 
@@ -114,7 +113,7 @@ def check_environment() -> bool:
             print(m)
         print()
         print("请安装缺少的依赖:")
-        print(f"  uv pip install -r requirements.txt")
+        print("  uv pip install -r requirements.txt")
         print()
 
     print("检查可选依赖:")
@@ -164,7 +163,7 @@ def verify_imports() -> bool:
             # 尝试备用导入
             if module == "yaml":
                 try:
-                    import yaml
+                    import yaml  # noqa: F401  # 动态导入检查可用性
 
                     print(f"✓ {module}: OK ({desc})")
                     continue

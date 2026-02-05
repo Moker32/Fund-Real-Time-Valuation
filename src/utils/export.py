@@ -8,10 +8,9 @@
 
 import csv
 from pathlib import Path
-from typing import List, Union
 
 
-def _get_value(obj: Union[dict, object], key: str, default: str = "") -> str:
+def _get_value(obj: dict | object, key: str, default: str = "") -> str:
     """获取对象或字典的值
 
     Args:
@@ -28,7 +27,7 @@ def _get_value(obj: Union[dict, object], key: str, default: str = "") -> str:
         return str(getattr(obj, key, default))
 
 
-def _get_float(obj: Union[dict, object], key: str, default: float = 0.0) -> float:
+def _get_float(obj: dict | object, key: str, default: float = 0.0) -> float:
     """获取对象或字典的浮点数值
 
     Args:
@@ -45,7 +44,7 @@ def _get_float(obj: Union[dict, object], key: str, default: float = 0.0) -> floa
         return float(getattr(obj, key, default))
 
 
-def export_funds_to_csv(funds: List[Union[dict, object]], filepath: str) -> bool:
+def export_funds_to_csv(funds: list[dict | object], filepath: str) -> bool:
     """导出基金列表到 CSV 文件
 
     Args:
@@ -75,7 +74,7 @@ def export_funds_to_csv(funds: List[Union[dict, object]], filepath: str) -> bool
         return False
 
 
-def export_portfolio_report(holdings: List[Union[dict, object]], filepath: str) -> bool:
+def export_portfolio_report(holdings: list[dict | object], filepath: str) -> bool:
     """导出持仓报告到 CSV 文件
 
     Args:

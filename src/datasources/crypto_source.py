@@ -3,14 +3,16 @@
 实现从 Binance 和 CoinGecko 获取加密货币数据
 """
 
-import time
 import asyncio
+import time
+from typing import Any
+
 import httpx
-from typing import Any, Dict, List, Optional
+
 from .base import (
     DataSource,
-    DataSourceType,
     DataSourceResult,
+    DataSourceType,
 )
 
 
@@ -48,7 +50,7 @@ class BinanceCryptoSource(DataSource):
             DataSourceResult: 加密货币数据结果
         """
         try:
-            url = f"https://api.binance.com/api/v3/ticker/24hr"
+            url = "https://api.binance.com/api/v3/ticker/24hr"
             params = {"symbol": symbol.upper()}
 
             response = await self.client.get(url, params=params)
@@ -102,7 +104,7 @@ class BinanceCryptoSource(DataSource):
                 )
             return self._handle_error(e, self.name)
 
-    async def fetch_batch(self, symbols: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, symbols: list[str]) -> list[DataSourceResult]:
         """批量获取加密货币数据
 
         Args:
@@ -138,7 +140,7 @@ class BinanceCryptoSource(DataSource):
         """关闭 HTTP 客户端"""
         await self.client.aclose()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取数据源状态"""
         status = super().get_status()
         status["common_symbols"] = self.common_symbols
@@ -180,7 +182,7 @@ class CoinGeckoCryptoSource(DataSource):
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
             }
         )
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0  # 缓存60秒
 
     async def fetch(self, coin_id: str = "bitcoin") -> DataSourceResult:
@@ -204,7 +206,7 @@ class CoinGeckoCryptoSource(DataSource):
             )
 
         try:
-            url = f"https://api.coingecko.com/api/v3/simple/price"
+            url = "https://api.coingecko.com/api/v3/simple/price"
             params = {
                 "ids": coin_id.lower(),
                 "vs_currencies": "usd",
@@ -278,7 +280,7 @@ class CoinGeckoCryptoSource(DataSource):
                 )
             return self._handle_error(e, self.name)
 
-    async def fetch_batch(self, coin_ids: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, coin_ids: list[str]) -> list[DataSourceResult]:
         """批量获取加密货币数据
 
         Args:
@@ -341,7 +343,7 @@ class CoinGeckoCryptoSource(DataSource):
         """关闭 HTTP 客户端"""
         await self.client.aclose()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取数据源状态"""
         status = super().get_status()
         status["cache_size"] = len(self._cache)
@@ -365,8 +367,8 @@ class CryptoAggregator(DataSource):
             source_type=DataSourceType.CRYPTO,
             timeout=timeout
         )
-        self._sources: List[DataSource] = []
-        self._primary_source: Optional[DataSource] = None
+        self._sources: list[DataSource] = []
+        self._primary_source: DataSource | None = None
 
     def add_source(self, source: DataSource, is_primary: bool = False):
         """添加数据源
@@ -417,7 +419,7 @@ class CryptoAggregator(DataSource):
             metadata={"symbol": symbol, "errors": errors}
         )
 
-    async def fetch_batch(self, symbols: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, symbols: list[str]) -> list[DataSourceResult]:
         """批量获取加密货币数据"""
         tasks = [self.fetch(symbol) for symbol in symbols]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -439,7 +441,7 @@ class CryptoAggregator(DataSource):
 
         return processed_results
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取聚合器状态"""
         status = super().get_status()
         status["source_count"] = len(self._sources)

@@ -15,6 +15,6 @@
     holdings = db.get_holdings()
 """
 
-from .database import DatabaseManager, FundHistoryDAO, ConfigDAO
+from .database import ConfigDAO, DatabaseManager, FundHistoryDAO
 
 __all__ = ["DatabaseManager", "FundHistoryDAO", "ConfigDAO"]

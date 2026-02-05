@@ -5,7 +5,6 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Literal
 from enum import Enum
 
 
@@ -98,7 +97,7 @@ class FundList:
         """检查是否在自选列表中"""
         return any(f.code == code for f in self.watchlist)
 
-    def get_holding(self, code: str) -> Optional[Holding]:
+    def get_holding(self, code: str) -> Holding | None:
         """获取持仓信息"""
         for h in self.holdings:
             if h.code == code:
@@ -111,7 +110,7 @@ class CommodityList:
     """商品列表容器"""
     commodities: list[Commodity] = field(default_factory=list)
 
-    def get_by_symbol(self, symbol: str) -> Optional[Commodity]:
+    def get_by_symbol(self, symbol: str) -> Commodity | None:
         """根据代码获取商品"""
         for c in self.commodities:
             if c.symbol == symbol:

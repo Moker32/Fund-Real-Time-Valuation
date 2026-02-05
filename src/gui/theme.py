@@ -4,9 +4,9 @@
 统一颜色常量管理，支持涨跌颜色配置、主题切换等功能。
 """
 
-import flet as ft
-from dataclasses import dataclass
 from typing import Optional
+
+import flet as ft
 
 
 # ============== 涨跌颜色配置 ==============
