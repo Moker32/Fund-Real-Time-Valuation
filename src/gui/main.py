@@ -40,6 +40,11 @@ from .components import (
     QuickActionButton,
     AppColors,
 )
+from .empty_states import (
+    empty_funds_state,
+    empty_commodities_state,
+    empty_news_state,
+)
 from .error_handling import (
     ErrorHandler,
     ErrorSeverity,
@@ -360,6 +365,11 @@ class FundGUIApp:
             placeholder="搜索基金代码或名称",
         )
 
+        # 基金列表空状态组件
+        self._funds_empty_state = empty_funds_state(
+            on_add=self._show_add_fund,
+        )
+
         # 基金列表（使用 Column + Scroll）
         self._fund_list = Column(
             spacing=12,
@@ -388,11 +398,11 @@ class FundGUIApp:
                     content=self.search_bar,
                 ),
                 Container(height=12),
-                # 基金列表容器 - 使用浅色背景以便看清卡片
+                # 基金列表容器
                 Container(
                     bgcolor=AppColors.TAB_BG,
                     expand=True,
-                    content=self._fund_list,
+                    content=self._fund_list_container,
                     padding=ft.padding.symmetric(horizontal=16),
                 ),
             ],
@@ -405,12 +415,27 @@ class FundGUIApp:
         """构建商品页面"""
         self.commodity_list = Column(spacing=4, scroll=ft.ScrollMode.AUTO, expand=True)
 
+        # 商品空状态
+        self._commodities_empty_state = empty_commodities_state(
+            on_refresh=self._on_refresh,
+        )
+
         return Container(
             content=Column(
                 [
                     Text("大宗商品行情", size=18, weight=ft.FontWeight.BOLD),
                     Divider(),
-                    self.commodity_list,
+                    # 使用 Stack 同时显示列表和空状态
+                    ft.Stack(
+                        controls=[
+                            self.commodity_list,
+                            Container(
+                                content=self._commodities_empty_state,
+                                visible=False,  # 初始隐藏空状态
+                            ),
+                        ],
+                        expand=True,
+                    ),
                 ],
                 expand=True,
             ),
@@ -421,12 +446,27 @@ class FundGUIApp:
         """构建新闻页面"""
         self.news_list = Column(spacing=4, scroll=ft.ScrollMode.AUTO, expand=True)
 
+        # 新闻空状态
+        self._news_empty_state = empty_news_state(
+            on_refresh=self._on_refresh,
+        )
+
         return Container(
             content=Column(
                 [
                     Text("财经新闻", size=18, weight=ft.FontWeight.BOLD),
                     Divider(),
-                    self.news_list,
+                    # 使用 Stack 同时显示列表和空状态
+                    ft.Stack(
+                        controls=[
+                            self.news_list,
+                            Container(
+                                content=self._news_empty_state,
+                                visible=False,  # 初始隐藏空状态
+                            ),
+                        ],
+                        expand=True,
+                    ),
                 ],
                 expand=True,
             ),
@@ -691,6 +731,12 @@ class FundGUIApp:
                 else:
                     log_debug(f"_fund_list 为 None，无法添加卡片")
 
+        # 控制空状态的可见性
+        if hasattr(self, '_funds_empty_state') and hasattr(self, '_fund_list_container'):
+            # Stack 的第二个控件是空状态容器
+            empty_state_container = self._fund_list_container.controls[1]
+            empty_state_container.visible = len(self.funds) == 0
+
         # 刷新基金列表
         if self._fund_list:
             self._fund_list.update()
@@ -763,6 +809,11 @@ class FundGUIApp:
                 except Exception as ex:
                     log_error(f"获取商品 {commodity.symbol} 数据失败: {ex}")
 
+            # 控制空状态可见性
+            if hasattr(self, '_commodities_empty_state'):
+                empty_state_container = self._commodities_empty_state.parent
+                empty_state_container.visible = len(self.commodity_list.controls) == 0
+
             self.page.update()
 
         except Exception as e:
@@ -830,6 +881,11 @@ class FundGUIApp:
                     self.news_list.controls.append(card)
             else:
                 self._load_sample_news()
+
+            # 控制空状态可见性
+            if hasattr(self, '_news_empty_state'):
+                empty_state_container = self._news_empty_state.parent
+                empty_state_container.visible = len(self.news_list.controls) == 0
 
             self.page.update()
 
