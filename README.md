@@ -87,6 +87,12 @@ python run_gui.py --web
 - **配置格式**: YAML
 - **网页解析**: beautifulsoup4
 
+## 文档
+
+- 📖 [API 文档](docs/API.md) - 核心模块 API 使用指南
+- 📊 [性能评估报告](docs/performance-evaluation.md) - 基金列表渲染性能分析
+- 🔧 [开发指南](src/gui/AGENTS.md) - GUI 开发指南
+
 ## 开发
 
 ```bash

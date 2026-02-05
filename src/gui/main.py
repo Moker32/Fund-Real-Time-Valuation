@@ -60,6 +60,7 @@ from datetime import datetime
 import asyncio
 import sys
 import os
+import time
 from pathlib import Path
 
 # 添加日志文件支持
@@ -635,6 +636,7 @@ class FundGUIApp:
 
     def _update_fund_table(self):
         """更新基金卡片列表（卡片式布局）"""
+        start_time = time.time()
         log_debug(f"_update_fund_table 开始执行，funds数量={len(self.funds)}")
         # 计算资产概览数据
         total_assets = sum(f.net_value * f.hold_shares for f in self.funds if f.hold_shares > 0)
@@ -739,6 +741,9 @@ class FundGUIApp:
 
         # 检查价格预警
         self._check_price_alerts()
+
+        elapsed = time.time() - start_time
+        log_debug(f"_update_fund_table 完成: 更新 {len(self.funds)} 个基金卡片，耗时 {elapsed:.3f}秒")
 
     def _check_price_alerts(self):
         """检查价格预警并显示通知"""
