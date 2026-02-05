@@ -3,15 +3,17 @@
 实现从新浪财经和 AKShare 获取债券/可转债数据
 """
 
+import asyncio
 import re
 import time
-import asyncio
+from typing import Any
+
 import httpx
-from typing import Any, Dict, List, Optional
+
 from .base import (
     DataSource,
-    DataSourceType,
     DataSourceResult,
+    DataSourceType,
 )
 
 
@@ -100,7 +102,7 @@ class SinaBondDataSource(DataSource):
                     )
                 await self._handle_retry_delay(attempt)
 
-            except httpx.RequestError as e:
+            except httpx.RequestError:
                 await self._handle_retry_delay(attempt)
 
             except Exception as e:
@@ -126,7 +128,7 @@ class SinaBondDataSource(DataSource):
         """
         return bool(re.match(r"^\d{6}$", str(bond_code)))
 
-    def _parse_response(self, response_text: str, bond_code: str) -> Optional[Dict[str, Any]]:
+    def _parse_response(self, response_text: str, bond_code: str) -> dict[str, Any] | None:
         """
         解析新浪债券响应
 
@@ -188,7 +190,7 @@ class SinaBondDataSource(DataSource):
         if attempt < self.max_retries - 1:
             await asyncio.sleep(self.retry_delay * (attempt + 1))
 
-    async def fetch_batch(self, bond_codes: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, bond_codes: list[str]) -> list[DataSourceResult]:
         """
         批量获取债券数据
 
@@ -370,7 +372,7 @@ class AKShareBondSource(DataSource):
                 metadata={"bond_type": bond_type}
             )
 
-    def _safe_float(self, value: Any) -> Optional[float]:
+    def _safe_float(self, value: Any) -> float | None:
         """安全转换为浮点数"""
         if value is None:
             return None
@@ -379,7 +381,7 @@ class AKShareBondSource(DataSource):
         except (ValueError, TypeError):
             return None
 
-    def _safe_int(self, value: Any) -> Optional[int]:
+    def _safe_int(self, value: Any) -> int | None:
         """安全转换为整数"""
         if value is None:
             return None
@@ -388,7 +390,7 @@ class AKShareBondSource(DataSource):
         except (ValueError, TypeError):
             return None
 
-    async def fetch_batch(self, bond_types: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, bond_types: list[str]) -> list[DataSourceResult]:
         """
         批量获取不同类型债券数据
 
@@ -459,7 +461,7 @@ class EastMoneyBondSource(DataSource):
         """
         try:
             # 东方财富债券行情 API
-            url = f"https://push2.eastmoney.com/api/qt/stock/get"
+            url = "https://push2.eastmoney.com/api/qt/stock/get"
             params = {
                 "fltt": "2",
                 "fields": "f2,f3,f4,f5,f6,f8,f12,f13,f14",
@@ -500,7 +502,7 @@ class EastMoneyBondSource(DataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    async def fetch_batch(self, bond_codes: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, bond_codes: list[str]) -> list[DataSourceResult]:
         """批量获取债券数据"""
         async def fetch_one(code: str) -> DataSourceResult:
             return await self.fetch(code)

@@ -4,21 +4,20 @@
 提供基金详情展示功能，包括基本信息和统计。
 """
 
+from dataclasses import dataclass
+
 import flet as ft
 from flet import (
-    Column,
-    Row,
-    Container,
-    Text,
-    ElevatedButton,
     AlertDialog,
     Card,
+    Column,
+    Container,
     Divider,
-    Icon,
+    ElevatedButton,
     Icons,
+    Row,
+    Text,
 )
-from typing import Optional
-from dataclasses import dataclass
 
 
 @dataclass

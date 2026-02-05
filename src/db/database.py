@@ -5,20 +5,19 @@
 支持基金配置、商品配置、历史数据和新闻缓存的存储与查询。
 """
 
-import sqlite3
-import json
-import os
-from pathlib import Path
-from datetime import datetime
-from typing import Optional, List, Dict, Any
-from contextlib import contextmanager
-from dataclasses import dataclass, asdict
 import logging
+import os
+import sqlite3
+from contextlib import contextmanager
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
-def _row_to_dict(row: sqlite3.Row) -> Dict[str, Any]:
+def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     """将 sqlite3.Row 转换为字典，处理整数到布尔值的转换"""
     if row is None:
         return {}
@@ -79,14 +78,14 @@ class CommodityConfig:
 class FundHistoryRecord:
     """基金净值历史记录"""
 
-    id: Optional[int] = None  # 数据库自增ID
+    id: int | None = None  # 数据库自增ID
     fund_code: str = ""
     fund_name: str = ""
     date: str = ""
     unit_net_value: float = 0.0
-    accumulated_net_value: Optional[float] = None
-    estimated_value: Optional[float] = None
-    growth_rate: Optional[float] = None
+    accumulated_net_value: float | None = None
+    estimated_value: float | None = None
+    growth_rate: float | None = None
     fetched_at: str = ""
 
 
@@ -109,7 +108,7 @@ class DatabaseManager:
     管理 SQLite 数据库连接、执行迁移和维护数据完整性。
     """
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         """
         初始化数据库管理器
 
@@ -335,7 +334,7 @@ class ConfigDAO:
             except sqlite3.IntegrityError:
                 return False
 
-    def get_watchlist(self) -> List[FundConfig]:
+    def get_watchlist(self) -> list[FundConfig]:
         """获取自选基金列表"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -344,14 +343,14 @@ class ConfigDAO:
             """)
             return [FundConfig(**row) for row in cursor.fetchall()]
 
-    def get_all_funds(self) -> List[FundConfig]:
+    def get_all_funds(self) -> list[FundConfig]:
         """获取所有配置基金（含持仓）"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM fund_config ORDER BY updated_at DESC")
             return [FundConfig(**row) for row in cursor.fetchall()]
 
-    def get_fund(self, code: str) -> Optional[FundConfig]:
+    def get_fund(self, code: str) -> FundConfig | None:
         """根据代码获取基金配置"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -359,7 +358,7 @@ class ConfigDAO:
             row = cursor.fetchone()
             return FundConfig(**row) if row else None
 
-    def get_holdings(self) -> List[FundConfig]:
+    def get_holdings(self) -> list[FundConfig]:
         """获取持仓基金列表（份额 > 0）"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -419,7 +418,7 @@ class ConfigDAO:
         """切换持有标记"""
         return self.update_fund(code, is_hold=is_hold)
 
-    def get_hold_funds(self) -> List["FundConfig"]:
+    def get_hold_funds(self) -> list["FundConfig"]:
         """获取标记为持有的基金列表"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -428,7 +427,7 @@ class ConfigDAO:
             )
             return [FundConfig(**row) for row in cursor.fetchall()]
 
-    def get_funds_by_hold(self, holding: bool) -> List["FundConfig"]:
+    def get_funds_by_hold(self, holding: bool) -> list["FundConfig"]:
         """根据持有标记获取基金列表"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -465,7 +464,7 @@ class ConfigDAO:
             except sqlite3.IntegrityError:
                 return False
 
-    def get_commodities(self, enabled_only: bool = False) -> List[CommodityConfig]:
+    def get_commodities(self, enabled_only: bool = False) -> list[CommodityConfig]:
         """获取商品配置列表"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -479,7 +478,7 @@ class ConfigDAO:
                 )
             return [CommodityConfig(**row) for row in cursor.fetchall()]
 
-    def get_commodity(self, symbol: str) -> Optional[CommodityConfig]:
+    def get_commodity(self, symbol: str) -> CommodityConfig | None:
         """根据代码获取商品配置"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -555,9 +554,9 @@ class FundHistoryDAO:
         fund_name: str,
         date: str,
         unit_net_value: float,
-        accumulated_net_value: Optional[float] = None,
-        estimated_value: Optional[float] = None,
-        growth_rate: Optional[float] = None,
+        accumulated_net_value: float | None = None,
+        estimated_value: float | None = None,
+        growth_rate: float | None = None,
     ) -> bool:
         """
         添加单条历史记录
@@ -600,7 +599,7 @@ class FundHistoryDAO:
             except sqlite3.IntegrityError:
                 return False
 
-    def add_history_batch(self, records: List[FundHistoryRecord]) -> int:
+    def add_history_batch(self, records: list[FundHistoryRecord]) -> int:
         """
         批量添加历史记录
 
@@ -645,9 +644,9 @@ class FundHistoryDAO:
         self,
         fund_code: str,
         limit: int = 365,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-    ) -> List[FundHistoryRecord]:
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> list[FundHistoryRecord]:
         """
         获取基金历史记录
 
@@ -677,7 +676,7 @@ class FundHistoryDAO:
             cursor.execute(query, params)
             return [FundHistoryRecord(**row) for row in cursor.fetchall()]
 
-    def get_latest_record(self, fund_code: str) -> Optional[FundHistoryRecord]:
+    def get_latest_record(self, fund_code: str) -> FundHistoryRecord | None:
         """获取最新历史记录"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -713,7 +712,7 @@ class FundHistoryDAO:
             )
             return cursor.rowcount
 
-    def get_history_summary(self, fund_code: str) -> Dict[str, Any]:
+    def get_history_summary(self, fund_code: str) -> dict[str, Any]:
         """获取历史数据统计摘要"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -768,8 +767,8 @@ class NewsDAO:
                 return False
 
     def get_news(
-        self, category: Optional[str] = None, limit: int = 50
-    ) -> List[NewsRecord]:
+        self, category: str | None = None, limit: int = 50
+    ) -> list[NewsRecord]:
         """获取新闻列表"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()

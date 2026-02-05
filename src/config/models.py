@@ -4,7 +4,7 @@
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
+from datetime import datetime
 from enum import Enum
 
 
@@ -97,7 +97,7 @@ class FundList:
         """检查是否在自选列表中"""
         return any(f.code == code for f in self.watchlist)
 
-    def get_holding(self, code: str) -> Optional[Holding]:
+    def get_holding(self, code: str) -> Holding | None:
         """获取持仓信息"""
         for h in self.holdings:
             if h.code == code:
@@ -110,7 +110,7 @@ class CommodityList:
     """商品列表容器"""
     commodities: list[Commodity] = field(default_factory=list)
 
-    def get_by_symbol(self, symbol: str) -> Optional[Commodity]:
+    def get_by_symbol(self, symbol: str) -> Commodity | None:
         """根据代码获取商品"""
         for c in self.commodities:
             if c.symbol == symbol:
@@ -120,3 +120,61 @@ class CommodityList:
     def get_by_source(self, source: str) -> list[Commodity]:
         """根据数据源获取商品列表"""
         return [c for c in self.commodities if c.source == source]
+
+
+class AlertDirection(str, Enum):
+    """预警方向"""
+    ABOVE = "above"  # 高于目标价
+    BELOW = "below"  # 低于目标价
+
+
+@dataclass
+class PriceAlert:
+    """价格预警模型"""
+    fund_code: str                              # 基金代码
+    fund_name: str                              # 基金名称
+    target_price: float                         # 目标价格
+    direction: str = AlertDirection.ABOVE.value # 预警方向
+    triggered: bool = False                     # 是否已触发
+    created_at: datetime = field(default_factory=datetime.now)
+
+    def check(self, current_price: float) -> bool:
+        """检查是否触发预警"""
+        if self.triggered:
+            return False
+        if self.direction == AlertDirection.ABOVE.value:
+            return current_price >= self.target_price
+        else:
+            return current_price <= self.target_price
+
+
+@dataclass
+class NotificationConfig:
+    """通知配置模型"""
+    enabled: bool = True                        # 是否启用通知
+    price_alerts: list[PriceAlert] = field(default_factory=list)
+    daily_summary: bool = False                 # 每日汇总
+    alert_sound: bool = False                   # 预警声音
+
+    def add_alert(self, alert: PriceAlert) -> None:
+        """添加预警"""
+        self.price_alerts.append(alert)
+
+    def remove_alert(self, fund_code: str, target_price: float) -> bool:
+        """移除预警"""
+        original_count = len(self.price_alerts)
+        self.price_alerts = [
+            a for a in self.price_alerts
+            if not (a.fund_code == fund_code and a.target_price == target_price)
+        ]
+        return len(self.price_alerts) < original_count
+
+    def get_alerts_for_fund(self, fund_code: str) -> list[PriceAlert]:
+        """获取基金的所有预警"""
+        return [a for a in self.price_alerts if a.fund_code == fund_code]
+
+    def clear_triggered(self) -> int:
+        """清除已触发的预警"""
+        original_count = len(self.price_alerts)
+        self.price_alerts = [a for a in self.price_alerts if not a.triggered]
+        return original_count - len(self.price_alerts)

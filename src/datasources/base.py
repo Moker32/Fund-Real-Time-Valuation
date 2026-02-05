@@ -3,11 +3,11 @@
 提供抽象基类 DataSource，所有数据源需继承此类并实现抽象方法
 """
 
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
 from enum import Enum
-import time
+from typing import Any
 
 
 class DataSourceType(Enum):
@@ -24,7 +24,7 @@ class DataSourceType(Enum):
 class DataSourceError(Exception):
     """数据源基础异常类"""
 
-    def __init__(self, message: str, source_type: DataSourceType, details: Optional[Dict] = None):
+    def __init__(self, message: str, source_type: DataSourceType, details: dict | None = None):
         self.message = message
         self.source_type = source_type
         self.details = details or {}
@@ -55,11 +55,11 @@ class TimeoutError(DataSourceError):
 class DataSourceResult:
     """数据源返回结果封装"""
     success: bool
-    data: Optional[Any] = None
-    error: Optional[str] = None
+    data: Any | None = None
+    error: str | None = None
     timestamp: float = 0.0
     source: str = ""
-    metadata: Optional[Dict] = None
+    metadata: dict | None = None
 
     def __post_init__(self):
         if self.timestamp == 0.0:
@@ -81,7 +81,7 @@ class DataSource(ABC):
         self.name = name
         self.source_type = source_type
         self.timeout = timeout
-        self._last_error: Optional[DataSourceError] = None
+        self._last_error: DataSourceError | None = None
         self._request_count = 0
         self._error_count = 0
 
@@ -103,7 +103,7 @@ class DataSource(ABC):
         pass
 
     @abstractmethod
-    async def fetch_batch(self, *args, **kwargs) -> List[DataSourceResult]:
+    async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
         """
         批量获取数据（抽象方法，子类可选实现）
 
@@ -155,7 +155,7 @@ class DataSource(ABC):
         self._request_count += 1
         return DataSourceResult(success=True, timestamp=time.time(), source=self.name)
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """
         获取数据源状态
 

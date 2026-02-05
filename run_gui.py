@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run python
 """Fund Real-Time Valuation Application
 
 基金实时估值图形化界面，基于 Flet 框架开发。

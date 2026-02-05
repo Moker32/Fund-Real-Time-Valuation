@@ -1,40 +1,42 @@
 # -*- coding: UTF-8 -*-
 """GUI Components for Fund Real-Time Valuation"""
 
+from collections.abc import Callable
+
 import flet as ft
 from flet import (
-    Container,
-    Column,
-    Row,
-    Text,
-    Card,
-    Icon,
-    Icons,
-    FontWeight,
     Alignment,
     BorderRadius,
-    MainAxisAlignment,
+    Card,
+    Column,
+    Container,
     CrossAxisAlignment,
+    FontWeight,
+    Icon,
+    Icons,
+    MainAxisAlignment,
+    ProgressRing,
+    Row,
+    Text,
 )
-from dataclasses import dataclass
-from typing import List, Optional
 
 
 class AppColors:
     """Application color scheme"""
 
-    BACKGROUND_DARK = "#000000"
-    CARD_DARK = "#1C1C1E"
-    CARD_HOVER = "#2C2C2E"
-    TEXT_PRIMARY = "#FFFFFF"
-    TEXT_SECONDARY = "#8E8E93"
-    TEXT_TERTIARY = "#636366"
-    UP_RED = "#FF3B30"
-    DOWN_GREEN = "#34C759"
-    NEUTRAL = "#8E8E93"
-    ACCENT_BLUE = "#007AFF"
-    ACCENT_ORANGE = "#FF9500"
-    DIVIDER = "#3A3A3C"
+    # 基础背景色
+    BACKGROUND_DARK = "#000000"  # 纯黑背景
+    TAB_BG = "#1E1E1E"  # Tab 背景色（深灰色）
+    CARD_DARK = "#2D2D2D"  # 卡片背景色（稍亮的灰色，与Tab背景形成对比）
+    CARD_HOVER = "#3D3D3D"
+    TEXT_PRIMARY = "#FFFFFF"  # 白色主文字
+    TEXT_SECONDARY = "#B0B0B0"  # 亮灰色次要文字，提高对比度
+    UP_RED = "#FF3B30"  # 红色
+    DOWN_GREEN = "#34C759"  # 绿色
+    NEUTRAL = "#8E8E93"  # 中性色
+    ACCENT_BLUE = "#007AFF"  # 蓝色
+    ACCENT_ORANGE = "#FF9500"  # 橙色
+    DIVIDER = "#3A3A3C"  # 分割线颜色
 
 
 def get_change_color(value: float) -> str:
@@ -65,8 +67,8 @@ class MiniChart(Container):
 
     def __init__(
         self,
-        data: List[float],
-        is_up: Optional[bool] = None,
+        data: list[float],
+        is_up: bool | None = None,
         width: int = 80,
         height: int = 32,
     ):
@@ -87,9 +89,7 @@ class MiniChart(Container):
 
         change = 0
         if len(self.chart_data) >= 2:
-            change = (
-                (self.chart_data[-1] - self.chart_data[0]) / self.chart_data[0]
-            ) * 100
+            change = ((self.chart_data[-1] - self.chart_data[0]) / self.chart_data[0]) * 100
 
         arrow = "up" if change >= 0 else "down"
 
@@ -99,14 +99,14 @@ class MiniChart(Container):
                 Container(
                     width=50,
                     height=8,
-                    bgcolor=self.chart_color + "26",  # 15% opacity
+                    bgcolor=f"{self.chart_color}40",  # 25% opacity hex
                 ),
             ],
             spacing=2,
             vertical_alignment=CrossAxisAlignment.CENTER,
         )
 
-    def update_data(self, data: List[float], is_up: Optional[bool] = None):
+    def update_data(self, data: list[float], is_up: bool | None = None):
         """Update chart data"""
         self.chart_data = data or [0]
 
@@ -120,15 +120,13 @@ class MiniChart(Container):
 
         change = 0
         if len(self.chart_data) >= 2:
-            change = (
-                (self.chart_data[-1] - self.chart_data[0]) / self.chart_data[0]
-            ) * 100
+            change = ((self.chart_data[-1] - self.chart_data[0]) / self.chart_data[0]) * 100
 
         arrow = "up" if change >= 0 else "down"
 
         self.content.controls[0].value = arrow
         self.content.controls[0].color = self.chart_color
-        self.content.controls[1].bgcolor = self.chart_color + "26"
+        self.content.controls[1].bgcolor = f"{self.chart_color}40"
 
         self.update()
 
@@ -148,8 +146,8 @@ class FundCard(Card):
         cost: float = 0,
         sector: str = "",
         is_hold: bool = False,
-        chart_data: Optional[List[float]] = None,
-        on_click: Optional[callable] = None,
+        chart_data: list[float] | None = None,
+        on_click: Callable | None = None,
     ):
         self.code = code
         self.name = name
@@ -175,9 +173,11 @@ class FundCard(Card):
         self.rate_color = get_change_color(self.profit_rate)
 
         # Change icon
-        self.change_icon = (
-            Icons.ARROW_DROP_UP if change_pct >= 0 else Icons.ARROW_DROP_DOWN
-        )
+        self.change_icon = Icons.ARROW_DROP_UP if change_pct >= 0 else Icons.ARROW_DROP_DOWN
+
+        # Loading state
+        self._loading = False
+        self._loading_progress_ring = None
 
         # Mini chart
         self.mini_chart = MiniChart(
@@ -193,22 +193,53 @@ class FundCard(Card):
         # Tooltips
         tooltip_text = f"{name}\ncode: {code}\nnet_value: {net_value:.4f}\nest_value: {est_value:.4f}\nchange: {change_pct:+.2f}%"
         if hold_shares > 0:
-            tooltip_text += f"\nholdings: {hold_shares:.2f}\ncost: {cost:.4f}\nprofit: {profit:+.2f}"
+            tooltip_text += (
+                f"\nholdings: {hold_shares:.2f}\ncost: {cost:.4f}\nprofit: {profit:+.2f}"
+            )
+
+        # Create loading progress ring
+        self.progress_ring = ProgressRing(
+            width=40,
+            height=40,
+            stroke_width=3,
+            color=AppColors.ACCENT_BLUE,
+            visible=False,
+        )
+
+        # Loading overlay container
+        self._loading_overlay = Container(
+            content=self.progress_ring,
+            alignment=Alignment(0.5, 0.5),
+            visible=False,
+            bgcolor=f"{AppColors.BACKGROUND_DARK}E6",  # 90% opacity
+            border_radius=BorderRadius(top_left=12, top_right=12, bottom_left=12, bottom_right=12),
+        )
+
+        # Card 组件使用 Container 设置背景色和圆角
+        card_content = Container(
+            bgcolor=AppColors.CARD_DARK,
+            border_radius=BorderRadius(top_left=12, top_right=12, bottom_left=12, bottom_right=12),
+            padding=12,
+            content=content,
+        )
+
+        # Stack: card content + loading overlay
+        self._card_stack = ft.Stack(
+            controls=[card_content, self._loading_overlay],
+            expand=True,
+        )
 
         super().__init__(
             elevation=2,
-            color="#1C1C1E",
-            shape=BorderRadius(
-                top_left=12, top_right=12, bottom_left=12, bottom_right=12
-            ),
             tooltip=tooltip_text,
-            content=Container(
-                content=content,
-                padding=16,
-                on_click=on_click,
-                ink=True,
-            ),
+            content=self._card_stack,
+            margin=0,
         )
+
+        # 添加点击事件到 Card 的内容
+        if on_click:
+            self.content.on_click = on_click
+            self.content.ink = True
 
     def _build_content(self) -> Column:
         """Build card content"""
@@ -308,7 +339,7 @@ class FundCard(Card):
                     border_radius=BorderRadius(
                         top_left=8, top_right=8, bottom_left=8, bottom_right=8
                     ),
-                    bgcolor=self.change_color + "26",  # 15% opacity
+                    bgcolor=f"{self.change_color}40",  # 25% opacity hex
                     content=Row(
                         controls=[
                             Icon(
@@ -363,13 +394,46 @@ class FundCard(Card):
             spacing=0,
         )
 
+    @property
+    def loading(self) -> bool:
+        """Get loading state"""
+        return self._loading
+
+    @loading.setter
+    def loading(self, value: bool):
+        """Set loading state"""
+        self._loading = value
+        self._update_loading_state()
+
+    def _update_loading_state(self):
+        """Update loading UI state"""
+        if self._loading_overlay:
+            self._loading_overlay.visible = self._loading
+        if self.progress_ring:
+            self.progress_ring.visible = self._loading
+        # Only update if card is added to page
+        try:
+            if hasattr(self, '_card_stack') and self._card_stack:
+                self._card_stack.update()
+        except RuntimeError:
+            # Card not added to page yet, skip update
+            pass
+
+    def set_loading(self, value: bool):
+        """Set loading state"""
+        self.loading = value
+
+    def toggle_loading(self):
+        """Toggle loading state"""
+        self.loading = not self._loading
+
     def update_data(
         self,
         net_value: float,
         est_value: float,
         change_pct: float,
         profit: float,
-        chart_data: Optional[List[float]] = None,
+        chart_data: list[float] | None = None,
     ):
         """Update card data - replace content"""
         self.net_value = net_value
@@ -385,18 +449,13 @@ class FundCard(Card):
         self.change_color = get_change_color(change_pct)
         self.profit_color = get_change_color(profit)
         self.rate_color = get_change_color(self.profit_rate)
-        self.change_icon = (
-            Icons.ARROW_DROP_UP if change_pct >= 0 else Icons.ARROW_DROP_DOWN
-        )
+        self.change_icon = Icons.ARROW_DROP_UP if change_pct >= 0 else Icons.ARROW_DROP_DOWN
 
         if chart_data:
             self.chart_data = chart_data
             self.mini_chart.update_data(chart_data, is_up=change_pct >= 0)
 
-        self.content.content = self._build_content()
-        self.content.content.update()
-        self.content.update()
-        self.update()
+        self.content = self._build_content()
 
 
 class FundPortfolioCard(Card):
@@ -416,17 +475,18 @@ class FundPortfolioCard(Card):
 
         super().__init__(
             elevation=0,
-            color=AppColors.CARD_DARK,
-            shape=BorderRadius(
-                top_left=16, top_right=16, bottom_left=16, bottom_right=16
-            ),
-            content=self._build_content(
-                total_assets,
-                daily_profit,
-                total_profit,
-                profit_rate,
-                fund_count,
-                hold_count,
+            content=Container(
+                bgcolor=AppColors.CARD_DARK,
+                border_radius=BorderRadius(top_left=16, top_right=16, bottom_left=16, bottom_right=16),
+                content=self._build_content(
+                    total_assets,
+                    daily_profit,
+                    total_profit,
+                    profit_rate,
+                    fund_count,
+                    hold_count,
+                ),
+                padding=16,
             ),
         )
 
@@ -627,9 +687,7 @@ class QuickActionButton(Column):
 class SearchBar(Container):
     """Search bar component"""
 
-    def __init__(
-        self, on_search: callable = None, placeholder: str = "Search fund code/name"
-    ):
+    def __init__(self, on_search: callable = None, placeholder: str = "Search fund code/name"):
         self.on_search = on_search
 
         self.text_field = ft.TextField(

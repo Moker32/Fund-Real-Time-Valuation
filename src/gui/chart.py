@@ -4,30 +4,29 @@
 提供分时图/K线图功能，基于 matplotlib 实现。
 """
 
+from dataclasses import dataclass, field
+
 import flet as ft
+import matplotlib
 from flet import (
-    Column,
-    Row,
-    Container,
-    Text,
-    ElevatedButton,
     AlertDialog,
+    Checkbox,
+    Column,
+    Container,
     Divider,
     Dropdown,
-    Checkbox,
-    margin,
+    ElevatedButton,
+    Row,
+    Text,
 )
-from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
-import matplotlib
 
 matplotlib.use("Agg")  # 使用非交互式后端
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import numpy as np
-from datetime import datetime
-import io
 import base64
+import io
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 @dataclass
@@ -36,12 +35,12 @@ class FundHistoryData:
 
     fund_code: str
     fund_name: str
-    dates: List[str]
-    open_values: List[float]
-    close_values: List[float]
-    high_values: List[float]
-    low_values: List[float]
-    volumes: List[int] = field(default_factory=list)
+    dates: list[str]
+    open_values: list[float]
+    close_values: list[float]
+    high_values: list[float]
+    low_values: list[float]
+    volumes: list[int] = field(default_factory=list)
 
     def __post_init__(self):
         """验证数据一致性"""
@@ -69,7 +68,7 @@ class FundHistoryData:
             return self.close_values[-1]
         return 0.0
 
-    def calculate_ma(self, period: int) -> List[Optional[float]]:
+    def calculate_ma(self, period: int) -> list[float | None]:
         """计算移动平均线"""
         if len(self.close_values) < period:
             return [None] * len(self.close_values)
@@ -85,8 +84,8 @@ class FundHistoryData:
     def generate_candlestick_chart(
         history: "FundHistoryData",
         show_ma: bool = False,
-        ma_periods: List[int] = None,
-        figsize: Tuple[int, int] = (12, 8),
+        ma_periods: list[int] = None,
+        figsize: tuple[int, int] = (12, 8),
     ) -> matplotlib.figure.Figure:
         """
         生成K线图
@@ -107,7 +106,7 @@ class FundHistoryData:
             return fig
 
         # 解析日期
-        dates = [datetime.strptime(d, "%Y-%m-%d") for d in history.dates]
+        # dates = [datetime.strptime(d, "%Y-%m-%d") for d in history.dates]  # 暂未使用
 
         # 创建图表
         fig, (ax_price, ax_volume) = plt.subplots(
@@ -185,7 +184,7 @@ class FundHistoryData:
 
         return fig
 
-    def to_chart_image(self, figsize: Tuple[int, int] = (10, 6)) -> str:
+    def to_chart_image(self, figsize: tuple[int, int] = (10, 6)) -> str:
         """
         生成图表并转换为base64图片
 
@@ -217,7 +216,7 @@ class FundChartDialog(AlertDialog):
         app,
         fund_code: str,
         fund_name: str,
-        history_data: Optional[FundHistoryData] = None,
+        history_data: FundHistoryData | None = None,
     ):
         super().__init__()
         self.app = app
@@ -226,7 +225,7 @@ class FundChartDialog(AlertDialog):
         self.history_data = history_data
 
         # 控件
-        self.chart_image: Optional[ft.Image] = None
+        self.chart_image: ft.Image | None = None
         self.period_dropdown = Dropdown(
             label="时间周期",
             width=120,
@@ -313,8 +312,8 @@ class FundChartDialog(AlertDialog):
 
         try:
             # 生成图表
-            show_ma = self.ma_checkbox.value
-            ma_periods = [5, 10, 20] if show_ma else None
+            # show_ma = self.ma_checkbox.value  # 暂未使用
+            # ma_periods = [5, 10, 20] if show_ma else None  # 暂未使用
 
             img_base64 = self.history_data.to_chart_image(figsize=(10, 6))
 
@@ -355,7 +354,7 @@ class FundChartCard(Container):
         super().__init__()
         self.fund_code = fund_code
         self.fund_name = fund_name
-        self.history_data: Optional[FundHistoryData] = None
+        self.history_data: FundHistoryData | None = None
 
         self.content = Column(
             [

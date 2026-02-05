@@ -4,10 +4,11 @@
 """
 
 import os
-import yaml
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TypeVar, Generic, Type, Optional, Any
+from typing import Any, Generic, TypeVar
+
+import yaml
 
 from .models import AppConfig
 
@@ -17,7 +18,7 @@ T = TypeVar('T')
 class BaseConfigLoader(ABC, Generic[T]):
     """配置加载器基类"""
 
-    def __init__(self, config_path: str, config_dir: Optional[str] = None):
+    def __init__(self, config_path: str, config_dir: str | None = None):
         """
         初始化配置加载器
 
@@ -41,7 +42,7 @@ class BaseConfigLoader(ABC, Generic[T]):
     def _load_yaml(self) -> dict:
         """加载 YAML 文件"""
         try:
-            with open(self._config_path, 'r', encoding='utf-8') as f:
+            with open(self._config_path, encoding='utf-8') as f:
                 return yaml.safe_load(f) or {}
         except FileNotFoundError:
             return {}
@@ -90,7 +91,7 @@ class BaseConfigLoader(ABC, Generic[T]):
 class AppConfigLoader(BaseConfigLoader[AppConfig]):
     """应用主配置加载器"""
 
-    def __init__(self, config_dir: Optional[str] = None):
+    def __init__(self, config_dir: str | None = None):
         super().__init__('config.yaml', config_dir)
 
     def _parse(self, data: dict) -> AppConfig:

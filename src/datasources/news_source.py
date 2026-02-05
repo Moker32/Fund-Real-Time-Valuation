@@ -3,21 +3,15 @@
 实现从新浪财经获取财经新闻
 """
 
-import re
-import json
-import time
 import asyncio
+import re
+import time
+from typing import Any
+
 import httpx
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
-from .base import (
-    DataSource,
-    DataSourceType,
-    DataSourceResult,
-    DataSourceError,
-    NetworkError
-)
+
+from .base import DataSource, DataSourceResult, DataSourceType
 
 
 class SinaNewsDataSource(DataSource):
@@ -45,7 +39,7 @@ class SinaNewsDataSource(DataSource):
                 "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
             }
         )
-        self._news_cache: List[Dict[str, Any]] = []
+        self._news_cache: list[dict[str, Any]] = []
         self._cache_time: float = 0.0
         self._cache_timeout = 300.0  # 缓存5分钟
 
@@ -118,7 +112,7 @@ class SinaNewsDataSource(DataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    async def fetch_batch(self, categories: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, categories: list[str]) -> list[DataSourceResult]:
         """批量获取多类别新闻"""
         async def fetch_one(cat: str) -> DataSourceResult:
             return await self.fetch(cat)
@@ -155,7 +149,7 @@ class SinaNewsDataSource(DataSource):
         }
         return urls.get(category, urls["finance"])
 
-    def _parse_news(self, html: str, category: str) -> List[Dict[str, Any]]:
+    def _parse_news(self, html: str, category: str) -> list[dict[str, Any]]:
         """
         解析新闻页面
 
@@ -276,7 +270,7 @@ class SinaNewsDataSource(DataSource):
         """关闭 HTTP 客户端"""
         await self.client.aclose()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取数据源状态"""
         status = super().get_status()
         status["cache_size"] = len(self._news_cache)
@@ -294,8 +288,8 @@ class NewsAggregatorDataSource(DataSource):
             source_type=DataSourceType.NEWS,
             timeout=timeout
         )
-        self._sources: List[DataSource] = []
-        self._default_source: Optional[DataSource] = None
+        self._sources: list[DataSource] = []
+        self._default_source: DataSource | None = None
 
     def add_source(self, source: DataSource, is_default: bool = False):
         """
@@ -352,7 +346,7 @@ class NewsAggregatorDataSource(DataSource):
             metadata={"category": category, "errors": errors}
         )
 
-    async def fetch_batch(self, categories: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, categories: list[str]) -> list[DataSourceResult]:
         """批量获取多类别新闻"""
         async def fetch_one(cat: str) -> DataSourceResult:
             return await self.fetch(cat)
@@ -377,7 +371,7 @@ class NewsAggregatorDataSource(DataSource):
 
         return processed_results
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """获取聚合器状态"""
         status = super().get_status()
         status["source_count"] = len(self._sources)

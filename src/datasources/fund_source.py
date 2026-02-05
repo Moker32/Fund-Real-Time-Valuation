@@ -3,20 +3,19 @@
 实现从天天基金/新浪接口获取基金实时估值数据
 """
 
-import re
-import json
-import time
 import asyncio
+import json
+import re
+import time
+from typing import Any
+
 import httpx
-from typing import Any, Dict, List, Optional
-from datetime import datetime
+
 from .base import (
+    DataParseError,
     DataSource,
-    DataSourceType,
     DataSourceResult,
-    DataSourceError,
-    NetworkError,
-    DataParseError
+    DataSourceType,
 )
 
 
@@ -103,7 +102,7 @@ class FundDataSource(DataSource):
                     )
                 await self._handle_retry_delay(attempt)
 
-            except httpx.RequestError as e:
+            except httpx.RequestError:
                 await self._handle_retry_delay(attempt)
 
             except json.JSONDecodeError as e:
@@ -125,7 +124,7 @@ class FundDataSource(DataSource):
             metadata={"fund_code": fund_code}
         )
 
-    async def fetch_batch(self, fund_codes: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
         """
         批量获取基金数据
 
@@ -171,7 +170,7 @@ class FundDataSource(DataSource):
         """
         return bool(re.match(r"^\d{6}$", str(fund_code)))
 
-    def _parse_response(self, response_text: str, fund_code: str) -> Optional[Dict[str, Any]]:
+    def _parse_response(self, response_text: str, fund_code: str) -> dict[str, Any] | None:
         """
         解析天天基金返回的 JS 数据
 
@@ -217,7 +216,7 @@ class FundDataSource(DataSource):
                 details={"fund_code": fund_code}
             )
 
-    def _safe_float(self, value: Any) -> Optional[float]:
+    def _safe_float(self, value: Any) -> float | None:
         """
         安全转换为浮点数
 
@@ -311,7 +310,7 @@ class SinaFundDataSource(DataSource):
                     )
                 await self._handle_retry_delay(attempt)
 
-            except httpx.RequestError as e:
+            except httpx.RequestError:
                 await self._handle_retry_delay(attempt)
 
             except Exception as e:
@@ -330,7 +329,7 @@ class SinaFundDataSource(DataSource):
         if attempt < self.max_retries - 1:
             await asyncio.sleep(self.retry_delay * (attempt + 1))
 
-    async def fetch_batch(self, fund_codes: List[str]) -> List[DataSourceResult]:
+    async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
         """批量获取基金数据"""
         async def fetch_one(code: str) -> DataSourceResult:
             return await self.fetch(code)
@@ -355,7 +354,7 @@ class SinaFundDataSource(DataSource):
 
         return processed_results
 
-    def _parse_html(self, html: str, fund_code: str) -> Optional[Dict[str, Any]]:
+    def _parse_html(self, html: str, fund_code: str) -> dict[str, Any] | None:
         """解析新浪基金页面 HTML"""
         # 简化实现 - 实际需要使用 BeautifulSoup 解析
         # 这里预留解析逻辑
