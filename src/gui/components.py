@@ -437,7 +437,7 @@ class FundCard(Card):
     ):
         """Update card data - replace content"""
         self.net_value = net_value
-        self.est_value = net_value
+        self.est_value = est_value
         self.change_pct = change_pct
         self.profit = profit
 
