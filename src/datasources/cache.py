@@ -103,7 +103,7 @@ class DataCache:
             # 读取失败，返回 None
             return None
 
-    def set(self, key: str, value: Any, ttl_seconds: int = None):
+    def set(self, key: str, value: Any, ttl_seconds: int | None = None):
         """
         设置缓存数据
 
@@ -131,7 +131,7 @@ class DataCache:
         except (OSError, TypeError) as e:
             logger.warning(f"缓存写入失败 (key={key}): {e}")
 
-    def clear(self, key: str = None):
+    def clear(self, key: str | None = None):
         """
         清除缓存
 

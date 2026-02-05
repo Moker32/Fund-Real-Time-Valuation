@@ -162,11 +162,12 @@ class NotificationConfig:
 
     def remove_alert(self, fund_code: str, target_price: float) -> bool:
         """移除预警"""
-        for i, alert in enumerate(self.price_alerts):
-            if alert.fund_code == fund_code and alert.target_price == target_price:
-                self.price_alerts.pop(i)
-                return True
-        return False
+        original_count = len(self.price_alerts)
+        self.price_alerts = [
+            a for a in self.price_alerts
+            if not (a.fund_code == fund_code and a.target_price == target_price)
+        ]
+        return len(self.price_alerts) < original_count
 
     def get_alerts_for_fund(self, fund_code: str) -> list[PriceAlert]:
         """获取基金的所有预警"""

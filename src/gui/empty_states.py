@@ -4,6 +4,7 @@
 提供基金、商品、新闻等列表为空时显示的友好提示组件。
 """
 
+from collections.abc import Callable
 import flet as ft
 from flet import (
     Column,
@@ -44,9 +45,9 @@ EMPTY_STATES_CONFIG = {
 
 
 def empty_funds_state(
-    message: str = None,
-    hint: str = None,
-    on_add: callable = None,
+    message: str | None = None,
+    hint: str | None = None,
+    on_add: Callable[[], None] | None = None,
 ) -> Container:
     """创建空基金状态组件
 
@@ -70,9 +71,9 @@ def empty_funds_state(
 
 
 def empty_commodities_state(
-    message: str = None,
-    hint: str = None,
-    on_refresh: callable = None,
+    message: str | None = None,
+    hint: str | None = None,
+    on_refresh: Callable[[], None] | None = None,
 ) -> Container:
     """创建空商品状态组件
 
@@ -96,9 +97,9 @@ def empty_commodities_state(
 
 
 def empty_news_state(
-    message: str = None,
-    hint: str = None,
-    on_refresh: callable = None,
+    message: str | None = None,
+    hint: str | None = None,
+    on_refresh: Callable[[], None] | None = None,
 ) -> Container:
     """创建空新闻状态组件
 
@@ -127,7 +128,7 @@ def create_empty_state(
     hint: str = "",
     button_text: str = "",
     button_icon: str = "",
-    on_button_click: callable = None,
+    on_button_click: Callable[[], None] | None = None,
 ) -> Container:
     """创建通用空状态组件
 
