@@ -377,6 +377,18 @@ class FundGUIApp:
             expand=True,
         )
 
+        # 基金列表容器（使用 Stack 同时显示列表和空状态）
+        self._fund_list_stack = ft.Stack(
+            controls=[
+                self._fund_list,
+                Container(
+                    content=self._funds_empty_state,
+                    visible=False,  # 初始隐藏空状态
+                ),
+            ],
+            expand=True,
+        )
+
         # 返回包含所有元素的 Column
         return Column(
             controls=[
@@ -402,7 +414,7 @@ class FundGUIApp:
                 Container(
                     bgcolor=AppColors.TAB_BG,
                     expand=True,
-                    content=self._fund_list_container,
+                    content=self._fund_list_stack,
                     padding=ft.padding.symmetric(horizontal=16),
                 ),
             ],
@@ -732,9 +744,9 @@ class FundGUIApp:
                     log_debug(f"_fund_list 为 None，无法添加卡片")
 
         # 控制空状态的可见性
-        if hasattr(self, '_funds_empty_state') and hasattr(self, '_fund_list_container'):
+        if hasattr(self, '_funds_empty_state') and hasattr(self, '_fund_list_stack'):
             # Stack 的第二个控件是空状态容器
-            empty_state_container = self._fund_list_container.controls[1]
+            empty_state_container = self._fund_list_stack.controls[1]
             empty_state_container.visible = len(self.funds) == 0
 
         # 刷新基金列表
