@@ -81,6 +81,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.datasources.manager import create_default_manager
 from src.datasources.base import DataSourceType
 from src.db.database import DatabaseManager, ConfigDAO
+from src.config.manager import ConfigManager
+from src.config.models import NotificationConfig, AppConfig
+from .notifications import NotificationManager, NotificationDialog
+from .settings import SettingsDialog
 
 
 @dataclass
@@ -109,8 +113,16 @@ class FundGUIApp:
         self.db_manager = DatabaseManager()
         self.config_dao = ConfigDAO(self.db_manager)
 
+        # 配置管理
+        self.config_manager = ConfigManager()
+        self.app_config = self.config_manager.load_app_config()
+
+        # 通知管理
+        self.notification_config = NotificationConfig()
+        self.notification_manager = NotificationManager(self.notification_config)
+
         self.funds: List[FundDisplayData] = []
-        self.refresh_interval = 30
+        self.refresh_interval = self.app_config.refresh_interval
         self.current_tab = 0
         self._fund_cards: dict[str, FundCard] = {}  # 缓存基金卡片组件
         self._fund_list: Optional[Column] = None  # 基金列表容器
@@ -388,12 +400,34 @@ class FundGUIApp:
         self._show_snackbar("数据已刷新")
 
     def _show_notifications(self, e):
-        """显示通知"""
-        self._show_snackbar("通知功能开发中")
+        """显示通知中心"""
+        dialog = NotificationDialog(self, self.notification_manager)
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
 
     def _show_settings(self, e):
-        """显示设置"""
-        self._show_snackbar("设置功能开发中")
+        """显示设置对话框"""
+        dialog = SettingsDialog(
+            self,
+            self.app_config,
+            on_save=self._save_settings,
+        )
+        self.page.overlay.append(dialog)
+        dialog.open = True
+        self.page.update()
+
+    def _save_settings(self, new_config: AppConfig):
+        """保存设置"""
+        self.app_config = new_config
+        self.config_manager.save_app_config(new_config)
+        self.refresh_interval = new_config.refresh_interval
+        # 应用新主题（如需要）
+        if new_config.theme == "light":
+            self.page.theme_mode = ft.ThemeMode.LIGHT
+        else:
+            self.page.theme_mode = ft.ThemeMode.DARK
+        self.page.update()
 
     def _on_fund_search(self, query: str):
         """基金搜索"""
