@@ -232,8 +232,21 @@ class FundGUIApp:
         portfolio_page_content = self._build_portfolio_page()
         news_page_content = self._build_news_page()
 
-        # 使用 TabBar + Tabs 组合（Flet 0.80.5）
-        # TabBar 负责标签导航，Tabs 负责内容管理
+        # 使用官方 Tabs 组件（Flet 0.80.5）
+        # Tabs 管理内容切换，TabBar 管理标签
+        self._tabs = Tabs(
+            length=4,
+            selected_index=0,
+            on_change=self._on_tabs_change,
+            content=Column([
+                Container(content=fund_page_content, expand=True),
+                Container(content=commodity_page_content, expand=True),
+                Container(content=portfolio_page_content, expand=True),
+                Container(content=news_page_content, expand=True),
+            ]),
+        )
+
+        # 创建 TabBar 负责标签导航
         self._tab_bar = TabBar(
             tabs=[
                 Tab(label="自选", icon=Icons.STAR_BORDER),
@@ -246,17 +259,6 @@ class FundGUIApp:
             label_color=AppColors.ACCENT_BLUE,
             unselected_label_color=AppColors.TEXT_SECONDARY,
             indicator_color=AppColors.ACCENT_BLUE,
-        )
-
-        # 使用 Tabs 管理内容切换，通过 visible 属性控制显示
-        self._tab_contents = Tabs(
-            content=Column([
-                Container(content=fund_page_content, expand=True),
-                Container(content=commodity_page_content, expand=True),
-                Container(content=portfolio_page_content, expand=True),
-                Container(content=news_page_content, expand=True),
-            ]),
-            length=4,
         )
 
         # 底部状态栏
@@ -276,7 +278,7 @@ class FundGUIApp:
         # 一次性添加所有控件到页面
         self.page.add(top_bar)
         self.page.add(self._tab_bar)
-        self.page.add(self._tab_contents)
+        self.page.add(self._tabs)
         self.page.add(self.status_bar)
 
         # 加载初始数据
@@ -1148,16 +1150,36 @@ class FundGUIApp:
             self.page.update()
 
     def _on_tab_click(self, e):
-        """处理标签页切换 (官方 TabBar on_click 事件)
-
-        Args:
-            e: 事件对象，e.data 包含点击的 tab 索引（字符串格式）
-        """
-        # TabBar 的 on_click 事件通过 e.data 传递选中的 tab 索引
-        self.current_tab = int(e.data)
+        """处理 TabBar 标签点击，同步 Tabs"""
+        # TabBar 的 on_click 事件可能不传递 e.data，需要直接从 TabBar 获取选中索引
+        if e.data is None:
+            # 如果 e.data 为 None，尝试从 TabBar 获取
+            selected_index = getattr(self._tab_bar, 'selected_index', None)
+            if selected_index is not None:
+                self.current_tab = selected_index
+            else:
+                # 遍历 tabs 查找选中的 tab
+                self.current_tab = 0
+                for i, tab in enumerate(self._tab_bar.tabs):
+                    if getattr(tab, 'selected', False):
+                        self.current_tab = i
+                        break
+        else:
+            self.current_tab = int(e.data)
 
         # 同步更新 Tabs 的 selected_index
-        self._tab_contents.selected_index = self.current_tab
+        self._tabs.selected_index = self.current_tab
+
+        log_debug(f"TabBar 切换到 tab {self.current_tab}")
+
+    def _on_tabs_change(self, e):
+        """处理标签页切换 (官方 Tabs on_change 事件)
+
+        Args:
+            e: 事件对象
+        """
+        # 直接从 Tabs 获取选中的索引，而不是依赖 e.data
+        self.current_tab = self._tabs.selected_index
 
         log_debug(f"切换到 tab {self.current_tab}")
 
@@ -1171,6 +1193,8 @@ class FundGUIApp:
             self.page.run_task(self._load_commodity_data)
         elif self.current_tab == 3:
             self.page.run_task(self._load_news_data)
+            self.page.run_task(self._load_commodity_data)
+        elif self.current_tab == 3:
             self.page.run_task(self._load_news_data)
 
 
