@@ -229,13 +229,16 @@ class FundGUIApp:
         # 构建各标签页内容
         fund_page_content = self._build_fund_page()
         commodity_page_content = self._build_commodity_page()
+        portfolio_page_content = self._build_portfolio_page()
         news_page_content = self._build_news_page()
 
-        # 使用 TabBar 定义标签导航（Flet 0.80.5）
+        # 使用 TabBar + Tabs 组合（Flet 0.80.5）
+        # TabBar 负责标签导航，Tabs 负责内容管理
         self._tab_bar = TabBar(
             tabs=[
                 Tab(label="自选", icon=Icons.STAR_BORDER),
                 Tab(label="商品", icon=Icons.TRENDING_UP),
+                Tab(label="组合", icon=Icons.PIE_CHART),
                 Tab(label="新闻", icon=Icons.NEWSPAPER),
             ],
             on_click=self._on_tab_click,
@@ -245,14 +248,15 @@ class FundGUIApp:
             indicator_color=AppColors.ACCENT_BLUE,
         )
 
-        # 使用 Tabs 管理内容切换
+        # 使用 Tabs 管理内容切换，通过 visible 属性控制显示
         self._tab_contents = Tabs(
             content=Column([
                 Container(content=fund_page_content, expand=True),
                 Container(content=commodity_page_content, expand=True),
+                Container(content=portfolio_page_content, expand=True),
                 Container(content=news_page_content, expand=True),
             ]),
-            length=3,
+            length=4,
         )
 
         # 底部状态栏
@@ -411,6 +415,29 @@ class FundGUIApp:
                                 content=self._commodities_empty_state,
                                 visible=False,  # 初始隐藏空状态
                             ),
+                        ],
+                        expand=True,
+                    ),
+                ],
+                expand=True,
+            ),
+            padding=10,
+        )
+
+    def _build_portfolio_page(self) -> Container:
+        """构建组合页面（饼图展示持仓分布）"""
+        # 组合数据
+        self.holdings_list = Column(spacing=4, scroll=ft.ScrollMode.AUTO, expand=True)
+
+        return Container(
+            content=Column(
+                [
+                    Text("投资组合", size=18, weight=ft.FontWeight.BOLD),
+                    Divider(),
+                    # 组合列表
+                    ft.Stack(
+                        controls=[
+                            self.holdings_list,
                         ],
                         expand=True,
                     ),
@@ -1129,6 +1156,9 @@ class FundGUIApp:
         # TabBar 的 on_click 事件通过 e.data 传递选中的 tab 索引
         self.current_tab = int(e.data)
 
+        # 同步更新 Tabs 的 selected_index
+        self._tab_contents.selected_index = self.current_tab
+
         log_debug(f"切换到 tab {self.current_tab}")
 
         # 更新页面以反映变化
@@ -1139,7 +1169,8 @@ class FundGUIApp:
             self.page.run_task(self._load_fund_data)
         elif self.current_tab == 1:
             self.page.run_task(self._load_commodity_data)
-        elif self.current_tab == 2:
+        elif self.current_tab == 3:
+            self.page.run_task(self._load_news_data)
             self.page.run_task(self._load_news_data)
 
 
