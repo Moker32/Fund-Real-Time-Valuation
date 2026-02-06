@@ -5,7 +5,7 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [2.0.0] - 2025-02-05
+## [0.0.1] - 2025-02-06
 
 ### Added
 
@@ -36,7 +36,7 @@
 - 添加 ruff 代码风格检查配置
 - 新增 120+ 个测试用例
 
-## [1.0.0] - 2025-01-XX
+## [0.0.1-beta] - 2025-01-XX
 
 ### Added
 

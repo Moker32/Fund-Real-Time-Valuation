@@ -29,6 +29,10 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 
+# 配置 matplotlib 中文字体（只需设置一次）
+plt.rcParams["font.sans-serif"] = ["SimHei", "DejaVu Sans"]
+plt.rcParams["axes.unicode_minus"] = False
+
 
 @dataclass
 class FundHistoryData:
@@ -114,54 +118,45 @@ class FundHistoryData:
             2, 1, figsize=figsize, height_ratios=[3, 1], sharex=True
         )
 
-        # 设置中文字体
-        plt.rcParams["font.sans-serif"] = ["SimHei", "DejaVu Sans"]
-        plt.rcParams["axes.unicode_minus"] = False
+        # 使用 numpy 向量化计算颜色
+        closes = np.array(history.close_values)
+        opens = np.array(history.open_values)
+        colors = np.where(closes >= opens, "#e74c3c", "#27ae60")  # 红色上涨，绿色下跌
 
-        # 计算K线颜色
-        colors = []
-        for i in range(n):
-            if history.close_values[i] >= history.open_values[i]:
-                colors.append("#e74c3c")  # 红色上涨
-            else:
-                colors.append("#27ae60")  # 绿色下跌
+        # 绘制K线影线 - 使用 vlines 批量绘制（比循环快）
+        x_positions = np.arange(n)
+        ax_price.vlines(
+            x_positions,
+            ymin=history.low_values,
+            ymax=history.high_values,
+            colors=colors,
+            linewidth=1,
+        )
 
-        # 绘制K线
-        width = 0.6
-        for i in range(n):
-            color = colors[i]
-            # 影线
-            ax_price.plot(
-                [i, i],
-                [history.low_values[i], history.high_values[i]],
-                color=color,
-                linewidth=1,
-            )
-            # 实体
-            body_height = abs(history.close_values[i] - history.open_values[i])
-            if body_height < 0.0001:
-                body_height = 0.001
-            body_bottom = min(history.open_values[i], history.close_values[i])
-            ax_price.bar(i, body_height, width=width, bottom=body_bottom, color=color)
+        # 绘制K线实体 - 使用 bar 批量绘制
+        body_height = np.abs(closes - opens)
+        body_height = np.where(body_height < 0.0001, 0.001, body_height)
+        body_bottom = np.minimum(opens, closes)
+        ax_price.bar(x_positions, body_height, width=0.6, bottom=body_bottom, color=colors)
 
-        # 绘制均线
+        # 绘制均线 - 使用 numpy 向量化
         if show_ma and ma_periods:
+            closes_arr = np.array(history.close_values)
             for period in ma_periods:
-                ma_values = history.calculate_ma(period)
-                ma_x = [i for i, v in enumerate(ma_values) if v is not None]
-                ma_y = [v for v in ma_values if v is not None]
-                if ma_x and ma_y:
-                    ax_price.plot(ma_x, ma_y, linewidth=1.5, label=f"MA{period}")
+                if len(closes_arr) >= period:
+                    # 使用卷积计算移动平均
+                    ma_values = np.convolve(closes_arr, np.ones(period) / period, mode='valid')
+                    valid_indices = np.arange(period - 1, len(closes_arr))
+                    ax_price.plot(valid_indices, ma_values, linewidth=1.5, label=f"MA{period}")
 
         # 设置价格轴
         ax_price.set_ylabel("净值", fontsize=12)
         ax_price.legend(loc="upper left")
         ax_price.grid(True, alpha=0.3)
 
-        # 绘制成交量
+        # 绘制成交量 - 批量绘制
         if history.volumes and len(history.volumes) == n:
-            volume_colors = [colors[i] for i in range(n)]
-            ax_volume.bar(range(n), history.volumes, color=volume_colors, width=0.6)
+            ax_volume.bar(x_positions, history.volumes, color=colors, width=0.6)
             ax_volume.set_ylabel("成交量", fontsize=12)
             ax_volume.set_xlabel("日期", fontsize=12)
             ax_volume.grid(True, alpha=0.3)
@@ -335,12 +330,43 @@ class FundChartDialog(AlertDialog):
         pass  # 暂时不实现动态切换
 
     def _on_ma_change(self, e):
-        """处理均线显示变化"""
-        self.content.content.controls[1] = Divider()
-        self.content.content.controls[2] = Container(
-            content=self._build_chart_container(), height=450
-        )
-        self.app.page.update()
+        """处理均线显示变化 - 只更新图片，不重建容器"""
+        self._update_chart_image()
+
+    def _update_chart_image(self):
+        """更新图表图片 - 复用 Image 组件"""
+        if not self.history_data or not self.history_data.dates:
+            return
+
+        try:
+            img_base64 = self.history_data.to_chart_image(figsize=(10, 6))
+
+            # 复用现有的 Image 组件，只更新 src_base64
+            if self.chart_image is None:
+                self.chart_image = ft.Image(
+                    width=850,
+                    height=400,
+                    fit=ft.ImageFit.CONTAIN,
+                )
+
+            self.chart_image.src_base64 = img_base64
+
+            # 更新内容
+            self.app.page.update()
+
+        except Exception as e:
+            # 如果更新失败，显示错误信息
+            self._show_chart_error(str(e))
+
+    def _show_chart_error(self, error_msg: str):
+        """显示图表错误"""
+        # 找到图表容器并显示错误
+        inner_column = self.content.content
+        if isinstance(inner_column, Column) and len(inner_column.controls) > 2:
+            chart_container = inner_column.controls[2]
+            if isinstance(chart_container, Container):
+                chart_container.content = Text(f"生成图表失败: {error_msg}", size=14, color=ft.Colors.RED)
+                self.app.page.update()
 
     def _close(self, e):
         """关闭对话框"""
@@ -356,12 +382,14 @@ class FundChartCard(Container):
         self.fund_code = fund_code
         self.fund_name = fund_name
         self.history_data: Optional[FundHistoryData] = None
+        self._chart_image: Optional[ft.Image] = None  # 缓存 Image 组件
+        self._placeholder: Optional[Text] = None  # 缓存占位符
 
         self.content = Column(
             [
                 Text(fund_name, size=16, weight=ft.FontWeight.BOLD),
                 Container(
-                    Text("点击查看完整K线图", size=12, color=ft.Colors.GREY),
+                    self._create_placeholder(),
                     height=150,
                     alignment=ft.alignment.center,
                 ),
@@ -369,6 +397,11 @@ class FundChartCard(Container):
             ],
             spacing=5,
         )
+
+    def _create_placeholder(self) -> Text:
+        """创建占位符"""
+        self._placeholder = Text("点击查看完整K线图", size=12, color=ft.Colors.GREY)
+        return self._placeholder
 
     def _show_chart(self, e):
         """显示图表对话框"""
@@ -381,22 +414,28 @@ class FundChartCard(Container):
             self.app.page.update()
 
     def update_history(self, history_data: FundHistoryData):
-        """更新历史数据"""
+        """更新历史数据 - 增量更新"""
         self.history_data = history_data
         if history_data and history_data.dates:
             try:
                 img_base64 = history_data.to_chart_image(figsize=(6, 3))
-                self.content.controls[1] = Container(
-                    content=ft.Image(
-                        src_base64=img_base64,
+
+                # 复用或创建 Image 组件
+                if self._chart_image is None:
+                    self._chart_image = ft.Image(
                         width=280,
                         height=140,
                         fit=ft.ImageFit.CONTAIN,
-                    ),
-                    height=150,
-                    alignment=ft.alignment.center,
-                )
-                if hasattr(self.app, "page"):
-                    self.app.page.update()
+                    )
+
+                self._chart_image.src_base64 = img_base64
+
+                # 更新容器内容
+                container = self.content.controls[1]
+                if isinstance(container, Container):
+                    container.content = self._chart_image
+                    if hasattr(self.app, "page"):
+                        self.app.page.update()
+
             except Exception:
                 pass

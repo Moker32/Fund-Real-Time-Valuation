@@ -36,6 +36,8 @@ from .theme import (
 from .components import (
     FundCard,
     FundPortfolioCard,
+    CommodityCard,
+    NewsCard,
     MiniChart,
     SearchBar,
     QuickActionButton,
@@ -745,17 +747,13 @@ class FundGUIApp:
             empty_state_container = self._fund_list_stack.controls[1]
             empty_state_container.visible = len(self.funds) == 0
 
-        # 刷新基金列表
-        if self._fund_list:
-            self._fund_list.update()
-
-        # 更新状态栏
+        # 更新状态栏时间戳
         if self.status_bar and self.status_bar.content:
             self.status_bar.content.controls[
                 0
             ].value = f"Last Update: {datetime.now().strftime('%H:%M:%S')}"
-            self.status_bar.content.update()
 
+        # 合并所有更新为一次 page.update()
         if self.page:
             log_debug(f"_update_fund_table: 调用 page.update()")
             self.page.update()
@@ -800,15 +798,27 @@ class FundGUIApp:
             log_debug(f"[预警触发] {message}")
 
     async def _load_commodity_data(self):
-        """加载商品数据"""
+        """加载商品数据 - 使用增量更新"""
         # 设置加载状态
         self.set_loading(True)
 
+        # 初始化商品卡片缓存
+        if not hasattr(self, '_commodity_cards'):
+            self._commodity_cards = {}
+
         try:
             commodities = self.config_dao.get_commodities(enabled_only=True)
+            current_symbols = {c.symbol for c in commodities}
+            cached_symbols = set(self._commodity_cards.keys())
 
-            self.commodity_list.controls.clear()
+            # 1. 移除已删除的商品卡片
+            removed_symbols = cached_symbols - current_symbols
+            for symbol in removed_symbols:
+                card = self._commodity_cards.pop(symbol)
+                if card in self.commodity_list.controls:
+                    self.commodity_list.controls.remove(card)
 
+            # 2. 更新或创建商品卡片
             for commodity in commodities:
                 try:
                     result = await self.data_source_manager.fetch(
@@ -817,42 +827,30 @@ class FundGUIApp:
 
                     if result.success and result.data:
                         data = result.data
-                        change_color = (
-                            ft.Colors.GREEN if data.get("change_percent", 0) >= 0 else ft.Colors.RED
-                        )
+                        price = data.get("price", 0)
+                        currency = data.get("currency", "CNY")
+                        change_percent = data.get("change_percent", 0)
+                        name = data.get("name", commodity.name)
 
-                        card = Card(
-                            content=Container(
-                                content=Row(
-                                    [
-                                        Column(
-                                            [
-                                                Text(
-                                                    data.get("name", commodity.name),
-                                                    size=14,
-                                                    weight=ft.FontWeight.BOLD,
-                                                ),
-                                                Text(
-                                                    f"{data.get('price', 0)} {data.get('currency', 'CNY')}",
-                                                    size=16,
-                                                ),
-                                            ],
-                                            expand=True,
-                                        ),
-                                        Text(
-                                            f"{data.get('change_percent', 0):+.2f}%",
-                                            color=change_color,
-                                            size=16,
-                                            weight=ft.FontWeight.BOLD,
-                                        ),
-                                    ],
-                                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                                ),
-                                padding=12,
-                            ),
-                            margin=padding.only(bottom=4),
-                        )
-                        self.commodity_list.controls.append(card)
+                        if commodity.symbol in self._commodity_cards:
+                            # 更新已有卡片
+                            self._commodity_cards[commodity.symbol].update_data(
+                                price=price,
+                                currency=currency,
+                                change_percent=change_percent,
+                            )
+                        else:
+                            # 创建新卡片
+                            card = CommodityCard(
+                                symbol=commodity.symbol,
+                                name=name,
+                                price=price,
+                                currency=currency,
+                                change_percent=change_percent,
+                            )
+                            self._commodity_cards[commodity.symbol] = card
+                            self.commodity_list.controls.append(card)
+
                 except Exception as ex:
                     log_error(f"获取商品 {commodity.symbol} 数据失败: {ex}")
 
@@ -877,55 +875,51 @@ class FundGUIApp:
             self.set_loading(False)
 
     async def _load_news_data(self):
-        """加载新闻数据"""
+        """加载新闻数据 - 使用增量更新"""
         # 设置加载状态
         self.set_loading(True)
+
+        # 初始化新闻卡片缓存（使用标题作为键，避免顺序变化导致错位）
+        if not hasattr(self, '_news_cards'):
+            self._news_cards: dict[str, NewsCard] = {}
 
         try:
             result = await self.data_source_manager.fetch(DataSourceType.NEWS, "finance")
 
-            self.news_list.controls.clear()
-
             if result.success and result.data:
+                # 收集当前新闻的标题集合
+                current_titles = {item.get("title", "") for item in result.data if item.get("title")}
+
+                # 移除已删除的新闻卡片
+                for removed_title in set(self._news_cards.keys()) - current_titles:
+                    card = self._news_cards.pop(removed_title)
+                    if card in self.news_list.controls:
+                        self.news_list.controls.remove(card)
+
+                # 更新或创建新闻卡片（按原始顺序）
                 for item in result.data:
-                    card = Card(
-                        content=Container(
-                            content=Column(
-                                [
-                                    Text(
-                                        item.get("title", "无标题"),
-                                        size=14,
-                                        max_lines=2,
-                                    ),
-                                    Row(
-                                        [
-                                            Icon(
-                                                Icons.ACCESS_TIME,
-                                                size=12,
-                                                color=ft.Colors.WHITE70,
-                                            ),
-                                            Text(
-                                                item.get("time", ""),
-                                                size=11,
-                                                color=ft.Colors.WHITE70,
-                                            ),
-                                            Text(" - "),
-                                            Text(
-                                                item.get("source", "未知"),
-                                                size=11,
-                                                color=ft.Colors.BLUE_200,
-                                            ),
-                                        ],
-                                        spacing=4,
-                                    ),
-                                ],
-                                spacing=4,
-                            ),
-                            padding=12,
-                        ),
-                        margin=padding.only(bottom=4),
-                    )
-                    self.news_list.controls.append(card)
+                    title = item.get("title", "")
+                    if not title:
+                        continue
+                    time = item.get("time", "")
+                    source = item.get("source", "未知")
+
+                    if title in self._news_cards:
+                        # 更新已有卡片
+                        self._news_cards[title].update_data(
+                            title=title,
+                            time=time,
+                            source=source,
+                        )
+                    else:
+                        # 创建新卡片
+                        card = NewsCard(
+                            title=title,
+                            time=time,
+                            source=source,
+                        )
+                        self._news_cards[title] = card
+                        self.news_list.controls.append(card)
             else:
                 self._load_sample_news()
 
@@ -945,42 +939,28 @@ class FundGUIApp:
             self.set_loading(False)
 
     def _load_sample_news(self):
-        """加载示例新闻"""
+        """加载示例新闻 - 使用 NewsCard"""
         sample_news = [
             {"title": "央行宣布降息25个基点", "time": "10:30", "source": "新浪财经"},
             {"title": "A股三大指数集体收涨", "time": "09:45", "source": "新浪财经"},
         ]
 
+        # 初始化新闻卡片缓存
+        if not hasattr(self, '_news_cards'):
+            self._news_cards: dict[str, NewsCard] = {}
+
+        # 清除现有控件
+        self.news_list.controls.clear()
+        self._news_cards.clear()
+
         for news in sample_news:
-            card = Card(
-                content=Container(
-                    content=Column(
-                        [
-                            Text(news["title"], size=14, max_lines=2),
-                            Row(
-                                [
-                                    Icon(
-                                        Icons.ACCESS_TIME,
-                                        size=12,
-                                        color=ft.Colors.WHITE70,
-                                    ),
-                                    Text(news["time"], size=11, color=ft.Colors.WHITE70),
-                                    Text(" - "),
-                                    Text(
-                                        news["source"],
-                                        size=11,
-                                        color=ft.Colors.BLUE_200,
-                                    ),
-                                ],
-                                spacing=4,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    padding=12,
-                ),
-                margin=padding.only(bottom=4),
+            title = news["title"]
+            card = NewsCard(
+                title=title,
+                time=news["time"],
+                source=news["source"],
             )
+            self._news_cards[title] = card
             self.news_list.controls.append(card)
 
     def _show_add_fund(self, e):
