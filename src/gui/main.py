@@ -20,6 +20,7 @@ from flet import (
     SnackBar,
     Tabs,
     Tab,
+    TabBar,
     Icon,
     Icons,
     IconButton,
@@ -230,31 +231,28 @@ class FundGUIApp:
         commodity_page_content = self._build_commodity_page()
         news_page_content = self._build_news_page()
 
-        # 使用官方 Tabs 组件（包含 TabBar 和内容）
-        # Flet 0.80.5 要求 TabBar 必须在 Tabs 内使用
-        self._tabs = Tabs(
+        # 使用 TabBar 定义标签导航（Flet 0.80.5）
+        self._tab_bar = TabBar(
             tabs=[
-                Tab(
-                    label="自选",
-                    icon=Icons.STAR_BORDER,
-                    content=fund_page_content,
-                ),
-                Tab(
-                    label="商品",
-                    icon=Icons.TRENDING_UP,
-                    content=commodity_page_content,
-                ),
-                Tab(
-                    label="新闻",
-                    icon=Icons.NEWSPAPER,
-                    content=news_page_content,
-                ),
+                Tab(label="自选", icon=Icons.STAR_BORDER),
+                Tab(label="商品", icon=Icons.TRENDING_UP),
+                Tab(label="新闻", icon=Icons.NEWSPAPER),
             ],
-            on_change=self._on_tab_change,
+            on_click=self._on_tab_click,
             tab_alignment=ft.TabAlignment.START,
             label_color=AppColors.ACCENT_BLUE,
             unselected_label_color=AppColors.TEXT_SECONDARY,
             indicator_color=AppColors.ACCENT_BLUE,
+        )
+
+        # 使用 Tabs 管理内容切换
+        self._tab_contents = Tabs(
+            content=Column([
+                Container(content=fund_page_content, expand=True),
+                Container(content=commodity_page_content, expand=True),
+                Container(content=news_page_content, expand=True),
+            ]),
+            length=3,
         )
 
         # 底部状态栏
@@ -273,7 +271,8 @@ class FundGUIApp:
 
         # 一次性添加所有控件到页面
         self.page.add(top_bar)
-        self.page.add(self._tabs)
+        self.page.add(self._tab_bar)
+        self.page.add(self._tab_contents)
         self.page.add(self.status_bar)
 
         # 加载初始数据
@@ -1121,13 +1120,13 @@ class FundGUIApp:
                     row.selected = False
             self.page.update()
 
-    def _on_tab_change(self, e):
-        """处理标签页切换 (官方 Tabs on_change 事件)
+    def _on_tab_click(self, e):
+        """处理标签页切换 (官方 TabBar on_click 事件)
 
         Args:
             e: 事件对象，e.data 包含点击的 tab 索引（字符串格式）
         """
-        # Tabs 的 on_change 事件通过 e.data 传递选中的 tab 索引
+        # TabBar 的 on_click 事件通过 e.data 传递选中的 tab 索引
         self.current_tab = int(e.data)
 
         log_debug(f"切换到 tab {self.current_tab}")
