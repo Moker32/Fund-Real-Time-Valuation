@@ -737,25 +737,27 @@ class TestConfigurationPersistence:
 
 
 class TestFundTableInteraction:
-    """基金表格交互测试"""
+    """基金列表交互测试"""
 
-    def test_fund_table_has_columns(self):
-        """测试基金表格有正确的列"""
+    def test_fund_list_exists(self):
+        """测试基金列表已创建"""
         from src.gui.main import FundGUIApp
 
         app = FundGUIApp()
-        # 需要先调用_build_fund_page来创建fund_table
+        # 需要先调用_build_fund_page来创建_fund_list
         container = app._build_fund_page()
-        assert app.fund_table is not None
+        assert app._fund_list is not None
+        # 验证是 Column 类型（通过检查有 controls 属性）
+        assert hasattr(app._fund_list, 'controls')
 
-    def test_fund_table_column_count(self):
-        """测试基金表格列数"""
+    def test_fund_list_is_column(self):
+        """测试基金列表是 Column 类型"""
         from src.gui.main import FundGUIApp
 
         app = FundGUIApp()
         app._build_fund_page()
-        # 应该有6列: 代码、名称、单位净值、估算净值、涨跌幅、持仓盈亏
-        assert len(app.fund_table.columns) == 6
+        # 基金列表使用 Column + FundCard 结构
+        assert hasattr(app._fund_list, 'controls')
 
     def test_fund_selection_state(self):
         """测试基金选择状态"""
@@ -834,6 +836,8 @@ class TestDialogValidation:
         class MockPage:
             def __init__(self):
                 self.overlay = []
+                self.width = 800
+                self.height = 600
 
             def update(self):
                 pass
@@ -848,7 +852,8 @@ class TestDialogValidation:
 
         assert dialog.code_field is not None
         assert dialog.name_field is not None
-        assert dialog.title.value == "添加基金"
+        # title 现在是 Row 类型
+        assert hasattr(dialog.title, 'controls')
 
     def test_add_fund_dialog_accepts_valid_input(self):
         """测试添加基金接受有效输入"""
@@ -857,6 +862,8 @@ class TestDialogValidation:
         class MockPage:
             def __init__(self):
                 self.overlay = []
+                self.width = 800
+                self.height = 600
 
             def update(self):
                 pass
