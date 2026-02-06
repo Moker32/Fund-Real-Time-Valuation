@@ -2,6 +2,7 @@
 """GUI Components for Fund Real-Time Valuation"""
 
 from collections.abc import Callable
+from typing import Optional
 
 import flet as ft
 from flet import (
@@ -68,7 +69,7 @@ class MiniChart(Container):
     def __init__(
         self,
         data: list[float],
-        is_up: bool | None = None,
+        is_up: Optional[bool] = None,
         width: int = 80,
         height: int = 32,
     ):
@@ -106,7 +107,7 @@ class MiniChart(Container):
             vertical_alignment=CrossAxisAlignment.CENTER,
         )
 
-    def update_data(self, data: list[float], is_up: bool | None = None):
+    def update_data(self, data: list[float], is_up: Optional[bool] = None):
         """Update chart data"""
         self.chart_data = data or [0]
 
@@ -148,8 +149,8 @@ class FundCard(Card):
         cost: float = 0,
         sector: str = "",
         is_hold: bool = False,
-        chart_data: list[float] | None = None,
-        on_click: Callable | None = None,
+        chart_data: Optional[list[float]] = None,
+        on_click: Optional[Callable] = None,
     ):
         self.code = code
         self.name = name
@@ -436,7 +437,7 @@ class FundCard(Card):
         est_value: float,
         change_pct: float,
         profit: float,
-        chart_data: list[float] | None = None,
+        chart_data: Optional[list[float]] = None,
     ):
         """Update card data - replace content"""
         self.net_value = net_value
@@ -690,7 +691,7 @@ class QuickActionButton(Column):
 class SearchBar(Container):
     """Search bar component"""
 
-    def __init__(self, on_search: Callable[[str], None] | None = None, placeholder: str = "Search fund code/name"):
+    def __init__(self, on_search: Optional[Callable[[str], None]] = None, placeholder: str = "Search fund code/name"):
         self.on_search = on_search
 
         self.text_field = ft.TextField(

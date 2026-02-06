@@ -969,7 +969,7 @@ class FundGUIApp:
         dialog.open = True
         self.page.update()
 
-    def _show_detail(self, e, fund: FundDisplayData | None = None):
+    def _show_detail(self, e, fund: Optional[FundDisplayData] = None):
         """显示基金详情对话框"""
         # 如果传入了基金，直接使用；否则从选中代码获取
         if fund is None:
@@ -1101,7 +1101,7 @@ class FundGUIApp:
             # 取消选中
             self._selected_funds.discard(fund_code)
 
-    def _get_selected_fund_code(self) -> str | None:
+    def _get_selected_fund_code(self) -> Optional[str]:
         """获取当前选中的基金代码（单选）"""
         # 优先使用复选框选中的基金
         if self._selected_funds:

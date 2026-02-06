@@ -5,7 +5,7 @@
 """
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import flet as ft
 from flet import (

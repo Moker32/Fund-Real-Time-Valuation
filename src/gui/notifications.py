@@ -6,7 +6,7 @@
 
 from collections.abc import Callable
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import flet as ft
 from flet import (
@@ -198,7 +198,7 @@ class AddAlertDialog(AlertDialog):
         fund_code: str,
         fund_name: str,
         current_price: float,
-        on_save: Callable | None = None,
+        on_save: Optional[Callable] = None,
     ):
         super().__init__()
         self.app = app

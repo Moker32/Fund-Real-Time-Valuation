@@ -70,8 +70,8 @@ class ErrorRecord:
     message: str
     severity: ErrorSeverity
     timestamp: datetime = field(default_factory=datetime.now)
-    details: str | None = None
-    exception_type: str | None = None
+    details: Optional[str] = None
+    exception_type: Optional[str] = None
 
 
 class ErrorHandler:
@@ -108,8 +108,8 @@ class ErrorHandler:
         self,
         message: str,
         severity: ErrorSeverity = ErrorSeverity.ERROR,
-        details: str | None = None,
-        exception: Exception | None = None,
+        details: Optional[str] = None,
+        exception: Optional[Exception] = None,
     ) -> ErrorRecord:
         """记录一个错误
 
@@ -144,7 +144,7 @@ class ErrorHandler:
 
         return record
 
-    def record_warning(self, message: str, details: str | None = None) -> ErrorRecord:
+    def record_warning(self, message: str, details: Optional[str] = None) -> ErrorRecord:
         """记录一个警告
 
         Args:
@@ -247,9 +247,9 @@ def show_error_dialog(
     page: ft.Page,
     message: str,
     severity: ErrorSeverity = ErrorSeverity.ERROR,
-    title: str | None = None,
-    details: str | None = None,
-    on_dismiss: Callable | None = None,
+    title: Optional[str] = None,
+    details: Optional[str] = None,
+    on_dismiss: Optional[Callable] = None,
 ) -> AlertDialog:
     """显示错误对话框
 
@@ -364,7 +364,7 @@ def show_error_dialog(
 def _close_dialog(
     dialog: AlertDialog,
     page: ft.Page,
-    on_dismiss: Callable | None = None,
+    on_dismiss: Optional[Callable] = None,
 ):
     """关闭对话框"""
     dialog.open = False
@@ -381,7 +381,7 @@ def _close_dialog(
 def show_network_error(
     page: ft.Page,
     operation: str = "网络请求",
-    error_message: str | None = None,
+    error_message: Optional[str] = None,
 ) -> AlertDialog:
     """显示网络错误对话框
 
@@ -406,7 +406,7 @@ def show_network_error(
 def show_data_error(
     page: ft.Page,
     data_type: str = "数据",
-    error_message: str | None = None,
+    error_message: Optional[str] = None,
 ) -> AlertDialog:
     """显示数据错误对话框
 

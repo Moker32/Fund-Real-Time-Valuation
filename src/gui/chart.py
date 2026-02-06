@@ -5,6 +5,7 @@
 """
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 import flet as ft
 import matplotlib
@@ -68,7 +69,7 @@ class FundHistoryData:
             return self.close_values[-1]
         return 0.0
 
-    def calculate_ma(self, period: int) -> list[float | None]:
+    def calculate_ma(self, period: int) -> list[Optional[float]]:
         """计算移动平均线"""
         if len(self.close_values) < period:
             return [None] * len(self.close_values)
@@ -216,7 +217,7 @@ class FundChartDialog(AlertDialog):
         app,
         fund_code: str,
         fund_name: str,
-        history_data: FundHistoryData | None = None,
+        history_data: Optional[FundHistoryData] = None,
     ):
         super().__init__()
         self.app = app
@@ -225,7 +226,7 @@ class FundChartDialog(AlertDialog):
         self.history_data = history_data
 
         # 控件
-        self.chart_image: ft.Image | None = None
+        self.chart_image: Optional[ft.Image] = None
         self.period_dropdown = Dropdown(
             label="时间周期",
             width=120,
@@ -354,7 +355,7 @@ class FundChartCard(Container):
         super().__init__()
         self.fund_code = fund_code
         self.fund_name = fund_name
-        self.history_data: FundHistoryData | None = None
+        self.history_data: Optional[FundHistoryData] = None
 
         self.content = Column(
             [

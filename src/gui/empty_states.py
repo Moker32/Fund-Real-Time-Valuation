@@ -49,9 +49,9 @@ EMPTY_STATES_CONFIG: dict[str, dict[str, Any]] = {
 
 
 def empty_funds_state(
-    message: str | None = None,
-    hint: str | None = None,
-    on_add: Callable[[Any], None] | None = None,
+    message: Optional[str] = None,
+    hint: Optional[str] = None,
+    on_add: Optional[Callable[[Any], None]] = None,
 ) -> Container:
     """创建空基金状态组件
 
@@ -75,9 +75,9 @@ def empty_funds_state(
 
 
 def empty_commodities_state(
-    message: str | None = None,
-    hint: str | None = None,
-    on_refresh: Callable[[Any], None] | None = None,
+    message: Optional[str] = None,
+    hint: Optional[str] = None,
+    on_refresh: Optional[Callable[[Any], None]] = None,
 ) -> Container:
     """创建空商品状态组件
 
@@ -101,9 +101,9 @@ def empty_commodities_state(
 
 
 def empty_news_state(
-    message: str | None = None,
-    hint: str | None = None,
-    on_refresh: Callable[[Any], None] | None = None,
+    message: Optional[str] = None,
+    hint: Optional[str] = None,
+    on_refresh: Optional[Callable[[Any], None]] = None,
 ) -> Container:
     """创建空新闻状态组件
 
@@ -163,7 +163,7 @@ def create_empty_state(
     )
 
     # 辅助说明
-    hint_text: Text | None = None
+    hint_text: Optional[Text] = None
     if hint:
         hint_text = Text(
             hint,
@@ -172,7 +172,7 @@ def create_empty_state(
         )
 
     # 按钮
-    button: ElevatedButton | None = None
+    button: Optional[ElevatedButton] = None
     if button_text and on_button_click:
         button = ElevatedButton(
             button_text,
