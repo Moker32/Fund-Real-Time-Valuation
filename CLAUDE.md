@@ -13,6 +13,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 python run_gui.py
 ./run_gui.py
 
+# 运行 FastAPI 服务 (Web API)
+python run_api.py --host 0.0.0.0 --port 8000
+python run_api.py --reload  # 开发模式热重载
+
 # 安装依赖
 uv pip install -r requirements.txt
 
@@ -24,6 +28,7 @@ uv run python -m pytest tests/ -v --tb=short # 简洁错误输出
 ## 技术栈
 
 - **UI 框架**: Flet 0.80.5
+- **Web 框架**: FastAPI 0.104.0
 - **HTTP 客户端**: httpx
 - **金融数据**: akshare, yfinance
 - **配置格式**: YAML
@@ -33,6 +38,14 @@ uv run python -m pytest tests/ -v --tb=short # 简洁错误输出
 
 ```
 run_gui.py          # GUI 应用入口
+run_api.py          # FastAPI 服务入口
+api/
+├── main.py         # FastAPI 应用入口
+├── dependencies.py # 依赖注入
+├── models.py       # Pydantic 数据模型
+└── routes/
+    ├── funds.py       # 基金 API 路由
+    └── commodities.py # 商品 API 路由
 src/
 ├── gui/              # Flet GUI 界面层
 │   ├── main.py       # 主应用 (FundGUIApp)
@@ -124,6 +137,34 @@ tabs = Tabs(
 - 故障切换 (failover)
 - 负载均衡 (可选)
 - 健康检查与统计
+
+### FastAPI 后端 (api/)
+
+#### API 端点
+
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/funds` | GET | 获取基金列表 |
+| `/api/funds/{code}` | GET | 获取基金详情 |
+| `/api/funds/{code}/estimate` | GET | 获取基金估值 |
+| `/api/funds/{code}/history` | GET | 获取基金历史净值 |
+| `/api/commodities` | GET | 获取商品行情列表 |
+| `/api/commodities/{type}` | GET | 获取单个商品行情 |
+| `/api/commodities/gold/cny` | GET | 获取国内黄金行情 |
+| `/api/commodities/gold/international` | GET | 获取国际黄金行情 |
+| `/api/commodities/oil/wti` | GET | 获取 WTI 原油行情 |
+| `/api/health` | GET | 健康检查 (详细) |
+| `/api/health/simple` | GET | 健康检查 (简单) |
+
+#### Pydantic 模型 (api/models.py)
+
+- `FundResponse` - 基金响应
+- `FundDetailResponse` - 基金详情响应
+- `FundEstimateResponse` - 基金估值响应
+- `CommodityResponse` - 商品响应
+- `HealthResponse` - 健康检查响应
+- `HealthDetailResponse` - 详细健康检查响应
+- `ErrorResponse` - 错误响应
 
 ### 数据模型 (config/models.py)
 
