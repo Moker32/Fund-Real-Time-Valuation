@@ -1,0 +1,100 @@
+@use 'variables' as *;
+
+// 重置样式
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background-color: $bg-primary;
+  color: $text-primary;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+// 链接样式
+a {
+  color: $btn-primary;
+  text-decoration: none;
+  transition: color $transition-fast;
+
+  &:hover {
+    color: $btn-hover;
+  }
+}
+
+// 按钮样式
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+// 输入框样式
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+// 滚动条样式
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: $bg-secondary;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $bg-tertiary;
+  border-radius: $radius-sm;
+
+  &:hover {
+    background: $text-secondary;
+  }
+}
+
+// 工具类
+.text-up {
+  color: $color-up;
+}
+
+.text-down {
+  color: $color-down;
+}
+
+.text-secondary {
+  color: $text-secondary;
+}
+
+.bg-primary {
+  background-color: $bg-primary;
+}
+
+.bg-secondary {
+  background-color: $bg-secondary;
+}

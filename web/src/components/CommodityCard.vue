@@ -1,0 +1,300 @@
+<template>
+  <div class="commodity-card" :class="{ loading: loading }">
+    <template v-if="loading">
+      <div class="skeleton-content">
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton skeleton-price"></div>
+        <div class="skeleton skeleton-change"></div>
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="card-header">
+        <div class="commodity-info">
+          <span class="commodity-symbol">{{ commodity.symbol }}</span>
+          <span class="commodity-name">{{ commodity.name }}</span>
+        </div>
+        <span class="commodity-source">{{ commodity.source || 'API' }}</span>
+      </div>
+
+      <div class="card-body">
+        <div class="price-section">
+          <span class="price font-mono">{{ formatPrice(commodity.price) }}</span>
+          <span class="currency">{{ commodity.currency }}</span>
+        </div>
+
+        <div class="change-section" :class="changeClass">
+          <span class="change-indicator">
+            <svg v-if="commodity.changePercent > 0" viewBox="0 0 24 24" fill="none">
+              <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <svg v-else-if="commodity.changePercent < 0" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5V19M19 12L12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span v-else>—</span>
+          </span>
+          <span class="change-value font-mono">{{ formatChange(commodity.change) }}</span>
+          <span class="change-percent font-mono">{{ formatPercent(commodity.changePercent) }}</span>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="price-range">
+          <span class="range-item">
+            <span class="label">高</span>
+            <span class="value font-mono">{{ formatPrice(commodity.high) }}</span>
+          </span>
+          <span class="range-item">
+            <span class="label">低</span>
+            <span class="value font-mono">{{ formatPrice(commodity.low) }}</span>
+          </span>
+        </div>
+        <span class="timestamp">{{ formatTime(commodity.timestamp) }}</span>
+      </div>
+    </template>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import type { Commodity } from '@/types';
+
+interface Props {
+  commodity: Commodity;
+  loading?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+});
+
+const changeClass = computed(() => {
+  if (props.commodity.changePercent > 0) return 'rising';
+  if (props.commodity.changePercent < 0) return 'falling';
+  return 'neutral';
+});
+
+function formatPrice(value: number): string {
+  if (value == null) return '--';
+  if (value >= 1000) {
+    return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  return value.toFixed(2);
+}
+
+function formatChange(value: number): string {
+  if (value == null) return '--';
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}${value.toFixed(2)}`;
+}
+
+function formatPercent(value: number): string {
+  if (value == null) return '--';
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}${value.toFixed(2)}%`;
+}
+
+function formatTime(dateStr: string): string {
+  if (!dateStr) return '--';
+  try {
+    const date = new Date(dateStr);
+    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+  } catch {
+    return '--';
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+.commodity-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  transition: all var(--transition-normal);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-light);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  &.loading {
+    cursor: default;
+    pointer-events: none;
+  }
+}
+
+.skeleton-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.skeleton {
+  height: 16px;
+  border-radius: var(--radius-sm);
+
+  &.skeleton-title {
+    width: 50%;
+    height: 18px;
+  }
+
+  &.skeleton-price {
+    width: 70%;
+    height: 24px;
+  }
+
+  &.skeleton-change {
+    width: 30%;
+  }
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.commodity-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.commodity-symbol {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-weight: var(--font-weight-medium);
+}
+
+.commodity-name {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.commodity-source {
+  font-size: var(--font-size-xs);
+  padding: 2px 8px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+}
+
+.card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: var(--spacing-md);
+}
+
+.price-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.price {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.currency {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.change-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+
+  &.rising {
+    background: var(--color-rise-bg);
+    color: var(--color-rise);
+
+    .change-indicator svg {
+      color: var(--color-rise);
+    }
+  }
+
+  &.falling {
+    background: var(--color-fall-bg);
+    color: var(--color-fall);
+
+    .change-indicator svg {
+      color: var(--color-fall);
+    }
+  }
+
+  &.neutral {
+    color: var(--color-neutral);
+  }
+}
+
+.change-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.change-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.change-percent {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-divider);
+}
+
+.price-range {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.range-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.value {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.timestamp {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+</style>

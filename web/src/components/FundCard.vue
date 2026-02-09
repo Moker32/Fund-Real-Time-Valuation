@@ -1,0 +1,278 @@
+<template>
+  <div class="fund-card" :class="{ loading: loading }">
+    <template v-if="loading">
+      <div class="skeleton-content">
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton skeleton-value"></div>
+        <div class="skeleton skeleton-change"></div>
+      </div>
+    </template>
+
+    <template v-else>
+      <div class="card-header">
+        <div class="fund-info">
+          <span class="fund-code">{{ fund.code }}</span>
+          <span class="fund-name">{{ fund.name }}</span>
+        </div>
+        <span class="fund-type">{{ fund.type || '混合型' }}</span>
+      </div>
+
+      <div class="card-body">
+        <div class="value-section">
+          <div class="value-row">
+            <span class="label">净值</span>
+            <span class="value font-mono">{{ formatNumber(fund.netValue, 4) }}</span>
+          </div>
+          <div class="value-row">
+            <span class="label">估值</span>
+            <span class="value font-mono">{{ formatNumber(fund.estimateValue, 4) }}</span>
+          </div>
+        </div>
+
+        <div class="change-section" :class="changeClass">
+          <span class="change-indicator">
+            <svg v-if="fund.estimateChangePercent > 0" viewBox="0 0 24 24" fill="none">
+              <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <svg v-else-if="fund.estimateChangePercent < 0" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5V19M19 12L12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span v-else>—</span>
+          </span>
+          <span class="change-value font-mono">{{ formatChange(fund.estimateChange) }}</span>
+          <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <span class="update-time">{{ formatTime(fund.netValueDate) }}</span>
+        <span class="source" v-if="fund.source">{{ fund.source }}</span>
+      </div>
+    </template>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import type { Fund } from '@/types';
+
+interface Props {
+  fund: Fund;
+  loading?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+});
+
+const changeClass = computed(() => {
+  if (props.fund.estimateChangePercent > 0) return 'rising';
+  if (props.fund.estimateChangePercent < 0) return 'falling';
+  return 'neutral';
+});
+
+function formatNumber(value: number, decimals: number = 2): string {
+  if (value == null) return '--';
+  return value.toFixed(decimals);
+}
+
+function formatChange(value: number): string {
+  if (value == null) return '--';
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}${value.toFixed(4)}`;
+}
+
+function formatPercent(value: number): string {
+  if (value == null) return '--';
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}${value.toFixed(2)}%`;
+}
+
+function formatTime(dateStr: string): string {
+  if (!dateStr) return '--';
+  try {
+    const date = new Date(dateStr);
+    return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+  } catch {
+    return dateStr;
+  }
+}
+</script>
+
+<style lang="scss" scoped>
+.fund-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  transition: all var(--transition-normal);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-light);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  &.loading {
+    cursor: default;
+    pointer-events: none;
+  }
+}
+
+.skeleton-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.skeleton {
+  height: 16px;
+  border-radius: var(--radius-sm);
+
+  &.skeleton-title {
+    width: 60%;
+    height: 18px;
+  }
+
+  &.skeleton-value {
+    width: 80%;
+  }
+
+  &.skeleton-change {
+    width: 40%;
+  }
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.fund-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fund-code {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.fund-name {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  line-height: 1.3;
+}
+
+.fund-type {
+  font-size: var(--font-size-xs);
+  padding: 2px 8px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+}
+
+.card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: var(--spacing-md);
+}
+
+.value-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.value-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.change-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+
+  &.rising {
+    background: var(--color-rise-bg);
+    color: var(--color-rise);
+
+    .change-indicator svg {
+      color: var(--color-rise);
+    }
+  }
+
+  &.falling {
+    background: var(--color-fall-bg);
+    color: var(--color-fall);
+
+    .change-indicator svg {
+      color: var(--color-fall);
+    }
+  }
+
+  &.neutral {
+    color: var(--color-neutral);
+  }
+}
+
+.change-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.change-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.change-percent {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-divider);
+}
+
+.update-time,
+.source {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+</style>
