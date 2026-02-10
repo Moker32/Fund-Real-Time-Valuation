@@ -4,21 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-基金实时估值 GUI 应用，基于 Python + Flet 框架，提供基金估值监控、自选管理、大宗商品行情和财经新闻功能。
+基金实时估值 Web 应用，基于 Vue 3 + FastAPI，提供基金估值监控、自选管理、大宗商品行情和财经新闻功能。
 
 ## 常用命令
 
 ```bash
-# 运行 GUI 应用
-python run_gui.py
-./run_gui.py
+# 安装所有依赖 (前后端)
+pnpm run install:all
 
-# 运行 FastAPI 服务 (Web API)
-python run_api.py --host 0.0.0.0 --port 8000
-python run_api.py --reload  # 开发模式热重载
+# 并行启动前后端开发服务器
+pnpm run dev
 
-# 安装依赖
-uv pip install -r requirements.txt
+# 单独启动
+pnpm run dev:web    # 前端 (Vite + Vue 3)
+uv run python run_api.py --reload  # 后端 (FastAPI)
+
+# 构建
+pnpm run build:web  # 构建前端
 
 # 运行测试
 uv run python -m pytest tests/ -v           # 运行所有测试
@@ -27,7 +29,7 @@ uv run python -m pytest tests/ -v --tb=short # 简洁错误输出
 
 ## 技术栈
 
-- **UI 框架**: Flet 0.80.5
+- **前端框架**: Vue 3 + Vite + TypeScript
 - **Web 框架**: FastAPI 0.104.0
 - **HTTP 客户端**: httpx
 - **金融数据**: akshare, yfinance
@@ -37,8 +39,11 @@ uv run python -m pytest tests/ -v --tb=short # 简洁错误输出
 ## 架构概览
 
 ```
-run_gui.py          # GUI 应用入口
-run_api.py          # FastAPI 服务入口
+run_api.py          # Web 应用入口
+web/                # Vue 3 前端
+├── src/            # 前端源码
+├── dist/           # 构建产物
+└── package.json    # 前端依赖
 api/
 ├── main.py         # FastAPI 应用入口
 ├── dependencies.py # 依赖注入
@@ -47,16 +52,6 @@ api/
     ├── funds.py       # 基金 API 路由
     └── commodities.py # 商品 API 路由
 src/
-├── gui/              # Flet GUI 界面层
-│   ├── main.py       # 主应用 (FundGUIApp)
-│   ├── components.py # 基金卡片、组合卡片等组件
-│   ├── notifications.py # 通知系统
-│   ├── settings.py   # 设置对话框
-│   ├── error_handling.py # 错误处理
-│   ├── empty_states.py # 空状态组件
-│   ├── detail.py     # 基金详情对话框
-│   ├── theme.py      # 主题和颜色
-│   └── AGENTS.md     # GUI 开发指南
 ├── datasources/      # 数据源层
 │   ├── manager.py    # DataSourceManager (多数据源管理)
 │   ├── cache.py      # 数据缓存层
@@ -74,12 +69,8 @@ src/
 │   ├── manager.py    # ConfigManager
 │   └── models.py     # 数据模型 (Fund, Holding, Commodity, PriceAlert 等)
 └── utils/            # 工具层
+    ├── colors.py     # 颜色和格式化工具
     └── export.py     # 数据导出
-```
-
-### GUI 数据流
-
-`配置 (YAML)` → `ConfigManager` → `DataSourceManager` → `FundGUIApp` → `FundCard` 组件
 
 ### 配置存储
 
@@ -87,56 +78,6 @@ src/
 - `config.yaml` - 应用主配置
 - `funds.yaml` - 基金自选/持仓
 - `commodities.yaml` - 商品关注列表
-
-## Flet 0.80.5 适配说明
-
-### Tabs 组件
-
-Flet 0.80.5 使用 `TabBar` + `Tabs` 组合：
-
-```python
-from flet import TabBar, Tab, Tabs
-
-# TabBar 负责标签
-tab_bar = TabBar(
-    tabs=[
-        Tab(label="自选", icon=Icons.STAR_BORDER),
-        Tab(label="商品", icon=Icons.TRENDING_UP),
-        Tab(label="新闻", icon=Icons.NEWSPAPER),
-    ],
-    on_click=self._on_tab_click,
-)
-
-# Tabs 负责内容
-tabs = Tabs(
-    content=Column([
-        Container(expand=True, content=page1, visible=True),
-        Container(expand=True, content=page2, visible=False),
-        Container(expand=True, content=page3, visible=False),
-    ]),
-    length=3,
-)
-```
-
-### 颜色属性
-
-| 组件 | 参数 | 示例 |
-|------|------|------|
-| Container | `bgcolor` | `Container(bgcolor="#3C3C3C")` |
-| Text | `color` | `Text("Hello", color="#FFFFFF")` |
-| Icon | `color` | `Icon(Icons.STAR, color="#FF3B30")` |
-| IconButton | `icon_color` | `IconButton(icon_color="#007AFF")` |
-| Card | `bgcolor` | `Card(bgcolor="#3C3C3C")` |
-
-### 关键设计
-
-### 数据源管理 (datasources/manager.py)
-
-`DataSourceManager` 负责：
-- 多数据源注册/注销
-- 故障切换 (failover)
-- 负载均衡 (可选)
-- 健康检查与统计
 
 ### FastAPI 后端 (api/)
 

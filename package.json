@@ -1,0 +1,26 @@
+{
+  "name": "fund-real-time-valuation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "基金实时估值应用 - 前后端统一开发入口",
+  "scripts": {
+    "dev:web": "cd web && pnpm run dev",
+    "dev:api": "uv run python run_api.py --reload",
+    "dev": "concurrently \"pnpm run dev:web\" \"uv run python run_api.py --reload\"",
+    "install:all": "pnpm install && uv pip install -r requirements.txt",
+    "install:web": "cd web && pnpm install",
+    "build:web": "cd web && pnpm run build",
+    "test": "uv run pytest tests/ -v",
+    "test:web": "cd web && pnpm run test",
+    "lint": "uv run ruff check .",
+    "lint:fix": "uv run ruff check --fix ."
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0",
+    "python": ">=3.10"
+  }
+}

@@ -29,3 +29,14 @@ ENV/
 
 # Git worktrees
 .worktrees/
+
+# Node.js / pnpm
+node_modules/
+pnpm-debug.log*
+.pnpm-debug.log*
+.pnp
+.pnp.js
+pnpm-lock.yaml
+
+# Frontend build
+web/dist/

@@ -1,55 +1,92 @@
-#!/usr/bin/env python
-"""
-FastAPI 服务启动脚本
+#!/usr/bin/env -S uv run python
+"""Fund Real-Time Valuation Web Application
+
+基金实时估值 Web 应用入口。
+
+用法：
+    python run_api.py              # 启动 API 服务
+    python run_api.py --frontend   # 启动 API + 前端 (需 pnpm)
+    python run_api.py --open       # 启动后自动打开浏览器
+    python run_api.py --port 8080  # 指定端口
 """
 
 import argparse
-import uvicorn
+import subprocess
+import sys
+import webbrowser
+from pathlib import Path
 
 
 def main():
-    """主函数"""
-    parser = argparse.ArgumentParser(description="基金实时估值 API 服务")
-    parser.add_argument(
-        "--host",
-        type=str,
-        default="0.0.0.0",
-        help="绑定地址 (默认: 0.0.0.0)",
+    parser = argparse.ArgumentParser(
+        description="基金实时估值 Web 应用"
     )
     parser.add_argument(
-        "--port",
+        "--frontend", "-f",
+        action="store_true",
+        help="同时启动前端开发服务器 (需要 pnpm)"
+    )
+    parser.add_argument(
+        "--port", "-p",
         type=int,
         default=8000,
-        help="端口号 (默认: 8000)",
+        help="API 服务端口 (默认: 8000)"
+    )
+    parser.add_argument(
+        "--open", "-o",
+        action="store_true",
+        help="启动后自动打开浏览器"
+    )
+    parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="绑定地址 (默认: 0.0.0.0)"
     )
     parser.add_argument(
         "--reload",
         action="store_true",
-        help="启用热重载 (开发模式)",
-    )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=1,
-        help="工作进程数 (默认: 1)",
-    )
-    parser.add_argument(
-        "--log-level",
-        type=str,
-        default="info",
-        choices=["debug", "info", "warning", "error"],
-        help="日志级别 (默认: info)",
+        help="启用热重载 (开发模式)"
     )
 
     args = parser.parse_args()
+
+    # 打印启动信息
+    print(f"""
+========================================
+  基金实时估值 Web API 服务
+========================================
+
+API 文档: http://localhost:{args.port}/docs
+健康检查: http://localhost:{args.port}/api/health
+
+按 Ctrl+C 停止服务
+""")
+
+    # 如果需要打开浏览器
+    if args.open:
+        webbrowser.open(f"http://localhost:{args.port}")
+
+    # 如果需要启动前端
+    if args.frontend:
+        web_dir = Path(__file__).parent / "web"
+        print(f"启动前端开发服务器...")
+        frontend_process = subprocess.Popen(
+            ["pnpm", "run", "dev", "--port", "5173"],
+            cwd=web_dir
+        )
+        print(f"前端开发服务器已启动: http://localhost:5173")
+        print(f"按 Ctrl+C 停止前端服务器")
+
+    # 启动 API 服务
+    from api.main import app
+    import uvicorn
 
     uvicorn.run(
         "api.main:app",
         host=args.host,
         port=args.port,
         reload=args.reload,
-        workers=args.workers if not args.reload else 1,
-        log_level=args.log_level,
+        log_level="info",
     )
 
 
