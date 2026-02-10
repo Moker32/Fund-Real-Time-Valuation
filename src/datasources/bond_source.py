@@ -235,6 +235,28 @@ class SinaBondDataSource(DataSource):
         except Exception:
             pass
 
+    async def health_check(self) -> bool:
+        """
+        健康检查 - 新浪债券接口
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            # 使用示例债券代码进行健康检查
+            bond_code = "113052"  # 兴业转债
+            market = "sh" if bond_code.startswith("1") else "sz"
+            url = f"https://hq.sinajs.cn/list={market}{bond_code}"
+            response = await self.client.get(url, timeout=self.timeout)
+            response.raise_for_status()
+
+            # 验证返回数据格式
+            if response.text and "hq_str_" in response.text:
+                return True
+            return False
+        except Exception:
+            return False
+
 
 class AKShareBondSource(DataSource):
     """AKShare 可转债数据源"""

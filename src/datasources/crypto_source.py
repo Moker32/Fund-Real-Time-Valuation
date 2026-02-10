@@ -146,6 +146,21 @@ class BinanceCryptoSource(DataSource):
         status["common_symbols"] = self.common_symbols
         return status
 
+    async def health_check(self) -> bool:
+        """
+        健康检查 - Binance API
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            url = "https://api.binance.com/api/v3/ping"
+            response = await self.client.get(url, timeout=self.timeout)
+            response.raise_for_status()
+            return response.status_code == 200
+        except Exception:
+            return False
+
 
 class CoinGeckoCryptoSource(DataSource):
     """CoinGecko API 加密货币数据源"""
@@ -350,6 +365,22 @@ class CoinGeckoCryptoSource(DataSource):
         status["cache_timeout"] = self._cache_timeout
         status["supported_coins"] = list(self.COIN_IDS.keys())
         return status
+
+    async def health_check(self) -> bool:
+        """
+        健康检查 - CoinGecko API
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            url = "https://api.coingecko.com/api/v3/ping"
+            response = await self.client.get(url, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
+            return data.get("gecko_says", "") == "To the Moon!"
+        except Exception:
+            return False
 
 
 class CryptoAggregator(DataSource):

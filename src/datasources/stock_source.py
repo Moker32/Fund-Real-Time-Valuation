@@ -250,6 +250,28 @@ class SinaStockDataSource(DataSource):
         status["supported_markets"] = ["sh", "sz"]
         return status
 
+    async def health_check(self) -> bool:
+        """
+        健康检查 - 新浪股票接口
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            # 使用示例股票代码进行健康检查
+            stock_code = "600000"  # 浦发银行
+            market = self._get_market(stock_code)
+            url = f"https://hq.sinajs.cn/list={market}{stock_code}"
+            response = await self.client.get(url, timeout=self.timeout)
+            response.raise_for_status()
+
+            # 验证返回数据格式
+            if response.text and "hq_str_" in response.text:
+                return True
+            return False
+        except Exception:
+            return False
+
 
 class YahooStockSource(DataSource):
     """Yahoo Finance 股票数据源
@@ -501,6 +523,30 @@ class YahooStockSource(DataSource):
         status["cache_timeout"] = self._cache_timeout
         status["supported_markets"] = ["cn (A)", "hk (港)", "us (美)"]
         return status
+
+    async def health_check(self) -> bool:
+        """
+        健康检查 - Yahoo Finance 接口
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            import yfinance as yf
+
+            # 使用示例股票代码进行健康检查
+            ticker_symbol = "AAPL"  # Apple 美股
+            ticker = yf.Ticker(ticker_symbol)
+
+            # 尝试获取快取数据
+            info = ticker.info
+
+            # 验证返回数据
+            if info and "symbol" in info:
+                return True
+            return False
+        except Exception:
+            return False
 
 
 class StockDataAggregator(DataSource):

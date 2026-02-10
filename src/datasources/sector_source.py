@@ -366,6 +366,27 @@ class SinaSectorDataSource(DataSource):
         """获取板块配置"""
         return self.SECTOR_CONFIG
 
+    async def health_check(self) -> bool:
+        """
+        健康检查 - 新浪板块接口
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            # 使用示例板块代码进行健康检查
+            sector_code = "bk04151"  # 白酒
+            url = f"https://quote.sina.com.cn/api/json.php/var%20_{sector_code}=CN_BK.getListDetail?symbol={sector_code}"
+            response = await self.client.get(url, timeout=self.timeout)
+            response.raise_for_status()
+
+            # 验证返回数据格式
+            if response.text and "var" in response.text:
+                return True
+            return False
+        except Exception:
+            return False
+
 
 class SectorDataAggregator(DataSource):
     """板块数据聚合器"""
@@ -672,6 +693,30 @@ class EastMoneySectorSource(DataSource):
         status["cache_timeout"] = self._cache_timeout
         status["supported_types"] = ["industry", "concept"]
         return status
+
+    async def health_check(self) -> bool:
+        """
+        健康检查 - 东方财富板块接口
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            import akshare as ak
+            loop = asyncio.get_event_loop()
+
+            # 尝试获取行业板块数据
+            df = await loop.run_in_executor(
+                None,
+                lambda: ak.stock_board_industry_name_em()
+            )
+
+            # 验证返回数据
+            if df is not None and not df.empty:
+                return True
+            return False
+        except Exception:
+            return False
 
 
 class EastMoneyIndustryDetailSource(DataSource):
