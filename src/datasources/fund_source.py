@@ -132,18 +132,35 @@ class FundDataSource(DataSource):
                             source=self.name,
                             metadata={"fund_code": fund_code}
                         )
-                    # QDII/FOF 基金判断（以 00、4、47 开头）
-                    if fund_code.startswith("00") or fund_code.startswith("4") or fund_code.startswith("47"):
+
+                # 检查是否是空响应
+                if response.text.strip() in ("jsonpgz();", "jsonpgz()"):
+                    # 天天基金不支持的基金，尝试使用东方财富开放式基金接口
+                    # QDII/FOF 基金（如 006476）可能在这里获取到
+                    result = await self._fetch_lof(fund_code)
+                    if result.success:
+                        return result
+
+                    # 东方财富接口也失败，返回友好错误
+                    if fund_code.startswith("5") or fund_code.startswith("15"):
                         return DataSourceResult(
                             success=False,
-                            error=f"{fund_code} 是 QDII/FOF 基金，天天基金接口暂不支持，可尝试证券账户在场内交易",
+                            error=f"{fund_code} 是 ETF 基金，请使用场内基金交易接口",
+                            timestamp=time.time(),
+                            source=self.name,
+                            metadata={"fund_code": fund_code}
+                        )
+                    if fund_code.startswith("16"):
+                        return DataSourceResult(
+                            success=False,
+                            error=f"{fund_code} 是 LOF 基金，请使用场内基金交易接口",
                             timestamp=time.time(),
                             source=self.name,
                             metadata={"fund_code": fund_code}
                         )
                     return DataSourceResult(
                         success=False,
-                        error=f"基金不存在: {fund_code}",
+                        error=f"基金 {fund_code} 数据获取失败: {result.error}",
                         timestamp=time.time(),
                         source=self.name,
                         metadata={"fund_code": fund_code}
@@ -289,63 +306,71 @@ class FundDataSource(DataSource):
 
     async def _fetch_lof(self, fund_code: str) -> DataSourceResult:
         """
-        获取 LOF/QDII 基金数据 - 使用东方财富接口
+        获取 LOF/QDII/FOF 基金数据 - 使用东方财富开放式基金接口
+
+        支持: LOF、QDII、FOF 等所有在天天基金网显示的开放式基金
 
         Args:
-            fund_code: LOF 基金代码
+            fund_code: 基金代码
 
         Returns:
-            DataSourceResult: LOF 基金数据结果
+            DataSourceResult: 基金数据结果
         """
         try:
             import asyncio
             loop = asyncio.get_event_loop()
             import akshare as ak
 
-            # 获取所有 LOF 实时数据
+            # 获取基金最新净值数据
             df = await loop.run_in_executor(
                 None,
-                lambda: ak.fund_lof_spot_em()
+                lambda: ak.fund_open_fund_info_em(
+                    symbol=fund_code,
+                    indicator="单位净值走势",
+                    period="近一年"
+                )
             )
 
             if df is None or df.empty:
                 return DataSourceResult(
                     success=False,
-                    error=f"LOF {fund_code} 无实时数据",
+                    error=f"基金 {fund_code} 无净值数据",
                     timestamp=time.time(),
                     source=self.name,
                     metadata={"fund_code": fund_code}
                 )
 
-            # 筛选指定基金
-            # 尝试多个可能的列名
-            fund_row = None
-            if "基金代码" in df.columns:
-                fund_row = df[df["基金代码"] == fund_code]
-            elif "code" in df.columns:
-                fund_row = df[df["code"] == fund_code]
+            # 获取最新一条数据（最后一行是最新的，因为数据是按日期升序排列的）
+            latest = df.iloc[-1]
 
-            if fund_row is None or fund_row.empty:
-                return DataSourceResult(
-                    success=False,
-                    error=f"未找到 LOF 基金: {fund_code}",
-                    timestamp=time.time(),
-                    source=self.name,
-                    metadata={"fund_code": fund_code}
-                )
+            # 获取基金简称
+            fund_name = ""
+            try:
+                daily_df = ak.fund_open_fund_daily_em()
+                if "基金代码" in daily_df.columns:
+                    name_row = daily_df[daily_df["基金代码"] == fund_code]
+                    if not name_row.empty:
+                        fund_name = str(name_row.iloc[0].get("基金简称", ""))
+            except Exception:
+                pass
 
-            # 获取最新一条数据
-            latest = fund_row.iloc[0]
+            # 如果没获取到名称，使用基金代码作为名称
+            if not fund_name:
+                fund_name = f"基金 {fund_code}"
 
-            # 提取数据 - LOF 接口字段
+            # 提取数据
+            net_date = str(latest.get("净值日期", ""))
+            unit_net = float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None
+            daily_change = float(latest.get("日增长率", 0)) if pd.notna(latest.get("日增长率")) else None
+
             data = {
-                "fund_code": str(latest.get("基金代码", fund_code)),
-                "name": str(latest.get("基金名称", f"LOF {fund_code}")),
-                "net_value_date": str(latest.get("净值日期", "")),
-                "unit_net_value": float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None,
-                "estimated_net_value": float(latest.get("估算净值", 0)) if pd.notna(latest.get("估算净值")) else None,
-                "estimated_growth_rate": float(latest.get("日增长率", 0)) if pd.notna(latest.get("日增长率")) else None,
-                "estimate_time": str(latest.get("净值日期", "")),
+                "fund_code": fund_code,
+                "name": fund_name,
+                "net_value_date": net_date,
+                "unit_net_value": unit_net,
+                "estimated_net_value": unit_net,  # 开放式基金暂无实时估值
+                "estimated_growth_rate": daily_change,
+                "estimate_time": net_date,
             }
 
             self._record_success()
@@ -368,7 +393,7 @@ class FundDataSource(DataSource):
         except Exception as e:
             return DataSourceResult(
                 success=False,
-                error=f"LOF 数据获取失败: {str(e)}",
+                error=f"基金数据获取失败: {str(e)}",
                 timestamp=time.time(),
                 source=self.name,
                 metadata={"fund_code": fund_code}
