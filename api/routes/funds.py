@@ -9,7 +9,7 @@ from typing import Optional, TypedDict
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.config.manager import ConfigManager
-from src.config.models import FundList
+from src.config.models import Fund, FundList
 from src.datasources.base import DataSourceType
 from src.datasources.manager import DataSourceManager
 

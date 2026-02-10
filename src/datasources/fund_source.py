@@ -10,6 +10,7 @@ import time
 from typing import Any
 
 import httpx
+import pandas as pd
 
 from .base import (
     DataParseError,
@@ -72,11 +73,81 @@ class FundDataSource(DataSource):
                 metadata={"fund_code": fund_code}
             )
 
+        # 判断基金类型
+        # 场内基金（交易所交易）
+        is_etf = fund_code.startswith("5") or fund_code.startswith("15")  # ETF
+        is_lof = fund_code.startswith("16")  # LOF 基金
+
         for attempt in range(self.max_retries):
             try:
+                # LOF 使用东方财富 LOF 接口
+                if is_lof:
+                    result = await self._fetch_lof(fund_code)
+                    if result.success:
+                        return result
+                    # LOF 获取失败，返回错误（不再尝试其他接口）
+                    return DataSourceResult(
+                        success=False,
+                        error=f"{fund_code} 是 LOF 基金，数据获取失败: {result.error}",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"fund_code": fund_code}
+                    )
+
+                # ETF 使用东方财富 ETF 接口
+                if is_etf:
+                    result = await self._fetch_etf(fund_code)
+                    if result.success:
+                        return result
+                    # ETF 获取失败，返回错误（不再尝试其他接口）
+                    return DataSourceResult(
+                        success=False,
+                        error=f"{fund_code} 是 ETF 基金，数据获取失败: {result.error}",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"fund_code": fund_code}
+                    )
+
+                # 普通基金使用天天基金接口
                 url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
                 response = await self.client.get(url)
                 response.raise_for_status()
+
+                # 检查是否是空响应
+                if response.text.strip() in ("jsonpgz();", "jsonpgz()"):
+                    # 判断基金类型并返回友好错误
+                    if fund_code.startswith("5") or fund_code.startswith("15"):
+                        return DataSourceResult(
+                            success=False,
+                            error=f"{fund_code} 是 ETF 基金，请使用场内基金交易接口",
+                            timestamp=time.time(),
+                            source=self.name,
+                            metadata={"fund_code": fund_code}
+                        )
+                    if fund_code.startswith("16"):
+                        return DataSourceResult(
+                            success=False,
+                            error=f"{fund_code} 是 LOF 基金，请使用场内基金交易接口",
+                            timestamp=time.time(),
+                            source=self.name,
+                            metadata={"fund_code": fund_code}
+                        )
+                    # QDII/FOF 基金判断（以 00、4、47 开头）
+                    if fund_code.startswith("00") or fund_code.startswith("4") or fund_code.startswith("47"):
+                        return DataSourceResult(
+                            success=False,
+                            error=f"{fund_code} 是 QDII/FOF 基金，天天基金接口暂不支持，可尝试证券账户在场内交易",
+                            timestamp=time.time(),
+                            source=self.name,
+                            metadata={"fund_code": fund_code}
+                        )
+                    return DataSourceResult(
+                        success=False,
+                        error=f"基金不存在: {fund_code}",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"fund_code": fund_code}
+                    )
 
                 # 解析返回的 JS 数据
                 data = self._parse_response(response.text, fund_code)
@@ -108,13 +179,34 @@ class FundDataSource(DataSource):
             except json.JSONDecodeError as e:
                 self._request_count += 1
                 self._error_count += 1
+                raw_text = ""
                 return DataSourceResult(
                     success=False,
                     error=f"数据解析失败: {str(e)}",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code, "raw_response": response.text[:200]}
+                    metadata={"fund_code": fund_code}
                 )
+
+        # 如果是 LOF，返回更明确的错误信息
+        if is_lof:
+            return DataSourceResult(
+                success=False,
+                error=f"{fund_code} 是 QDII/LOF 基金，akshare 东方财富接口返回数据为空",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        # 如果是 ETF，返回更明确的错误信息
+        if is_etf:
+            return DataSourceResult(
+                success=False,
+                error=f"{fund_code} 是 ETF 基金，当前数据源暂不支持",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
 
         return DataSourceResult(
             success=False,
@@ -123,6 +215,164 @@ class FundDataSource(DataSource):
             source=self.name,
             metadata={"fund_code": fund_code}
         )
+
+    async def _fetch_etf(self, fund_code: str) -> DataSourceResult:
+        """
+        获取 ETF 数据 - 使用东方财富接口
+
+        Args:
+            fund_code: ETF 代码
+
+        Returns:
+            DataSourceResult: ETF 数据结果
+        """
+        try:
+            # 使用 akshare 获取 ETF 数据
+            import asyncio
+            loop = asyncio.get_event_loop()
+            import akshare as ak
+
+            # 获取 ETF 最新数据
+            df = await loop.run_in_executor(
+                None,
+                lambda: ak.fund_etf_fund_info_em(fund=fund_code)
+            )
+
+            if df is None or df.empty:
+                return DataSourceResult(
+                    success=False,
+                    error=f"ETF {fund_code} 无数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code}
+                )
+
+            # 获取最新一条数据
+            latest = df.iloc[0]
+
+            # 提取数据
+            data = {
+                "fund_code": fund_code,
+                "name": f"ETF {fund_code}",  # ETF 接口不直接返回名称
+                "net_value_date": str(latest.get("净值日期", "")),
+                "unit_net_value": float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None,
+                "estimated_net_value": float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None,
+                "estimated_growth_rate": float(latest.get("日增长率", 0)) if pd.notna(latest.get("日增长率")) else None,
+                "estimate_time": str(latest.get("净值日期", "")),
+            }
+
+            self._record_success()
+            return DataSourceResult(
+                success=True,
+                data=data,
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 库未安装",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+        except Exception as e:
+            return DataSourceResult(
+                success=False,
+                error=f"ETF 数据获取失败: {str(e)}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+    async def _fetch_lof(self, fund_code: str) -> DataSourceResult:
+        """
+        获取 LOF/QDII 基金数据 - 使用东方财富接口
+
+        Args:
+            fund_code: LOF 基金代码
+
+        Returns:
+            DataSourceResult: LOF 基金数据结果
+        """
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            import akshare as ak
+
+            # 获取所有 LOF 实时数据
+            df = await loop.run_in_executor(
+                None,
+                lambda: ak.fund_lof_spot_em()
+            )
+
+            if df is None or df.empty:
+                return DataSourceResult(
+                    success=False,
+                    error=f"LOF {fund_code} 无实时数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code}
+                )
+
+            # 筛选指定基金
+            # 尝试多个可能的列名
+            fund_row = None
+            if "基金代码" in df.columns:
+                fund_row = df[df["基金代码"] == fund_code]
+            elif "code" in df.columns:
+                fund_row = df[df["code"] == fund_code]
+
+            if fund_row is None or fund_row.empty:
+                return DataSourceResult(
+                    success=False,
+                    error=f"未找到 LOF 基金: {fund_code}",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code}
+                )
+
+            # 获取最新一条数据
+            latest = fund_row.iloc[0]
+
+            # 提取数据 - LOF 接口字段
+            data = {
+                "fund_code": str(latest.get("基金代码", fund_code)),
+                "name": str(latest.get("基金名称", f"LOF {fund_code}")),
+                "net_value_date": str(latest.get("净值日期", "")),
+                "unit_net_value": float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None,
+                "estimated_net_value": float(latest.get("估算净值", 0)) if pd.notna(latest.get("估算净值")) else None,
+                "estimated_growth_rate": float(latest.get("日增长率", 0)) if pd.notna(latest.get("日增长率")) else None,
+                "estimate_time": str(latest.get("净值日期", "")),
+            }
+
+            self._record_success()
+            return DataSourceResult(
+                success=True,
+                data=data,
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 库未安装",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+        except Exception as e:
+            return DataSourceResult(
+                success=False,
+                error=f"LOF 数据获取失败: {str(e)}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
 
     async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
         """
@@ -242,7 +492,7 @@ class FundDataSource(DataSource):
         """关闭异步客户端"""
         await self.client.aclose()
 
-    def __del__(self):
+    async def __del__(self):
         """析构时确保关闭客户端"""
         try:
             if hasattr(self, 'client') and self.client.is_closed is False:
@@ -250,6 +500,27 @@ class FundDataSource(DataSource):
                 pass
         except Exception:
             pass
+
+    async def health_check(self) -> bool:
+        """
+        健康检查 - 天天基金接口
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            # 天天基金接口支持批量查询，使用一个示例基金代码
+            url = f"http://fundgz.1234567.com.cn/js/161039.js?rt={int(time.time() * 1000)}"
+            response = await self.client.get(url, timeout=self.timeout)
+            response.raise_for_status()
+
+            # 验证返回数据格式
+            data = response.text
+            if data and "jsonpgz" in data and "fundcode" in data:
+                return True
+            return False
+        except Exception:
+            return False
 
 
 class SinaFundDataSource(DataSource):
@@ -366,6 +637,20 @@ class SinaFundDataSource(DataSource):
     async def close(self):
         """关闭异步客户端"""
         await self.client.aclose()
+
+    async def health_check(self) -> bool:
+        """
+        健康检查 - 新浪基金接口
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            url = "https://finance.sina.com.cn/"
+            response = await self.client.get(url, timeout=self.timeout)
+            return response.status_code == 200
+        except Exception:
+            return False
 
 
 # 导出类

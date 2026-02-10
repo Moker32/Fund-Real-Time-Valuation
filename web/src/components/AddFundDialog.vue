@@ -1,9 +1,9 @@
 <template>
-  <Teleport to="body">
+  <Transition name="dialog">
     <div v-if="visible" class="dialog-overlay" @click.self="close">
       <div class="dialog add-fund-dialog">
         <div class="dialog-header">
-          <h3>{{ isEditing ? '编辑基金' : '添加基金' }}</h3>
+          <h3>添加基金</h3>
           <button class="close-btn" @click="close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 6L6 18M6 6l12 12"/>
@@ -13,23 +13,20 @@
 
         <div class="dialog-body">
           <div class="form-group">
-            <label for="fundCode">基金代码</label>
+            <label>基金代码</label>
             <input
-              id="fundCode"
               v-model="form.code"
               type="text"
               placeholder="例如: 161039"
               maxlength="6"
-              :disabled="isEditing"
               @input="onCodeInput"
             />
             <span class="hint">请输入6位数字基金代码</span>
           </div>
 
           <div class="form-group">
-            <label for="fundName">基金名称</label>
+            <label>基金名称</label>
             <input
-              id="fundName"
               v-model="form.name"
               type="text"
               placeholder="例如: 易方达消费行业股票"
@@ -37,17 +34,15 @@
           </div>
 
           <div v-if="searchResult" class="search-result">
-            <div class="result-item" :class="{ selected: isInWatchlist }">
+            <div class="result-item">
               <div class="fund-info">
                 <span class="fund-code">{{ searchResult.code }}</span>
                 <span class="fund-name">{{ searchResult.name }}</span>
               </div>
-              <span v-if="isInWatchlist" class="status-badge">已在自选</span>
             </div>
           </div>
 
           <div v-if="searchLoading" class="search-loading">
-            <div class="spinner"></div>
             <span>正在查询基金信息...</span>
           </div>
 
@@ -63,13 +58,12 @@
             :disabled="!canSubmit || submitting"
             @click="handleSubmit"
           >
-            <span v-if="submitting" class="spinner"></span>
-            {{ submitting ? '添加中...' : (isEditing ? '保存' : '添加') }}
+            {{ submitting ? '添加中...' : '添加' }}
           </button>
         </div>
       </div>
     </div>
-  </Teleport>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -79,13 +73,9 @@ import type { Fund } from '@/types';
 
 interface Props {
   visible: boolean;
-  editFund?: Fund | null;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  visible: false,
-  editFund: null,
-});
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   (e: 'close'): void;
@@ -103,9 +93,6 @@ const searchError = ref<string | null>(null);
 const submitting = ref(false);
 const existingCodes = ref<Set<string>>(new Set());
 
-const isEditing = computed(() => !!props.editFund);
-
-// 检查是否已在自选列表中
 const isInWatchlist = computed(() => {
   if (!searchResult.value) return false;
   return existingCodes.value.has(searchResult.value.code);
@@ -116,14 +103,10 @@ const canSubmit = computed(() => {
   if (!form.value.code || form.value.code.length !== 6) return false;
   if (!form.value.name) return false;
   if (searchError.value) return false;
-  // 编辑模式不需要检查是否在列表中
-  if (isEditing.value) return true;
-  // 添加模式下如果在列表中则不允许添加
   if (isInWatchlist.value) return false;
   return true;
 });
 
-// 搜索基金
 async function searchFund(code: string) {
   if (code.length !== 6) {
     searchResult.value = null;
@@ -148,7 +131,6 @@ async function searchFund(code: string) {
 }
 
 function onCodeInput() {
-  // 只保留数字
   form.value.code = form.value.code.replace(/\D/g, '');
   searchFund(form.value.code);
 }
@@ -170,7 +152,6 @@ async function handleSubmit() {
 
 function close() {
   emit('close');
-  // 重置表单
   setTimeout(() => {
     form.value = { code: '', name: '' };
     searchResult.value = null;
@@ -178,16 +159,6 @@ function close() {
   }, 200);
 }
 
-// 监听编辑基金
-watch(() => props.editFund, (fund) => {
-  if (fund) {
-    form.value = { code: fund.code, name: fund.name };
-    searchResult.value = fund;
-    searchError.value = null;
-  }
-}, { immediate: true });
-
-// 获取现有基金代码列表
 watch(() => props.visible, async (visible) => {
   if (visible) {
     try {
@@ -197,10 +168,10 @@ watch(() => props.visible, async (visible) => {
       console.error('获取基金列表失败:', err);
     }
   }
-}, { immediate: true });
+});
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 .dialog-overlay {
   position: fixed;
   inset: 0;
@@ -209,239 +180,196 @@ watch(() => props.visible, async (visible) => {
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fadeIn var(--transition-fast);
 }
 
-.add-fund-dialog {
+.dialog {
   width: 90%;
   max-width: 420px;
-  background: var(--color-bg-card);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-lg);
+  background: #1e1e1e;
+  border-radius: 12px;
+  border: 1px solid #2a2a2a;
 }
 
 .dialog-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid var(--color-divider);
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
 
-  h3 {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-semibold);
-    color: var(--color-text-primary);
-    margin: 0;
-  }
+.dialog-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
 
-  .close-btn {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-md);
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    transition: all var(--transition-fast);
+.close-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #999;
+  cursor: pointer;
+}
 
-    svg {
-      width: 20px;
-      height: 20px;
-    }
-
-    &:hover {
-      background: var(--color-bg-tertiary);
-      color: var(--color-text-primary);
-    }
-  }
+.close-btn svg {
+  width: 20px;
+  height: 20px;
 }
 
 .dialog-body {
-  padding: var(--spacing-lg);
+  padding: 16px;
 }
 
 .form-group {
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: 16px;
+}
 
-  label {
-    display: block;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    color: var(--color-text-secondary);
-    margin-bottom: var(--spacing-xs);
-  }
+.form-group label {
+  display: block;
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 4px;
+}
 
-  input {
-    width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--color-bg-tertiary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    color: var(--color-text-primary);
-    font-size: var(--font-size-md);
-    transition: all var(--transition-fast);
+.form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  background: #2a2a2a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+}
 
-    &::placeholder {
-      color: var(--color-text-tertiary);
-    }
+.form-group input:focus {
+  outline: none;
+  border-color: #1890ff;
+}
 
-    &:focus {
-      outline: none;
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px var(--color-primary-alpha);
-    }
-
-    &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-  }
-
-  .hint {
-    display: block;
-    font-size: var(--font-size-xs);
-    color: var(--color-text-tertiary);
-    margin-top: var(--spacing-xs);
-  }
+.form-group .hint {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
 }
 
 .search-result {
-  margin-top: var(--spacing-md);
+  margin-top: 16px;
 }
 
 .result-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--spacing-md);
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
-
-  &.selected {
-    border-color: var(--color-warning);
-    background: var(--color-warning-alpha);
-  }
-
-  .fund-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .fund-code {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-tertiary);
-    font-family: var(--font-mono);
-  }
-
-  .fund-name {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-primary);
-    font-weight: var(--font-weight-medium);
-  }
-
-  .status-badge {
-    font-size: var(--font-size-xs);
-    padding: 2px 8px;
-    background: var(--color-warning-alpha);
-    color: var(--color-warning);
-    border-radius: var(--radius-full);
-  }
+  padding: 12px;
+  background: #2a2a2a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
 }
 
-.search-loading,
-.search-error {
+.fund-info {
   display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  margin-top: var(--spacing-md);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fund-code {
+  font-size: 12px;
+  color: #666;
+}
+
+.fund-name {
+  font-size: 14px;
+  color: #fff;
+  font-weight: 500;
 }
 
 .search-loading {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  margin-top: 16px;
+  background: #2a2a2a;
+  border-radius: 8px;
+  color: #999;
+  font-size: 14px;
 }
 
 .search-error {
-  background: var(--color-fall-alpha);
-  color: var(--color-fall);
-}
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid transparent;
-  border-top-color: currentColor;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  margin-top: 16px;
+  background: rgba(82, 196, 26, 0.15);
+  color: #52c41a;
+  border-radius: 8px;
+  font-size: 14px;
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  border-top: 1px solid var(--color-divider);
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .btn {
-  padding: var(--spacing-sm) var(--spacing-lg);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition-fast);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
+  transition: all 0.15s ease;
+}
 
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .spinner {
-    width: 14px;
-    height: 14px;
-  }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-secondary {
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
+  background: #2a2a2a;
+  border: 1px solid #2a2a2a;
+  color: #fff;
+}
 
-  &:hover:not(:disabled) {
-    background: var(--color-bg-card);
-    border-color: var(--color-border-light);
-  }
+.btn-secondary:hover:not(:disabled) {
+  background: #3a3a3a;
 }
 
 .btn-primary {
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  color: white;
-
-  &:hover:not(:disabled) {
-    opacity: 0.9;
-  }
+  background: #1890ff;
+  border: 1px solid #1890ff;
+  color: #fff;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* Transitions */
+.dialog-enter-active,
+.dialog-leave-active {
+  transition: all 0.2s ease;
+}
+
+.dialog-enter-from,
+.dialog-leave-to {
+  opacity: 0;
+}
+
+.dialog-enter-from .dialog,
+.dialog-leave-to .dialog {
+  transform: scale(0.95);
 }
 </style>
