@@ -28,6 +28,13 @@ class FundResponse(BaseModel):
     }
 
 
+class FundListResponse(BaseModel):
+    """基金列表响应模型"""
+    funds: list[dict] = Field(..., description="基金列表")
+    total: int = Field(..., description="基金总数")
+    timestamp: str = Field(..., description="响应时间戳")
+
+
 class FundDetailResponse(FundResponse):
     """基金详情响应模型"""
     pass
@@ -73,6 +80,12 @@ class CommodityResponse(BaseModel):
     model_config = {
         "populate_by_name": True,
     }
+
+
+class CommodityListResponse(BaseModel):
+    """商品列表响应模型"""
+    commodities: list[dict] = Field(..., description="商品列表")
+    timestamp: str = Field(..., description="响应时间戳")
 
 
 class HealthResponse(BaseModel):

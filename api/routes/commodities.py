@@ -3,7 +3,9 @@
 提供商品相关的 REST API 端点
 """
 
-from typing import Optional
+from datetime import datetime
+from datetime import datetime
+from typing import Optional, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -12,7 +14,13 @@ from src.datasources.commodity_source import YFinanceCommoditySource, AKShareCom
 from src.datasources.manager import DataSourceManager
 
 from ..dependencies import DataSourceDependency
-from ..models import CommodityResponse, ErrorResponse
+from ..models import CommodityResponse, CommodityListResponse, ErrorResponse
+
+
+class CommodityListData(TypedDict):
+    """商品列表响应数据结构"""
+    commodities: list[dict]
+    timestamp: str
 
 
 router = APIRouter(prefix="/api/commodities", tags=["商品"])
@@ -31,7 +39,7 @@ SUPPORTED_COMMODITIES = [
 
 @router.get(
     "",
-    response_model=list[CommodityResponse],
+    response_model=CommodityListData,
     summary="获取商品行情",
     description="获取所有支持的商品实时行情",
     responses={
@@ -42,7 +50,7 @@ SUPPORTED_COMMODITIES = [
 async def get_commodities(
     types: Optional[str] = None,
     manager: DataSourceManager = Depends(DataSourceDependency()),
-) -> list[dict]:
+) -> CommodityListData:
     """
     获取商品行情列表
 
@@ -51,13 +59,15 @@ async def get_commodities(
         manager: 数据源管理器依赖
 
     Returns:
-        list[CommodityResponse]: 商品行情列表
+        CommodityListData: 包含商品列表和时间戳的字典
     """
+    current_time = datetime.now().isoformat() + "Z"
+
     # 确定要获取的商品类型
     if types:
         commodity_types = [t.strip() for t in types.split(",") if t.strip()]
         if not commodity_types:
-            return []
+            return {"commodities": [], "timestamp": current_time}
     else:
         commodity_types = SUPPORTED_COMMODITIES
 
@@ -97,7 +107,7 @@ async def get_commodities(
                         prevClose=data.get("prev_close"),
                     ).model_dump())
 
-    return all_results
+    return {"commodities": all_results, "timestamp": current_time}
 
 
 @router.get(

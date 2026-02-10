@@ -4,10 +4,12 @@
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from src.config.manager import ConfigManager
+from src.config.models import FundList
 from src.datasources.base import DataSourceType
 from src.datasources.manager import DataSourceManager
 
@@ -16,16 +18,67 @@ from ..models import (
     ErrorResponse,
     FundDetailResponse,
     FundEstimateResponse,
+    FundListResponse,
     FundResponse,
 )
+
+
+class FundListData(TypedDict):
+    """基金列表响应数据结构"""
+    funds: list[dict]
+    total: int
+    timestamp: str
 
 
 router = APIRouter(prefix="/api/funds", tags=["基金"])
 
 
+def get_default_fund_codes() -> list[str]:
+    """获取默认基金代码列表"""
+    default_funds = [
+        "161039",  # 易方达消费行业股票
+        "161725",  # 招商中证白酒指数
+        "110022",  # 易方达消费行业
+        "000015",  # 华夏策略精选混合
+        "161032",  # 富国中证新能源汽车指数
+    ]
+
+    try:
+        config_manager = ConfigManager()
+        fund_list: FundList = config_manager.load_funds()
+        codes = fund_list.get_all_codes()
+        if codes:
+            return codes
+    except Exception:
+        pass
+
+    return default_funds
+
+
+def build_fund_response(data: dict, source: str = "") -> dict:
+    """构建基金响应数据"""
+    unit_net = data.get("unit_net_value")
+    estimate_net = data.get("estimated_net_value")
+    estimate_change = None
+    if unit_net is not None and estimate_net is not None and unit_net != 0:
+        estimate_change = round(estimate_net - unit_net, 4)
+
+    return FundResponse(
+        code=data.get("fund_code", ""),
+        name=data.get("name", ""),
+        netValue=data.get("unit_net_value"),
+        netValueDate=data.get("net_value_date"),
+        estimateValue=data.get("estimated_net_value"),
+        estimateChangePercent=data.get("estimated_growth_rate"),
+        estimateTime=data.get("estimate_time"),
+        estimateChange=estimate_change,
+        source=source,
+    ).model_dump()
+
+
 @router.get(
     "",
-    response_model=list[FundResponse],
+    response_model=FundListData,
     summary="获取基金列表",
     description="获取所有已注册基金数据源的基金信息",
     responses={
@@ -36,7 +89,7 @@ router = APIRouter(prefix="/api/funds", tags=["基金"])
 async def get_funds_list(
     codes: Optional[str] = None,
     manager: DataSourceManager = Depends(DataSourceDependency()),
-) -> list[dict]:
+) -> FundListData:
     """
     获取基金列表
 
@@ -45,59 +98,43 @@ async def get_funds_list(
         manager: 数据源管理器依赖
 
     Returns:
-        list[FundResponse]: 基金列表
+        FundListData: 包含基金列表、总数量和时间戳的字典
     """
+    current_time = datetime.now().isoformat() + "Z"
+
     # 如果指定了基金代码
     if codes:
         fund_codes = [c.strip() for c in codes.split(",") if c.strip()]
         if not fund_codes:
-            return []
+            return {"funds": [], "total": 0, "timestamp": current_time}
 
-        results = await manager.fetch_batch(DataSourceType.FUND, fund_codes)
+        # 构建参数列表，每个元素是字典格式
+        params_list = [{"args": [code]} for code in fund_codes]
+        results = await manager.fetch_batch(DataSourceType.FUND, params_list)
         funds = []
         for result in results:
             if result.success:
-                data = result.data
-
-                # 计算 estimateChange (估算涨跌额)
-                unit_net = data.get("unit_net_value")
-                estimate_net = data.get("estimated_net_value")
-                estimate_change = None
-                if unit_net is not None and estimate_net is not None and unit_net != 0:
-                    estimate_change = round(estimate_net - unit_net, 4)
-
-                funds.append(FundResponse(
-                    code=data.get("fund_code", ""),
-                    name=data.get("name", ""),
-                    netValue=data.get("unit_net_value"),
-                    netValueDate=data.get("net_value_date"),
-                    estimateValue=data.get("estimated_net_value"),
-                    estimateChangePercent=data.get("estimated_growth_rate"),
-                    estimateTime=data.get("estimate_time"),
-                    estimateChange=estimate_change,
-                    source=result.source,
-                ).model_dump())
+                funds.append(build_fund_response(result.data, result.source))
             else:
                 # 如果单个基金获取失败，记录错误但不中断
                 pass
-        return funds
+        return {"funds": funds, "total": len(funds), "timestamp": current_time}
 
-    # 获取所有注册的基金数据源信息
-    sources = manager.get_sources_by_type(DataSourceType.FUND)
-    return [
-        {
-            "code": "",
-            "name": f"基金数据源: {source.name}",
-            "netValue": None,
-            "netValueDate": None,
-            "estimateValue": None,
-            "estimateChangePercent": None,
-            "estimateTime": None,
-            "estimateChange": None,
-            "source": source.name,
-        }
-        for source in sources
-    ]
+    # 没有指定 codes 时，使用默认基金代码获取真实数据
+    fund_codes = get_default_fund_codes()
+
+    # 构建参数列表
+    params_list = [{"args": [code]} for code in fund_codes]
+    results = await manager.fetch_batch(DataSourceType.FUND, params_list)
+    funds = []
+    for result in results:
+        if result.success:
+            funds.append(build_fund_response(result.data, result.source))
+        else:
+            # 如果单个基金获取失败，记录错误但不中断
+            pass
+
+    return {"funds": funds, "total": len(funds), "timestamp": current_time}
 
 
 @router.get(
