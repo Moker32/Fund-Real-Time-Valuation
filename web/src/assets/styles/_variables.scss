@@ -4,11 +4,13 @@
 $bg-primary: #0a0a0a;
 $bg-secondary: #1a1a1a;
 $bg-tertiary: #2a2a2a;
+$bg-card: #1e1e1e;
+$bg-card-hover: #252525;
 
 // 文字色
 $text-primary: #ffffff;
 $text-secondary: #999999;
-$text-muted: #666666;
+$text-tertiary: #666666;
 
 // 涨跌幅颜色
 $color-up: #ff4d4f;
@@ -17,6 +19,7 @@ $color-neutral: #999999;
 
 // 分割线
 $border-color: #2a2a2a;
+$border-light: #3a3a3a;
 
 // 按钮颜色
 $btn-primary: #1890ff;
@@ -27,6 +30,7 @@ $btn-disabled: #4a4a4a;
 $radius-sm: 4px;
 $radius-md: 8px;
 $radius-lg: 12px;
+$radius-full: 9999px;
 
 // 过渡动画
 $transition-fast: 0.15s ease;

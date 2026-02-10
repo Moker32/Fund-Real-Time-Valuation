@@ -14,7 +14,14 @@
           <span class="fund-code">{{ fund.code }}</span>
           <span class="fund-name">{{ fund.name }}</span>
         </div>
-        <span class="fund-type">{{ fund.type || '混合型' }}</span>
+        <div class="card-actions">
+          <span class="fund-type">{{ fund.type || '混合型' }}</span>
+          <button class="action-btn delete-btn" title="从自选移除" @click.stop="$emit('remove', fund.code)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div class="card-body">
@@ -64,6 +71,10 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
 });
+
+defineEmits<{
+  (e: 'remove', code: string): void;
+}>();
 
 const changeClass = computed(() => {
   if (props.fund.estimateChangePercent > 0) return 'rising';
@@ -152,10 +163,18 @@ function formatTime(dateStr: string): string {
   margin-bottom: var(--spacing-md);
 }
 
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
 .fund-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .fund-code {
@@ -169,6 +188,9 @@ function formatTime(dateStr: string): string {
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
   line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fund-type {
@@ -177,6 +199,41 @@ function formatTime(dateStr: string): string {
   background: var(--color-bg-tertiary);
   border-radius: var(--radius-full);
   color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.action-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  opacity: 0;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    background: var(--color-bg-tertiary);
+    color: var(--color-fall);
+  }
+}
+
+.delete-btn:hover {
+  background: var(--color-fall-alpha);
+  color: var(--color-fall);
+}
+
+.fund-card:hover .action-btn {
+  opacity: 1;
 }
 
 .card-body {

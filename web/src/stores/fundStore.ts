@@ -165,6 +165,40 @@ export const useFundStore = defineStore('funds', () => {
     await fetchFunds();
   }
 
+  // 添加基金到自选
+  async function addFund(code: string, name: string): Promise<boolean> {
+    try {
+      const response = await fundApi.addToWatchlist(code, name);
+      if (response.success) {
+        // 刷新基金列表
+        await fetchFunds();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[FundStore] addFund error:', err);
+      error.value = getFriendlyErrorMessage(err);
+      throw err;
+    }
+  }
+
+  // 从自选移除基金
+  async function removeFund(code: string): Promise<boolean> {
+    try {
+      const response = await fundApi.removeFromWatchlist(code);
+      if (response.success) {
+        // 从本地列表中移除
+        funds.value = funds.value.filter((f) => f.code !== code);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[FundStore] removeFund error:', err);
+      error.value = getFriendlyErrorMessage(err);
+      throw err;
+    }
+  }
+
   return {
     // State
     funds,
@@ -189,5 +223,7 @@ export const useFundStore = defineStore('funds', () => {
     setAutoRefresh,
     clearError,
     retry,
+    addFund,
+    removeFund,
   };
 });

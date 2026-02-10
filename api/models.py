@@ -129,3 +129,16 @@ class OverviewResponse(BaseModel):
     model_config = {
         "populate_by_name": True,
     }
+
+
+class AddFundRequest(BaseModel):
+    """添加基金请求模型"""
+    code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d+$", description="基金代码")
+    name: str = Field(..., min_length=1, max_length=100, description="基金名称")
+
+
+class AddFundResponse(BaseModel):
+    """添加基金响应模型"""
+    success: bool = Field(default=True, description="是否成功")
+    message: str = Field(..., description="响应消息")
+    fund: dict = Field(..., description="添加的基金信息")

@@ -27,14 +27,28 @@
         <path d="M7 14L11 10L15 12L21 6"/>
       </svg>
       <span>暂无基金数据</span>
-      <p>请在设置中添加自选基金</p>
+      <p>点击下方按钮添加自选基金</p>
+      <button class="btn-primary" @click="showAddDialog = true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5V19M5 12H19"/>
+        </svg>
+        添加基金
+      </button>
     </div>
 
     <!-- Fund List -->
     <div v-else class="fund-list">
       <div class="list-header">
-        <h2 class="section-title">自选基金</h2>
-        <span class="fund-count">{{ fundStore.funds.length }} 只</span>
+        <div class="header-left">
+          <h2 class="section-title">自选基金</h2>
+          <span class="fund-count">{{ fundStore.funds.length }} 只</span>
+        </div>
+        <button class="btn-add" @click="showAddDialog = true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5V19M5 12H19"/>
+          </svg>
+          添加基金
+        </button>
       </div>
 
       <div class="funds-grid">
@@ -42,20 +56,30 @@
           v-for="fund in fundStore.funds"
           :key="fund.code"
           :fund="fund"
+          @remove="handleRemoveFund"
         />
       </div>
     </div>
+
+    <!-- Add Fund Dialog -->
+    <AddFundDialog
+      :visible="showAddDialog"
+      @close="showAddDialog = false"
+      @added="handleFundAdded"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useFundStore } from '@/stores/fundStore';
 import FundCard from '@/components/FundCard.vue';
 import MarketOverview from '@/components/MarketOverview.vue';
+import AddFundDialog from '@/components/AddFundDialog.vue';
 import type { Overview, Fund } from '@/types';
 
 const fundStore = useFundStore();
+const showAddDialog = ref(false);
 
 // Empty fund for loading skeleton
 const emptyFund: Fund = {
@@ -72,7 +96,6 @@ const overviewData = computed<Overview | null>(() => {
   if (fundStore.funds.length === 0) return null;
 
   const totalValue = fundStore.funds.reduce((sum, f) => {
-    // Use estimate value as proxy if available
     return sum + (f.estimateValue || f.netValue || 0);
   }, 0);
 
@@ -86,6 +109,16 @@ const overviewData = computed<Overview | null>(() => {
     lastUpdated: fundStore.lastUpdated || '',
   };
 });
+
+async function handleRemoveFund(code: string) {
+  if (confirm(`确定要从自选移除基金 ${code} 吗？`)) {
+    await fundStore.removeFund(code);
+  }
+}
+
+function handleFundAdded() {
+  fundStore.fetchFunds();
+}
 
 onMounted(() => {
   fundStore.fetchFunds();
@@ -109,15 +142,47 @@ onMounted(() => {
   margin-bottom: var(--spacing-lg);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
 .section-title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
+  margin: 0;
 }
 
 .fund-count {
   font-size: var(--font-size-sm);
   color: var(--color-text-tertiary);
+}
+
+.btn-add {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
 }
 
 .funds-grid {
@@ -166,6 +231,30 @@ onMounted(() => {
       background: var(--color-bg-card);
       border-color: var(--color-border-light);
     }
+  }
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    opacity: 0.9;
   }
 }
 

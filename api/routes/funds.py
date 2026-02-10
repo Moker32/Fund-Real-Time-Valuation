@@ -20,6 +20,7 @@ from ..models import (
     FundEstimateResponse,
     FundListResponse,
     FundResponse,
+    AddFundRequest,
 )
 
 
@@ -285,3 +286,94 @@ async def get_fund_history(
         )
 
     return result.data
+
+
+@router.post(
+    "/watchlist",
+    response_model=dict,
+    summary="添加自选基金",
+    description="将基金添加到自选列表",
+    responses={
+        200: {"description": "添加成功"},
+        400: {"model": ErrorResponse, "description": "请求参数错误"},
+        404: {"model": ErrorResponse, "description": "基金不存在"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def add_to_watchlist(
+    request: AddFundRequest,
+    manager: DataSourceManager = Depends(DataSourceDependency()),
+) -> dict:
+    """
+    添加基金到自选列表
+
+    Args:
+        request: 添加基金请求
+        manager: 数据源管理器依赖
+
+    Returns:
+        dict: 添加结果
+    """
+    # 验证基金是否存在
+    result = await manager.fetch(DataSourceType.FUND, request.code)
+    if not result.success:
+        raise HTTPException(
+            status_code=404 if "不存在" in result.error else 400,
+            detail=result.error,
+        )
+
+    # 获取基金名称（如果请求中没有提供）
+    fund_name = request.name
+    if not fund_name and result.data:
+        fund_name = result.data.get("name", "")
+
+    # 添加到自选列表
+    config_manager = ConfigManager()
+    fund = Fund(code=request.code, name=fund_name)
+    config_manager.add_watchlist(fund)
+
+    return {
+        "success": True,
+        "message": f"基金 {request.code} 已添加到自选",
+        "fund": {"code": request.code, "name": fund_name},
+    }
+
+
+@router.delete(
+    "/watchlist/{code}",
+    response_model=dict,
+    summary="删除自选基金",
+    description="从自选列表中移除基金",
+    responses={
+        200: {"description": "删除成功"},
+        404: {"model": ErrorResponse, "description": "基金不在自选列表中"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def remove_from_watchlist(code: str) -> dict:
+    """
+    从自选列表中移除基金
+
+    Args:
+        code: 基金代码 (6位数字)
+
+    Returns:
+        dict: 删除结果
+    """
+    config_manager = ConfigManager()
+
+    # 检查是否在自选列表中
+    fund_list = config_manager.load_funds()
+    if not fund_list.is_watching(code):
+        raise HTTPException(
+            status_code=404,
+            detail=f"基金 {code} 不在自选列表中",
+        )
+
+    # 从自选列表中移除
+    config_manager.remove_watchlist(code)
+
+    return {
+        "success": True,
+        "message": f"基金 {code} 已从自选移除",
+    }

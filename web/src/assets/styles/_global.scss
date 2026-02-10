@@ -1,5 +1,76 @@
 @use 'variables' as *;
 
+// 定义 CSS 自定义属性
+:root {
+  // 背景色
+  --color-bg-primary: #{$bg-primary};
+  --color-bg-secondary: #{$bg-secondary};
+  --color-bg-tertiary: #{$bg-tertiary};
+  --color-bg-card: #{$bg-card};
+  --color-bg-card-hover: #{$bg-card-hover};
+
+  // 文字色
+  --color-text-primary: #{$text-primary};
+  --color-text-secondary: #{$text-secondary};
+  --color-text-tertiary: #{$text-muted};
+
+  // 涨跌幅颜色
+  --color-rise: #{$color-up};
+  --color-rise-bg: rgba(255, 77, 79, 0.15);
+  --color-fall: #{$color-down};
+  --color-fall-bg: rgba(82, 196, 26, 0.15);
+  --color-neutral: #{$color-neutral};
+  --color-warning: #faad14;
+  --color-warning-alpha: rgba(250, 173, 20, 0.15);
+
+  // 分割线
+  --color-border: #{$border-color};
+  --color-border-light: #{$border-light};
+  --color-divider: rgba(255, 255, 255, 0.08);
+
+  // 按钮颜色
+  --color-primary: #{$btn-primary};
+  --color-primary-hover: #{$btn-hover};
+  --color-primary-alpha: rgba(24, 144, 255, 0.15);
+
+  // 卡片圆角
+  --radius-sm: #{$radius-sm};
+  --radius-md: #{$radius-md};
+  --radius-lg: #{$radius-lg};
+  --radius-full: #{$radius-full};
+
+  // 过渡动画
+  --transition-fast: #{$transition-fast};
+  --transition-normal: #{$transition-normal};
+
+  // 阴影
+  --shadow-sm: #{$shadow-sm};
+  --shadow-md: #{$shadow-md};
+  --shadow-lg: #{$shadow-lg};
+
+  // 字体
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --font-mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+
+  // 间距
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+}
+
 // 重置样式
 *,
 *::before,
@@ -17,8 +88,8 @@ html {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background-color: $bg-primary;
-  color: $text-primary;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
   line-height: 1.5;
   min-height: 100vh;
 }
@@ -29,12 +100,12 @@ body {
 
 // 链接样式
 a {
-  color: $btn-primary;
+  color: var(--color-primary);
   text-decoration: none;
-  transition: color $transition-fast;
+  transition: color var(--transition-fast);
 
   &:hover {
-    color: $btn-hover;
+    color: var(--color-primary-hover);
   }
 }
 
@@ -66,35 +137,35 @@ select {
 }
 
 ::-webkit-scrollbar-track {
-  background: $bg-secondary;
+  background: var(--color-bg-secondary);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: $bg-tertiary;
-  border-radius: $radius-sm;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
 
   &:hover {
-    background: $text-secondary;
+    background: var(--color-text-secondary);
   }
 }
 
 // 工具类
 .text-up {
-  color: $color-up;
+  color: var(--color-rise);
 }
 
 .text-down {
-  color: $color-down;
+  color: var(--color-fall);
 }
 
 .text-secondary {
-  color: $text-secondary;
+  color: var(--color-text-secondary);
 }
 
 .bg-primary {
-  background-color: $bg-primary;
+  background-color: var(--color-bg-primary);
 }
 
 .bg-secondary {
-  background-color: $bg-secondary;
+  background-color: var(--color-bg-secondary);
 }

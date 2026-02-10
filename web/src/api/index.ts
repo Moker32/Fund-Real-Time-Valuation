@@ -183,6 +183,23 @@ export const fundApi = {
   }> {
     return api.get(`/api/funds/${code}/history`, { params: { days } });
   },
+
+  // Add to watchlist
+  async addToWatchlist(code: string, name: string): Promise<{
+    success: boolean;
+    message: string;
+    fund: { code: string; name: string };
+  }> {
+    return api.post('/api/funds/watchlist', { code, name });
+  },
+
+  // Remove from watchlist
+  async removeFromWatchlist(code: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return api.delete(`/api/funds/watchlist/${code}`);
+  },
 };
 
 export const commodityApi = {
