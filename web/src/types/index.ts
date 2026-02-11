@@ -7,6 +7,7 @@ export interface Fund {
   estimateValue: number;
   estimateChange: number;
   estimateChangePercent: number;
+  estimateTime?: string;
   type?: string;
   source?: string;
 }

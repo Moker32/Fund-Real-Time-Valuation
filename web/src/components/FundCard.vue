@@ -53,7 +53,7 @@
       </div>
 
       <div class="card-footer">
-        <span class="update-time">{{ formatNetValueDate(fund.netValueDate) }}</span>
+        <span class="update-time">{{ formatTime(fund.estimateTime) }}</span>
         <span class="source" v-if="fund.source">{{ fund.source }}</span>
       </div>
     </template>
