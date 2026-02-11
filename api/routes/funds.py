@@ -130,7 +130,7 @@ async def get_funds_list(
             else:
                 # 如果单个基金获取失败，记录错误但不中断
                 pass
-        return {"funds": funds, "total": len(funds), "timestamp": current_time}
+        return {"funds": funds, "total": len(funds), "timestamp": current_time, "progress": 100}
 
     # 没有指定 codes 时，使用默认基金代码获取真实数据
     fund_codes = get_default_fund_codes()
@@ -147,7 +147,7 @@ async def get_funds_list(
             # 如果单个基金获取失败，记录错误但不中断
             pass
 
-    return {"funds": funds, "total": len(funds), "timestamp": current_time}
+    return {"funds": funds, "total": len(funds), "timestamp": current_time, "progress": 100}
 
 
 @router.get(
