@@ -5,7 +5,9 @@
 """
 
 import asyncio
+import json
 import logging
+from pathlib import Path
 from typing import Any
 
 from src.config.manager import ConfigManager
@@ -29,6 +31,55 @@ class CacheWarmer:
         self._warmup_task: asyncio.Task | None = None
         self._refresh_task: asyncio.Task | None = None
         self._running = False
+        self._cache_loaded = False  # 标记缓存是否已加载
+
+    async def preload_all_cache(self, timeout: float = 10.0):
+        """
+        预加载所有文件缓存到内存（同步读取，不触发数据源请求）
+
+        服务启动时立即执行，让首次请求就能使用缓存数据。
+
+        Args:
+            timeout: 超时时间（秒）
+        """
+        try:
+            from src.datasources.fund_source import get_fund_cache
+
+            cache = get_fund_cache()
+            cache_dir = cache.cache_dir
+
+            if not cache_dir.exists():
+                logger.info(f"缓存目录不存在: {cache_dir}")
+                self._cache_loaded = True
+                return
+
+            logger.info(f"开始预加载缓存目录: {cache_dir}")
+
+            loaded_count = 0
+            cache_files = list(cache_dir.glob('*.json'))
+
+            for cache_file in cache_files:
+                try:
+                    with open(cache_file, encoding='utf-8') as f:
+                        cache_data = json.load(f)
+                        value = cache_data.get('value')
+
+                    if value is not None:
+                        # 解析 key
+                        cache_key = cache_data.get('key', cache_file.stem)
+                        # 直接设置到内存缓存
+                        await cache.memory_cache.set(cache_key, value, cache.file_ttl)
+                        loaded_count += 1
+
+                except (json.JSONDecodeError, KeyError, ValueError, OSError) as e:
+                    logger.warning(f"加载缓存文件失败: {cache_file}, error: {e}")
+
+            self._cache_loaded = True
+            logger.info(f"缓存预加载完成: {loaded_count}/{len(cache_files)} 个缓存文件")
+
+        except Exception as e:
+            logger.error(f"缓存预加载失败: {e}")
+            self._cache_loaded = True  # 标记已尝试加载，避免重复
 
     async def warmup(self, timeout: float = 120.0):
         """

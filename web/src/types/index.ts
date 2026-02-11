@@ -4,6 +4,8 @@ export interface Fund {
   name: string;
   netValue: number;
   netValueDate: string;
+  prevNetValue?: number;
+  prevNetValueDate?: string;
   estimateValue: number;
   estimateChange: number;
   estimateChangePercent: number;

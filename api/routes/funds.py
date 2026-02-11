@@ -70,6 +70,8 @@ def build_fund_response(data: dict, source: str = "", is_holding: bool = False) 
         type=data.get("type"),
         netValue=data.get("unit_net_value"),
         netValueDate=data.get("net_value_date"),
+        prevNetValue=data.get("prev_net_value"),
+        prevNetValueDate=data.get("prev_net_value_date"),
         estimateValue=data.get("estimated_net_value"),
         estimateChangePercent=data.get("estimated_growth_rate"),
         estimateTime=data.get("estimate_time"),

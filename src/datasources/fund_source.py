@@ -219,9 +219,30 @@ class FundDataSource(DataSource):
                     fund_type = await self._get_fund_type(fund_code)
                     if fund_type:
                         data["type"] = fund_type
+                    else:
+                        # Fallback: 从基金名称中识别 QDII
+                        fund_name = data.get("name", "")
+                        if "(QDII)" in fund_name or fund_name.endswith("QDII"):
+                            data["type"] = "QDII"
+                            fund_type = "QDII"
 
-                    # 天天基金支持实时估值
-                    data["has_real_time_estimate"] = True
+                    # 根据基金类型判断是否有实时估值（QDII/FOF 等没有实时估值）
+                    no_realtime_types = {"QDII", "FOF", "ETF-联接"}
+                    data["has_real_time_estimate"] = fund_type not in no_realtime_types
+
+                    # QDII/FOF 等基金需要获取上一交易日净值用于对比
+                    if fund_type in no_realtime_types:
+                        # 调用东方财富接口获取上一净值
+                        lof_result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
+                        if lof_result.success:
+                            data["prev_net_value"] = lof_result.data.get("prev_net_value")
+                            data["prev_net_value_date"] = lof_result.data.get("prev_net_value_date")
+                        else:
+                            data["prev_net_value"] = None
+                            data["prev_net_value_date"] = None
+                    else:
+                        data["prev_net_value"] = None
+                        data["prev_net_value_date"] = None
 
                     self._record_success()
 
@@ -433,9 +454,20 @@ class FundDataSource(DataSource):
             except Exception:
                 pass
 
+            # 判断是否有实时估值（QDII/FOF 等基金类型没有实时估值）
+            # QDII 投资海外市场有时差，FOF 是基金中的基金，净值更新延迟
+            no_realtime_types = {"QDII", "FOF", "ETF-联接"}
+            has_real_time = has_real_time_estimate and fund_type not in no_realtime_types
+
             # 提取数据
+            # 最新净值（最后一行）和上一个净值（倒数第二行）
+            latest = df.iloc[-1]
+            prev_row = df.iloc[-2] if len(df) >= 2 else latest
+
             net_date = str(latest.get("净值日期", ""))
+            prev_net_date = str(prev_row.get("净值日期", ""))
             unit_net = float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None
+            prev_unit_net = float(prev_row.get("单位净值", 0)) if pd.notna(prev_row.get("单位净值")) else None
             daily_change = float(latest.get("日增长率", 0)) if pd.notna(latest.get("日增长率")) else None
 
             data = {
@@ -444,10 +476,12 @@ class FundDataSource(DataSource):
                 "type": fund_type,
                 "net_value_date": net_date,
                 "unit_net_value": unit_net,
+                "prev_net_value_date": prev_net_date,
+                "prev_net_value": prev_unit_net,
                 "estimated_net_value": unit_net,  # 开放式基金暂无实时估值，使用单位净值
                 "estimated_growth_rate": daily_change,
                 "estimate_time": net_date,
-                "has_real_time_estimate": has_real_time_estimate,  # 标识是否有实时估值
+                "has_real_time_estimate": has_real_time,  # 根据基金类型判断是否有实时估值
             }
 
             self._record_success()

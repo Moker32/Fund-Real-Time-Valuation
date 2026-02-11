@@ -12,7 +12,7 @@
       <div class="card-header">
         <div class="fund-info">
           <span class="fund-code">{{ fund.code }}</span>
-          <span class="fund-name">{{ fund.name }}</span>
+          <span class="fund-name" :title="fund.name">{{ fund.name }}</span>
         </div>
         <div class="card-actions">
           <button
@@ -42,13 +42,17 @@
             <span class="value font-mono">{{ formatNumber(fund.netValue, 4) }}</span>
             <span class="value-date">{{ formatNetValueDate(fund.netValueDate) }}</span>
           </div>
-          <div class="value-row">
-            <span class="label">{{ fund.hasRealTimeEstimate === false ? '日涨幅' : '估值' }}</span>
+          <!-- 非 QDII 基金显示估值 -->
+          <div v-if="fund.hasRealTimeEstimate !== false" class="value-row">
+            <span class="label">估值</span>
             <span class="value font-mono">{{ formatNumber(fund.estimateValue, 4) }}</span>
-            <!-- QDII/FOF基金显示净值日期 -->
-            <span v-if="fund.hasRealTimeEstimate === false" class="value-date">
-              {{ formatNetValueDate(fund.netValueDate) }}
-            </span>
+            <span class="value-date">{{ formatNetValueDate(fund.estimateTime) }}</span>
+          </div>
+          <!-- QDII 基金显示前日净值 -->
+          <div v-else-if="fund.prevNetValue" class="value-row qdii-prev-row">
+            <span class="label">前日</span>
+            <span class="value font-mono">{{ formatNumber(fund.prevNetValue, 4) }}</span>
+            <span class="value-date">{{ formatNetValueDate(fund.prevNetValueDate) }}</span>
           </div>
         </div>
 
@@ -64,13 +68,10 @@
           </span>
           <span class="change-value font-mono">{{ formatChange(fund.estimateChange) }}</span>
           <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
-          <!-- QDII/FOF基金显示提示 -->
-          <span v-if="fund.hasRealTimeEstimate === false" class="qdii-badge" title="QDII/FOF基金暂无实时估值，显示上一交易日涨跌幅">日</span>
         </div>
       </div>
 
       <div class="card-footer">
-        <!-- QDII/FOF基金显示净值日期，实时估值基金显示更新时间 -->
         <span class="update-time">
           {{ fund.hasRealTimeEstimate === false ? '净值日期' : '更新' }}: {{ formatTime(fund.hasRealTimeEstimate === false ? fund.netValueDate : fund.estimateTime) }}
         </span>
@@ -131,6 +132,10 @@ function formatTime(dateStr: string): string {
   if (!dateStr) return '--';
   try {
     const date = new Date(dateStr);
+    // 如果没有时间部分（00:00），只显示日期
+    if (date.getHours() === 0 && date.getMinutes() === 0) {
+      return `${date.getMonth() + 1}/${date.getDate()}`;
+    }
     return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
   } catch {
     return dateStr;
@@ -311,6 +316,10 @@ function formatNetValueDate(dateStr: string): string {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+
+  &.qdii-prev-row {
+    opacity: 0.7;
+  }
 }
 
 .value-date {
@@ -381,15 +390,6 @@ function formatNetValueDate(dateStr: string): string {
 .change-percent {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-}
-
-.qdii-badge {
-  font-size: 10px;
-  padding: 1px 4px;
-  background: var(--color-bg-tertiary);
-  border-radius: 3px;
-  color: var(--color-text-tertiary);
-  margin-left: 4px;
 }
 
 .card-footer {

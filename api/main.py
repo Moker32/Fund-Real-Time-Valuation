@@ -41,11 +41,20 @@ async def lifespan(app: FastAPI):
     manager = create_default_manager()
     set_data_source_manager(manager)
 
-    # 启动后台健康检查
+    # 创建缓存预热器（用于后续操作）
+    _cache_warmer = CacheWarmer(manager)
+
+    # 立即预加载所有缓存数据到内存（不阻塞，快速同步读取）
+    # 这样前端首次请求就能拿到缓存数据，而不必等待数据刷新
+    await _cache_warmer.preload_all_cache(timeout=10)
+
+    # 启动后台健康检查（会立即执行一次检查）
     await manager.start_background_health_check()
 
+    # 等待一段时间让健康检查完成初始化，避免与缓存预热并发触发 akshare
+    await asyncio.sleep(2)
+
     # 启动缓存预热（不阻塞服务启动）
-    _cache_warmer = CacheWarmer(manager)
     asyncio.create_task(_cache_warmer.start_background_warmup(interval=300))
 
     yield

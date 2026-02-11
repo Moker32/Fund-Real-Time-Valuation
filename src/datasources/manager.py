@@ -659,7 +659,7 @@ def create_default_manager(
     # 注册基金数据源（按优先级排序）
     # 优先级数值越小优先级越高
 
-    # 天天基金接口（主数据源）
+    # 天天基金接口（主数据源 - 最快最稳定）
     fund_tiantian = FundDataSource()
     manager.register(fund_tiantian, DataSourceConfig(
         source_class=type(fund_tiantian),
@@ -669,23 +669,23 @@ def create_default_manager(
         priority=1
     ))
 
-    # 新浪基金接口（备用1）
+    # 暂时禁用备用数据源，因为它们响应慢且容易超时
+    # 如需启用，请将 enabled 改为 True
     fund_sina = SinaFundDataSource()
     manager.register(fund_sina, DataSourceConfig(
         source_class=type(fund_sina),
         name=fund_sina.name,
         source_type=DataSourceType.FUND,
-        enabled=True,
+        enabled=False,  # 禁用：响应慢(~2s)且经常失败
         priority=2
     ))
 
-    # 东方财富基金接口（备用2）
     fund_eastmoney = EastMoneyFundDataSource()
     manager.register(fund_eastmoney, DataSourceConfig(
         source_class=type(fund_eastmoney),
         name=fund_eastmoney.name,
         source_type=DataSourceType.FUND,
-        enabled=True,
+        enabled=False,  # 禁用：响应慢(~2s)且经常失败
         priority=3
     ))
 
