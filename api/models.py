@@ -26,6 +26,9 @@ class FundResponse(BaseModel):
     # 是否持有
     isHolding: bool = Field(False, description="是否持有该基金")
 
+    # 是否有实时估值（区分 QDII/FOF 等无实时估值的基金）
+    hasRealTimeEstimate: bool = Field(True, alias="has_real_time_estimate", description="是否有实时估值")
+
     model_config = {
         "populate_by_name": True,
     }
@@ -59,6 +62,9 @@ class FundEstimateResponse(BaseModel):
 
     # 是否持有
     isHolding: bool = Field(False, description="是否持有该基金")
+
+    # 是否有实时估值（区分 QDII/FOF 等无实时估值的基金）
+    hasRealTimeEstimate: bool = Field(True, alias="has_real_time_estimate", description="是否有实时估值")
 
     model_config = {
         "populate_by_name": True,

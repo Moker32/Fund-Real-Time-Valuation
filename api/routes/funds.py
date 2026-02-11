@@ -76,6 +76,7 @@ def build_fund_response(data: dict, source: str = "", is_holding: bool = False) 
         estimateChange=estimate_change,
         source=source,
         isHolding=is_holding,
+        hasRealTimeEstimate=data.get("has_real_time_estimate", True),
     ).model_dump()
 
 
@@ -210,6 +211,7 @@ async def get_fund_detail(
         estimateChange=estimate_change,
         source=result.source,
         isHolding=is_holding,
+        hasRealTimeEstimate=data.get("has_real_time_estimate", True),
     ).model_dump()
 
 
@@ -273,6 +275,7 @@ async def get_fund_estimate(
         netValueDate=data.get("net_value_date"),
         estimateChange=estimate_change,
         isHolding=is_holding,
+        hasRealTimeEstimate=data.get("has_real_time_estimate", True),
     ).model_dump()
 
 

@@ -11,6 +11,7 @@ export interface Fund {
   type?: string;
   source?: string;
   isHolding?: boolean;  // 是否持有
+  hasRealTimeEstimate?: boolean;  // 是否有实时估值（QDII/FOF等为false）
 }
 
 export interface FundListResponse {

@@ -118,7 +118,7 @@ class FundDataSource(DataSource):
             try:
                 # LOF 使用东方财富 LOF 接口
                 if is_lof:
-                    result = await self._fetch_lof(fund_code)
+                    result = await self._fetch_lof(fund_code, has_real_time_estimate=True)
                     if result.success:
                         # 写入缓存
                         cache_key = f"fund:{self.name}:{fund_code}"
@@ -180,8 +180,9 @@ class FundDataSource(DataSource):
                 # 检查是否是空响应
                 if response.text.strip() in ("jsonpgz();", "jsonpgz()"):
                     # 天天基金不支持的基金，尝试使用东方财富开放式基金接口
-                    # QDII/FOF 基金（如 006476）可能在这里获取到
-                    result = await self._fetch_lof(fund_code)
+                    # QDII/FOF 基金（如 470888）可能在这里获取到
+                    # 这些基金没有实时估值，只有上一个交易日的日增长率
+                    result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
                     if result.success:
                         return result
 
@@ -218,6 +219,9 @@ class FundDataSource(DataSource):
                     fund_type = await self._get_fund_type(fund_code)
                     if fund_type:
                         data["type"] = fund_type
+
+                    # 天天基金支持实时估值
+                    data["has_real_time_estimate"] = True
 
                     self._record_success()
 
@@ -330,6 +334,7 @@ class FundDataSource(DataSource):
                 "estimated_net_value": float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None,
                 "estimated_growth_rate": float(latest.get("日增长率", 0)) if pd.notna(latest.get("日增长率")) else None,
                 "estimate_time": str(latest.get("净值日期", "")),
+                "has_real_time_estimate": True,  # ETF 有实时估值
             }
 
             self._record_success()
@@ -358,7 +363,7 @@ class FundDataSource(DataSource):
                 metadata={"fund_code": fund_code}
             )
 
-    async def _fetch_lof(self, fund_code: str) -> DataSourceResult:
+    async def _fetch_lof(self, fund_code: str, has_real_time_estimate: bool = True) -> DataSourceResult:
         """
         获取 LOF/QDII/FOF 基金数据 - 使用东方财富开放式基金接口
 
@@ -366,6 +371,7 @@ class FundDataSource(DataSource):
 
         Args:
             fund_code: 基金代码
+            has_real_time_estimate: 是否有实时估值（默认为 True，QDII/FOF 应设为 False）
 
         Returns:
             DataSourceResult: 基金数据结果
@@ -438,9 +444,10 @@ class FundDataSource(DataSource):
                 "type": fund_type,
                 "net_value_date": net_date,
                 "unit_net_value": unit_net,
-                "estimated_net_value": unit_net,  # 开放式基金暂无实时估值
+                "estimated_net_value": unit_net,  # 开放式基金暂无实时估值，使用单位净值
                 "estimated_growth_rate": daily_change,
                 "estimate_time": net_date,
+                "has_real_time_estimate": has_real_time_estimate,  # 标识是否有实时估值
             }
 
             self._record_success()
