@@ -7,6 +7,7 @@ import asyncio
 import json
 import re
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -18,6 +19,25 @@ from .base import (
     DataSourceResult,
     DataSourceType,
 )
+from .dual_cache import DualLayerCache
+
+
+# 全局缓存实例（单例模式）
+_fund_cache: DualLayerCache | None = None
+
+
+def get_fund_cache() -> DualLayerCache:
+    """获取基金缓存单例"""
+    global _fund_cache
+    if _fund_cache is None:
+        cache_dir = Path.home() / ".fund-tui" / "cache" / "funds"
+        _fund_cache = DualLayerCache(
+            cache_dir=cache_dir,
+            memory_ttl=30,      # 内存缓存 30 秒
+            file_ttl=300,        # 文件缓存 5 分钟
+            max_memory_items=100
+        )
+    return _fund_cache
 
 
 class FundDataSource(DataSource):
@@ -54,12 +74,13 @@ class FundDataSource(DataSource):
             }
         )
 
-    async def fetch(self, fund_code: str) -> DataSourceResult:
+    async def fetch(self, fund_code: str, use_cache: bool = True) -> DataSourceResult:
         """
         获取单个基金数据
 
         Args:
             fund_code: 基金代码 (6位数字)
+            use_cache: 是否使用缓存
 
         Returns:
             DataSourceResult: 包含基金数据的结果
@@ -73,6 +94,22 @@ class FundDataSource(DataSource):
                 metadata={"fund_code": fund_code}
             )
 
+        cache_key = f"fund:{self.name}:{fund_code}"
+
+        # 检查缓存
+        if use_cache:
+            cache = get_fund_cache()
+            cached_value, cache_type = await cache.get(cache_key)
+            if cached_value is not None:
+                # 缓存命中
+                return DataSourceResult(
+                    success=True,
+                    data=cached_value,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code, "cache": cache_type}
+                )
+
         # 判断基金类型
         # 场内基金（交易所交易）
         is_etf = fund_code.startswith("5") or fund_code.startswith("15")  # ETF
@@ -84,6 +121,10 @@ class FundDataSource(DataSource):
                 if is_lof:
                     result = await self._fetch_lof(fund_code)
                     if result.success:
+                        # 写入缓存
+                        cache_key = f"fund:{self.name}:{fund_code}"
+                        cache = get_fund_cache()
+                        await cache.set(cache_key, result.data)
                         return result
                     # LOF 获取失败，返回错误（不再尝试其他接口）
                     return DataSourceResult(
@@ -98,6 +139,10 @@ class FundDataSource(DataSource):
                 if is_etf:
                     result = await self._fetch_etf(fund_code)
                     if result.success:
+                        # 写入缓存
+                        cache_key = f"fund:{self.name}:{fund_code}"
+                        cache = get_fund_cache()
+                        await cache.set(cache_key, result.data)
                         return result
                     # ETF 获取失败，返回错误（不再尝试其他接口）
                     return DataSourceResult(
@@ -176,6 +221,12 @@ class FundDataSource(DataSource):
                         data["type"] = fund_type
 
                     self._record_success()
+
+                    # 写入缓存
+                    cache_key = f"fund:{self.name}:{fund_code}"
+                    cache = get_fund_cache()
+                    await cache.set(cache_key, data)
+
                     return DataSourceResult(
                         success=True,
                         data=data,
