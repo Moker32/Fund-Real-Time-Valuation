@@ -9,8 +9,9 @@ QDII/FOF 基金核心功能单元测试
 4. build_fund_response 函数
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 class TestQdiiFofTypeRecognition:

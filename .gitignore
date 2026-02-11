@@ -40,3 +40,6 @@ pnpm-lock.yaml
 
 # Frontend build
 web/dist/
+
+# Vite dev server
+web/.vite/
