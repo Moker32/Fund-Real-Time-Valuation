@@ -68,6 +68,13 @@ export const useFundStore = defineStore('funds', () => {
     return sum / funds.value.length;
   });
 
+  // 持有优先排序（保持原序）
+  const holdingFirstFunds = computed(() => {
+    const holding = funds.value.filter((f) => f.isHolding);
+    const notHolding = funds.value.filter((f) => !f.isHolding);
+    return [...holding, ...notHolding];
+  });
+
   // 获取友好的错误消息
   function getFriendlyErrorMessage(err: unknown): string {
     if (err instanceof ApiError) {
@@ -222,6 +229,7 @@ export const useFundStore = defineStore('funds', () => {
     topGainers,
     topLosers,
     averageChange,
+    holdingFirstFunds,
     // Actions
     fetchFunds,
     fetchFundEstimate,

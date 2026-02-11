@@ -49,7 +49,7 @@
       <div class="list-header">
         <div class="header-left">
           <h2 class="section-title">自选基金</h2>
-          <span class="fund-count">{{ fundStore.funds.length }} 只</span>
+          <span class="fund-count">{{ fundStore.holdingFirstFunds.length }} 只</span>
         </div>
         <button class="btn-add" @click="showAddDialog = true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -62,7 +62,7 @@
       <div class="funds-grid">
         <TransitionGroup name="fund-card">
           <FundCard
-            v-for="fund in fundStore.funds"
+            v-for="fund in fundStore.holdingFirstFunds"
             :key="fund.code"
             :fund="fund"
             @remove="handleRemoveFund"
@@ -119,7 +119,7 @@ const emptyFund: EmptyFundState = {
 
 // 计算属性：是否显示加载状态
 const isLoading = computed(() => fundStore.loading);
-const hasFunds = computed(() => fundStore.funds.length > 0);
+const hasFunds = computed(() => fundStore.holdingFirstFunds.length > 0);
 const hasError = computed(() => !!fundStore.error);
 
 // 模板条件简化：显示骨架屏
