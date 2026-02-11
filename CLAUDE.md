@@ -16,7 +16,8 @@ pnpm run install:all
 pnpm run dev
 
 # 单独启动
-pnpm run dev:web    # 前端 (Vite + Vue 3)
+pnpm run dev:web    # 前端 (Vite + Vue 3, 端口 3000)
+pnpm run dev:api    # 后端 (FastAPI, 端口 8000)
 uv run python run_api.py --reload  # 后端 (FastAPI)
 
 # 构建
@@ -33,6 +34,7 @@ cd web && pnpm run lint          # 前端 lint (ESLint)
 cd web && pnpm run typecheck     # 前端类型检查 (vue-tsc)
 # 或使用统一命令
 pnpm run lint                    # 后端 lint
+pnpm run lint:fix               # 后端 lint 自动修复
 pnpm run lint:web               # 前端 lint
 pnpm run typecheck              # 后端 + 前端 类型检查
 pnpm run check                  # 运行所有检查 (lint + typecheck)
@@ -91,8 +93,9 @@ pnpm run check                  # 运行所有检查 (lint + typecheck)
 | `/api/funds/{code}` | GET | 获取基金详情 |
 | `/api/funds/{code}/estimate` | GET | 获取基金实时估值 |
 | `/api/funds/{code}/history` | GET | 获取基金历史净值 |
-| `/api/funds/add` | POST | 添加基金到自选 |
-| `/api/funds/{code}` | DELETE | 从自选移除基金 |
+| `/api/funds/watchlist` | POST | 添加基金到自选 |
+| `/api/funds/watchlist/{code}` | DELETE | 从自选移除基金 |
+| `/api/funds/{code}/holding` | PUT | 标记/取消持有基金 |
 | `/api/commodities` | GET | 获取商品行情列表 |
 | `/api/commodities/{type}` | GET | 获取单个商品行情 |
 | `/api/commodities/gold/cny` | GET | 获取国内黄金行情 |
@@ -108,10 +111,10 @@ pnpm run check                  # 运行所有检查 (lint + typecheck)
 
 #### Pydantic 模型 (api/models.py)
 
-- `FundResponse` - 基金响应
-- `FundListResponse` - 基金列表响应
-- `FundDetailResponse` - 基金详情响应
-- `FundEstimateResponse` - 基金估值响应
+- `FundResponse` - 基金响应（基类）
+- `FundListData` - 基金列表响应（TypedDict）
+- `FundDetailResponse` - 基金详情响应（继承 FundResponse）
+- `FundEstimateResponse` - 基金估值响应（继承 FundResponse）
 - `CommodityResponse` - 商品响应
 - `CommodityListResponse` - 商品列表响应
 - `HealthResponse` - 健康检查响应

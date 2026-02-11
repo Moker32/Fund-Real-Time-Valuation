@@ -443,7 +443,7 @@ class FundDataSource(DataSource):
                     if not name_rows.empty:
                         fund_name = str(name_rows.iloc[0].get("基金简称", ""))
             except Exception as e:
-                logger.warning(f"获取基金简称失败: {fund_code}, error: {e}")
+                logger.debug(f"获取基金简称失败: {fund_code}, error: {e}")
 
             # 如果没获取到名称，使用基金代码作为名称
             if not fund_name:
@@ -461,7 +461,7 @@ class FundDataSource(DataSource):
                         if "-" in fund_type:
                             fund_type = fund_type.split("-")[0]  # "QDII-商品" -> "QDII"
             except Exception as e:
-                logger.warning(f"获取基金类型失败: {fund_code}, error: {e}")
+                logger.debug(f"获取基金类型失败: {fund_code}, error: {e}")
 
             # 根据基金类型判断是否有实时估值（QDII/FOF 等投资海外市场或为基金中基金，净值更新延迟）
             no_realtime_types = {"QDII", "FOF", "ETF-联接"}

@@ -156,6 +156,19 @@ class TestHasRealTimeEstimate:
 
         assert response["hasRealTimeEstimate"] is True
 
+    def test_has_real_time_estimate_for_fof(self):
+        """FOF 基金 hasRealTimeEstimate 应为 False"""
+        from api.routes.funds import build_fund_response
+
+        data = {
+            "fund_code": "005217",
+            "name": "交银施罗德安享稳健养老目标一年持有FOF",
+            "type": "FOF",
+            "has_real_time_estimate": False,
+        }
+        response = build_fund_response(data)
+        assert response["hasRealTimeEstimate"] is False
+
 
 class TestCalculateEstimateChange:
     """测试 _calculate_estimate_change 函数"""
@@ -219,6 +232,18 @@ class TestCalculateEstimateChange:
         result = _calculate_estimate_change(unit_net=1.123456, estimate_net=1.654321)
 
         assert result == round(1.654321 - 1.123456, 4)
+
+    def test_calculate_estimate_change_extreme_values(self):
+        """测试极端值场景"""
+        from api.routes.funds import _calculate_estimate_change
+
+        # 大数计算
+        result = _calculate_estimate_change(unit_net=1000000.0, estimate_net=1000000.1234)
+        assert result == 0.1234
+
+        # 极小数值
+        result = _calculate_estimate_change(unit_net=0.0001, estimate_net=0.0002)
+        assert result == 0.0001
 
 
 class TestCheckIsHolding:

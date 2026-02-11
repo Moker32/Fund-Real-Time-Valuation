@@ -42,6 +42,12 @@ if [ ! -d "node_modules" ]; then
     pnpm install
 fi
 
+# 检查 Python 依赖（使用 uv）
+if [ ! -f ".venv" ] || ! uv pip list &>/dev/null; then
+    echo -e "${YELLOW}安装 Python 依赖...${NC}"
+    uv pip install -r requirements.txt
+fi
+
 echo ""
 echo -e "${GREEN}启动服务...${NC}"
 echo ""

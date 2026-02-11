@@ -169,6 +169,10 @@ async def get_funds_list(
                 fund_code = result.metadata.get("fund_code", "unknown")
                 logger.warning(f"基金获取失败: {fund_code} - {result.error}")
                 failed_count += 1
+
+        if failed_count > 0:
+            logger.info(f"批量获取基金完成: 成功 {len(funds)}, 失败 {failed_count}")
+
         return {"funds": funds, "total": len(funds), "timestamp": current_time, "progress": 100}
 
     # 没有指定 codes 时，使用默认基金代码获取真实数据
