@@ -220,15 +220,21 @@ class FundDataSource(DataSource):
                     if fund_type:
                         data["type"] = fund_type
                     else:
-                        # Fallback: 从基金名称中识别 QDII
+                        # Fallback: 从基金名称中识别 QDII/FOF
                         fund_name = data.get("name", "")
                         if "(QDII)" in fund_name or fund_name.endswith("QDII"):
                             data["type"] = "QDII"
                             fund_type = "QDII"
+                        elif "FOF" in fund_name or "(FOF)" in fund_name:
+                            data["type"] = "FOF"
+                            fund_type = "FOF"
 
                     # 根据基金类型判断是否有实时估值（QDII/FOF 等没有实时估值）
                     no_realtime_types = {"QDII", "FOF", "ETF-联接"}
-                    data["has_real_time_estimate"] = fund_type not in no_realtime_types
+                    # 如果 fund_type 仍为空字符串，默认认为有实时估值
+                    data["has_real_time_estimate"] = (
+                        bool(fund_type) and fund_type not in no_realtime_types
+                    )
 
                     # QDII/FOF 等基金需要获取上一交易日净值用于对比
                     if fund_type in no_realtime_types:

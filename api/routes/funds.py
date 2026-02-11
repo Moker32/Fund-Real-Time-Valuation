@@ -56,13 +56,26 @@ def get_default_fund_codes() -> list[str]:
     return default_funds
 
 
+def _calculate_estimate_change(unit_net: float | None, estimate_net: float | None) -> float | None:
+    """计算估算涨跌额
+
+    Args:
+        unit_net: 单位净值
+        estimate_net: 估算净值
+
+    Returns:
+        估算涨跌额，如果无法计算则返回 None
+    """
+    if unit_net is not None and estimate_net is not None and unit_net != 0:
+        return round(estimate_net - unit_net, 4)
+    return None
+
+
 def build_fund_response(data: dict, source: str = "", is_holding: bool = False) -> dict:
     """构建基金响应数据"""
     unit_net = data.get("unit_net_value")
     estimate_net = data.get("estimated_net_value")
-    estimate_change = None
-    if unit_net is not None and estimate_net is not None and unit_net != 0:
-        estimate_change = round(estimate_net - unit_net, 4)
+    estimate_change = _calculate_estimate_change(unit_net, estimate_net)
 
     return FundResponse(
         code=data.get("fund_code", ""),
@@ -192,9 +205,7 @@ async def get_fund_detail(
     # 计算 estimateChange (估算涨跌额)
     unit_net = data.get("unit_net_value")
     estimate_net = data.get("estimated_net_value")
-    estimate_change = None
-    if unit_net is not None and estimate_net is not None and unit_net != 0:
-        estimate_change = round(estimate_net - unit_net, 4)
+    estimate_change = _calculate_estimate_change(unit_net, estimate_net)
 
     # 检查是否持仓
     config_manager = ConfigManager()
@@ -257,9 +268,7 @@ async def get_fund_estimate(
     # 计算 estimateChange (估算涨跌额)
     unit_net = data.get("unit_net_value")
     estimate_net = data.get("estimated_net_value")
-    estimate_change = None
-    if unit_net is not None and estimate_net is not None and unit_net != 0:
-        estimate_change = round(estimate_net - unit_net, 4)
+    estimate_change = _calculate_estimate_change(unit_net, estimate_net)
 
     # 检查是否持仓
     config_manager = ConfigManager()
