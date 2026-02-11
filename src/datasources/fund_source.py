@@ -25,15 +25,15 @@ class FundDataSource(DataSource):
 
     def __init__(
         self,
-        timeout: float = 10.0,
-        max_retries: int = 3,
+        timeout: float = 30.0,
+        max_retries: int = 2,
         retry_delay: float = 1.0
     ):
         """
         初始化基金数据源
 
         Args:
-            timeout: 请求超时时间
+            timeout: 请求超时时间(秒)
             max_retries: 最大重试次数
             retry_delay: 重试间隔(秒)
         """
