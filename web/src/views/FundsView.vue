@@ -52,12 +52,14 @@
       </div>
 
       <div class="funds-grid">
-        <FundCard
-          v-for="fund in fundStore.funds"
-          :key="fund.code"
-          :fund="fund"
-          @remove="handleRemoveFund"
-        />
+        <TransitionGroup name="fund-card">
+          <FundCard
+            v-for="fund in fundStore.funds"
+            :key="fund.code"
+            :fund="fund"
+            @remove="handleRemoveFund"
+          />
+        </TransitionGroup>
       </div>
     </div>
 
@@ -189,6 +191,26 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--spacing-md);
+}
+
+// 基金卡片过渡动画
+.fund-card-enter-active,
+.fund-card-leave-active {
+  transition: all 0.3s ease;
+}
+
+.fund-card-enter-from {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+.fund-card-leave-to {
+  opacity: 0;
+  transform: scale(0.95);
+}
+
+.fund-card-move {
+  transition: transform 0.3s ease;
 }
 
 .error-state,
