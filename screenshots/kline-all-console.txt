@@ -1,0 +1,4 @@
+Total messages: 2 (Errors: 0, Warnings: 0)
+
+[DEBUG] [vite] connecting... @ http://localhost:3000/@vite/client:732
+[DEBUG] [vite] connected. @ http://localhost:3000/@vite/client:826

@@ -829,6 +829,27 @@ class FundHistorySource(DataSource):
         """验证基金代码格式"""
         return bool(re.match(r"^\d{6}$", str(fund_code)))
 
+    async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
+        """
+        批量获取基金历史数据（未实现，返回单条结果）
+
+        Returns:
+            List[DataSourceResult]: 返回结果列表
+        """
+        # 从 kwargs 中提取参数
+        fund_code = kwargs.get('fund_code')
+        period = kwargs.get('period', '近一年')
+
+        if fund_code:
+            result = await self.fetch(fund_code, period)
+            return [result]
+        return [DataSourceResult(
+            success=False,
+            error="缺少 fund_code 参数",
+            timestamp=time.time(),
+            source=self.name,
+        )]
+
 
 class FundHistoryYFinanceSource(DataSource):
     """基金历史数据源 - 使用 yfinance 获取历史数据（备用方案）"""
@@ -919,6 +940,26 @@ class FundHistoryYFinanceSource(DataSource):
         """异步获取历史数据"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, lambda: self.fetch(fund_code, period))
+
+    async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
+        """
+        批量获取基金历史数据（未实现，返回单条结果）
+
+        Returns:
+            List[DataSourceResult]: 返回结果列表
+        """
+        fund_code = kwargs.get('fund_code')
+        period = kwargs.get('period', '1y')
+
+        if fund_code:
+            result = await self.fetch(fund_code, period)
+            return [result]
+        return [DataSourceResult(
+            success=False,
+            error="缺少 fund_code 参数",
+            timestamp=time.time(),
+            source=self.name,
+        )]
 
 
 class SinaFundDataSource(DataSource):

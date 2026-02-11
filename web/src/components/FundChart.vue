@@ -8,8 +8,26 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { createChart, ColorType, CrosshairMode, IChartApi, ISeriesApi } from 'lightweight-charts';
+import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
 import type { FundHistory } from '@/types';
+
+// 类型定义
+interface ChartApi {
+  addCandlestickSeries: (options: {
+    upColor: string;
+    downColor: string;
+    borderVisible: boolean;
+    wickUpColor: string;
+    wickDownColor: string;
+  }) => {
+    setData: (data: FundHistory[]) => void;
+  };
+  applyOptions: (options: { width: number }) => void;
+  remove: () => void;
+  getSeries: () => {
+    setData: (data: FundHistory[]) => void;
+  } | null;
+}
 
 const props = withDefaults(defineProps<{
   data: FundHistory[];
@@ -19,8 +37,8 @@ const props = withDefaults(defineProps<{
 });
 
 const chartContainer = ref<Element | null>(null);
-let chart: IChartApi | null = null;
-let candleSeries: ISeriesApi<"Candlestick"> | null = null;
+let chart: ChartApi | null = null;
+let candleSeries: { setData: (data: FundHistory[]) => void } | null = null;
 
 const initChart = () => {
   if (!chartContainer.value) return;

@@ -155,9 +155,14 @@ function handleFundAdded() {
   fundStore.fetchFunds();
 }
 
-onMounted(() => {
+onMounted(async () => {
   isMounted = true;
-  fundStore.fetchFunds();
+  await fundStore.fetchFunds();
+
+  // 加载每个基金的 K 线数据（包含今日实时 K 线）
+  fundStore.holdingFirstFunds.forEach((fund) => {
+    fundStore.fetchHistory(fund.code);
+  });
 });
 
 onUnmounted(() => {

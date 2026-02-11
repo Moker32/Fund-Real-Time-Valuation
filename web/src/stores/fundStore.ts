@@ -237,22 +237,62 @@ export const useFundStore = defineStore('funds', () => {
     }
   }
 
-  // 获取基金历史数据
+  // 获取基金历史数据（包含今日实时 K 线）
   async function fetchHistory(code: string, days: number = 60): Promise<FundHistory[]> {
     try {
-      const response = await fundApi.getFundHistory(code, days);
-      const history = response.data || [];
+      // 并行获取历史数据和今日估值
+      const [historyResponse, estimateResponse] = await Promise.allSettled([
+        fundApi.getFundHistory(code, days),
+        fundApi.getFundEstimate(code),
+      ]);
+
+      const history: FundHistory[] = historyResponse.status === 'fulfilled'
+        ? (historyResponse.value.data || [])
+        : [];
+
+      // 构建今日 K 线数据
+      let todayKLine: FundHistory | null = null;
+
+      if (estimateResponse.status === 'fulfilled' && estimateResponse.value) {
+        const estimate = estimateResponse.value;
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (!todayStr) return history; // 处理日期异常
+
+        // 找到昨日净值作为开盘价
+        let openPrice: number | null = null;
+        if (history.length > 0) {
+          const lastItem = history[history.length - 1];
+          if (lastItem && lastItem.close) {
+            openPrice = lastItem.close;
+          }
+        }
+
+        // 如果有开盘价和当前估值，构建今日 K 线
+        if (openPrice !== null && estimate.netValue) {
+          todayKLine = {
+            time: todayStr,
+            open: openPrice,
+            high: Math.max(openPrice, estimate.netValue),
+            low: Math.min(openPrice, estimate.netValue),
+            close: estimate.netValue,
+            volume: 0,
+          };
+        }
+      }
+
+      // 合并历史数据和今日 K 线
+      const fullHistory = todayKLine ? [...history, todayKLine] : history;
 
       // 更新对应基金的历史数据
       const index = funds.value.findIndex((f) => f.code === code);
       if (index !== -1) {
         const currentFund = funds.value[index];
         if (currentFund) {
-          funds.value[index] = { ...currentFund, history };
+          funds.value[index] = { ...currentFund, history: fullHistory };
         }
       }
 
-      return history;
+      return fullHistory;
     } catch (err) {
       console.error(`[FundStore] fetchHistory error for ${code}:`, err);
       return [];
