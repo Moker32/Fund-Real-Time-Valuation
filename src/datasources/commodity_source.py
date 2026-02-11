@@ -246,7 +246,7 @@ class AKShareCommoditySource(CommodityDataSource):
             timeout=timeout
         )
         self._cache: dict[str, dict[str, Any]] = {}
-        self._cache_timeout = 60.0
+        self._cache_timeout = 10.0  # 缓存10秒，商品价格实时性要求高
 
     async def fetch(self, commodity_type: str = "gold_cny") -> DataSourceResult:
         """获取国内商品数据"""
@@ -306,19 +306,20 @@ class AKShareCommoditySource(CommodityDataSource):
             return self._handle_error(e, self.name)
 
     async def _fetch_gold_cny(self) -> dict[str, Any] | None:
-        """获取上海黄金交易所 Au99.99 数据"""
+        """获取上海黄金交易所 Au99.99 实时数据"""
         import akshare as ak
 
-        df = ak.spot_golden_benchmark_sge()
+        # 使用实时行情接口
+        df = ak.spot_golden_sge()
         if df is not None and not df.empty:
             latest = df.iloc[0]
             return {
                 "commodity": "gold_cny",
                 "symbol": "Au99.99",  # 添加 symbol
                 "name": "Au99.99 (上海黄金)",
-                "price": float(latest.get("早盘价", latest.get("晚盘价", 0))),
-                "change_percent": 0.0,  # API 不提供涨跌幅
-                "time": str(latest.get("交易时间", "")),
+                "price": float(latest.get("价格", 0)),
+                "change_percent": float(latest.get("涨跌幅", 0)),
+                "time": str(latest.get("时间", "")),
                 "raw_data": df.to_dict("records")[:3]
             }
         return None
