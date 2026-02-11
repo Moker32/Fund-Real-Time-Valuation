@@ -29,6 +29,7 @@
           <div class="value-row">
             <span class="label">净值</span>
             <span class="value font-mono">{{ formatNumber(fund.netValue, 4) }}</span>
+            <span class="value-date">{{ formatNetValueDate(fund.netValueDate) }}</span>
           </div>
           <div class="value-row">
             <span class="label">估值</span>
@@ -106,6 +107,16 @@ function formatTime(dateStr: string): string {
     return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
   } catch {
     return dateStr;
+  }
+}
+
+function formatNetValueDate(dateStr: string): string {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+  } catch {
+    return '';
   }
 }
 </script>
@@ -253,6 +264,12 @@ function formatTime(dateStr: string): string {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+}
+
+.value-date {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
 }
 
 .label {
