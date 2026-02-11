@@ -19,7 +19,7 @@ pnpm run install:all
 # 并行启动前后端开发服务器
 pnpm run dev
 
-# 访问 http://localhost:5173 查看前端
+# 访问 http://localhost:3000 查看前端
 # 访问 http://localhost:8000/docs 查看 API 文档
 ```
 
@@ -27,35 +27,48 @@ pnpm run dev
 
 ```
 ├── run_api.py              # Web 应用入口
+├── pyproject.toml          # Python 项目配置
+├── package.json            # pnpm 工作空间配置
+├── api/                    # FastAPI 后端
+│   ├── main.py             # FastAPI 应用
+│   ├── dependencies.py     # 依赖注入
+│   ├── models.py           # Pydantic 数据模型
+│   └── routes/             # API 路由
+│       ├── funds.py        # 基金 API
+│       ├── commodities.py  # 商品 API
+│       └── overview.py     # 市场概览 API
 ├── web/                    # Vue 3 前端
 │   ├── src/               # 前端源码
-│   ├── dist/              # 构建产物
 │   └── package.json       # 前端依赖
-├── api/                   # FastAPI 后端
-│   ├── main.py           # FastAPI 应用
-│   ├── dependencies.py   # 依赖注入
-│   ├── models.py         # 数据模型
-│   └── routes/           # API 路由
-│       ├── funds.py      # 基金 API
-│       └── commodities.py # 商品 API
-├── src/                   # Python 源码
-│   ├── datasources/      # 数据源层
-│   ├── config/           # 配置管理
-│   └── utils/            # 工具模块
+├── src/                    # Python 源码
+│   ├── datasources/       # 数据源层
+│   ├── config/            # 配置管理
+│   └── utils/             # 工具模块
 └── tests/                 # 测试
 ```
 
 ## 开发
 
 ```bash
-# 运行后端测试
-uv run python -m pytest tests/ -v
+# 安装依赖 (前端 + 后端)
+pnpm run install:all
 
-# 类型检查
-uv run python -m mypy src/
+# 并行启动前后端开发服务器
+pnpm run dev
 
-# 代码风格检查
-uv run python -m ruff check src/
+# 单独启动
+pnpm run dev:web    # 前端 (Vite + Vue 3)
+uv run python run_api.py --reload  # 后端 (FastAPI)
+
+# 运行测试
+uv run pytest tests/ -v
+
+# 代码检查
+uv run ruff check .              # Python 代码检查
+uv run ruff check --fix .        # 自动修复
+uv run mypy .                    # 类型检查
+cd web && pnpm run lint          # 前端代码检查
+cd web && pnpm run typecheck    # 前端类型检查
 
 # 构建前端
 pnpm run build:web

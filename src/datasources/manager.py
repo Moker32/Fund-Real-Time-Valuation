@@ -362,23 +362,6 @@ class DataSourceManager:
 
         return processed_results
 
-        # 处理异常情况
-        processed_results = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                processed_results.append(
-                    DataSourceResult(
-                        success=False,
-                        error=str(result),
-                        timestamp=time.time(),
-                        source=primary_source.name
-                    )
-                )
-            else:
-                processed_results.append(result)
-
-        return processed_results
-
     def _get_ordered_sources(self, source_type: DataSourceType) -> list[DataSource]:
         """
         获取排序后的数据源列表
@@ -654,23 +637,62 @@ class DataSourceManager:
 
 
 # 工厂函数
-def create_default_manager() -> DataSourceManager:
+def create_default_manager(
+    enable_load_balancing: bool = False,
+    health_check_interval: int = 60
+) -> DataSourceManager:
     """
     创建默认配置的数据源管理器
+
+    Args:
+        enable_load_balancing: 是否启用负载均衡
+        health_check_interval: 健康检查间隔（秒）
 
     Returns:
         DataSourceManager: 配置好的管理器实例
     """
     from .commodity_source import AKShareCommoditySource, YFinanceCommoditySource
-    from .fund_source import FundDataSource
+    from .fund_source import FundDataSource, SinaFundDataSource, EastMoneyFundDataSource
     from .news_source import SinaNewsDataSource
     from .sector_source import EastMoneySectorSource, SinaSectorDataSource
 
-    manager = DataSourceManager()
+    manager = DataSourceManager(
+        enable_load_balancing=enable_load_balancing,
+        health_check_interval=health_check_interval
+    )
 
-    # 注册基金数据源
-    fund_source = FundDataSource()
-    manager.register(fund_source)
+    # 注册基金数据源（按优先级排序）
+    # 优先级数值越小优先级越高
+
+    # 天天基金接口（主数据源）
+    fund_tiantian = FundDataSource()
+    manager.register(fund_tiantian, DataSourceConfig(
+        source_class=type(fund_tiantian),
+        name=fund_tiantian.name,
+        source_type=DataSourceType.FUND,
+        enabled=True,
+        priority=1
+    ))
+
+    # 新浪基金接口（备用1）
+    fund_sina = SinaFundDataSource()
+    manager.register(fund_sina, DataSourceConfig(
+        source_class=type(fund_sina),
+        name=fund_sina.name,
+        source_type=DataSourceType.FUND,
+        enabled=True,
+        priority=2
+    ))
+
+    # 东方财富基金接口（备用2）
+    fund_eastmoney = EastMoneyFundDataSource()
+    manager.register(fund_eastmoney, DataSourceConfig(
+        source_class=type(fund_eastmoney),
+        name=fund_eastmoney.name,
+        source_type=DataSourceType.FUND,
+        enabled=True,
+        priority=3
+    ))
 
     # 注册商品数据源
     commodity_source = AKShareCommoditySource()
