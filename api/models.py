@@ -13,6 +13,7 @@ class FundResponse(BaseModel):
     """基金响应模型"""
     code: str = Field(..., alias="fund_code", description="基金代码")
     name: str = Field(..., description="基金名称")
+    type: Optional[str] = Field(None, description="基金类型（如：股票型、混合型、债券型、QDII等）")
     netValue: Optional[float] = Field(None, alias="unit_net_value", description="单位净值")
     netValueDate: Optional[str] = Field(None, alias="net_value_date", description="净值日期")
     estimateValue: Optional[float] = Field(None, alias="estimated_net_value", description="估值")
@@ -44,6 +45,7 @@ class FundEstimateResponse(BaseModel):
     """基金估值响应模型"""
     code: str = Field(..., alias="fund_code", description="基金代码")
     name: str = Field(..., description="基金名称")
+    type: Optional[str] = Field(None, description="基金类型（如：股票型、混合型、债券型、QDII等）")
     netValue: Optional[float] = Field(None, alias="unit_net_value", description="最新单位净值")
     netValueDate: Optional[str] = Field(None, alias="net_value_date", description="净值日期")
     estimateValue: Optional[float] = Field(None, alias="estimated_net_value", description="单位净值估算")

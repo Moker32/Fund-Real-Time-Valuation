@@ -170,6 +170,11 @@ class FundDataSource(DataSource):
                 data = self._parse_response(response.text, fund_code)
 
                 if data:
+                    # 获取基金类型
+                    fund_type = await self._get_fund_type(fund_code)
+                    if fund_type:
+                        data["type"] = fund_type
+
                     self._record_success()
                     return DataSourceResult(
                         success=True,
@@ -343,8 +348,9 @@ class FundDataSource(DataSource):
             # 获取最新一条数据（最后一行是最新的，因为数据是按日期升序排列的）
             latest = df.iloc[-1]
 
-            # 获取基金简称
+            # 获取基金简称和类型
             fund_name = ""
+            fund_type = ""
             try:
                 daily_df = ak.fund_open_fund_daily_em()
                 if "基金代码" in daily_df.columns:
@@ -358,6 +364,20 @@ class FundDataSource(DataSource):
             if not fund_name:
                 fund_name = f"基金 {fund_code}"
 
+            # 获取基金详细信息（包含类型）
+            try:
+                info_df = ak.fund_individual_basic_info_xq(symbol=fund_code)
+                if info_df is not None and not info_df.empty:
+                    # 查找基金类型
+                    type_row = info_df[info_df["item"] == "基金类型"]
+                    if not type_row.empty:
+                        fund_type = str(type_row.iloc[0]["value"]).strip()
+                        # 简化类型名称
+                        if "-" in fund_type:
+                            fund_type = fund_type.split("-")[0]  # "QDII-商品" -> "QDII"
+            except Exception:
+                pass
+
             # 提取数据
             net_date = str(latest.get("净值日期", ""))
             unit_net = float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None
@@ -366,6 +386,7 @@ class FundDataSource(DataSource):
             data = {
                 "fund_code": fund_code,
                 "name": fund_name,
+                "type": fund_type,
                 "net_value_date": net_date,
                 "unit_net_value": unit_net,
                 "estimated_net_value": unit_net,  # 开放式基金暂无实时估值
@@ -444,6 +465,35 @@ class FundDataSource(DataSource):
             bool: 是否有效
         """
         return bool(re.match(r"^\d{6}$", str(fund_code)))
+
+    async def _get_fund_type(self, fund_code: str) -> str:
+        """
+        获取基金类型信息
+
+        Args:
+            fund_code: 基金代码
+
+        Returns:
+            str: 基金类型（如：股票型、混合型、债券型、QDII、ETF等）
+        """
+        try:
+            import akshare as ak
+
+            # 获取基金详细信息
+            info_df = ak.fund_individual_basic_info_xq(symbol=fund_code)
+            if info_df is not None and not info_df.empty:
+                # 查找基金类型
+                type_row = info_df[info_df["item"] == "基金类型"]
+                if not type_row.empty:
+                    fund_type = str(type_row.iloc[0]["value"]).strip()
+                    # 简化类型名称
+                    if "-" in fund_type:
+                        fund_type = fund_type.split("-")[0]  # "QDII-商品" -> "QDII"
+                    return fund_type
+
+            return ""
+        except Exception:
+            return ""
 
     def _parse_response(self, response_text: str, fund_code: str) -> dict[str, Any] | None:
         """

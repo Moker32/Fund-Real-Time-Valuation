@@ -67,6 +67,7 @@ def build_fund_response(data: dict, source: str = "") -> dict:
     return FundResponse(
         code=data.get("fund_code", ""),
         name=data.get("name", ""),
+        type=data.get("type"),
         netValue=data.get("unit_net_value"),
         netValueDate=data.get("net_value_date"),
         estimateValue=data.get("estimated_net_value"),
@@ -183,6 +184,7 @@ async def get_fund_detail(
     return FundDetailResponse(
         code=data.get("fund_code", ""),
         name=data.get("name", ""),
+        type=data.get("type"),
         netValue=data.get("unit_net_value"),
         netValueDate=data.get("net_value_date"),
         estimateValue=data.get("estimated_net_value"),
@@ -238,6 +240,7 @@ async def get_fund_estimate(
     return FundEstimateResponse(
         code=data.get("fund_code", ""),
         name=data.get("name", ""),
+        type=data.get("type"),
         estimateValue=data.get("estimated_net_value"),
         estimateChangePercent=data.get("estimated_growth_rate"),
         estimateTime=data.get("estimate_time"),

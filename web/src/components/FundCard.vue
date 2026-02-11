@@ -15,7 +15,7 @@
           <span class="fund-name">{{ fund.name }}</span>
         </div>
         <div class="card-actions">
-          <span class="fund-type">{{ fund.type || '混合型' }}</span>
+          <span class="fund-type">{{ fund.type || '其他' }}</span>
           <button class="action-btn delete-btn" title="从自选移除" @click.stop="$emit('remove', fund.code)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
