@@ -5,6 +5,7 @@
 
 import asyncio
 import json
+import logging
 import re
 import time
 from pathlib import Path
@@ -20,6 +21,8 @@ from .base import (
     DataSourceType,
 )
 from .dual_cache import DualLayerCache
+
+logger = logging.getLogger(__name__)
 
 # 全局缓存实例（单例模式）
 _fund_cache: DualLayerCache | None = None
@@ -225,13 +228,13 @@ class FundDataSource(DataSource):
                         if "(QDII)" in fund_name or fund_name.endswith("QDII"):
                             data["type"] = "QDII"
                             fund_type = "QDII"
-                        elif "FOF" in fund_name or "(FOF)" in fund_name:
+                        elif fund_name.endswith("FOF") or "(FOF)" in fund_name:
                             data["type"] = "FOF"
                             fund_type = "FOF"
 
                     # 根据基金类型判断是否有实时估值（QDII/FOF 等没有实时估值）
                     no_realtime_types = {"QDII", "FOF", "ETF-联接"}
-                    # 如果 fund_type 仍为空字符串，默认认为有实时估值
+                    # 如果 fund_type 为空字符串，则没有实时估值
                     data["has_real_time_estimate"] = (
                         bool(fund_type) and fund_type not in no_realtime_types
                     )
@@ -436,11 +439,11 @@ class FundDataSource(DataSource):
             try:
                 daily_df = ak.fund_open_fund_daily_em()
                 if "基金代码" in daily_df.columns:
-                    name_row = daily_df[daily_df["基金代码"] == fund_code]
-                    if not name_row.empty:
-                        fund_name = str(name_row.iloc[0].get("基金简称", ""))
-            except Exception:
-                pass
+                    name_rows = daily_df[daily_df["基金代码"] == fund_code]
+                    if not name_rows.empty:
+                        fund_name = str(name_rows.iloc[0].get("基金简称", ""))
+            except Exception as e:
+                logger.warning(f"获取基金简称失败: {fund_code}, error: {e}")
 
             # 如果没获取到名称，使用基金代码作为名称
             if not fund_name:
@@ -457,11 +460,10 @@ class FundDataSource(DataSource):
                         # 简化类型名称
                         if "-" in fund_type:
                             fund_type = fund_type.split("-")[0]  # "QDII-商品" -> "QDII"
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"获取基金类型失败: {fund_code}, error: {e}")
 
-            # 判断是否有实时估值（QDII/FOF 等基金类型没有实时估值）
-            # QDII 投资海外市场有时差，FOF 是基金中的基金，净值更新延迟
+            # 根据基金类型判断是否有实时估值（QDII/FOF 等投资海外市场或为基金中基金，净值更新延迟）
             no_realtime_types = {"QDII", "FOF", "ETF-联接"}
             has_real_time = has_real_time_estimate and fund_type not in no_realtime_types
 
@@ -588,7 +590,8 @@ class FundDataSource(DataSource):
                     return fund_type
 
             return ""
-        except Exception:
+        except Exception as e:
+            logger.warning(f"获取基金类型失败: {fund_code}, error: {e}")
             return ""
 
     def _parse_response(self, response_text: str, fund_code: str) -> dict[str, Any] | None:

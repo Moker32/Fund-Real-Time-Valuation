@@ -20,7 +20,7 @@ class FundResponse(BaseModel):
     estimateValue: float | None = Field(None, alias="estimated_net_value", description="估值")
     estimateChangePercent: float | None = Field(None, alias="estimated_growth_rate", description="估算增长率(%)")
     estimateTime: str | None = Field(None, alias="estimate_time", description="估值时间")
-    source: str = Field(..., description="数据源")
+    source: str = Field(default="", description="数据源")
 
     # 添加 estimateChange 字段（计算属性）
     estimateChange: float | None = Field(None, description="估算涨跌额")
@@ -48,31 +48,9 @@ class FundDetailResponse(FundResponse):
     pass
 
 
-class FundEstimateResponse(BaseModel):
-    """基金估值响应模型"""
-    code: str = Field(..., alias="fund_code", description="基金代码")
-    name: str = Field(..., description="基金名称")
-    type: str | None = Field(None, description="基金类型（如：股票型、混合型、债券型、QDII等）")
-    netValue: float | None = Field(None, alias="unit_net_value", description="最新单位净值")
-    netValueDate: str | None = Field(None, alias="net_value_date", description="净值日期")
-    prevNetValue: float | None = Field(None, alias="prev_net_value", description="上一交易日净值")
-    prevNetValueDate: str | None = Field(None, alias="prev_net_value_date", description="上一交易日净值日期")
-    estimateValue: float | None = Field(None, alias="estimated_net_value", description="单位净值估算")
-    estimateChangePercent: float | None = Field(None, alias="estimated_growth_rate", description="估算增长率(%)")
-    estimateTime: str | None = Field(None, alias="estimate_time", description="估值时间")
-
-    # 添加 estimateChange 字段（计算属性）
-    estimateChange: float | None = Field(None, description="估算涨跌额")
-
-    # 是否持有
-    isHolding: bool = Field(False, description="是否持有该基金")
-
-    # 是否有实时估值（区分 QDII/FOF 等无实时估值的基金）
-    hasRealTimeEstimate: bool = Field(True, alias="has_real_time_estimate", description="是否有实时估值")
-
-    model_config = {
-        "populate_by_name": True,
-    }
+class FundEstimateResponse(FundResponse):
+    """基金估值响应模型 - 继承 FundResponse"""
+    pass
 
 
 class CommodityResponse(BaseModel):

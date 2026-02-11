@@ -3,6 +3,7 @@
 提供基金相关的 REST API 端点
 """
 
+import logging
 from datetime import datetime
 from typing import TypedDict
 
@@ -32,6 +33,26 @@ class FundListData(TypedDict):
 
 
 router = APIRouter(prefix="/api/funds", tags=["基金"])
+
+logger = logging.getLogger(__name__)
+
+
+def _check_is_holding(code: str) -> bool:
+    """检查基金是否为持仓
+
+    Args:
+        code: 基金代码
+
+    Returns:
+        bool: 是否持有
+    """
+    try:
+        config_manager = ConfigManager()
+        fund_list = config_manager.load_funds()
+        return code in {h.code for h in fund_list.holdings}
+    except Exception:
+        logger.warning(f"加载持仓信息失败: {code}")
+        return False
 
 
 def get_default_fund_codes() -> list[str]:
@@ -138,13 +159,16 @@ async def get_funds_list(
         params_list = [{"args": [code]} for code in fund_codes]
         results = await manager.fetch_batch(DataSourceType.FUND, params_list)
         funds = []
+        failed_count = 0
         for result in results:
             if result.success:
                 is_holding = result.data.get("fund_code") in holding_codes
                 funds.append(build_fund_response(result.data, result.source, is_holding))
             else:
-                # 如果单个基金获取失败，记录错误但不中断
-                pass
+                # 记录失败的基金代码
+                fund_code = result.metadata.get("fund_code", "unknown")
+                logger.warning(f"基金获取失败: {fund_code} - {result.error}")
+                failed_count += 1
         return {"funds": funds, "total": len(funds), "timestamp": current_time, "progress": 100}
 
     # 没有指定 codes 时，使用默认基金代码获取真实数据
@@ -154,13 +178,19 @@ async def get_funds_list(
     params_list = [{"args": [code]} for code in fund_codes]
     results = await manager.fetch_batch(DataSourceType.FUND, params_list)
     funds = []
+    failed_count = 0
     for result in results:
         if result.success:
             is_holding = result.data.get("fund_code") in holding_codes
             funds.append(build_fund_response(result.data, result.source, is_holding))
         else:
-            # 如果单个基金获取失败，记录错误但不中断
-            pass
+            # 记录失败的基金代码
+            fund_code = result.metadata.get("fund_code", "unknown")
+            logger.warning(f"基金获取失败: {fund_code} - {result.error}")
+            failed_count += 1
+
+    if failed_count > 0:
+        logger.info(f"批量获取基金完成: 成功 {len(funds)}, 失败 {failed_count}")
 
     return {"funds": funds, "total": len(funds), "timestamp": current_time, "progress": 100}
 
@@ -190,7 +220,6 @@ async def get_fund_detail(
     Returns:
         FundDetailResponse: 基金详情
     """
-    from src.config.manager import ConfigManager
 
     result = await manager.fetch(DataSourceType.FUND, code)
 
@@ -208,9 +237,7 @@ async def get_fund_detail(
     estimate_change = _calculate_estimate_change(unit_net, estimate_net)
 
     # 检查是否持仓
-    config_manager = ConfigManager()
-    fund_list = config_manager.load_funds()
-    is_holding = code in {h.code for h in fund_list.holdings}
+    is_holding = _check_is_holding(code)
 
     return FundDetailResponse(
         code=data.get("fund_code", ""),
@@ -253,7 +280,6 @@ async def get_fund_estimate(
     Returns:
         FundEstimateResponse: 基金估值信息
     """
-    from src.config.manager import ConfigManager
 
     result = await manager.fetch(DataSourceType.FUND, code)
 
@@ -271,9 +297,7 @@ async def get_fund_estimate(
     estimate_change = _calculate_estimate_change(unit_net, estimate_net)
 
     # 检查是否持仓
-    config_manager = ConfigManager()
-    fund_list = config_manager.load_funds()
-    is_holding = code in {h.code for h in fund_list.holdings}
+    is_holding = _check_is_holding(code)
 
     return FundEstimateResponse(
         code=data.get("fund_code", ""),
