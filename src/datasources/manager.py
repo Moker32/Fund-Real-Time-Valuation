@@ -279,6 +279,7 @@ class DataSourceManager:
         params_list: list[dict[str, Any]],
         *args,
         parallel: bool = True,
+        failover: bool = True,
         **kwargs
     ) -> list[DataSourceResult]:
         """
@@ -289,6 +290,7 @@ class DataSourceManager:
             params_list: 参数列表，每个元素包含 args 和 kwargs
             *args: 通用位置参数
             parallel: 是否并行执行请求
+            failover: 是否启用故障切换（一个数据源失败后尝试下一个）
             **kwargs: 通用关键字参数
 
         Returns:
@@ -305,52 +307,60 @@ class DataSourceManager:
                 )
             ] * len(params_list)
 
-        primary_source = sources[0]
-
-        if not parallel:
-            # 串行执行（兼容旧行为）
-            results = []
-            for params in params_list:
-                async with await self._get_semaphore():
-                    try:
-                        result = await primary_source.fetch(
-                            *params.get("args", args),
-                            **kwargs,
-                            **params.get("kwargs", {})
-                        )
-                        results.append(result)
-                    except Exception as e:
-                        results.append(
-                            DataSourceResult(
-                                success=False,
-                                error=str(e),
-                                timestamp=time.time(),
-                                source=primary_source.name
-                            )
-                        )
-            return results
-
         # 并行执行 - 使用信号量限制并发数
         async def fetch_one(params: dict[str, Any]) -> DataSourceResult:
             async with await self._get_semaphore():
-                try:
-                    result = await primary_source.fetch(
-                        *params.get("args", args),
-                        **kwargs,
-                        **params.get("kwargs", {})
-                    )
-                    return result
-                except Exception as e:
-                    return DataSourceResult(
-                        success=False,
-                        error=str(e),
-                        timestamp=time.time(),
-                        source=primary_source.name
-                    )
+                source_args = params.get("args", args)
+                source_kwargs = {**kwargs, **params.get("kwargs", {})}
+
+                # 故障切换：依次尝试所有数据源
+                errors = []
+                for source in sources:
+                    # 跳过禁用的数据源
+                    config = self._source_configs.get(source.name)
+                    if config and not config.enabled:
+                        continue
+
+                    try:
+                        result = await source.fetch(*source_args, **source_kwargs)
+                        self._record_request(source.name, source_type, result)
+
+                        if result.success:
+                            return result
+                        errors.append(f"{source.name}: {result.error}")
+                    except Exception as e:
+                        errors.append(f"{source.name}: {str(e)}")
+                        self._record_request(source.name, source_type, None, error=str(e))
+
+                # 所有数据源都失败
+                return DataSourceResult(
+                    success=False,
+                    error=f"所有数据源均失败: {'; '.join(errors)}",
+                    timestamp=time.time(),
+                    source="manager",
+                    metadata={"errors": errors}
+                )
 
         # 使用 gather 并行执行所有请求
         tasks = [fetch_one(params) for params in params_list]
         results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 处理异常情况
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append(
+                    DataSourceResult(
+                        success=False,
+                        error=str(result),
+                        timestamp=time.time(),
+                        source="manager"
+                    )
+                )
+            else:
+                processed_results.append(result)
+
+        return processed_results
 
         # 处理异常情况
         processed_results = []
