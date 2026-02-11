@@ -1,4 +1,15 @@
 // Fund Types
+
+// K 线历史数据类型（OHLCV）
+export interface FundHistory {
+  time: string;       // 日期时间 (YYYY-MM-DD)
+  open: number;       // 开盘价
+  high: number;       // 最高价
+  low: number;        // 最低价
+  close: number;      // 收盘价
+  volume: number;     // 成交量
+}
+
 export interface Fund {
   code: string;
   name: string;
@@ -14,6 +25,7 @@ export interface Fund {
   source?: string;
   isHolding?: boolean;  // 是否持有
   hasRealTimeEstimate?: boolean;  // 是否有实时估值（QDII/FOF等为false）
+  history?: FundHistory[];  // 可选的历史 K 线数据
 }
 
 export interface FundListResponse {

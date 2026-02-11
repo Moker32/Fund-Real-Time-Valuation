@@ -31,6 +31,7 @@ export default [
         confirm: "readonly",
         alert: "readonly",
         fetch: "readonly",
+        Element: "readonly",
       },
     },
   },

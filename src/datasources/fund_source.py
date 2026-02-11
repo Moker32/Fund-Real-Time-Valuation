@@ -742,8 +742,8 @@ class FundHistorySource(DataSource):
             # 在异步上下文中使用 akshare
             import akshare as ak
 
-            # 天天基金净值
-            fund_df = ak.fund_ggmz(symbol=fund_code)
+            # 获取基金历史净值数据
+            fund_df = ak.fund_etf_fund_info_em(fund=fund_code)
 
             if fund_df is None or fund_df.empty:
                 return DataSourceResult(
@@ -754,33 +754,37 @@ class FundHistorySource(DataSource):
                     metadata={"fund_code": fund_code}
                 )
 
-            # 解析数据
-            history_data = []
+            # 解析数据并转换为 OHLCV 格式（K 线图需要）
+            ohlcv_data = []
             for _, row in fund_df.iterrows():
-                date = row.get("日期", "")
+                date = row.get("净值日期", "")
                 net_value = row.get("单位净值", None)
-                accumulated_net = row.get("累计净值", None)
 
-                if net_value is not None:
+                if date and net_value is not None:
                     try:
-                        history_data.append({
-                            "date": str(date),
-                            "net_value": float(net_value),
-                            "accumulated_net": float(accumulated_net) if accumulated_net else None
+                        nav = float(net_value)
+                        # 基金净值是单点数据，open/high/low/close 相同
+                        ohlcv_data.append({
+                            "time": str(date),
+                            "open": round(nav, 4),
+                            "high": round(nav, 4),
+                            "low": round(nav, 4),
+                            "close": round(nav, 4),
+                            "volume": 0,  # 基金没有成交量
                         })
                     except (ValueError, TypeError):
                         continue
 
-            # 按日期排序
-            history_data.sort(key=lambda x: x["date"])
+            # 按日期升序排序
+            ohlcv_data.sort(key=lambda x: x["time"])
 
             self._record_success()
             return DataSourceResult(
                 success=True,
                 data={
                     "fund_code": fund_code,
-                    "history": history_data,
-                    "count": len(history_data)
+                    "data": ohlcv_data,
+                    "count": len(ohlcv_data)
                 },
                 timestamp=time.time(),
                 source=self.name,

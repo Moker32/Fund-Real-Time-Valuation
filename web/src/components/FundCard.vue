@@ -77,6 +77,11 @@
         </span>
         <span class="source" v-if="fund.source">{{ fund.source }}</span>
       </div>
+
+      <!-- K 线图区域（当有历史数据时显示） -->
+      <div v-if="fund.history && fund.history.length > 0" class="fund-card-chart">
+        <FundChart :data="fund.history" :height="100" />
+      </div>
     </template>
   </div>
 </template>
@@ -85,6 +90,7 @@
 import { computed } from 'vue';
 import { useFundStore } from '@/stores/fundStore';
 import type { Fund } from '@/types';
+import FundChart from './FundChart.vue';
 
 interface Props {
   fund: Fund;
@@ -404,5 +410,11 @@ function formatNetValueDate(dateStr: string): string {
 .source {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
+}
+
+.fund-card-chart {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-divider);
 }
 </style>

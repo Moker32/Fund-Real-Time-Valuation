@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, Overview, HealthStatus } from '@/types';
+import type { Fund, Commodity, Overview, HealthStatus, FundHistory } from '@/types';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -174,8 +174,8 @@ export const fundApi = {
 
   async getFundHistory(code: string, days: number = 30): Promise<{
     code: string;
-    name: string;
-    history: Array<{ date: string; value: number }>;
+    data: FundHistory[];
+    count: number;
   }> {
     return api.get(`/api/funds/${code}/history`, { params: { days } });
   },

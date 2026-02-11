@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { fundApi } from '@/api';
-import type { Fund } from '@/types';
+import type { Fund, FundHistory } from '@/types';
 import { ApiError } from '@/api';
 
 export interface FetchOptions {
@@ -141,17 +141,19 @@ export const useFundStore = defineStore('funds', () => {
       const estimate = await fundApi.getFundEstimate(code);
       const index = funds.value.findIndex((f) => f.code === code);
       if (index !== -1 && estimate.code) {
-        funds.value[index] = {
-          code: estimate.code,
-          name: estimate.name,
-          netValue: estimate.netValue,
-          netValueDate: funds.value[index]?.netValueDate || new Date().toISOString(),
-          estimateValue: estimate.estimateValue,
-          estimateChange: estimate.estimateChange,
-          estimateChangePercent: estimate.estimateChangePercent,
-          type: funds.value[index]?.type,
-          source: funds.value[index]?.source,
-        };
+        const currentFund = funds.value[index];
+        if (currentFund) {
+          funds.value[index] = {
+            ...currentFund,
+            code: estimate.code,
+            name: estimate.name,
+            netValue: estimate.netValue,
+            netValueDate: currentFund.netValueDate || new Date().toISOString(),
+            estimateValue: estimate.estimateValue,
+            estimateChange: estimate.estimateChange,
+            estimateChangePercent: estimate.estimateChangePercent,
+          };
+        }
       }
     } catch (err) {
       console.error(`[FundStore] fetchFundEstimate error for ${code}:`, err);
@@ -220,7 +222,10 @@ export const useFundStore = defineStore('funds', () => {
         // 更新本地状态
         const index = funds.value.findIndex((f) => f.code === code);
         if (index !== -1) {
-          funds.value[index] = { ...funds.value[index], isHolding: holding };
+          const currentFund = funds.value[index];
+          if (currentFund) {
+            funds.value[index] = { ...currentFund, isHolding: holding };
+          }
         }
         return true;
       }
@@ -229,6 +234,28 @@ export const useFundStore = defineStore('funds', () => {
       console.error('[FundStore] toggleHolding error:', err);
       error.value = getFriendlyErrorMessage(err);
       throw err;
+    }
+  }
+
+  // 获取基金历史数据
+  async function fetchHistory(code: string, days: number = 60): Promise<FundHistory[]> {
+    try {
+      const response = await fundApi.getFundHistory(code, days);
+      const history = response.data || [];
+
+      // 更新对应基金的历史数据
+      const index = funds.value.findIndex((f) => f.code === code);
+      if (index !== -1) {
+        const currentFund = funds.value[index];
+        if (currentFund) {
+          funds.value[index] = { ...currentFund, history };
+        }
+      }
+
+      return history;
+    } catch (err) {
+      console.error(`[FundStore] fetchHistory error for ${code}:`, err);
+      return [];
     }
   }
 
@@ -253,6 +280,7 @@ export const useFundStore = defineStore('funds', () => {
     // Actions
     fetchFunds,
     fetchFundEstimate,
+    fetchHistory,
     setRefreshInterval,
     setAutoRefresh,
     clearError,
