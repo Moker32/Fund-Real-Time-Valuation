@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance, type AxiosError } from 'axios';
+import axios from 'axios';
 import type { Fund, Commodity, Overview, HealthStatus } from '@/types';
 
 // API Configuration
@@ -6,27 +6,37 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 // 自定义错误类
 export class ApiError extends Error {
+  code?: string;
+  detail?: string;
+  timestamp?: string;
+  statusCode?: number;
+
   constructor(
     message: string,
-    public code?: string,
-    public detail?: string,
-    public timestamp?: string,
-    public statusCode?: number
+    code?: string,
+    detail?: string,
+    timestamp?: string,
+    statusCode?: number
   ) {
     super(message);
     this.name = 'ApiError';
+    this.code = code;
+    this.detail = detail;
+    this.timestamp = timestamp;
+    this.statusCode = statusCode;
   }
 }
 
 // 网络错误检测
 const isNetworkError = (error: unknown): boolean => {
-  if (error instanceof AxiosError) {
-    return !error.response;
+  const err = error as { isAxiosError?: boolean; response?: { status?: number } };
+  if (err.isAxiosError === true) {
+    return !err.response?.status;
   }
   return error instanceof Error && (error.message.includes('Network Error') || error.message.includes('ECONNREFUSED'));
 };
 
-// 错误消息映射表（更友好的提示信息）
+// 错误消息映射表
 const errorMessageMap: Record<string, string> = {
   'Network Error': '网络连接失败，请检查网络设置',
   'ECONNREFUSED': '无法连接到服务器，请确保后端服务已启动',
@@ -38,16 +48,15 @@ const errorMessageMap: Record<string, string> = {
 };
 
 // 获取友好的错误消息
-const getFriendlyErrorMessage = (error: AxiosError): string => {
+const getFriendlyErrorMessage = (error: { response?: { status?: number; data?: Record<string, unknown> }; message?: string }): string => {
   const statusCode = error.response?.status;
-  const responseData = error.response?.data as { error?: string; detail?: string } | undefined;
+  const responseData = error.response?.data;
 
-  // 优先使用后端返回的错误信息
-  if (responseData?.error) {
-    return responseData.detail ? `${responseData.error}: ${responseData.detail}` : responseData.error;
+  if (responseData?.error && typeof responseData.error === 'string') {
+    const detail = responseData.detail && typeof responseData.detail === 'string' ? responseData.detail : '';
+    return detail ? `${responseData.error}: ${detail}` : responseData.error;
   }
 
-  // 根据状态码返回友好消息
   if (statusCode) {
     switch (statusCode) {
       case 400:
@@ -65,20 +74,20 @@ const getFriendlyErrorMessage = (error: AxiosError): string => {
     }
   }
 
-  // 根据错误消息返回友好消息
+  const errorMsg = error.message || '';
   for (const [key, message] of Object.entries(errorMessageMap)) {
-    if (error.message.includes(key)) {
+    if (errorMsg.includes(key)) {
       return message;
     }
   }
 
-  return error.message || '未知错误，请稍后重试';
+  return errorMsg || '未知错误，请稍后重试';
 };
 
 // Create axios instance
-const api: AxiosInstance = axios.create({
+const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000,  // 60秒，基金数据获取可能较慢
   headers: {
     'Content-Type': 'application/json',
   },
@@ -87,7 +96,6 @@ const api: AxiosInstance = axios.create({
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // Add timestamp to prevent caching
     config.params = {
       ...config.params,
       _t: Date.now(),
@@ -99,23 +107,17 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor - 改进错误处理
+// Response interceptor
 api.interceptors.response.use(
-  (response) => {
-    return response.data;
-  },
-  async (error: AxiosError) => {
-    const responseData = error.response?.data as {
-      success?: boolean;
-      error?: string;
-      detail?: string;
-      timestamp?: string;
-    } | undefined;
+  (response) => response.data,
+  (error: unknown) => {
+    const err = error as { response?: { status?: number; data?: Record<string, unknown> }; config?: { method?: string; url?: string }; message?: string };
 
-    // 检查是否是后端返回的错误响应格式
+    const responseData = err.response?.data;
+
     if (responseData && responseData.success === false) {
-      const friendlyMessage = getFriendlyErrorMessage(error);
-      console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}:`, {
+      const friendlyMessage = getFriendlyErrorMessage(err);
+      console.error(`[API Error] ${err.config?.method?.toUpperCase()} ${err.config?.url}:`, {
         error: responseData.error,
         detail: responseData.detail,
         timestamp: responseData.timestamp,
@@ -123,46 +125,41 @@ api.interceptors.response.use(
 
       throw new ApiError(
         friendlyMessage,
-        responseData.error,
-        responseData.detail,
-        responseData.timestamp,
-        error.response?.status
+        responseData.error as string,
+        responseData.detail as string,
+        responseData.timestamp as string,
+        err.response?.status
       );
     }
 
-    // 处理网络错误
     if (isNetworkError(error)) {
-      const friendlyMessage = getFriendlyErrorMessage(error);
-      console.error(`[Network Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}:`, error.message);
-      throw new ApiError(friendlyMessage, 'NETWORK_ERROR', error.message);
+      const friendlyMessage = getFriendlyErrorMessage(err);
+      console.error(`[Network Error] ${err.config?.method?.toUpperCase()} ${err.config?.url}:`, err.message);
+      throw new ApiError(friendlyMessage, 'NETWORK_ERROR', err.message);
     }
 
-    // 其他错误
-    const friendlyMessage = getFriendlyErrorMessage(error);
-    console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}:`, error.message);
+    const friendlyMessage = getFriendlyErrorMessage(err);
+    console.error(`[API Error] ${err.config?.method?.toUpperCase()} ${err.config?.url}:`, err.message);
     throw new ApiError(
       friendlyMessage,
       'UNKNOWN_ERROR',
-      error.message,
+      err.message,
       undefined,
-      error.response?.status
+      err.response?.status
     );
   }
 );
 
 // API Methods
 export const fundApi = {
-  // Get all funds
   async getFunds(): Promise<{ funds: Fund[]; total: number; timestamp: string }> {
     return api.get('/api/funds');
   },
 
-  // Get single fund
   async getFund(code: string): Promise<Fund> {
     return api.get(`/api/funds/${code}`);
   },
 
-  // Get fund estimate
   async getFundEstimate(code: string): Promise<{
     code: string;
     name: string;
@@ -175,7 +172,6 @@ export const fundApi = {
     return api.get(`/api/funds/${code}/estimate`);
   },
 
-  // Get fund history
   async getFundHistory(code: string, days: number = 30): Promise<{
     code: string;
     name: string;
@@ -184,7 +180,6 @@ export const fundApi = {
     return api.get(`/api/funds/${code}/history`, { params: { days } });
   },
 
-  // Add to watchlist
   async addToWatchlist(code: string, name: string): Promise<{
     success: boolean;
     message: string;
@@ -193,7 +188,6 @@ export const fundApi = {
     return api.post('/api/funds/watchlist', { code, name });
   },
 
-  // Remove from watchlist
   async removeFromWatchlist(code: string): Promise<{
     success: boolean;
     message: string;
@@ -203,17 +197,14 @@ export const fundApi = {
 };
 
 export const commodityApi = {
-  // Get all commodities
   async getCommodities(): Promise<{ commodities: Commodity[]; timestamp: string }> {
     return api.get('/api/commodities');
   },
 
-  // Get commodity by type
   async getCommodity(type: string): Promise<Commodity> {
     return api.get(`/api/commodities/${type}`);
   },
 
-  // Get gold price (CNY)
   async getGoldCNY(): Promise<{
     symbol: string;
     name: string;
@@ -225,7 +216,6 @@ export const commodityApi = {
     return api.get('/api/commodities/gold/cny');
   },
 
-  // Get international gold
   async getGoldInternational(): Promise<{
     symbol: string;
     name: string;
@@ -237,7 +227,6 @@ export const commodityApi = {
     return api.get('/api/commodities/gold/international');
   },
 
-  // Get WTI oil
   async getOilWTI(): Promise<{
     symbol: string;
     name: string;
@@ -266,5 +255,4 @@ export const healthApi = {
   },
 };
 
-// Export api instance for custom requests
 export { api };
