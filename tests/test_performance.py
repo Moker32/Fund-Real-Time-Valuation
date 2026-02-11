@@ -4,20 +4,18 @@
 测试基金列表更新性能，验证是否需要虚拟滚动。
 """
 
-import pytest
-import time
-from unittest.mock import Mock, MagicMock
-from datetime import datetime
-import flet as ft
-
 # 添加 src 目录到路径
 import sys
+import time
 from pathlib import Path
+from unittest.mock import Mock
+
+import flet as ft
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.config.models import Fund, Holding
-from src.gui.main import FundGUIApp, FundDisplayData
-from dataclasses import dataclass, field
+from src.gui.main import FundDisplayData, FundGUIApp
 
 
 class TestFundListPerformance:

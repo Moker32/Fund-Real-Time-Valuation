@@ -2,21 +2,22 @@
 加密货币数据源测试
 """
 
-import pytest
 import asyncio
 import sys
 from pathlib import Path
+
+import pytest
 
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from src.datasources.base import DataSourceResult, DataSourceType
 from src.datasources.crypto_source import (
     BinanceCryptoSource,
     CoinGeckoCryptoSource,
     CryptoAggregator,
 )
-from src.datasources.base import DataSourceType, DataSourceResult
 
 
 class TestBinanceCryptoSource:

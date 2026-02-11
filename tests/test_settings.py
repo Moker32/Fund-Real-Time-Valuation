@@ -1,7 +1,6 @@
 # -*- coding: UTF-8 -*-
 """设置功能测试"""
 
-import pytest
 
 from src.config.models import AppConfig, Theme
 

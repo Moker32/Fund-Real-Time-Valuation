@@ -1,15 +1,14 @@
 # -*- coding: UTF-8 -*-
 """通知系统测试"""
 
-import pytest
-from datetime import datetime
+
+from src.gui.notifications import NotificationManager
 
 from src.config.models import (
-    PriceAlert,
-    NotificationConfig,
     AlertDirection,
+    NotificationConfig,
+    PriceAlert,
 )
-from src.gui.notifications import NotificationManager
 
 
 class TestPriceAlert:

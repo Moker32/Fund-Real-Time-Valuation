@@ -4,7 +4,7 @@
 """
 
 from datetime import datetime
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -15,12 +15,11 @@ from src.datasources.manager import DataSourceManager
 
 from ..dependencies import DataSourceDependency
 from ..models import (
+    AddFundRequest,
     ErrorResponse,
     FundDetailResponse,
     FundEstimateResponse,
-    FundListResponse,
     FundResponse,
-    AddFundRequest,
 )
 
 
@@ -29,7 +28,7 @@ class FundListData(TypedDict):
     funds: list[dict]
     total: int
     timestamp: str
-    progress: Optional[int]  # 加载进度 0-100
+    progress: int | None  # 加载进度 0-100
 
 
 router = APIRouter(prefix="/api/funds", tags=["基金"])
@@ -91,7 +90,7 @@ def build_fund_response(data: dict, source: str = "", is_holding: bool = False) 
     },
 )
 async def get_funds_list(
-    codes: Optional[str] = None,
+    codes: str | None = None,
     manager: DataSourceManager = Depends(DataSourceDependency()),
 ) -> FundListData:
     """

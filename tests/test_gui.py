@@ -5,12 +5,13 @@
 确保 GUI 和数据库模块协同工作正常。
 """
 
-import pytest
+import os
 import sys
 import tempfile
-import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 # 添加 src 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -28,8 +29,8 @@ class TestGUIModuleImport:
     def test_import_main_module(self):
         """测试主应用模块可以正常导入"""
         from src.gui.main import (
-            FundGUIApp,
             FundDisplayData,
+            FundGUIApp,
         )
 
         assert FundGUIApp is not None
@@ -37,7 +38,7 @@ class TestGUIModuleImport:
 
     def test_import_database_module(self):
         """测试数据库模块可以正常导入"""
-        from src.db import DatabaseManager, ConfigDAO, FundHistoryDAO
+        from src.db import ConfigDAO, DatabaseManager, FundHistoryDAO
 
         assert DatabaseManager is not None
         assert ConfigDAO is not None
@@ -116,7 +117,7 @@ class TestDataClasses:
 
     def test_config_dao_operations(self):
         """测试配置 DAO 基本操作"""
-        from src.db.database import DatabaseManager, ConfigDAO
+        from src.db.database import ConfigDAO, DatabaseManager
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             temp_path = f.name
@@ -182,7 +183,7 @@ class TestDataClasses:
 
     def test_default_data_initialization(self):
         """测试默认数据初始化"""
-        from src.db.database import DatabaseManager, ConfigDAO
+        from src.db.database import ConfigDAO, DatabaseManager
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             temp_path = f.name
@@ -331,8 +332,8 @@ class TestFundChart:
 
     def test_fund_chart_generation(self):
         """测试基金图表生成"""
-        from src.gui.chart import FundHistoryData
         import matplotlib
+        from src.gui.chart import FundHistoryData
 
         matplotlib.use("Agg")  # 使用非交互式后端
         import matplotlib.pyplot as plt
@@ -364,8 +365,8 @@ class TestFundChart:
 
     def test_fund_chart_with_ma_lines(self):
         """测试带均线的基金图表"""
-        from src.gui.chart import FundHistoryData
         import matplotlib
+        from src.gui.chart import FundHistoryData
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
@@ -485,8 +486,8 @@ class TestFundDetail:
 
     def test_fund_chart_with_ma_lines(self):
         """测试带均线的基金图表"""
-        from src.gui.chart import FundHistoryData
         import matplotlib
+        from src.gui.chart import FundHistoryData
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
@@ -525,7 +526,7 @@ class TestRegressionTests:
 
     def test_full_workflow_simulation(self):
         """测试完整工作流程模拟"""
-        from src.db.database import DatabaseManager, ConfigDAO, FundHistoryDAO
+        from src.db.database import ConfigDAO, DatabaseManager, FundHistoryDAO
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             temp_path = f.name
@@ -595,6 +596,7 @@ class TestRegressionTests:
     def test_database_and_gui_compatibility(self):
         """测试数据库和 GUI 模块兼容性"""
         from src.gui.main import FundDisplayData
+
         from src.db.database import FundConfig
 
         # 测试数据类可以互相转换（模拟）
@@ -621,7 +623,7 @@ class TestRegressionTests:
 
     def test_multiple_operations_atomicity(self):
         """测试多次操作的原子性"""
-        from src.db.database import DatabaseManager, ConfigDAO
+        from src.db.database import ConfigDAO, DatabaseManager
 
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
             temp_path = f.name
@@ -664,7 +666,7 @@ class TestConfigurationPersistence:
 
     def test_config_persistence_across_sessions(self):
         """测试配置跨会话持久化"""
-        from src.db.database import DatabaseManager, ConfigDAO
+        from src.db.database import ConfigDAO, DatabaseManager
 
         # 第一个"会话" - 写入配置
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
@@ -745,7 +747,7 @@ class TestFundTableInteraction:
 
         app = FundGUIApp()
         # 需要先调用_build_fund_page来创建fund_table
-        container = app._build_fund_page()
+        app._build_fund_page()
         assert app.fund_table is not None
 
     def test_fund_table_column_count(self):
@@ -767,7 +769,7 @@ class TestFundTableInteraction:
 
     def test_fund_selection_with_holding(self):
         """测试带持仓的基金选择状态"""
-        from src.gui.main import FundGUIApp, FundDisplayData
+        from src.gui.main import FundGUIApp
 
         app = FundGUIApp()
         # 模拟选中一只基金
@@ -881,8 +883,7 @@ class TestHoldingDialogValidation:
 
     def test_holding_dialog_accepts_valid_input(self):
         """测试持仓对话框接受有效输入"""
-        from src.gui.main import HoldingDialog, FundGUIApp
-        from src.gui.main import FundDisplayData
+        from src.gui.main import FundDisplayData, FundGUIApp, HoldingDialog
 
         class MockPage:
             def __init__(self):
@@ -923,8 +924,7 @@ class TestHoldingDialogValidation:
 
     def test_holding_dialog_handles_empty_input(self):
         """测试持仓对话框处理空输入"""
-        from src.gui.main import HoldingDialog, FundGUIApp
-        from src.gui.main import FundDisplayData
+        from src.gui.main import FundDisplayData, FundGUIApp, HoldingDialog
 
         class MockPage:
             def update(self):
@@ -1086,8 +1086,8 @@ class TestChartEdgeCases:
 
     def test_single_day_history(self):
         """测试单日历史数据"""
-        from src.gui.chart import FundHistoryData
         import matplotlib
+        from src.gui.chart import FundHistoryData
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt

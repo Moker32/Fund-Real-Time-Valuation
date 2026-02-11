@@ -13,7 +13,10 @@
     "test": "uv run pytest tests/ -v",
     "test:web": "cd web && pnpm run test",
     "lint": "uv run ruff check .",
-    "lint:fix": "uv run ruff check --fix ."
+    "lint:fix": "uv run ruff check --fix .",
+    "lint:web": "cd web && pnpm run lint",
+    "typecheck": "uv run mypy . && cd web && pnpm run typecheck",
+    "check": "pnpm run lint && pnpm run typecheck"
   },
   "devDependencies": {
     "concurrently": "^8.2.0"

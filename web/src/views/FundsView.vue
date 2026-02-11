@@ -22,14 +22,14 @@
     </div>
 
     <!-- Loading State -->
-    <div v-else-if="fundStore.loading && fundStore.funds.length === 0" class="loading-state">
+    <div v-if="showSkeleton" class="loading-state">
       <div class="loading-grid">
-        <FundCard v-for="i in 6" :key="i" :fund="emptyFund" :loading="true" />
+        <FundCard v-for="i in LOADING_SKELETON_COUNT" :key="i" :fund="emptyFund" :loading="true" />
       </div>
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="fundStore.funds.length === 0" class="empty-state">
+    <div v-else-if="!hasFunds && !hasError" class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <path d="M3 3V21H21"/>
         <path d="M7 14L11 10L15 12L21 6"/>
@@ -45,7 +45,7 @@
     </div>
 
     <!-- Fund List -->
-    <div v-else class="fund-list">
+    <div v-if="showFundList" class="fund-list">
       <div class="list-header">
         <div class="header-left">
           <h2 class="section-title">自选基金</h2>
@@ -81,18 +81,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useFundStore } from '@/stores/fundStore';
 import FundCard from '@/components/FundCard.vue';
 import MarketOverview from '@/components/MarketOverview.vue';
 import AddFundDialog from '@/components/AddFundDialog.vue';
 import type { Overview, Fund } from '@/types';
 
+// 加载骨架屏数量常量
+const LOADING_SKELETON_COUNT = 6;
+
+// 空基金状态类型（用于骨架屏显示）
+interface EmptyFundState {
+  code: string;
+  name: string;
+  netValue: number;
+  netValueDate: string;
+  estimateValue: number;
+  estimateChange: number;
+  estimateChangePercent: number;
+}
+
 const fundStore = useFundStore();
 const showAddDialog = ref(false);
+let isMounted = true;
 
-// Empty fund for loading skeleton
-const emptyFund: Fund = {
+// 空基金数据用于加载骨架屏
+const emptyFund: EmptyFundState = {
   code: '---',
   name: '加载中...',
   netValue: 0,
@@ -100,7 +115,17 @@ const emptyFund: Fund = {
   estimateValue: 0,
   estimateChange: 0,
   estimateChangePercent: 0,
-} as Fund;
+};
+
+// 计算属性：是否显示加载状态
+const isLoading = computed(() => fundStore.loading);
+const hasFunds = computed(() => fundStore.funds.length > 0);
+const hasError = computed(() => !!fundStore.error);
+
+// 模板条件简化：显示骨架屏
+const showSkeleton = computed(() => isLoading.value && !hasFunds.value);
+// 模板条件简化：显示基金列表
+const showFundList = computed(() => hasFunds.value && !hasError.value);
 
 const overviewData = computed<Overview | null>(() => {
   if (fundStore.funds.length === 0) return null;
@@ -131,7 +156,12 @@ function handleFundAdded() {
 }
 
 onMounted(() => {
+  isMounted = true;
   fundStore.fetchFunds();
+});
+
+onUnmounted(() => {
+  isMounted = false;
 });
 </script>
 
@@ -203,15 +233,13 @@ onMounted(() => {
   color: var(--color-text-tertiary);
 }
 
-.btn-add {
+// 公共按钮样式
+.btn {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
   padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
   border-radius: var(--radius-md);
-  color: white;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
@@ -221,6 +249,13 @@ onMounted(() => {
     width: 16px;
     height: 16px;
   }
+}
+
+.btn-add {
+  @extend .btn;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  color: white;
 
   &:hover {
     opacity: 0.9;
@@ -298,23 +333,10 @@ onMounted(() => {
 }
 
 .btn-primary {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-sm) var(--spacing-lg);
+  @extend .btn;
   background: var(--color-primary);
   border: 1px solid var(--color-primary);
-  border-radius: var(--radius-md);
   color: white;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-
-  svg {
-    width: 16px;
-    height: 16px;
-  }
 
   &:hover {
     opacity: 0.9;

@@ -12,7 +12,6 @@
 
 import argparse
 import subprocess
-import sys
 import webbrowser
 from pathlib import Path
 
@@ -69,16 +68,15 @@ API 文档: http://localhost:{args.port}/docs
     # 如果需要启动前端
     if args.frontend:
         web_dir = Path(__file__).parent / "web"
-        print(f"启动前端开发服务器...")
-        frontend_process = subprocess.Popen(
+        print("启动前端开发服务器...")
+        subprocess.Popen(
             ["pnpm", "run", "dev", "--port", "5173"],
             cwd=web_dir
         )
-        print(f"前端开发服务器已启动: http://localhost:5173")
-        print(f"按 Ctrl+C 停止前端服务器")
+        print("前端开发服务器已启动: http://localhost:5173")
+        print("按 Ctrl+C 停止前端服务器")
 
     # 启动 API 服务
-    from api.main import app
     import uvicorn
 
     uvicorn.run(

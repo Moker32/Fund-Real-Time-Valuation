@@ -8,10 +8,10 @@
 - 与 FundGUIApp 的集成
 """
 
-import pytest
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock, patch
+
+import pytest
 
 # 添加 src 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -59,7 +59,7 @@ class TestTabComponent:
 
     def test_tab_creation_with_icon(self):
         """测试创建带图标的 Tab"""
-        from flet import Tab, Icons
+        from flet import Icons, Tab
 
         tab = Tab(label="基金", icon=Icons.STAR_BORDER)
         assert tab.label == "基金"
@@ -71,7 +71,7 @@ class TestTabBarComponent:
 
     def test_tabbar_creation(self):
         """测试 TabBar 创建"""
-        from flet import TabBar, Tab
+        from flet import Tab, TabBar
 
         tab_bar = TabBar(
             tabs=[
@@ -86,7 +86,7 @@ class TestTabBarComponent:
 
     def test_tabbar_with_icons(self):
         """测试带图标的 TabBar"""
-        from flet import TabBar, Tab, Icons
+        from flet import Icons, Tab, TabBar
 
         tab_bar = TabBar(
             tabs=[
@@ -103,7 +103,7 @@ class TestTabBarComponent:
 
     def test_tabbar_with_on_click_handler(self):
         """测试带 on_click 事件处理器的 TabBar"""
-        from flet import TabBar, Tab
+        from flet import Tab, TabBar
 
         handler_called = [False]
         tab_index = [None]
@@ -125,7 +125,7 @@ class TestTabBarComponent:
 
     def test_tabbar_with_tab_alignment(self):
         """测试带 tab_alignment 的 TabBar"""
-        from flet import TabBar, Tab, TabAlignment
+        from flet import Tab, TabAlignment, TabBar
 
         tab_bar = TabBar(
             tabs=[Tab(label="测试")],
@@ -136,7 +136,7 @@ class TestTabBarComponent:
 
     def test_tabbar_with_label_colors(self):
         """测试带标签颜色的 TabBar"""
-        from flet import TabBar, Tab
+        from flet import Tab, TabBar
 
         tab_bar = TabBar(
             tabs=[Tab(label="测试")],
@@ -153,7 +153,7 @@ class TestTabBarEventHandling:
 
     def test_tab_bar_click_event_data(self):
         """测试 TabBar 点击事件数据"""
-        from flet import TabBar, Tab
+        from flet import Tab, TabBar
 
         # 模拟事件对象
         class MockEvent:
@@ -227,7 +227,7 @@ class TestTabBarAPIVersionCompatibility:
 
     def test_tabbar_replaces_old_custom_tabs(self):
         """测试 TabBar 替换旧的自定义 Tabs 实现"""
-        from flet import TabBar, Tab, Icons
+        from flet import Icons, Tab, TabBar
 
         # 新的官方 API 使用 TabBar + Tab
         tab_bar = TabBar(
@@ -244,7 +244,7 @@ class TestTabBarAPIVersionCompatibility:
 
     def test_tabbar_no_longer_needs_custom_containers(self):
         """测试 TabBar 不再需要自定义容器来管理可见性"""
-        from flet import TabBar, Tab, Column, Container
+        from flet import Tab, TabBar
 
         # 官方 API 的 TabBar 负责标签导航
         # 内容切换由开发者自行管理

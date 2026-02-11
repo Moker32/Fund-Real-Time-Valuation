@@ -9,12 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .base import DataSource, DataSourceResult, DataSourceType
-from .health import (
-    DataSourceHealthChecker,
-    HealthCheckInterceptor,
-    HealthCheckResult,
-    HealthStatus
-)
+from .health import DataSourceHealthChecker, HealthCheckInterceptor, HealthCheckResult, HealthStatus
 
 
 @dataclass
@@ -652,7 +647,7 @@ def create_default_manager(
         DataSourceManager: 配置好的管理器实例
     """
     from .commodity_source import AKShareCommoditySource, YFinanceCommoditySource
-    from .fund_source import FundDataSource, SinaFundDataSource, EastMoneyFundDataSource
+    from .fund_source import EastMoneyFundDataSource, FundDataSource, SinaFundDataSource
     from .news_source import SinaNewsDataSource
     from .sector_source import EastMoneySectorSource, SinaSectorDataSource
 

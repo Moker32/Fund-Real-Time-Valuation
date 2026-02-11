@@ -4,9 +4,8 @@
 """
 
 from datetime import datetime
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from src.config.manager import ConfigManager
 from src.config.models import FundList
@@ -15,7 +14,6 @@ from src.datasources.manager import DataSourceManager
 
 from ..dependencies import DataSourceDependency
 from ..models import ErrorResponse, OverviewResponse
-
 
 router = APIRouter(prefix="/api", tags=["概览"])
 
@@ -105,7 +103,6 @@ async def get_overview(
             # 获取估值和净值
             estimate_value = data.get("estimated_net_value")
             unit_net_value = data.get("unit_net_value")
-            estimate_rate = data.get("estimated_growth_rate")
 
             # 计算持仓价值（假设持有1份，用于展示）
             if estimate_value is not None:

@@ -24,14 +24,18 @@ pnpm run build:web  # 构建前端
 
 # 运行测试
 uv run python -m pytest tests/ -v           # 运行所有测试
-uv run python -m pytest tests/ -v --tb=short # 简洁错误输出
 
 # 代码检查
-uv run ruff check .              # Python 代码检查
-uv run ruff check --fix .        # 自动修复 Python 代码
+uv run ruff check .              # Python lint
+uv run ruff check --fix .        # Python lint 自动修复
 uv run mypy .                    # Python 类型检查
-cd web && pnpm run lint          # 前端代码检查
+cd web && pnpm run lint          # 前端 lint (ESLint)
 cd web && pnpm run typecheck     # 前端类型检查 (vue-tsc)
+# 或使用统一命令
+pnpm run lint                    # 后端 lint
+pnpm run lint:web               # 前端 lint
+pnpm run typecheck              # 后端 + 前端 类型检查
+pnpm run check                  # 运行所有检查 (lint + typecheck)
 ```
 
 ## 技术栈

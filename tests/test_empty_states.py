@@ -4,10 +4,8 @@
 测试空状态 UI 组件的创建和显示功能。
 """
 
-import pytest
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock
 
 # 添加 src 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -72,8 +70,8 @@ class TestEmptyFundsState:
 
     def test_empty_funds_state_has_text(self):
         """测试空基金状态包含文本"""
-        from src.gui.empty_states import empty_funds_state
         from flet import Text
+        from src.gui.empty_states import empty_funds_state
 
         result = empty_funds_state()
         content = result.content
@@ -142,8 +140,8 @@ class TestEmptyCommoditiesState:
 
     def test_empty_commodities_state_has_text(self):
         """测试空商品状态包含文本"""
-        from src.gui.empty_states import empty_commodities_state
         from flet import Text
+        from src.gui.empty_states import empty_commodities_state
 
         result = empty_commodities_state()
         content = result.content
@@ -189,8 +187,8 @@ class TestEmptyNewsState:
 
     def test_empty_news_state_has_text(self):
         """测试空新闻状态包含文本"""
-        from src.gui.empty_states import empty_news_state
         from flet import Text
+        from src.gui.empty_states import empty_news_state
 
         result = empty_news_state()
         content = result.content
@@ -234,7 +232,6 @@ class TestEmptyStatesColors:
     def test_empty_states_use_app_colors(self):
         """测试空状态使用 AppColors"""
         from src.gui.empty_states import empty_funds_state
-        from src.gui.components import AppColors
 
         result = empty_funds_state()
 
@@ -253,12 +250,12 @@ class TestEmptyStatesIntegration:
 
     def test_empty_states_can_be_used_in_column(self):
         """测试空状态可以在 Column 中使用"""
+        from flet import Column, Container
         from src.gui.empty_states import (
-            empty_funds_state,
             empty_commodities_state,
+            empty_funds_state,
             empty_news_state,
         )
-        from flet import Column, Container
 
         # 创建空状态组件
         funds_empty = empty_funds_state()

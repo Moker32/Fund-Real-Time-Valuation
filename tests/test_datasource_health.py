@@ -8,31 +8,30 @@
 4. 集成测试 - DataSourceManager 健康检查集成
 """
 
-import pytest
 import asyncio
 import sys
-import time
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
-from datetime import datetime
+
+import pytest
 
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.datasources.base import (
-    DataSourceType,
-    DataSourceResult,
     DataSource,
+    DataSourceResult,
+    DataSourceType,
 )
 from src.datasources.health import (
-    HealthStatus,
-    HealthCheckResult,
     DataSourceHealthChecker,
     HealthCheckInterceptor,
+    HealthCheckResult,
+    HealthStatus,
 )
-from src.datasources.manager import DataSourceManager, DataSourceConfig
-
+from src.datasources.manager import DataSourceManager
 
 # ============================================================================
 # 1. 单元测试 - HealthStatus 枚举

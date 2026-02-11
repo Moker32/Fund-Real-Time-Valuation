@@ -8,9 +8,8 @@
 - notification_config: 通知配置实例
 """
 
-import sys
 import os
-from pathlib import Path
+import sys
 from datetime import datetime
 
 # 添加项目根目录到 Python 路径
@@ -33,15 +32,14 @@ if CONFIG_ROOT not in sys.path:
 import pytest
 
 from src.config.models import (
-    Fund,
-    Holding,
+    AlertDirection,
     AppConfig,
-    FundList,
     Commodity,
-    CommodityList,
+    Fund,
+    FundList,
+    Holding,
     NotificationConfig,
     PriceAlert,
-    AlertDirection,
 )
 
 

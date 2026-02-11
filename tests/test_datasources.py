@@ -7,48 +7,43 @@
 3. 集成测试 (真实 API) - 基金数据源, 商品数据源
 """
 
-import pytest
 import asyncio
 import sys
 import time
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+
+import pytest
 
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from src.datasources.aggregator import (
+    SameSourceAggregator,
+)
 from src.datasources.base import (
-    DataSourceType,
-    DataSourceResult,
+    DataParseError,
     DataSource,
     DataSourceError,
+    DataSourceResult,
+    DataSourceType,
     NetworkError,
-    DataParseError,
-)
-from src.datasources.portfolio import (
-    PortfolioAnalyzer,
-    AssetType,
-    PortfolioPosition,
-    PortfolioAllocation,
-    PortfolioResult,
-)
-from src.datasources.stock_source import (
-    SinaStockDataSource,
-    YahooStockSource,
-    StockDataAggregator,
 )
 from src.datasources.crypto_source import (
     BinanceCryptoSource,
-    CoinGeckoCryptoSource,
 )
-from src.datasources.aggregator import (
-    DataAggregator,
-    SameSourceAggregator,
-    LoadBalancedAggregator,
+from src.datasources.portfolio import (
+    AssetType,
+    PortfolioAllocation,
+    PortfolioAnalyzer,
+    PortfolioPosition,
 )
-
+from src.datasources.stock_source import (
+    SinaStockDataSource,
+    StockDataAggregator,
+    YahooStockSource,
+)
 
 # ============================================================================
 # 1. 单元测试 - DataSourceType 枚举
@@ -222,7 +217,6 @@ class TestPortfolioAnalyzer:
         analyzer.add_position("C1", AssetType.COMMODITY, "商品", 100, 10000.0, 100.0)
 
         result = analyzer.analyze()
-        total_value = 40000.0  # 10000 + 10000 + 10000 + 10000
         assert result.allocation.fund_weight == pytest.approx(25.0, rel=0.01)
         assert result.allocation.stock_weight == pytest.approx(25.0, rel=0.01)
         assert result.allocation.bond_weight == pytest.approx(25.0, rel=0.01)

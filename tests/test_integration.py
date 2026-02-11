@@ -10,28 +10,22 @@
 """
 
 import csv
-import os
-import tempfile
-import pytest
-from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime
+
+from src.gui.notifications import NotificationManager
 
 from src.config.models import (
-    Fund,
-    Holding,
-    AppConfig,
-    FundList,
-    Commodity,
+    AlertDirection,
     CommodityList,
+    DataSource,
+    Fund,
+    FundList,
     NotificationConfig,
     PriceAlert,
-    AlertDirection,
     Theme,
-    DataSource,
 )
-from src.gui.notifications import NotificationManager
-from src.utils.export import export_funds_to_csv, export_portfolio_report
 from src.datasources.cache import DataCache
+from src.utils.export import export_funds_to_csv, export_portfolio_report
 
 
 class TestFundListWorkflow:
@@ -98,7 +92,7 @@ class TestNotificationWorkflow:
         assert len(manager.get_active_alerts()) == 2
 
         # 添加新预警
-        new_alert = manager.add_alert(
+        manager.add_alert(
             "161039", "富国中证新能源汽车指数", 1.0, AlertDirection.ABOVE.value
         )
         assert len(manager.get_all_alerts()) == 3
@@ -170,14 +164,14 @@ class TestExportWorkflow:
         assert portfolio_csv.exists()
 
         # 验证基金 CSV 内容
-        with open(funds_csv, "r", encoding="utf-8-sig") as f:
+        with open(funds_csv, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             assert len(rows) == len(sample_funds)
             assert rows[0]["code"] == "000001"
 
         # 验证持仓 CSV 内容
-        with open(portfolio_csv, "r", encoding="utf-8-sig") as f:
+        with open(portfolio_csv, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             assert len(rows) == len(sample_holdings)
@@ -194,7 +188,7 @@ class TestExportWorkflow:
         result = export_funds_to_csv(funds_dict, str(filepath))
 
         assert result is True
-        with open(filepath, "r", encoding="utf-8-sig") as f:
+        with open(filepath, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             assert len(rows) == 2
@@ -335,7 +329,7 @@ class TestConfigSaveLoad:
     def test_fund_list_integration(self, fund_list):
         """测试基金列表集成"""
         # 获取所有代码
-        all_codes = fund_list.get_all_codes()
+        fund_list.get_all_codes()
 
         # 过滤自选基金
         watchlist_codes = [f.code for f in fund_list.watchlist]
@@ -379,7 +373,7 @@ class TestIntegrationScenarios:
     def test_fund_price_alert_export_flow(self, sample_funds, sample_holdings, notification_config, tmp_path):
         """测试基金-预警-导出完整流程"""
         # 1. 创建基金和持仓
-        fund_list = FundList(watchlist=sample_funds, holdings=sample_holdings)
+        FundList(watchlist=sample_funds, holdings=sample_holdings)
 
         # 2. 设置价格预警
         manager = NotificationManager(notification_config)
@@ -398,7 +392,7 @@ class TestIntegrationScenarios:
         assert portfolio_csv.exists()
 
         # 5. 验证导出内容包含所有基金
-        with open(portfolio_csv, "r", encoding="utf-8-sig") as f:
+        with open(portfolio_csv, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             assert len(rows) == len(sample_holdings)

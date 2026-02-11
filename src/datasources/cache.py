@@ -8,7 +8,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class DataCache:
             # 如果读取失败，视为过期
             return True
 
-    def get(self, key: str) -> Union[Any, None]:
+    def get(self, key: str) -> Any | None:
         """
         获取缓存数据
 

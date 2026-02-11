@@ -181,8 +181,8 @@ class DualLayerCache:
 
     async def delete(self, key: str):
         """删除缓存"""
-        # L1
-        self.memory_cache.clear()  # 简化：清空 L1（因为 key 可能被 LRU 淘汰）
+        # L1 - 删除单个 key
+        self.memory_cache._remove(key)
 
         # L2
         file_key = self._get_file_key(key)

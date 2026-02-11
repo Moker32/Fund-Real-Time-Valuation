@@ -8,13 +8,13 @@
 4. 运行测试（验证通过）
 """
 
-import pytest
+import logging
+import sys
 import tempfile
-import os
 import time
 from pathlib import Path
-import sys
-import logging
+
+import pytest
 
 # 添加 src 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -136,7 +136,6 @@ class TestDataCache:
 
     def test_cache_write_error_logged(self, cache, caplog):
         """测试缓存写入失败时记录警告日志"""
-        import logging
         from unittest.mock import patch
 
         # 模拟写入失败（磁盘满或权限问题）
@@ -150,7 +149,6 @@ class TestDataCache:
 
     def test_cache_delete_error_logged(self, cache, caplog):
         """测试缓存删除失败时记录警告日志"""
-        import logging
         from unittest.mock import patch
 
         # 模拟删除文件时失败
@@ -164,7 +162,6 @@ class TestDataCache:
 
     def test_cache_clear_all_error_logged(self, cache, caplog):
         """测试批量清除失败时记录警告日志"""
-        import logging
         from unittest.mock import patch
 
         # 模拟 glob 失败
@@ -178,7 +175,6 @@ class TestDataCache:
 
     def test_cache_cleanup_error_logged(self, cache, caplog):
         """测试清理过期缓存失败时记录警告日志"""
-        import logging
         from unittest.mock import patch
 
         # 先创建一个过期缓存
@@ -187,7 +183,7 @@ class TestDataCache:
 
         with caplog.at_level(logging.WARNING):
             with patch.object(Path, "unlink", side_effect=OSError("File locked")):
-                cleaned = cache.cleanup_expired()
+                cache.cleanup_expired()
 
         # 验证清理失败时有警告日志（即使部分失败也应记录）
         assert any("清理过期缓存失败" in record.message for record in caplog.records), \

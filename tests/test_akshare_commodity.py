@@ -3,11 +3,12 @@
 测试 YFinance 和 AKShare 商品数据源
 """
 
+
 import pytest
-import asyncio
+
 from src.datasources.commodity_source import (
-    YFinanceCommoditySource,
     AKShareCommoditySource,
+    YFinanceCommoditySource,
 )
 
 

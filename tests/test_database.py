@@ -8,21 +8,22 @@
 4. 运行测试（验证通过）
 """
 
-import pytest
-import tempfile
 import os
-from pathlib import Path
 import sys
+import tempfile
+from pathlib import Path
+
+import pytest
 
 # 添加 src 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.db.database import (
-    DatabaseManager,
-    ConfigDAO,
-    FundHistoryDAO,
-    FundConfig,
     CommodityConfig,
+    ConfigDAO,
+    DatabaseManager,
+    FundConfig,
+    FundHistoryDAO,
 )
 
 
@@ -115,7 +116,7 @@ class TestConfigDAO:
         assert fund is not None
         assert fund.code == "TDD003"
         assert fund.name == "测试基金003"
-        assert fund.watchlist == True  # SQLite 返回整数 1
+        assert fund.watchlist  # SQLite 返回整数 1
         assert fund.shares == 0.0
 
     def test_get_nonexistent_fund(self, config_dao):
@@ -175,7 +176,7 @@ class TestConfigDAO:
 
         assert result is True
         fund = config_dao.get_fund("WATCHTEST")
-        assert fund.watchlist == True  # SQLite 返回整数 1
+        assert fund.watchlist  # SQLite 返回整数 1
 
     def test_remove_from_watchlist(self, config_dao):
         """测试从自选移除"""
@@ -184,7 +185,7 @@ class TestConfigDAO:
 
         assert result is True
         fund = config_dao.get_fund("WATCHTEST2")
-        assert fund.watchlist == False  # SQLite 返回整数 0
+        assert not fund.watchlist  # SQLite 返回整数 0
 
     def test_add_commodity(self, config_dao):
         """测试添加商品"""
@@ -207,7 +208,7 @@ class TestConfigDAO:
         assert result is True
         commodity = config_dao.get_commodity("TEST_CMD")
         assert commodity.name == "新名称"
-        assert commodity.enabled == False  # SQLite 返回整数 0
+        assert not commodity.enabled  # SQLite 返回整数 0
 
     def test_init_default_funds(self, config_dao):
         """测试初始化默认基金"""

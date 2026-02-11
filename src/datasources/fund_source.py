@@ -21,7 +21,6 @@ from .base import (
 )
 from .dual_cache import DualLayerCache
 
-
 # 全局缓存实例（单例模式）
 _fund_cache: DualLayerCache | None = None
 
@@ -252,7 +251,6 @@ class FundDataSource(DataSource):
             except json.JSONDecodeError as e:
                 self._request_count += 1
                 self._error_count += 1
-                raw_text = ""
                 return DataSourceResult(
                     success=False,
                     error=f"数据解析失败: {str(e)}",
@@ -618,11 +616,12 @@ class FundDataSource(DataSource):
         """关闭异步客户端"""
         await self.client.aclose()
 
-    async def __del__(self):
-        """析构时确保关闭客户端"""
+    def __del__(self):
+        """析构时确保关闭客户端（异步客户端需要在异步上下文中关闭）"""
         try:
             if hasattr(self, 'client') and self.client.is_closed is False:
-                # Note: 异步客户端需要在异步上下文中关闭
+                # Note: 异步客户端无法在 __del__ 中安全关闭
+                # 应使用 async with 或显式调用 close() 方法
                 pass
         except Exception:
             pass
@@ -645,136 +644,6 @@ class FundDataSource(DataSource):
             if data and "jsonpgz" in data and "fundcode" in data:
                 return True
             return False
-        except Exception:
-            return False
-
-
-class SinaFundDataSource(DataSource):
-    """新浪基金数据源 - 备用数据源"""
-
-    def __init__(self, timeout: float = 10.0, max_retries: int = 3, retry_delay: float = 1.0):
-        """
-        初始化新浪基金数据源
-
-        Args:
-            timeout: 请求超时时间
-            max_retries: 最大重试次数
-            retry_delay: 重试间隔(秒)
-        """
-        super().__init__(
-            name="fund_sina",
-            source_type=DataSourceType.FUND,
-            timeout=timeout
-        )
-        self.max_retries = max_retries
-        self.retry_delay = retry_delay
-        self.client = httpx.AsyncClient(
-            timeout=timeout,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-            }
-        )
-
-    async def fetch(self, fund_code: str) -> DataSourceResult:
-        """获取基金数据 - 新浪接口"""
-        for attempt in range(self.max_retries):
-            try:
-                # 新浪基金接口
-                url = f"https://finance.sina.com.cn/fund/qqjl/{fund_code}.shtml"
-                response = await self.client.get(url)
-                response.raise_for_status()
-
-                # 从 HTML 中提取数据
-                data = self._parse_html(response.text, fund_code)
-
-                self._record_success()
-                return DataSourceResult(
-                    success=True,
-                    data=data,
-                    timestamp=time.time(),
-                    source=self.name,
-                    metadata={"fund_code": fund_code}
-                )
-
-            except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404:
-                    return DataSourceResult(
-                        success=False,
-                        error=f"基金不存在: {fund_code}",
-                        timestamp=time.time(),
-                        source=self.name,
-                        metadata={"fund_code": fund_code, "status_code": 404}
-                    )
-                await self._handle_retry_delay(attempt)
-
-            except httpx.RequestError:
-                await self._handle_retry_delay(attempt)
-
-            except Exception as e:
-                return self._handle_error(e, self.name)
-
-        return DataSourceResult(
-            success=False,
-            error=f"获取基金数据失败，已重试 {self.max_retries} 次",
-            timestamp=time.time(),
-            source=self.name,
-            metadata={"fund_code": fund_code}
-        )
-
-    async def _handle_retry_delay(self, attempt: int):
-        """处理重试延迟"""
-        if attempt < self.max_retries - 1:
-            await asyncio.sleep(self.retry_delay * (attempt + 1))
-
-    async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
-        """批量获取基金数据"""
-        async def fetch_one(code: str) -> DataSourceResult:
-            return await self.fetch(code)
-
-        tasks = [fetch_one(code) for code in fund_codes]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        processed_results = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                processed_results.append(
-                    DataSourceResult(
-                        success=False,
-                        error=str(result),
-                        timestamp=time.time(),
-                        source=self.name,
-                        metadata={"fund_code": fund_codes[i]}
-                    )
-                )
-            else:
-                processed_results.append(result)
-
-        return processed_results
-
-    def _parse_html(self, html: str, fund_code: str) -> dict[str, Any] | None:
-        """解析新浪基金页面 HTML"""
-        # 简化实现 - 实际需要使用 BeautifulSoup 解析
-        # 这里预留解析逻辑
-        return {
-            "fund_code": fund_code,
-            "note": "新浪接口需要完整解析实现"
-        }
-
-    async def close(self):
-        """关闭异步客户端"""
-        await self.client.aclose()
-
-    async def health_check(self) -> bool:
-        """
-        健康检查 - 新浪基金接口
-
-        Returns:
-            bool: 健康状态
-        """
-        try:
-            url = "https://finance.sina.com.cn/"
-            response = await self.client.get(url, timeout=self.timeout)
-            return response.status_code == 200
         except Exception:
             return False
 
@@ -1053,7 +922,7 @@ class SinaFundDataSource(DataSource):
         for attempt in range(self.max_retries):
             try:
                 # 使用新浪基金 API
-                url = f"https://finance.sina.com.cn/fund/枢纽/{fund_code}.js"
+                url = f"https://finance.sina.com.cn/fund/qqjl/{fund_code}.js"
                 response = await self.client.get(url, follow_redirects=True)
                 response.raise_for_status()
 
@@ -1111,7 +980,7 @@ class SinaFundDataSource(DataSource):
             except asyncio.TimeoutError:
                 await asyncio.sleep(self.retry_delay)
                 continue
-            except Exception as e:
+            except Exception:
                 await asyncio.sleep(self.retry_delay)
                 continue
 
@@ -1285,7 +1154,7 @@ class EastMoneyFundDataSource(DataSource):
             except asyncio.TimeoutError:
                 await asyncio.sleep(self.retry_delay)
                 continue
-            except Exception as e:
+            except Exception:
                 await asyncio.sleep(self.retry_delay)
                 continue
 

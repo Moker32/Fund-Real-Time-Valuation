@@ -6,20 +6,22 @@ FastAPI 应用入口
 import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Union
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from src.datasources.manager import DataSourceManager, create_default_manager
 from src.datasources.cache_warmer import CacheWarmer
+from src.datasources.manager import create_default_manager
 
-from .dependencies import close_data_source_manager, get_data_source_manager, set_data_source_manager
-from .models import ErrorResponse, HealthDetailResponse, HealthResponse
+from .dependencies import (
+    close_data_source_manager,
+    get_data_source_manager,
+    set_data_source_manager,
+)
+from .models import HealthDetailResponse, HealthResponse
 from .routes import commodities, funds, overview
-
 
 # 全局预热器实例
 _cache_warmer: CacheWarmer | None = None

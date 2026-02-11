@@ -3,8 +3,6 @@
 
 import csv
 import os
-import pytest
-import tempfile
 
 from src.config.models import Fund, Holding
 
@@ -29,7 +27,7 @@ class TestExportFundsToCsv:
         assert os.path.exists(filepath)
 
         # 验证文件内容
-        with open(filepath, "r", encoding="utf-8-sig") as f:
+        with open(filepath, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -50,7 +48,7 @@ class TestExportFundsToCsv:
 
         assert os.path.exists(filepath)
 
-        with open(filepath, "r", encoding="utf-8-sig") as f:
+        with open(filepath, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -65,7 +63,7 @@ class TestExportFundsToCsv:
         filepath = tmp_path / "headers_test.csv"
         export_funds_to_csv(funds, str(filepath))
 
-        with open(filepath, "r", encoding="utf-8-sig") as f:
+        with open(filepath, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             headers = reader.fieldnames
 
@@ -92,7 +90,7 @@ class TestExportPortfolioReport:
         assert os.path.exists(filepath)
 
         # 验证文件内容
-        with open(filepath, "r", encoding="utf-8-sig") as f:
+        with open(filepath, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -121,7 +119,7 @@ class TestExportPortfolioReport:
 
         assert os.path.exists(filepath)
 
-        with open(filepath, "r", encoding="utf-8-sig") as f:
+        with open(filepath, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
 
@@ -136,7 +134,7 @@ class TestExportPortfolioReport:
         filepath = tmp_path / "portfolio_headers.csv"
         export_portfolio_report(holdings, str(filepath))
 
-        with open(filepath, "r", encoding="utf-8-sig") as f:
+        with open(filepath, encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             headers = reader.fieldnames
 
@@ -173,12 +171,12 @@ class TestExportFileCreated:
 
         # 第一次导出
         export_funds_to_csv(funds1, str(filepath))
-        with open(filepath, "r", encoding="utf-8-sig") as f:
-            content1 = f.read()
+        with open(filepath, encoding="utf-8-sig") as f:
+            _ = f.read()
 
         # 第二次导出（覆盖）
         export_funds_to_csv(funds2, str(filepath))
-        with open(filepath, "r", encoding="utf-8-sig") as f:
+        with open(filepath, encoding="utf-8-sig") as f:
             content2 = f.read()
 
         # 验证文件内容已更新

@@ -1,12 +1,11 @@
 # -*- coding: UTF-8 -*-
 """Tests for loading state functionality"""
 
-import sys
 import os
+import sys
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from dataclasses import dataclass, field
-from typing import List, Optional
 
 # Add project paths
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -15,7 +14,7 @@ if SRC_ROOT not in sys.path:
     sys.path.insert(0, SRC_ROOT)
 
 # Import GUI components
-from src.gui.components import FundCard, AppColors, get_change_color
+from src.gui.components import FundCard
 
 
 class TestFundCardLoadingState:
@@ -43,7 +42,7 @@ class TestFundCardLoadingState:
             change_pct=0.9,
             profit=100.0,
         )
-        assert card.loading == False, "Loading state should default to False"
+        assert not card.loading, "Loading state should default to False"
 
     def test_fundcard_set_loading_true(self):
         """Test setting loading state to True"""
@@ -56,7 +55,7 @@ class TestFundCardLoadingState:
             profit=100.0,
         )
         card.set_loading(True)
-        assert card.loading == True, "Loading state should be True after set_loading(True)"
+        assert card.loading, "Loading state should be True after set_loading(True)"
 
     def test_fundcard_set_loading_false(self):
         """Test setting loading state to False"""
@@ -70,7 +69,7 @@ class TestFundCardLoadingState:
         )
         card.set_loading(True)
         card.set_loading(False)
-        assert card.loading == False, "Loading state should be False after set_loading(False)"
+        assert not card.loading, "Loading state should be False after set_loading(False)"
 
     def test_fundcard_has_progress_ring(self):
         """Test that FundCard has ProgressRing component when loading"""
@@ -96,7 +95,7 @@ class TestFundCardLoadingState:
         )
         card.set_loading(True)
         # ProgressRing should be visible when loading
-        assert card.progress_ring.visible == True, "ProgressRing should be visible when loading"
+        assert card.progress_ring.visible, "ProgressRing should be visible when loading"
 
     def test_fundcard_progress_ring_hidden_when_not_loading(self):
         """Test that ProgressRing is hidden when not loading"""
@@ -110,7 +109,7 @@ class TestFundCardLoadingState:
         )
         card.set_loading(False)
         # ProgressRing should be hidden when not loading
-        assert card.progress_ring.visible == False, "ProgressRing should be hidden when not loading"
+        assert not card.progress_ring.visible, "ProgressRing should be hidden when not loading"
 
     def test_fundcard_content_opacity_when_loading(self):
         """Test that card loading overlay is visible when loading"""
@@ -124,8 +123,8 @@ class TestFundCardLoadingState:
         )
         card.set_loading(True)
         # Loading overlay should be visible when loading
-        assert card._loading_overlay.visible == True, "Loading overlay should be visible when loading"
-        assert card.progress_ring.visible == True, "ProgressRing should be visible when loading"
+        assert card._loading_overlay.visible, "Loading overlay should be visible when loading"
+        assert card.progress_ring.visible, "ProgressRing should be visible when loading"
 
 
 class TestRefreshButtonState:
@@ -159,18 +158,18 @@ class TestLoadingIndicatorIntegration:
         )
 
         # Initially not loading
-        assert card.loading == False
-        assert card.progress_ring.visible == False
+        assert not card.loading
+        assert not card.progress_ring.visible
 
         # Set loading
         card.set_loading(True)
-        assert card.loading == True
-        assert card.progress_ring.visible == True
+        assert card.loading
+        assert card.progress_ring.visible
 
         # Set not loading
         card.set_loading(False)
-        assert card.loading == False
-        assert card.progress_ring.visible == False
+        assert not card.loading
+        assert not card.progress_ring.visible
 
     def test_multiple_cards_loading_independently(self):
         """Test that multiple cards can have independent loading states"""
@@ -195,10 +194,10 @@ class TestLoadingIndicatorIntegration:
         card1.set_loading(True)
         card2.set_loading(False)
 
-        assert card1.loading == True
-        assert card1.progress_ring.visible == True
-        assert card2.loading == False
-        assert card2.progress_ring.visible == False
+        assert card1.loading
+        assert card1.progress_ring.visible
+        assert not card2.loading
+        assert not card2.progress_ring.visible
 
 
 class TestLoadingStateMethods:
@@ -241,13 +240,13 @@ class TestLoadingStateMethods:
             profit=100.0,
         )
 
-        assert card.loading == False
+        assert not card.loading
 
         card.toggle_loading()
-        assert card.loading == True
+        assert card.loading
 
         card.toggle_loading()
-        assert card.loading == False
+        assert not card.loading
 
 
 class TestAppLoadingState:
@@ -274,15 +273,15 @@ class TestAppLoadingState:
             app = FundGUIApp()
 
             # Initially not loading
-            assert app.is_loading == False
+            assert not app.is_loading
 
             # Set loading
             app.set_loading(True)
-            assert app.is_loading == True
+            assert app.is_loading
 
             # Set not loading
             app.set_loading(False)
-            assert app.is_loading == False
+            assert not app.is_loading
 
 
 if __name__ == "__main__":

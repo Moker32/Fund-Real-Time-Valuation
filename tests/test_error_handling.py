@@ -4,10 +4,9 @@
 测试全局错误处理功能。
 """
 
-import pytest
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 # 添加 src 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -20,8 +19,8 @@ class TestErrorHandlingModule:
         """测试错误处理模块可以正常导入"""
         from src.gui.error_handling import (
             ErrorHandler,
-            show_error_dialog,
             ErrorSeverity,
+            show_error_dialog,
         )
 
         assert ErrorHandler is not None
@@ -60,7 +59,7 @@ class TestErrorHandlingModule:
 
     def test_error_handler_record_warning(self):
         """测试错误处理器记录警告"""
-        from src.gui.error_handling import ErrorHandler, ErrorSeverity
+        from src.gui.error_handling import ErrorHandler
 
         handler = ErrorHandler()
 
@@ -107,8 +106,8 @@ class TestErrorHandlingModule:
 
     def test_error_handler_clear_old_errors(self):
         """测试错误处理器清除旧错误"""
+
         from src.gui.error_handling import ErrorHandler, ErrorSeverity
-        import time
 
         handler = ErrorHandler(max_recent_errors=5)
 
@@ -123,7 +122,7 @@ class TestErrorHandlingModule:
 
     def test_error_handler_exception_handler(self):
         """测试错误处理器异常装饰器"""
-        from src.gui.error_handling import ErrorHandler, ErrorSeverity
+        from src.gui.error_handling import ErrorHandler
 
         handler = ErrorHandler()
 
@@ -142,7 +141,7 @@ class TestErrorHandlingModule:
 
     def test_error_handler_exception_handler_with_return(self):
         """测试异常装饰器可以返回默认值"""
-        from src.gui.error_handling import ErrorHandler, ErrorSeverity
+        from src.gui.error_handling import ErrorHandler
 
         handler = ErrorHandler()
 
@@ -165,7 +164,7 @@ class TestShowErrorDialog:
 
     def test_show_error_dialog_with_mock_page(self):
         """测试使用模拟页面显示错误对话框"""
-        from src.gui.error_handling import show_error_dialog, ErrorSeverity
+        from src.gui.error_handling import ErrorSeverity, show_error_dialog
 
         # 创建模拟页面
         mock_page = MagicMock()
@@ -188,7 +187,7 @@ class TestShowErrorDialog:
 
     def test_show_error_dialog_info_severity(self):
         """测试显示信息级别错误对话框"""
-        from src.gui.error_handling import show_error_dialog, ErrorSeverity
+        from src.gui.error_handling import ErrorSeverity, show_error_dialog
 
         mock_page = MagicMock()
         mock_page.overlay = []
@@ -205,7 +204,7 @@ class TestShowErrorDialog:
 
     def test_show_error_dialog_warning_severity(self):
         """测试显示警告级别错误对话框"""
-        from src.gui.error_handling import show_error_dialog, ErrorSeverity
+        from src.gui.error_handling import ErrorSeverity, show_error_dialog
 
         mock_page = MagicMock()
         mock_page.overlay = []
@@ -222,7 +221,7 @@ class TestShowErrorDialog:
 
     def test_show_error_dialog_critical_severity(self):
         """测试显示严重级别错误对话框"""
-        from src.gui.error_handling import show_error_dialog, ErrorSeverity
+        from src.gui.error_handling import ErrorSeverity, show_error_dialog
 
         mock_page = MagicMock()
         mock_page.overlay = []
@@ -239,7 +238,7 @@ class TestShowErrorDialog:
 
     def test_show_error_dialog_with_details(self):
         """测试显示带详细信息的错误对话框"""
-        from src.gui.error_handling import show_error_dialog, ErrorSeverity
+        from src.gui.error_handling import ErrorSeverity, show_error_dialog
 
         mock_page = MagicMock()
         mock_page.overlay = []
@@ -268,8 +267,8 @@ class TestErrorHandlerIntegration:
 
     def test_gui_app_error_handler_type(self):
         """测试 GUI 应用错误处理器类型"""
-        from src.gui.main import FundGUIApp
         from src.gui.error_handling import ErrorHandler
+        from src.gui.main import FundGUIApp
 
         app = FundGUIApp()
         assert isinstance(app.error_handler, ErrorHandler)
@@ -277,7 +276,6 @@ class TestErrorHandlerIntegration:
     def test_gui_app_error_handler_shared(self):
         """测试 GUI 应用共享同一个错误处理器"""
         from src.gui.main import FundGUIApp
-        from src.gui.error_handling import ErrorHandler
 
         app1 = FundGUIApp()
         app2 = FundGUIApp()
@@ -287,9 +285,10 @@ class TestErrorHandlerIntegration:
 
     def test_show_error_dialog_integration(self):
         """测试错误对话框在 GUI 中集成"""
-        from src.gui.main import FundGUIApp
-        from src.gui.error_handling import ErrorSeverity, show_error_dialog
         from unittest.mock import MagicMock
+
+        from src.gui.error_handling import ErrorSeverity, show_error_dialog
+        from src.gui.main import FundGUIApp
 
         app = FundGUIApp()
 
@@ -317,8 +316,8 @@ class TestAppColorsInErrorHandling:
     def test_error_severity_colors_defined(self):
         """测试错误级别颜色已定义"""
         from src.gui.error_handling import (
-            ErrorSeverity,
             ERROR_COLORS,
+            ErrorSeverity,
         )
 
         assert hasattr(ErrorSeverity, "INFO")
@@ -339,8 +338,9 @@ class TestDialogCallbackErrorLogging:
     def test_dialog_callback_error_is_logged(self, caplog):
         """测试对话框关闭回调异常被记录到日志"""
         import logging
-        from src.gui.error_handling import show_error_dialog, ErrorSeverity
         from unittest.mock import MagicMock
+
+        from src.gui.error_handling import ErrorSeverity, show_error_dialog
 
         # 设置日志级别
         caplog.set_level(logging.WARNING)
@@ -376,8 +376,9 @@ class TestDialogCallbackErrorLogging:
     def test_dialog_callback_success_no_error_logged(self, caplog):
         """测试成功执行的回调不会产生错误日志"""
         import logging
-        from src.gui.error_handling import show_error_dialog, ErrorSeverity
         from unittest.mock import MagicMock
+
+        from src.gui.error_handling import ErrorSeverity, show_error_dialog
 
         caplog.set_level(logging.WARNING)
 

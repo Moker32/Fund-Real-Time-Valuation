@@ -3,13 +3,11 @@
 提供 FastAPI 应用所需的各种依赖项
 """
 
-from typing import Optional
 
 from src.datasources.manager import DataSourceManager, create_default_manager
 
-
 # 全局数据源管理器实例
-_data_source_manager: Optional[DataSourceManager] = None
+_data_source_manager: DataSourceManager | None = None
 
 
 def get_data_source_manager() -> DataSourceManager:
@@ -47,7 +45,7 @@ async def close_data_source_manager():
 class DataSourceDependency:
     """数据源管理器依赖类"""
 
-    def __init__(self, manager: Optional[DataSourceManager] = None):
+    def __init__(self, manager: DataSourceManager | None = None):
         """
         初始化数据源依赖
 

@@ -3,14 +3,15 @@
 测试新浪和东方财富板块数据源
 """
 
+
 import pytest
-import asyncio
+
 from src.datasources.sector_source import (
-    SinaSectorDataSource,
-    SectorDataAggregator,
-    EastMoneySectorSource,
-    EastMoneyIndustryDetailSource,
     EastMoneyConceptDetailSource,
+    EastMoneyIndustryDetailSource,
+    EastMoneySectorSource,
+    SectorDataAggregator,
+    SinaSectorDataSource,
 )
 
 

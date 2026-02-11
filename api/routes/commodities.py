@@ -4,17 +4,16 @@
 """
 
 from datetime import datetime
-from datetime import datetime
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.datasources.base import DataSourceType
-from src.datasources.commodity_source import YFinanceCommoditySource, AKShareCommoditySource
+from src.datasources.commodity_source import AKShareCommoditySource, YFinanceCommoditySource
 from src.datasources.manager import DataSourceManager
 
 from ..dependencies import DataSourceDependency
-from ..models import CommodityResponse, CommodityListResponse, ErrorResponse
+from ..models import CommodityResponse, ErrorResponse
 
 
 class CommodityListData(TypedDict):
@@ -48,7 +47,7 @@ SUPPORTED_COMMODITIES = [
     },
 )
 async def get_commodities(
-    types: Optional[str] = None,
+    types: str | None = None,
     manager: DataSourceManager = Depends(DataSourceDependency()),
 ) -> CommodityListData:
     """

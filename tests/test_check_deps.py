@@ -1,7 +1,6 @@
 # -*- coding: UTF-8 -*-
 """依赖检查模块测试"""
 
-import pytest
 import sys
 from pathlib import Path
 
@@ -50,11 +49,11 @@ class TestDependencyCheck:
 
     def test_verify_imports(self):
         """测试核心模块导入"""
-        from src.gui.check_deps import verify_imports
-
         # 允许yaml导入失败（可能是pyyaml）
         import sys
         from io import StringIO
+
+        from src.gui.check_deps import verify_imports
 
         # 捕获输出
         old_stdout = sys.stdout
