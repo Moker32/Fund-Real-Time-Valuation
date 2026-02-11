@@ -3,6 +3,7 @@ FastAPI 应用入口
 基金实时估值 Web API 服务
 """
 
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Union
@@ -13,10 +14,15 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.datasources.manager import DataSourceManager, create_default_manager
+from src.datasources.cache_warmer import CacheWarmer
 
 from .dependencies import close_data_source_manager, get_data_source_manager, set_data_source_manager
 from .models import ErrorResponse, HealthDetailResponse, HealthResponse
 from .routes import commodities, funds, overview
+
+
+# 全局预热器实例
+_cache_warmer: CacheWarmer | None = None
 
 
 @asynccontextmanager
@@ -27,6 +33,8 @@ async def lifespan(app: FastAPI):
     Args:
         app: FastAPI 应用实例
     """
+    global _cache_warmer
+
     # 启动时初始化数据源管理器
     manager = create_default_manager()
     set_data_source_manager(manager)
@@ -34,7 +42,15 @@ async def lifespan(app: FastAPI):
     # 启动后台健康检查
     await manager.start_background_health_check()
 
+    # 启动缓存预热（不阻塞服务启动）
+    _cache_warmer = CacheWarmer(manager)
+    asyncio.create_task(_cache_warmer.start_background_warmup(interval=300))
+
     yield
+
+    # 停止后台预热
+    if _cache_warmer:
+        _cache_warmer.stop()
 
     # 关闭时清理资源
     await close_data_source_manager()
