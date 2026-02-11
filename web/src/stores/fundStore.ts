@@ -32,6 +32,8 @@ export const useFundStore = defineStore('funds', () => {
   // State
   const funds = ref<Fund[]>([]);
   const loading = ref(false);
+  const loadingProgress = ref(0);  // 加载进度 0-100
+  const loadingTotal = ref(0);     // 需要加载的总数
   const error = ref<string | null>(null);
   const lastUpdated = ref<string | null>(null);
   const refreshInterval = ref(30); // seconds
@@ -88,6 +90,8 @@ export const useFundStore = defineStore('funds', () => {
   async function fetchFunds(options: FetchOptions = DEFAULT_OPTIONS) {
     const { retries, retryDelay, showError } = { ...DEFAULT_OPTIONS, ...options };
     loading.value = true;
+    loadingProgress.value = 0;
+    loadingTotal.value = 0;
     error.value = null;
     retryCount.value = 0;
 
@@ -98,6 +102,7 @@ export const useFundStore = defineStore('funds', () => {
       try {
         const response = await fundApi.getFunds();
         funds.value = response.funds || [];
+        loadingProgress.value = 100;  // 加载完成
         lastUpdated.value = new Date().toLocaleTimeString('zh-CN');
         return; // 成功，退出函数
       } catch (err) {
@@ -119,6 +124,7 @@ export const useFundStore = defineStore('funds', () => {
       console.error('[FundStore] fetchFunds failed after retries:', error.value);
     }
     loading.value = false;
+    loadingProgress.value = 0;
   }
 
   async function fetchFundEstimate(code: string, options: FetchOptions = {}) {

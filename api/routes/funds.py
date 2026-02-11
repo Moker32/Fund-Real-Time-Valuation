@@ -29,6 +29,7 @@ class FundListData(TypedDict):
     funds: list[dict]
     total: int
     timestamp: str
+    progress: Optional[int]  # 加载进度 0-100
 
 
 router = APIRouter(prefix="/api/funds", tags=["基金"])
@@ -116,7 +117,7 @@ async def get_funds_list(
     if codes:
         fund_codes = [c.strip() for c in codes.split(",") if c.strip()]
         if not fund_codes:
-            return {"funds": [], "total": 0, "timestamp": current_time}
+            return {"funds": [], "total": 0, "timestamp": current_time, "progress": 0}
 
         # 构建参数列表，每个元素是字典格式
         params_list = [{"args": [code]} for code in fund_codes]

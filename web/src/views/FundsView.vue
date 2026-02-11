@@ -3,6 +3,14 @@
     <!-- Market Overview -->
     <MarketOverview :overview="overviewData" :loading="fundStore.loading" />
 
+    <!-- Loading Progress Bar -->
+    <div v-if="fundStore.loading && fundStore.loadingProgress > 0 && fundStore.loadingProgress < 100" class="loading-progress">
+      <div class="progress-bar">
+        <div class="progress-fill" :style="{ width: fundStore.loadingProgress + '%' }"></div>
+      </div>
+      <span class="progress-text">正在加载基金数据... {{ fundStore.loadingProgress }}%</span>
+    </div>
+
     <!-- Error State -->
     <div v-if="fundStore.error" class="error-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -135,6 +143,39 @@ onMounted(() => {
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+.loading-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  background: var(--color-bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.progress-bar {
+  width: 100%;
+  max-width: 400px;
+  height: 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
 }
 
 .list-header {
