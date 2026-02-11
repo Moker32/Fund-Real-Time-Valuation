@@ -15,7 +15,17 @@
           <span class="fund-name">{{ fund.name }}</span>
         </div>
         <div class="card-actions">
-          <span v-if="fund.isHolding" class="fund-type holding">持有</span>
+          <button
+            class="action-btn holding-btn"
+            :class="{ active: fund.isHolding }"
+            :title="fund.isHolding ? '取消持有' : '标记持有'"
+            @click.stop="toggleHolding"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path v-if="fund.isHolding" d="M5 12l5 5L19 7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path v-else d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
           <span class="fund-type">{{ fund.type || '其他' }}</span>
           <button class="action-btn delete-btn" title="从自选移除" @click.stop="$emit('remove', fund.code)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -63,6 +73,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useFundStore } from '@/stores/fundStore';
 import type { Fund } from '@/types';
 
 interface Props {
@@ -74,6 +85,8 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
 });
 
+const fundStore = useFundStore();
+
 defineEmits<{
   (e: 'remove', code: string): void;
 }>();
@@ -83,6 +96,10 @@ const changeClass = computed(() => {
   if (props.fund.estimateChangePercent < 0) return 'falling';
   return 'neutral';
 });
+
+async function toggleHolding() {
+  await fundStore.toggleHolding(props.fund.code, !props.fund.isHolding);
+}
 
 function formatNumber(value: number, decimals: number = 2): string {
   if (value == null) return '--';
@@ -212,11 +229,6 @@ function formatNetValueDate(dateStr: string): string {
   border-radius: var(--radius-full);
   color: var(--color-text-secondary);
   flex-shrink: 0;
-
-  &.holding {
-    background: var(--color-rise-bg);
-    color: var(--color-rise);
-  }
 }
 
 .action-btn {
@@ -247,6 +259,26 @@ function formatNetValueDate(dateStr: string): string {
 .delete-btn:hover {
   background: var(--color-fall-alpha);
   color: var(--color-fall);
+}
+
+.holding-btn {
+  svg {
+    stroke-width: 2.5;
+  }
+
+  &:hover {
+    background: var(--color-rise-alpha);
+    color: var(--color-rise);
+  }
+
+  &.active {
+    opacity: 1;
+    color: var(--color-rise);
+
+    &:hover {
+      background: var(--color-rise-alpha);
+    }
+  }
 }
 
 .fund-card:hover .action-btn {

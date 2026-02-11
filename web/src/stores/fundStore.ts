@@ -212,6 +212,26 @@ export const useFundStore = defineStore('funds', () => {
     }
   }
 
+  // 标记/取消持有
+  async function toggleHolding(code: string, holding: boolean): Promise<boolean> {
+    try {
+      const response = await fundApi.toggleHolding(code, holding);
+      if (response.success) {
+        // 更新本地状态
+        const index = funds.value.findIndex((f) => f.code === code);
+        if (index !== -1) {
+          funds.value[index] = { ...funds.value[index], isHolding: holding };
+        }
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('[FundStore] toggleHolding error:', err);
+      error.value = getFriendlyErrorMessage(err);
+      throw err;
+    }
+  }
+
   return {
     // State
     funds,
@@ -239,5 +259,6 @@ export const useFundStore = defineStore('funds', () => {
     retry,
     addFund,
     removeFund,
+    toggleHolding,
   };
 });

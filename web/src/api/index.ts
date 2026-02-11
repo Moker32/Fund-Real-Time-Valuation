@@ -194,6 +194,13 @@ export const fundApi = {
   }> {
     return api.delete(`/api/funds/watchlist/${code}`);
   },
+
+  async toggleHolding(code: string, holding: boolean): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return api.put(`/api/funds/${code}/holding`, null, { params: { holding } });
+  },
 };
 
 export const commodityApi = {

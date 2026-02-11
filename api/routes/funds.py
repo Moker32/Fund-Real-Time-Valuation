@@ -6,7 +6,7 @@
 from datetime import datetime
 from typing import TypedDict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.config.manager import ConfigManager
 from src.config.models import Fund, FundList
@@ -366,6 +366,84 @@ async def add_to_watchlist(
         "message": f"基金 {request.code} 已添加到自选",
         "fund": {"code": request.code, "name": fund_name},
     }
+
+
+@router.put(
+    "/{code}/holding",
+    response_model=dict,
+    summary="标记/取消持有基金",
+    description="将基金标记为持有或取消持有",
+    responses={
+        200: {"description": "操作成功"},
+        400: {"model": ErrorResponse, "description": "请求参数错误"},
+        404: {"model": ErrorResponse, "description": "基金不存在"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def toggle_holding(
+    code: str,
+    holding: bool = Query(..., description="True 表示标记为持有，False 表示取消持有"),
+    manager: DataSourceManager = Depends(DataSourceDependency()),
+) -> dict:
+    """
+    标记/取消持有基金
+
+    Args:
+        code: 基金代码
+        holding: 是否持有
+        manager: 数据源管理器依赖
+
+    Returns:
+        dict: 操作结果
+    """
+    from src.config.manager import ConfigManager
+
+    config_manager = ConfigManager()
+    fund_list = config_manager.load_funds()
+
+    if holding:
+        # 标记为持有
+        if fund_list.is_holding(code):
+            return {
+                "success": True,
+                "message": f"基金 {code} 已是持有状态",
+            }
+
+        # 验证基金是否存在
+        result = await manager.fetch(DataSourceType.FUND, code)
+        if not result.success:
+            raise HTTPException(
+                status_code=404 if "不存在" in result.error else 400,
+                detail=result.error,
+            )
+
+        fund_name = result.data.get("name", "") if result.data else ""
+
+        # 如果在自选列表中，获取名称
+        if not fund_name:
+            watching = fund_list.get_watching(code)
+            if watching:
+                fund_name = watching.name
+
+        new_holding = Holding(code=code, name=fund_name)
+        config_manager.add_holding(new_holding)
+        return {
+            "success": True,
+            "message": f"基金 {code} 已标记为持有",
+        }
+    else:
+        # 取消持有
+        if not fund_list.is_holding(code):
+            return {
+                "success": True,
+                "message": f"基金 {code} 不在持有列表中",
+            }
+
+        config_manager.remove_holding(code)
+        return {
+            "success": True,
+            "message": f"基金 {code} 已取消持有",
+        }
 
 
 @router.delete(
