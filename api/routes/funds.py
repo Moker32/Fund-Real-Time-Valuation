@@ -56,7 +56,7 @@ def get_default_fund_codes() -> list[str]:
     return default_funds
 
 
-def build_fund_response(data: dict, source: str = "") -> dict:
+def build_fund_response(data: dict, source: str = "", is_holding: bool = False) -> dict:
     """构建基金响应数据"""
     unit_net = data.get("unit_net_value")
     estimate_net = data.get("estimated_net_value")
@@ -75,6 +75,7 @@ def build_fund_response(data: dict, source: str = "") -> dict:
         estimateTime=data.get("estimate_time"),
         estimateChange=estimate_change,
         source=source,
+        isHolding=is_holding,
     ).model_dump()
 
 
@@ -102,7 +103,14 @@ async def get_funds_list(
     Returns:
         FundListData: 包含基金列表、总数量和时间戳的字典
     """
+    from src.config.manager import ConfigManager
+
     current_time = datetime.now().isoformat() + "Z"
+
+    # 加载持仓信息
+    config_manager = ConfigManager()
+    fund_list = config_manager.load_funds()
+    holding_codes = {h.code for h in fund_list.holdings}
 
     # 如果指定了基金代码
     if codes:
@@ -116,7 +124,8 @@ async def get_funds_list(
         funds = []
         for result in results:
             if result.success:
-                funds.append(build_fund_response(result.data, result.source))
+                is_holding = result.data.get("fund_code") in holding_codes
+                funds.append(build_fund_response(result.data, result.source, is_holding))
             else:
                 # 如果单个基金获取失败，记录错误但不中断
                 pass
@@ -131,7 +140,8 @@ async def get_funds_list(
     funds = []
     for result in results:
         if result.success:
-            funds.append(build_fund_response(result.data, result.source))
+            is_holding = result.data.get("fund_code") in holding_codes
+            funds.append(build_fund_response(result.data, result.source, is_holding))
         else:
             # 如果单个基金获取失败，记录错误但不中断
             pass
@@ -164,6 +174,8 @@ async def get_fund_detail(
     Returns:
         FundDetailResponse: 基金详情
     """
+    from src.config.manager import ConfigManager
+
     result = await manager.fetch(DataSourceType.FUND, code)
 
     if not result.success:
@@ -181,6 +193,11 @@ async def get_fund_detail(
     if unit_net is not None and estimate_net is not None and unit_net != 0:
         estimate_change = round(estimate_net - unit_net, 4)
 
+    # 检查是否持仓
+    config_manager = ConfigManager()
+    fund_list = config_manager.load_funds()
+    is_holding = code in {h.code for h in fund_list.holdings}
+
     return FundDetailResponse(
         code=data.get("fund_code", ""),
         name=data.get("name", ""),
@@ -192,6 +209,7 @@ async def get_fund_detail(
         estimateTime=data.get("estimate_time"),
         estimateChange=estimate_change,
         source=result.source,
+        isHolding=is_holding,
     ).model_dump()
 
 
@@ -220,6 +238,8 @@ async def get_fund_estimate(
     Returns:
         FundEstimateResponse: 基金估值信息
     """
+    from src.config.manager import ConfigManager
+
     result = await manager.fetch(DataSourceType.FUND, code)
 
     if not result.success:
@@ -237,6 +257,11 @@ async def get_fund_estimate(
     if unit_net is not None and estimate_net is not None and unit_net != 0:
         estimate_change = round(estimate_net - unit_net, 4)
 
+    # 检查是否持仓
+    config_manager = ConfigManager()
+    fund_list = config_manager.load_funds()
+    is_holding = code in {h.code for h in fund_list.holdings}
+
     return FundEstimateResponse(
         code=data.get("fund_code", ""),
         name=data.get("name", ""),
@@ -247,6 +272,7 @@ async def get_fund_estimate(
         netValue=data.get("unit_net_value"),
         netValueDate=data.get("net_value_date"),
         estimateChange=estimate_change,
+        isHolding=is_holding,
     ).model_dump()
 
 

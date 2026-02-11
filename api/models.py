@@ -24,6 +24,9 @@ class FundResponse(BaseModel):
     # 添加 estimateChange 字段（计算属性）
     estimateChange: Optional[float] = Field(None, description="估算涨跌额")
 
+    # 是否持有
+    isHolding: bool = Field(False, description="是否持有该基金")
+
     model_config = {
         "populate_by_name": True,
     }
@@ -54,6 +57,9 @@ class FundEstimateResponse(BaseModel):
 
     # 添加 estimateChange 字段（计算属性）
     estimateChange: Optional[float] = Field(None, description="估算涨跌额")
+
+    # 是否持有
+    isHolding: bool = Field(False, description="是否持有该基金")
 
     model_config = {
         "populate_by_name": True,

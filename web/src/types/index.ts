@@ -10,6 +10,7 @@ export interface Fund {
   estimateTime?: string;
   type?: string;
   source?: string;
+  isHolding?: boolean;  // 是否持有
 }
 
 export interface FundListResponse {

@@ -15,6 +15,7 @@
           <span class="fund-name">{{ fund.name }}</span>
         </div>
         <div class="card-actions">
+          <span v-if="fund.isHolding" class="fund-type holding">持有</span>
           <span class="fund-type">{{ fund.type || '其他' }}</span>
           <button class="action-btn delete-btn" title="从自选移除" @click.stop="$emit('remove', fund.code)">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -211,6 +212,11 @@ function formatNetValueDate(dateStr: string): string {
   border-radius: var(--radius-full);
   color: var(--color-text-secondary);
   flex-shrink: 0;
+
+  &.holding {
+    background: var(--color-rise-bg);
+    color: var(--color-rise);
+  }
 }
 
 .action-btn {
