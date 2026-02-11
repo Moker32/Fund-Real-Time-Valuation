@@ -361,12 +361,6 @@ class DataSourceHealthChecker:
         self._running = False
         if hasattr(self, '_check_task'):
             self._check_task.cancel()
-            try:
-                # 在事件循环中等待任务取消
-                loop = asyncio.get_event_loop()
-                loop.run_until_complete(self._check_task)
-            except asyncio.CancelledError:
-                pass
 
     def reset(self):
         """重置所有健康检查状态"""

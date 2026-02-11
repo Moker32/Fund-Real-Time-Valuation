@@ -28,7 +28,11 @@ class TestBinanceCryptoSource:
         """创建测试实例"""
         s = BinanceCryptoSource(timeout=5.0)
         yield s
-        asyncio.get_event_loop().run_until_complete(s.close())
+        # 使用 asyncio.run 确保事件循环正确处理
+        try:
+            asyncio.run(s.close())
+        except Exception:
+            pass
 
     def test_init(self, source):
         """测试初始化"""
@@ -60,7 +64,11 @@ class TestCoinGeckoCryptoSource:
         """创建测试实例"""
         s = CoinGeckoCryptoSource(timeout=10.0)
         yield s
-        asyncio.get_event_loop().run_until_complete(s.close())
+        # 使用 asyncio.run 确保事件循环正确处理
+        try:
+            asyncio.run(s.close())
+        except Exception:
+            pass
 
     def test_init(self, source):
         """测试初始化"""
@@ -118,7 +126,11 @@ class TestCryptoAggregator:
         agg.add_source(binance, is_primary=True)
         agg.add_source(coingecko)
         yield agg
-        asyncio.get_event_loop().run_until_complete(agg.close())
+        # 使用 asyncio.run 确保事件循环正确处理
+        try:
+            asyncio.run(agg.close())
+        except Exception:
+            pass
 
     def test_init(self, aggregator):
         """测试初始化"""

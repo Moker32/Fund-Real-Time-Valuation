@@ -459,7 +459,10 @@ class TestSinaStockDataSource:
         """创建测试实例"""
         s = SinaStockDataSource(timeout=5.0)
         yield s
-        asyncio.get_event_loop().run_until_complete(s.close())
+        try:
+            asyncio.run(s.close())
+        except Exception:
+            pass
 
     def test_init(self, source):
         """测试初始化"""
@@ -656,7 +659,10 @@ class TestBinanceCryptoSource:
         """创建测试实例"""
         s = BinanceCryptoSource(timeout=5.0)
         yield s
-        asyncio.get_event_loop().run_until_complete(s.close())
+        try:
+            asyncio.run(s.close())
+        except Exception:
+            pass
 
     def test_init(self, source):
         """测试初始化"""

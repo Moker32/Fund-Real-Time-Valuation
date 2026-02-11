@@ -376,7 +376,7 @@ class ConfigDAO:
             **kwargs: 更新的字段（name, watchlist, shares, cost, is_hold, sector, notes）
         """
         allowed_fields = {
-            "Name",
+            "name",
             "watchlist",
             "shares",
             "cost",
