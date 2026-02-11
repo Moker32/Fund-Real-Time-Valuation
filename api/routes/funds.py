@@ -9,7 +9,7 @@ from typing import TypedDict
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.config.manager import ConfigManager
-from src.config.models import Fund, FundList
+from src.config.models import Fund, FundList, Holding
 from src.datasources.base import DataSourceType
 from src.datasources.manager import DataSourceManager
 
@@ -421,9 +421,10 @@ async def toggle_holding(
 
         # 如果在自选列表中，获取名称
         if not fund_name:
-            watching = fund_list.get_watching(code)
-            if watching:
-                fund_name = watching.name
+            for f in fund_list.watchlist:
+                if f.code == code:
+                    fund_name = f.name
+                    break
 
         new_holding = Holding(code=code, name=fund_name)
         config_manager.add_holding(new_holding)

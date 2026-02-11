@@ -97,6 +97,10 @@ class FundList:
         """检查是否在自选列表中"""
         return any(f.code == code for f in self.watchlist)
 
+    def is_holding(self, code: str) -> bool:
+        """检查是否在持有列表中"""
+        return any(h.code == code for h in self.holdings)
+
     def get_holding(self, code: str) -> Holding | None:
         """获取持仓信息"""
         for h in self.holdings:
