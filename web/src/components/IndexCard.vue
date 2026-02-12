@@ -22,12 +22,12 @@
 
       <div class="card-body">
         <div class="price-section">
-          <span class="price font-mono">{{ formatPrice(indexData.price) }}</span>
+          <span class="price font-mono" :class="{ 'value-updated': priceAnimating }">{{ formatPrice(indexData.price) }}</span>
           <span class="currency">{{ indexData.currency }}</span>
         </div>
 
-        <div class="change-section" :class="changeClass">
-          <span class="change-percent font-mono">{{ formatPercent(indexData.changePercent) }}</span>
+        <div class="change-section" :class="[changeClass, { 'value-updated': changeAnimating }]">
+          <span class="change-percent font-mono" :key="indexData.changePercent">{{ formatPercent(indexData.changePercent) }}</span>
           <span class="change-indicator-value">
             <svg v-if="indexData.changePercent > 0" viewBox="0 0 24 24" fill="none">
               <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -42,26 +42,32 @@
       </div>
 
       <div class="card-footer">
-        <div class="price-range">
-          <span class="range-item">
+        <div class="footer-row">
+          <div class="footer-item">
             <span class="label">高</span>
             <span class="value font-mono">{{ formatPrice(indexData.high) }}</span>
-          </span>
-          <span class="range-item">
+          </div>
+          <div class="footer-item">
             <span class="label">低</span>
             <span class="value font-mono">{{ formatPrice(indexData.low) }}</span>
-          </span>
-          <span class="range-item">
+          </div>
+        </div>
+        <div class="footer-row">
+          <div class="footer-item">
             <span class="label">开盘</span>
             <span class="value font-mono">{{ formatPrice(indexData.open) }}</span>
-          </span>
-        </div>
-        <div class="market-time" v-if="indexData.marketTime">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 6V12L16 14"/>
-          </svg>
-          <span>{{ formatMarketTime(indexData.marketTime) }}</span>
+          </div>
+          <div class="footer-item" v-if="indexData.prevClose">
+            <span class="label">收盘</span>
+            <span class="value font-mono">{{ formatPrice(indexData.prevClose) }}</span>
+          </div>
+          <div class="market-time" v-if="indexData.marketTime">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6V12L16 14"/>
+            </svg>
+            <span>{{ formatMarketTime(indexData.marketTime) }}</span>
+          </div>
         </div>
       </div>
     </template>
@@ -69,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch, onMounted } from 'vue';
 import type { MarketIndex } from '@/types';
 
 interface Props {
@@ -83,6 +89,37 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Use a computed property to handle potential undefined values
 const indexData = computed(() => props.index);
+
+const prevPrice = ref<number | undefined>();
+const prevChangePercent = ref<number | undefined>();
+
+// Watch for price changes to trigger animation
+watch(() => props.index.price, (newVal, oldVal) => {
+  if (oldVal !== undefined && newVal !== oldVal) {
+    triggerPriceAnimation();
+  }
+  prevPrice.value = newVal;
+});
+
+watch(() => props.index.changePercent, (newVal, oldVal) => {
+  if (oldVal !== undefined && newVal !== oldVal) {
+    triggerChangeAnimation();
+  }
+  prevChangePercent.value = newVal;
+});
+
+const priceAnimating = ref(false);
+const changeAnimating = ref(false);
+
+function triggerPriceAnimation() {
+  priceAnimating.value = true;
+  setTimeout(() => priceAnimating.value = false, 500);
+}
+
+function triggerChangeAnimation() {
+  changeAnimating.value = true;
+  setTimeout(() => changeAnimating.value = false, 500);
+}
 
 const changeClass = computed(() => {
   if (props.index.changePercent > 0) return 'rising';
@@ -318,6 +355,33 @@ function formatMarketTime(dateStr: string | undefined): string {
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
   line-height: 1;
+  transition: all 0.3s ease;
+
+  &.value-updated {
+    animation: value-pulse 0.5s ease-out;
+  }
+}
+
+.currency {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+@keyframes value-pulse {
+  0% {
+    transform: scale(1);
+    color: var(--color-text-primary);
+  }
+  30% {
+    color: var(--color-rise);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    color: var(--color-text-primary);
+  }
 }
 
 .currency {
@@ -355,6 +419,22 @@ function formatMarketTime(dateStr: string | undefined): string {
   &.neutral {
     color: var(--color-neutral);
   }
+
+  &.value-updated {
+    animation: change-pulse 0.5s ease-out;
+  }
+}
+
+@keyframes change-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .change-percent {
@@ -377,21 +457,23 @@ function formatMarketTime(dateStr: string | undefined): string {
 
 .card-footer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: var(--spacing-xs);
   padding-top: var(--spacing-sm);
   border-top: 1px solid var(--color-divider);
 }
 
-.price-range {
+.footer-row {
   display: flex;
-  gap: var(--spacing-md);
+  align-items: center;
+  gap: var(--spacing-lg);
 }
 
-.range-item {
+.footer-item {
   display: flex;
   align-items: center;
   gap: 4px;
+  min-width: 90px;
 }
 
 .label {
@@ -410,6 +492,7 @@ function formatMarketTime(dateStr: string | undefined): string {
   gap: 4px;
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
+  margin-left: auto;
 
   svg {
     width: 12px;

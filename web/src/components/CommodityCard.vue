@@ -19,11 +19,11 @@
 
       <div class="card-body">
         <div class="price-section">
-          <span class="price font-mono">{{ formatPrice(commodity.price) }}</span>
+          <span class="price font-mono" :class="{ 'value-updated': priceAnimating }">{{ formatPrice(commodity.price) }}</span>
           <span class="currency">{{ commodity.currency }}</span>
         </div>
 
-        <div class="change-section" :class="changeClass">
+        <div class="change-section" :class="[changeClass, { 'value-updated': changeAnimating }]">
           <span class="change-percent font-mono">{{ formatPercent(commodity.changePercent) }}</span>
           <span class="change-indicator-value">
             <svg v-if="commodity.changePercent > 0" viewBox="0 0 24 24" fill="none">
@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { Commodity } from '@/types';
 
 interface Props {
@@ -73,6 +73,33 @@ const changeClass = computed(() => {
   if (props.commodity.changePercent < 0) return 'falling';
   return 'neutral';
 });
+
+// 价格动画状态
+const priceAnimating = ref(false);
+const changeAnimating = ref(false);
+
+// 监听价格变化触发动画
+watch(() => props.commodity.price, (newVal, oldVal) => {
+  if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) {
+    triggerPriceAnimation();
+  }
+});
+
+watch(() => props.commodity.changePercent, (newVal, oldVal) => {
+  if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) {
+    triggerChangeAnimation();
+  }
+});
+
+function triggerPriceAnimation() {
+  priceAnimating.value = true;
+  setTimeout(() => priceAnimating.value = false, 500);
+}
+
+function triggerChangeAnimation() {
+  changeAnimating.value = true;
+  setTimeout(() => changeAnimating.value = false, 500);
+}
 
 function formatPrice(value: number): string {
   if (value == null) return '--';
@@ -204,11 +231,33 @@ function formatTime(dateStr: string): string {
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
   line-height: 1;
+  transition: all 0.3s ease;
+
+  &.value-updated {
+    animation: value-pulse 0.5s ease-out;
+  }
 }
 
 .currency {
   font-size: var(--font-size-sm);
   color: var(--color-text-tertiary);
+}
+
+@keyframes value-pulse {
+  0% {
+    transform: scale(1);
+    color: var(--color-text-primary);
+  }
+  30% {
+    color: var(--color-rise);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    color: var(--color-text-primary);
+  }
 }
 
 .change-section {
@@ -240,6 +289,22 @@ function formatTime(dateStr: string): string {
 
   &.neutral {
     color: var(--color-neutral);
+  }
+
+  &.value-updated {
+    animation: change-pulse 0.5s ease-out;
+  }
+}
+
+@keyframes change-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 

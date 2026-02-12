@@ -45,7 +45,7 @@
           <!-- 非 QDII 基金显示估值 -->
           <div v-if="fund.hasRealTimeEstimate !== false" class="value-row">
             <span class="label">估值</span>
-            <span class="value font-mono">{{ formatNumber(fund.estimateValue, 4) }}</span>
+            <span class="value font-mono" :class="{ 'value-updated': valueAnimating }">{{ formatNumber(fund.estimateValue, 4) }}</span>
             <span class="value-date">{{ formatNetValueDate(fund.estimateTime) }}</span>
           </div>
           <!-- QDII 基金显示前日净值 -->
@@ -56,7 +56,7 @@
           </div>
         </div>
 
-        <div class="change-section" :class="changeClass">
+        <div class="change-section" :class="[changeClass, { 'value-updated': changeAnimating }]">
           <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
           <span class="change-indicator-value">
             <svg v-if="fund.estimateChangePercent > 0" viewBox="0 0 24 24" fill="none">
@@ -87,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useFundStore } from '@/stores/fundStore';
 import type { Fund } from '@/types';
 import FundChart from './FundChart.vue';
@@ -118,6 +118,33 @@ const changeClass = computed(() => {
   if (props.fund.estimateChangePercent < 0) return 'falling';
   return 'neutral';
 });
+
+// 价格动画状态
+const valueAnimating = ref(false);
+const changeAnimating = ref(false);
+
+// 监听价格变化触发动画
+watch(() => props.fund.estimateValue, (newVal, oldVal) => {
+  if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) {
+    triggerValueAnimation();
+  }
+});
+
+watch(() => props.fund.estimateChangePercent, (newVal, oldVal) => {
+  if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) {
+    triggerChangeAnimation();
+  }
+});
+
+function triggerValueAnimation() {
+  valueAnimating.value = true;
+  setTimeout(() => valueAnimating.value = false, 500);
+}
+
+function triggerChangeAnimation() {
+  changeAnimating.value = true;
+  setTimeout(() => changeAnimating.value = false, 500);
+}
 
 async function toggleHolding() {
   await fundStore.toggleHolding(props.fund.code, !props.fund.isHolding);
@@ -349,6 +376,28 @@ function formatNetValueDate(dateStr: string): string {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
+  transition: all 0.3s ease;
+
+  &.value-updated {
+    animation: value-pulse 0.5s ease-out;
+  }
+}
+
+@keyframes value-pulse {
+  0% {
+    transform: scale(1);
+    color: var(--color-text-primary);
+  }
+  30% {
+    color: var(--color-rise);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    color: var(--color-text-primary);
+  }
 }
 
 .change-section {
@@ -380,6 +429,22 @@ function formatNetValueDate(dateStr: string): string {
 
   &.neutral {
     color: var(--color-neutral);
+  }
+
+  &.value-updated {
+    animation: change-pulse 0.5s ease-out;
+  }
+}
+
+@keyframes change-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
   }
 }
 
