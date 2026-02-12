@@ -213,11 +213,49 @@ def get_full_fund_info(fund_code: str) -> dict[str, Any] | None:
         return None
 
 
+def _infer_fund_type_from_name(fund_name: str) -> str:
+    """
+    从基金名称推断基金类型
+
+    Args:
+        fund_name: 基金名称
+
+    Returns:
+        基金类型字符串
+    """
+    if not fund_name:
+        return ""
+
+    name = fund_name.upper()
+
+    # 根据名称中的关键词推断类型
+    if "QDII" in name:
+        return "QDII"
+    if "FOF" in name:
+        return "FOF"
+    if "ETF" in name and "联接" in name:
+        return "ETF-联接"
+    if "ETF" in name:
+        return "ETF"
+    if "LOF" in name:
+        return "LOF"
+    if "货币" in name:
+        return "货币型"
+    if "债券" in name:
+        return "债券型"
+    if "混合" in name:
+        return "混合型"
+    if "股票" in name or "指数" in name:
+        return "股票型"
+
+    return ""
+
+
 def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
     """
     获取基金基本信息（名称和类型），使用全局缓存和数据库
 
-    优先从数据库读取，如果不存在则从 akshare 获取并保存到数据库
+    优先从数据库读取，如果不存在或类型为空则从 akshare 获取并保存到数据库
 
     Args:
         fund_code: 基金代码
@@ -238,12 +276,18 @@ def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
     # 2. 尝试从数据库读取
     db_info = get_basic_info_db(fund_code)
     if db_info:
-        result = (db_info.get("short_name", "") or "", db_info.get("type", "") or "")
-        _fund_info_cache[fund_code] = (result, now)
-        _fund_info_hit_count += 1
-        return result
-
-    _fund_info_miss_count += 1
+        name = db_info.get("short_name", "") or ""
+        fund_type = db_info.get("type", "") or ""
+        # 只有当类型不为空时才使用缓存，否则需要重新获取
+        if fund_type:
+            result = (name, fund_type)
+            _fund_info_cache[fund_code] = (result, now)
+            _fund_info_hit_count += 1
+            return result
+        # 类型为空，需要从 akshare 重新获取
+        _fund_info_miss_count += 1
+    else:
+        _fund_info_miss_count += 1
 
     # 3. 从 akshare 获取
     try:
@@ -272,6 +316,10 @@ def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
                         fund_type = fund_type.split("-")[0]
         except Exception as e:
             logger.debug(f"获取基金类型失败: {fund_code}, error: {e}")
+
+        # 备选方案：从基金名称中识别类型
+        if not fund_type and fund_name:
+            fund_type = _infer_fund_type_from_name(fund_name)
 
         result = (fund_name, fund_type)
         _fund_info_cache[fund_code] = (result, now)
@@ -358,10 +406,17 @@ class FundDataSource(DataSource):
             if not daily_dao.is_expired(fund_code):
                 cached_daily = daily_dao.get_latest(fund_code)
                 if cached_daily:
+                    # 获取基金类型（从基本信息表）
+                    fund_type = ""
+                    basic_info = get_basic_info_db(fund_code)
+                    if basic_info:
+                        fund_type = basic_info.get("type", "") or ""
+
                     # 构建返回数据格式
                     result_data = {
                         "fund_code": fund_code,
                         "name": cached_daily.fund_name or "",
+                        "type": fund_type,
                         "net_value_date": cached_daily.date,
                         "unit_net_value": cached_daily.unit_net_value,
                         "estimated_net_value": cached_daily.estimated_value,
@@ -1774,10 +1829,17 @@ class Fund123DataSource(DataSource):
             if not daily_dao.is_expired(fund_code):
                 cached_daily = daily_dao.get_latest(fund_code)
                 if cached_daily:
+                    # 获取基金类型（从基本信息表）
+                    fund_type = ""
+                    basic_info = get_basic_info_db(fund_code)
+                    if basic_info:
+                        fund_type = basic_info.get("type", "") or ""
+
                     # 构建返回数据格式
                     result_data = {
                         "fund_code": fund_code,
                         "name": cached_daily.fund_name or "",
+                        "type": fund_type,
                         "net_value_date": cached_daily.date,
                         "unit_net_value": cached_daily.unit_net_value,
                         "estimated_net_value": cached_daily.estimated_value,
@@ -1947,9 +2009,19 @@ class Fund123DataSource(DataSource):
         net_value = float(fund_info.get("netValue", 0)) if fund_info.get("netValue") else None
         net_date = str(fund_info.get("netValueDate", ""))
 
+        # 获取基金类型
+        fund_type = ""
+        basic_info = get_basic_info_db(fund_code)
+        if basic_info:
+            fund_type = basic_info.get("type", "") or ""
+        # 备选方案：从基金名称中识别
+        if not fund_type:
+            fund_type = _infer_fund_type_from_name(fund_name)
+
         result_data = {
             "fund_code": fund_code,
             "name": fund_name,
+            "type": fund_type,
             "net_value_date": net_date,
             "unit_net_value": net_value,
             "estimated_net_value": estimate_value,
