@@ -110,7 +110,6 @@ const initChart = () => {
     updateData();
   }
 };
-};
 
 const updateData = () => {
   if (!series || !props.data || props.data.length === 0) return;
@@ -125,11 +124,26 @@ const updateData = () => {
         // FundHistory 格式
         return { time: item.time, value: item.close };
       } else {
-        // FundIntraday 格式
-        return { time: item.time, value: item.price };
+        // FundIntraday 格式 - 解析 YYYY-MM-DD HH:mm 格式
+        const timeStr = item.time;
+        const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
+        if (match) {
+          return {
+            time: {
+              year: parseInt(match[1]),
+              month: parseInt(match[2]),
+              day: parseInt(match[3]),
+              hour: parseInt(match[4]),
+              minute: parseInt(match[5]),
+            },
+            value: item.price,
+          };
+        }
+        // 回退到日期格式
+        return { time: timeStr.split(' ')[0], value: item.price };
       }
     });
-    series.setData(lineData as { time: string; value: number }[]);
+    series.setData(lineData as { time: string | { year: number; month: number; day: number; hour?: number; minute?: number; }; value: number }[]);
   }
 };
 

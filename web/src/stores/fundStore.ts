@@ -305,46 +305,61 @@ export const useFundStore = defineStore('funds', () => {
       // 获取当前估值的今日数据
       const estimateResponse = await fundApi.getFundEstimate(code);
 
-      if (estimateResponse && estimateResponse.netValue) {
-        const todayStr = new Date().toISOString().split('T')[0];
-
-        // 构建两个分时数据点：开盘（昨日收盘）和当前（今日估值）
-        const intraday: FundIntraday[] = [];
-
-        // 获取昨日收盘价作为开盘价
-        const historyResponse = await fundApi.getFundHistory(code, 2);
-        if (historyResponse.data && historyResponse.data.length > 0) {
-          const lastDay = historyResponse.data[historyResponse.data.length - 1];
-          if (lastDay && lastDay.close) {
-            // 开盘点
-            intraday.push({
-              time: '09:30',  // 股市开盘时间
-              price: lastDay.close,
-            });
-          }
-        }
-
-        // 当前估值为收盘点
-        const now = new Date();
-        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-        intraday.push({
-          time: currentTime,
-          price: estimateResponse.netValue,
-        });
-
-        // 更新对应基金的分时数据
-        const index = funds.value.findIndex((f) => f.code === code);
-        if (index !== -1) {
-          const currentFund = funds.value[index];
-          if (currentFund) {
-            funds.value[index] = { ...currentFund, intraday };
-          }
-        }
-
-        return intraday;
+      // API 返回 estimated_net_value，需要检查
+      const currentPrice = estimateResponse?.estimated_net_value || estimateResponse?.estimateValue;
+      if (!currentPrice) {
+        return [];
       }
 
-      return [];
+      // 构建分时数据点
+      const intraday: FundIntraday[] = [];
+
+      // 获取历史数据用于开盘价
+      const historyResponse = await fundApi.getFundHistory(code, 10);
+      if (historyResponse.data && historyResponse.data.length > 0) {
+        // 找到最后一个有效数据（不是今日的 NaT）
+        let lastValidDay = null;
+        for (let i = historyResponse.data.length - 1; i >= 0; i--) {
+          const day = historyResponse.data[i];
+          if (day && day.close && day.time !== 'NaT') {
+            lastValidDay = day;
+            break;
+          }
+        }
+
+        if (lastValidDay) {
+          // 开盘点 - 使用昨日日期 + 09:30
+          intraday.push({
+            time: `${lastValidDay.time} 09:30`,
+            price: lastValidDay.close,
+          });
+        }
+      }
+
+      // 当前估值为收盘点
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const currentTime = `${todayStr} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      intraday.push({
+        time: currentTime,
+        price: currentPrice,
+      });
+
+      // 只有两个数据点才有效
+      if (intraday.length < 2) {
+        return [];
+      }
+
+      // 更新对应基金的分时数据
+      const index = funds.value.findIndex((f) => f.code === code);
+      if (index !== -1) {
+        const currentFund = funds.value[index];
+        if (currentFund) {
+          funds.value[index] = { ...currentFund, intraday };
+        }
+      }
+
+      return intraday;
     } catch (err) {
       console.error(`[FundStore] fetchIntraday error for ${code}:`, err);
       return [];

@@ -168,6 +168,8 @@ export const fundApi = {
     estimateChange: number;
     estimateChangePercent: number;
     timestamp: string;
+    estimated_net_value?: number;
+    unit_net_value?: number;
   }> {
     return api.get(`/api/funds/${code}/estimate`);
   },

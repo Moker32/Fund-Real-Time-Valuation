@@ -160,7 +160,7 @@ onMounted(async () => {
   await fundStore.fetchFunds();
 
   // 加载每个基金的分时数据
-  fundStore.holdingFirstFunds.forEach((fund) => {
+  fundStore.funds.forEach((fund) => {
     fundStore.fetchIntraday(fund.code);
   });
 });
