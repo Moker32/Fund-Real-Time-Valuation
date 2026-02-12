@@ -4,6 +4,7 @@ FastAPI 应用入口
 """
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -12,9 +13,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from src.datasources.cache_warmer import CacheWarmer
 from src.datasources.cache_cleaner import CacheCleaner, get_cache_cleaner
+from src.datasources.cache_warmer import CacheWarmer
 from src.datasources.manager import create_default_manager
+
+logger = logging.getLogger(__name__)
 
 from .dependencies import (
     close_data_source_manager,
@@ -22,7 +25,7 @@ from .dependencies import (
     set_data_source_manager,
 )
 from .models import HealthDetailResponse, HealthResponse
-from .routes import cache, commodities, funds, overview
+from .routes import cache, commodities, funds, indices, overview
 
 # 全局预热器实例
 _cache_warmer: CacheWarmer | None = None
@@ -216,6 +219,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 # 注册路由
 app.include_router(funds.router)
 app.include_router(commodities.router)
+app.include_router(indices.router)
 app.include_router(overview.router)
 app.include_router(cache.router)
 

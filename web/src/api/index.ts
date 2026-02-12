@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday } from '@/types';
+import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse } from '@/types';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -272,6 +272,26 @@ export const healthApi = {
 
   async getSimpleHealth(): Promise<{ status: string; timestamp: string }> {
     return api.get('/api/health/simple');
+  },
+};
+
+export const indexApi = {
+  async getIndices(): Promise<IndexListResponse> {
+    return api.get('/api/indices');
+  },
+
+  async getIndex(indexType: string): Promise<MarketIndex> {
+    return api.get(`/api/indices/${indexType}`);
+  },
+
+  async getRegions(): Promise<{
+    regions: Array<{
+      name: string;
+      indices: Array<{ index: string; name: string }>;
+    }>;
+    supported_indices: string[];
+  }> {
+    return api.get('/api/indices/regions');
   },
 };
 

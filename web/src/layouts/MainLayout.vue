@@ -29,6 +29,15 @@
           <span v-if="!sidebarCollapsed" class="nav-text">商品行情</span>
         </router-link>
 
+        <router-link to="/indices" class="nav-item" :class="{ active: currentRoute === 'indices' }">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 3V21H21"/>
+            <path d="M7 14L11 10L15 12L21 6" stroke-width="1.5"/>
+            <circle cx="12" cy="12" r="2" stroke-width="1.5"/>
+          </svg>
+          <span v-if="!sidebarCollapsed" class="nav-text">全球市场</span>
+        </router-link>
+
         <router-link to="/settings" class="nav-item" :class="{ active: currentRoute === 'settings' }">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="12" cy="12" r="3"/>
@@ -97,11 +106,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useFundStore } from '@/stores/fundStore';
 import { useCommodityStore } from '@/stores/commodityStore';
+import { useIndexStore } from '@/stores/indexStore';
 import { healthApi } from '@/api';
 
 const route = useRoute();
 const fundStore = useFundStore();
 const commodityStore = useCommodityStore();
+const indexStore = useIndexStore();
 
 const sidebarCollapsed = ref(false);
 const healthStatus = ref<'healthy' | 'degraded' | 'unhealthy'>('healthy');
@@ -114,12 +125,13 @@ const pageTitle = computed(() => {
   const titles: Record<string, string> = {
     funds: '基金自选',
     commodities: '商品行情',
+    indices: '全球市场',
     settings: '设置',
   };
   return titles[currentRoute.value] || 'FundVue';
 });
 
-const lastUpdated = computed(() => fundStore.lastUpdated || commodityStore.lastUpdated);
+const lastUpdated = computed(() => fundStore.lastUpdated || commodityStore.lastUpdated || indexStore.lastUpdated);
 
 function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value;
@@ -144,6 +156,7 @@ async function refresh() {
     await Promise.all([
       fundStore.fetchFunds(),
       commodityStore.fetchCommodities(),
+      indexStore.fetchIndices(),
     ]);
     await checkHealth();
   } finally {
@@ -158,6 +171,7 @@ function startAutoRefresh() {
   refreshTimer = window.setInterval(() => {
     fundStore.fetchFunds();
     commodityStore.fetchCommodities();
+    indexStore.fetchIndices();
   }, interval);
 }
 

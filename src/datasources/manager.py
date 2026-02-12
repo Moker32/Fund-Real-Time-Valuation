@@ -739,6 +739,10 @@ def create_default_manager(
     manager.register(BinanceCryptoSource())
     manager.register(CoinGeckoCryptoSource())
 
+    # === 新增全球指数数据源 ===
+    from .index_source import YahooIndexSource
+    manager.register(YahooIndexSource())
+
     return manager
 
 

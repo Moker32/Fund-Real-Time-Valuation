@@ -10,6 +10,7 @@ httpx>=0.24.0                  # HTTP 客户端
 pyyaml>=6.0                    # YAML 配置
 beautifulsoup4>=4.12.0         # 网页解析
 python-dateutil>=2.8.2         # 日期处理
+pytz>=2023.3                   # 时区处理
 
 # === 图表 ===
 matplotlib>=3.7.0              # 图表绘制

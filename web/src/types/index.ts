@@ -63,6 +63,32 @@ export interface CommodityListResponse {
   timestamp: string;
 }
 
+// Market Index Types
+export interface MarketIndex {
+  index: string;
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  currency: string;
+  exchange?: string;
+  timestamp: string;
+  source: string;
+  high?: number;
+  low?: number;
+  open?: number;
+  prevClose?: number;
+  region?: string;          // 区域: 'america', 'asia', 'europe', 'china', 'hk'
+  tradingStatus?: string;   // 交易状态: 'open', 'closed', 'pre'
+  marketTime?: string;     // 市场当前时间
+}
+
+export interface IndexListResponse {
+  indices: MarketIndex[];
+  timestamp: string;
+}
+
 // Overview Types
 export interface Overview {
   totalValue: number;
@@ -97,6 +123,13 @@ export interface FundState {
 
 export interface CommodityState {
   commodities: Commodity[];
+  loading: boolean;
+  error: string | null;
+  lastUpdated: string | null;
+}
+
+export interface IndexState {
+  indices: MarketIndex[];
   loading: boolean;
   error: string | null;
   lastUpdated: string | null;

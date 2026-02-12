@@ -19,6 +19,11 @@ const router = createRouter({
           component: () => import('@/views/CommoditiesView.vue'),
         },
         {
+          path: 'indices',
+          name: 'indices',
+          component: () => import('@/views/IndicesView.vue'),
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/SettingsView.vue'),
