@@ -8,7 +8,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { createChart, ColorType, CrosshairMode } from 'lightweight-charts';
+import { createChart, ColorType, CrosshairMode, CandlestickSeries } from 'lightweight-charts';
 import type { FundHistory } from '@/types';
 
 // 类型定义
@@ -79,7 +79,7 @@ const initChart = () => {
     handleScale: false,
   });
 
-  candleSeries = chart.addCandlestickSeries({
+  candleSeries = chart.addSeries(CandlestickSeries, {
     upColor: '#ef4444',
     downColor: '#22c55e',
     borderVisible: false,
