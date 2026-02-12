@@ -44,24 +44,37 @@ const getTrendColor = (): string => {
 };
 
 // 解析时间字符串为秒级 Unix 时间戳
+// 支持格式: "YYYY-MM-DD", "YYYY-MM-DD HH:mm:ss", "HH:mm"
 const parseTimeToTimestamp = (timeStr: string): number => {
-  // 格式: "2024-01-01" 或 "2024-01-01 14:30:00" 或 ISO 格式
-  const date = new Date(timeStr);
-  if (isNaN(date.getTime())) {
-    // 尝试解析其他格式
-    const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:[\sT](\d{2}):(\d{2}):?(\d{2})?)?$/);
-    if (match) {
-      const year = parseInt(match[1], 10);
-      const month = parseInt(match[2], 10) - 1;
-      const day = parseInt(match[3], 10);
-      const hour = match[4] ? parseInt(match[4], 10) : 0;
-      const minute = match[5] ? parseInt(match[5], 10) : 0;
-      const second = match[6] ? parseInt(match[6], 10) : 0;
-      return Math.floor(new Date(year, month, day, hour, minute, second).getTime() / 1000);
-    }
-    return Math.floor(Date.now() / 1000);
+  // 格式: "HH:mm" (日内分时数据，如 "14:30")
+  const timeOnlyMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+  if (timeOnlyMatch) {
+    const hour = parseInt(timeOnlyMatch[1], 10);
+    const minute = parseInt(timeOnlyMatch[2], 10);
+    const now = new Date();
+    return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0).getTime() / 1000);
   }
-  return Math.floor(date.getTime() / 1000);
+
+  // 格式: "YYYY-MM-DD" 或 "YYYY-MM-DD HH:mm:ss" 或 ISO 格式
+  const date = new Date(timeStr);
+  if (!isNaN(date.getTime())) {
+    return Math.floor(date.getTime() / 1000);
+  }
+
+  // 尝试解析其他格式
+  const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:[\sT](\d{2}):(\d{2}):?(\d{2})?)?$/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const day = parseInt(match[3], 10);
+    const hour = match[4] ? parseInt(match[4], 10) : 0;
+    const minute = match[5] ? parseInt(match[5], 10) : 0;
+    const second = match[6] ? parseInt(match[6], 10) : 0;
+    return Math.floor(new Date(year, month, day, hour, minute, second).getTime() / 1000);
+  }
+
+  // 返回当前时间戳作为回退
+  return Math.floor(Date.now() / 1000);
 };
 
 const initChart = () => {

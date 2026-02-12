@@ -108,4 +108,5 @@ export interface AppState {
   sidebarCollapsed: boolean;
   refreshInterval: number;
   autoRefresh: boolean;
+  showChart: boolean;
 }

@@ -38,6 +38,7 @@ export const useFundStore = defineStore('funds', () => {
   const lastUpdated = ref<string | null>(null);
   const refreshInterval = ref(30); // seconds
   const autoRefresh = ref(true);
+  const showChart = ref(true); // 是否显示基金卡片图表
   const retryCount = ref(0);
   const maxRetries = 2;
 
@@ -173,6 +174,10 @@ export const useFundStore = defineStore('funds', () => {
 
   function setAutoRefresh(enabled: boolean) {
     autoRefresh.value = enabled;
+  }
+
+  function setShowChart(enabled: boolean) {
+    showChart.value = enabled;
   }
 
   function clearError() {
@@ -362,6 +367,7 @@ export const useFundStore = defineStore('funds', () => {
     lastUpdated,
     refreshInterval,
     autoRefresh,
+    showChart,
     retryCount,
     maxRetries,
     // Getters
@@ -379,6 +385,7 @@ export const useFundStore = defineStore('funds', () => {
     fetchIntraday,
     setRefreshInterval,
     setAutoRefresh,
+    setShowChart,
     clearError,
     retry,
     addFund,

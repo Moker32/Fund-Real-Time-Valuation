@@ -16,6 +16,17 @@
         </label>
       </div>
 
+      <div class="setting-item">
+        <div class="setting-info">
+          <span class="setting-label">显示折线图</span>
+          <span class="setting-description">在基金卡片中显示日内分时折线图</span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" v-model="showChart" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
       <div class="setting-item" v-if="autoRefresh">
         <div class="setting-info">
           <span class="setting-label">刷新间隔</span>
@@ -66,6 +77,7 @@ import { useFundStore } from '@/stores/fundStore';
 const fundStore = useFundStore();
 
 const autoRefresh = ref(fundStore.autoRefresh ?? true);
+const showChart = ref(fundStore.showChart ?? true);
 const refreshInterval = ref(fundStore.refreshInterval || 30);
 const apiUrl = ref(import.meta.env.VITE_API_URL || 'http://localhost:8000');
 
@@ -75,6 +87,10 @@ watch(autoRefresh, (value) => {
 
 watch(refreshInterval, (value) => {
   fundStore.setRefreshInterval?.(value);
+});
+
+watch(showChart, (value) => {
+  fundStore.setShowChart?.(value);
 });
 </script>
 

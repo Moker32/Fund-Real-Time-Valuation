@@ -79,7 +79,7 @@
       </div>
 
       <!-- 分时图区域（当有日内数据时显示） -->
-      <div v-if="fund.intraday && fund.intraday.length > 0" class="fund-card-chart">
+      <div v-if="shouldShowChart" class="fund-card-chart">
         <FundChart :data="fund.intraday" :height="80" chart-type="line" />
       </div>
     </template>
@@ -107,6 +107,12 @@ defineEmits<{
   (e: 'remove', code: string): void;
 }>();
 
+// 是否显示图表
+const shouldShowChart = computed(() => {
+  return fundStore.showChart && props.fund.intraday && props.fund.intraday.length > 0;
+});
+
+// 涨跌样式
 const changeClass = computed(() => {
   if (props.fund.estimateChangePercent > 0) return 'rising';
   if (props.fund.estimateChangePercent < 0) return 'falling';
