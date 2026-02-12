@@ -102,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useFundStore } from '@/stores/fundStore';
 import { useCommodityStore } from '@/stores/commodityStore';
@@ -118,7 +118,10 @@ const sidebarCollapsed = ref(false);
 const healthStatus = ref<'healthy' | 'degraded' | 'unhealthy'>('healthy');
 const statusText = ref('已连接');
 const refreshing = ref(false);
-let refreshTimer: number | null = null;
+let fundTimer: number | null = null;
+let commodityTimer: number | null = null;
+let indexTimer: number | null = null;
+let healthTimer: number | null = null;
 
 const currentRoute = computed(() => route.name as string || 'funds');
 const pageTitle = computed(() => {
@@ -153,11 +156,12 @@ async function refresh() {
 
   refreshing.value = true;
   try {
-    await Promise.all([
-      fundStore.fetchFunds(),
-      commodityStore.fetchCommodities(),
-      indexStore.fetchIndices(),
-    ]);
+    // 分布刷新，避免同时请求造成阻塞
+    fundStore.fetchFunds();
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒后刷新商品
+    commodityStore.fetchCategories();
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 再过2秒后刷新指数
+    indexStore.fetchIndices();
     await checkHealth();
   } finally {
     setTimeout(() => {
@@ -167,23 +171,72 @@ async function refresh() {
 }
 
 function startAutoRefresh() {
-  const interval = (fundStore.refreshInterval || 30) * 1000;
-  refreshTimer = window.setInterval(() => {
-    fundStore.fetchFunds();
-    commodityStore.fetchCommodities();
-    indexStore.fetchIndices();
-  }, interval);
+  if (!fundStore.autoRefresh) return;
+
+  const baseInterval = (fundStore.refreshInterval || 30) * 1000;
+
+  // 分布刷新：每个数据源间隔几秒，避免同时请求
+  // 基金：基准间隔
+  fundTimer = window.setInterval(() => {
+    if (fundStore.autoRefresh) {
+      fundStore.fetchFunds();
+    }
+  }, baseInterval);
+
+  // 商品：基准间隔 + 5秒
+  commodityTimer = window.setInterval(() => {
+    if (fundStore.autoRefresh) {
+      commodityStore.fetchCategories();
+    }
+  }, baseInterval + 5000);
+
+  // 指数：基准间隔 + 10秒
+  indexTimer = window.setInterval(() => {
+    if (fundStore.autoRefresh) {
+      indexStore.fetchIndices();
+    }
+  }, baseInterval + 10000);
 }
+
+function stopAutoRefresh() {
+  if (fundTimer) {
+    clearInterval(fundTimer);
+    fundTimer = null;
+  }
+  if (commodityTimer) {
+    clearInterval(commodityTimer);
+    commodityTimer = null;
+  }
+  if (indexTimer) {
+    clearInterval(indexTimer);
+    indexTimer = null;
+  }
+}
+
+// 监听自动刷新设置变化
+watch(() => fundStore.autoRefresh, (enabled) => {
+  if (enabled) {
+    startAutoRefresh();
+  } else {
+    stopAutoRefresh();
+  }
+});
+
+watch(() => fundStore.refreshInterval, () => {
+  stopAutoRefresh();
+  startAutoRefresh();
+});
 
 onMounted(async () => {
   await refresh();
   startAutoRefresh();
-  setInterval(checkHealth, 30000);
+  healthTimer = window.setInterval(checkHealth, 30000);
 });
 
 onUnmounted(() => {
-  if (refreshTimer) {
-    clearInterval(refreshTimer);
+  stopAutoRefresh();
+  if (healthTimer) {
+    clearInterval(healthTimer);
   }
 });
 </script>

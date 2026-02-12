@@ -3,18 +3,14 @@ import { ref, computed } from 'vue';
 import { indexApi } from '@/api';
 import type { MarketIndex } from '@/types';
 import { ApiError } from '@/api';
+import { formatTime } from '@/utils/time';
 
 export interface FetchOptions {
   retries?: number;
   retryDelay?: number;
   showError?: boolean;
+  force?: boolean;  // 强制刷新
 }
-
-const DEFAULT_OPTIONS: FetchOptions = {
-  retries: 2,
-  retryDelay: 1000,
-  showError: true,
-};
 
 // 延迟函数
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -101,7 +97,7 @@ export const useIndexStore = defineStore('indices', () => {
       if (err.code && friendlyErrorMessages[err.code]) {
         return friendlyErrorMessages[err.code];
       }
-      return err.message;
+      return err.message || '获取指数列表失败';
     }
     if (err instanceof Error) {
       return friendlyErrorMessages[err.message] || err.message || '获取指数列表失败';
@@ -110,8 +106,17 @@ export const useIndexStore = defineStore('indices', () => {
   }
 
   // Actions
-  async function fetchIndices(options: FetchOptions = DEFAULT_OPTIONS) {
-    const { retries, retryDelay, showError } = { ...DEFAULT_OPTIONS, ...options };
+  async function fetchIndices(options: FetchOptions = {}) {
+    const retries = options.retries ?? 2;
+    const retryDelay = options.retryDelay ?? 1000;
+    const showError = options.showError ?? true;
+    const force = options.force ?? false;
+
+    // 如果已有数据且不是强制刷新，不显示 loading
+    if (!force && indices.value.length > 0) {
+      return;
+    }
+
     loading.value = true;
     error.value = null;
     retryCount.value = 0;
@@ -123,7 +128,7 @@ export const useIndexStore = defineStore('indices', () => {
       try {
         const response = await indexApi.getIndices();
         indices.value = response.indices || [];
-        lastUpdated.value = new Date().toLocaleTimeString('zh-CN');
+        lastUpdated.value = formatTime(new Date());
         return; // 成功，退出函数
       } catch (err) {
         lastError = err;

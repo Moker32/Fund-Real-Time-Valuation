@@ -172,10 +172,19 @@ function formatTime(dateStr: string): string {
   try {
     const date = new Date(dateStr);
     // 如果没有时间部分（00:00），只显示日期
-    if (date.getHours() === 0 && date.getMinutes() === 0) {
-      return `${date.getMonth() + 1}/${date.getDate()}`;
+    const hours = parseInt(date.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, hour: '2-digit' }), 10);
+    const minutes = parseInt(date.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', minute: '2-digit' }), 10);
+    if (hours === 0 && minutes === 0) {
+      return date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' });
     }
-    return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    return date.toLocaleString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
   } catch {
     return dateStr;
   }

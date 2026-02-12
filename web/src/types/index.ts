@@ -128,7 +128,7 @@ export interface MarketIndex {
   prevClose?: number;
   region?: string;          // 区域: 'america', 'asia', 'europe', 'china', 'hk'
   tradingStatus?: string;   // 交易状态: 'open', 'closed', 'pre'
-  marketTime?: string;     // 市场当前时间
+  marketTime?: string;     // 市场当前时间（用于判断状态）
 }
 
 export interface IndexListResponse {

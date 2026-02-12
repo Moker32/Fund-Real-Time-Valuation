@@ -72,7 +72,6 @@ def get_trading_status(index_type: str) -> dict:
     return {
         "status": status,
         "market_time": local_now.strftime("%Y-%m-%d %H:%M:%S"),
-        "timezone": tz_str,
     }
 
 

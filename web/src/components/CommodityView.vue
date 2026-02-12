@@ -33,6 +33,14 @@
         <span>该分类暂无数据</span>
       </div>
 
+      <div v-else-if="activeCommodities.length === 0" class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M8 15s1.5-2 4-2 4 2 4 2M9 9h.01M15 9h.01"/>
+        </svg>
+        <span>暂无商品数据</span>
+      </div>
+
       <div v-else class="commodity-grid">
         <CommodityCard
           v-for="commodity in activeCommodities"

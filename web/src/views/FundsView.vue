@@ -157,7 +157,10 @@ function handleFundAdded() {
 
 onMounted(async () => {
   isMounted = true;
-  await fundStore.fetchFunds();
+  // 只在数据为空时加载
+  if (fundStore.funds.length === 0) {
+    await fundStore.fetchFunds();
+  }
 
   // 加载每个基金的分时数据
   fundStore.funds.forEach((fund) => {

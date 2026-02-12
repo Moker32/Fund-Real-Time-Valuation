@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { fundApi } from '@/api';
 import type { Fund, FundHistory, FundIntraday } from '@/types';
 import { ApiError } from '@/api';
+import { formatTime } from '@/utils/time';
 
 export interface FetchOptions {
   retries?: number;
@@ -118,7 +119,7 @@ export const useFundStore = defineStore('funds', () => {
         funds.value = response.funds || [];
         loading.value = false;
         loadingProgress.value = 100;  // 加载完成
-        lastUpdated.value = new Date().toLocaleTimeString('zh-CN');
+        lastUpdated.value = formatTime(new Date());
         return; // 成功，退出函数
       } catch (err) {
         lastError = err;

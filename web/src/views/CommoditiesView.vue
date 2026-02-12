@@ -34,7 +34,10 @@ import CommodityView from '@/components/CommodityView.vue';
 const commodityStore = useCommodityStore();
 
 onMounted(() => {
-  commodityStore.fetchCategories();
+  // 只在数据为空时强制加载
+  if (commodityStore.categories.length === 0) {
+    commodityStore.fetchCategories({ force: true });
+  }
 });
 </script>
 

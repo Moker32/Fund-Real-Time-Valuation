@@ -3,18 +3,14 @@ import { ref, computed } from 'vue';
 import { commodityApi } from '@/api';
 import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHistoryItem } from '@/types';
 import { ApiError } from '@/api';
+import { formatTime } from '@/utils/time';
 
 export interface FetchOptions {
   retries?: number;
   retryDelay?: number;
   showError?: boolean;
+  force?: boolean;  // 强制刷新
 }
-
-const DEFAULT_OPTIONS: FetchOptions = {
-  retries: 2,
-  retryDelay: 1000,
-  showError: true,
-};
 
 // 延迟函数
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -27,13 +23,6 @@ const friendlyErrorMessages: Record<string, string> = {
   'Internal Server Error': '服务器暂时繁忙，请稍后重试',
   'timeout': '请求超时，请检查网络连接',
   '503': '商品服务暂时不可用',
-};
-
-// 分类图标映射
-const categoryIcons: Record<string, string> = {
-  'precious_metal': 'diamond',
-  'energy': 'flame',
-  'base_metal': 'cube',
 };
 
 export const useCommodityStore = defineStore('commodities', () => {
@@ -126,7 +115,7 @@ export const useCommodityStore = defineStore('commodities', () => {
       if (err.code && friendlyErrorMessages[err.code]) {
         return friendlyErrorMessages[err.code];
       }
-      return err.message;
+      return err.message || '获取商品列表失败';
     }
     if (err instanceof Error) {
       return friendlyErrorMessages[err.message] || err.message || '获取商品列表失败';
@@ -135,8 +124,10 @@ export const useCommodityStore = defineStore('commodities', () => {
   }
 
   // Actions
-  async function fetchCommodities(options: FetchOptions = DEFAULT_OPTIONS) {
-    const { retries, retryDelay, showError } = { ...DEFAULT_OPTIONS, ...options };
+  async function fetchCommodities(options: FetchOptions = {}) {
+    const retries = options.retries ?? 2;
+    const retryDelay = options.retryDelay ?? 1000;
+    const showError = options.showError ?? true;
     loading.value = true;
     error.value = null;
     retryCount.value = 0;
@@ -148,7 +139,7 @@ export const useCommodityStore = defineStore('commodities', () => {
       try {
         const response = await commodityApi.getCommodities();
         commodities.value = response.commodities || [];
-        lastUpdated.value = new Date().toLocaleTimeString('zh-CN');
+        lastUpdated.value = formatTime(new Date());
         return; // 成功，退出函数
       } catch (err) {
         lastError = err;
@@ -172,8 +163,17 @@ export const useCommodityStore = defineStore('commodities', () => {
   }
 
   // 获取分类列表
-  async function fetchCategories(options: FetchOptions = DEFAULT_OPTIONS) {
-    const { retries, retryDelay, showError } = { ...DEFAULT_OPTIONS, ...options };
+  async function fetchCategories(options: FetchOptions = {}) {
+    const retries = options.retries ?? 2;
+    const retryDelay = options.retryDelay ?? 1000;
+    const showError = options.showError ?? true;
+    const force = options.force ?? false;
+
+    // 如果已有数据且不是强制刷新，不显示 loading
+    if (!force && categories.value.length > 0) {
+      return;
+    }
+
     loading.value = true;
     error.value = null;
     retryCount.value = 0;
@@ -188,9 +188,9 @@ export const useCommodityStore = defineStore('commodities', () => {
         // 如果还没有激活的分类，默认选中第一个有数据的分类
         if (!activeCategory.value && categories.value.length > 0) {
           const firstWithData = categories.value.find(c => c.commodities.length > 0);
-          activeCategory.value = firstWithData?.id || categories.value[0].id;
+          activeCategory.value = firstWithData?.id || categories.value[0]?.id || null;
         }
-        lastUpdated.value = new Date().toLocaleTimeString('zh-CN');
+        lastUpdated.value = formatTime(new Date());
 
         // 同时更新 commodities 以保持向后兼容
         const flatCommodities: Commodity[] = [];
@@ -199,6 +199,7 @@ export const useCommodityStore = defineStore('commodities', () => {
         }
         commodities.value = flatCommodities;
 
+        loading.value = false;
         return;
       } catch (err) {
         lastError = err;

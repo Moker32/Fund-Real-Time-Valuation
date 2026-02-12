@@ -125,7 +125,12 @@ function formatTime(dateStr: string): string {
   if (!dateStr) return '--';
   try {
     const date = new Date(dateStr);
-    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    return date.toLocaleTimeString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   } catch {
     return '--';
   }

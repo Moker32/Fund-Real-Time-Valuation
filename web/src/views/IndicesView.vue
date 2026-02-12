@@ -111,7 +111,10 @@ const emptyIndex: MarketIndex = {
 } as MarketIndex;
 
 onMounted(() => {
-  indexStore.fetchIndices();
+  // 只在数据为空时强制加载
+  if (indexStore.indices.length === 0) {
+    indexStore.fetchIndices({ force: true });
+  }
 });
 </script>
 

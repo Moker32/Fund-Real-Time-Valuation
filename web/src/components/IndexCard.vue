@@ -54,19 +54,19 @@
         </div>
         <div class="footer-row">
           <div class="footer-item">
-            <span class="label">开盘</span>
+            <span class="label">今开</span>
             <span class="value font-mono">{{ formatPrice(indexData.open) }}</span>
           </div>
           <div class="footer-item" v-if="indexData.prevClose">
-            <span class="label">收盘</span>
+            <span class="label">昨收</span>
             <span class="value font-mono">{{ formatPrice(indexData.prevClose) }}</span>
           </div>
-          <div class="market-time" v-if="indexData.marketTime">
+          <div class="market-time" v-if="indexData.timestamp">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="12" cy="12" r="10"/>
               <path d="M12 6V12L16 14"/>
             </svg>
-            <span>{{ formatMarketTime(indexData.marketTime) }}</span>
+            <span>{{ formatMarketTime(indexData.timestamp) }}</span>
           </div>
         </div>
       </div>
@@ -172,7 +172,13 @@ function formatMarketTime(dateStr: string | undefined): string {
   if (!dateStr) return '--';
   try {
     const date = new Date(dateStr);
-    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    // 统一使用上海时区
+    return date.toLocaleTimeString('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   } catch {
     return '--';
   }
