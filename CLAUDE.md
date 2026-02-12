@@ -140,3 +140,33 @@ pnpm run check                  # 运行所有检查 (lint + typecheck)
 - **数据源超时**: 基金数据源默认超时 30 秒，某些数据源可能较慢
 - **CORS 配置**: 生产环境应限制 CORS 来源域名
 - **类型检查**: `src/datasources/*` 模块由于第三方库兼容性问题，在 mypy 中被禁用类型检查
+
+## 测试方法
+
+- **Playwright 浏览器测试**: `pnpm run dev:web` 启动后用 Playwright 检查控制台错误
+- **控制台错误检查**: 使用 `mcp__plugin_playwright_playwright__browser_console_messages` 获取错误日志
+
+## 图表库选择
+
+- **uPlot** (推荐): MIT 许可证，无水印，体积小 (~30KB)，适合简单折线图
+- **lightweight-charts**: GPL v3 许可证，强制显示 TradingView 水印
+- 避免使用 GPL 许可证的库在前端，会强制显示品牌链接
+
+## 数据库缓存策略
+
+- **SQLite 数据库**: `~/.fund-tui/fund_data.db`
+- **缓存表**: `fund_basic_info`, `fund_daily_cache`, `fund_intraday_cache`
+- **缓存优先级**: 内存 → 数据库 → 外部 API
+- **获取数据后必须保存到数据库**，减轻 API 压力
+
+## 常见问题
+
+- **Vue 模板语法**: 确保 computed/watch 中的 `return` 在正确位置，避免 "return outside function" 错误
+- **字段名映射**: 保存数据时字段名要一致（如 `price` vs `value`），否则会存储空值
+- **TypeScript**: 可选字段用 `| None` 类型，赋值时处理 `undefined`
+
+## 前端组件模式
+
+- **Pinia Store**: 使用 `useFundStore` 管理基金状态
+- **组件 Props**: 用 `withDefaults(defineProps<Props>(), {...})` 设置默认值
+- **条件渲染**: 用 `v-if` 控制组件显示/隐藏
