@@ -55,7 +55,7 @@ class CommodityDataSource(DataSource):
             try:
                 self._db_dao.save_from_api(commodity_type, data, source)
             except Exception as e:
-                logger.warning(f"保存商品数据到数据库失败: {e}")
+                logger.error(f"保存商品数据到数据库失败: {e}")
 
     async def close(self):
         """关闭数据源（子类应重写此方法）"""
@@ -236,7 +236,7 @@ class YFinanceCommoditySource(CommodityDataSource):
 
         return processed_results
 
-    def _get_name(self, commodity_type: str) -> str:
+    def get_name(self, commodity_type: str) -> str:
         """获取商品名称"""
         names = {
             "gold": "黄金 (COMEX)",

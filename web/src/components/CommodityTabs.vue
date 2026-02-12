@@ -46,11 +46,11 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  (e: 'select', categoryId: string): void;
+  (e: 'category-select', categoryId: string): void;
 }>();
 
 function selectCategory(categoryId: string) {
-  emit('select', categoryId);
+  emit('category-select', categoryId);
 }
 </script>
 

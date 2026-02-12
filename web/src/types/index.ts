@@ -118,13 +118,6 @@ export interface WatchedCommodity {
   added_at: string;
 }
 
-export interface WatchedCommodityItem {
-  symbol: string;
-  name: string;
-  category: string;
-  addedAt: string;
-}
-
 export interface WatchlistResponse {
   watchlist: WatchedCommodity[];
   count: number;

@@ -4,16 +4,26 @@ import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
+// 错误码联合类型
+export type ApiErrorCode =
+  | 'NETWORK_ERROR'
+  | 'TIMEOUT'
+  | 'VALIDATION_ERROR'
+  | 'NOT_FOUND'
+  | 'SERVER_ERROR'
+  | 'SERVICE_UNAVAILABLE'
+  | 'UNKNOWN_ERROR';
+
 // 自定义错误类
 export class ApiError extends Error {
-  code?: string;
+  code?: ApiErrorCode;
   detail?: string;
   timestamp?: string;
   statusCode?: number;
 
   constructor(
     message: string,
-    code?: string,
+    code?: ApiErrorCode,
     detail?: string,
     timestamp?: string,
     statusCode?: number
@@ -125,7 +135,7 @@ api.interceptors.response.use(
 
       throw new ApiError(
         friendlyMessage,
-        responseData.error as string,
+        responseData.error as ApiErrorCode,
         responseData.detail as string,
         responseData.timestamp as string,
         err.response?.status

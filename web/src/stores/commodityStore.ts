@@ -5,15 +5,24 @@ import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHist
 import { ApiError } from '@/api';
 import { formatTime } from '@/utils/time';
 
-// 防抖函数
+// 防抖函数（支持异步函数返回 Promise）
 function debounce<T extends (...args: Parameters<T>) => ReturnType<T>>(
   func: T,
   wait: number
-): (...args: Parameters<T>) => void {
+): (...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>> {
   let timeout: ReturnType<typeof setTimeout> | null = null;
   return (...args: Parameters<T>) => {
-    if (timeout) clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
+    return new Promise<Awaited<ReturnType<T>>>((resolve) => {
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        const result = func(...args);
+        if (result instanceof Promise) {
+          result.then(resolve);
+        } else {
+          resolve(result as Awaited<ReturnType<T>>);
+        }
+      }, wait);
+    });
   };
 }
 
@@ -107,7 +116,7 @@ export const useCommodityStore = defineStore('commodities', () => {
       price: item.price,
       currency: item.currency,
       change: item.change ?? 0,
-      changePercent: item.changePercent,
+      changePercent: item.changePercent ?? 0,
       high: item.high ?? 0,
       low: item.low ?? 0,
       open: item.open ?? 0,
@@ -247,7 +256,8 @@ export const useCommodityStore = defineStore('commodities', () => {
       return response.history || [];
     } catch (err) {
       console.error(`[CommodityStore] fetchHistory error for ${commodityType}:`, err);
-      return [];
+      error.value = getFriendlyErrorMessage(err);
+      throw err; // 抛出异常，让调用者能够区分"无数据"和"获取失败"
     }
   }
 
@@ -494,21 +504,21 @@ export const useCommodityStore = defineStore('commodities', () => {
     } catch (err) {
       searchError.value = getFriendlyErrorMessage(err);
       console.error('[CommodityStore] searchCommodities error:', err);
-      return [];
+      throw err; // 抛出异常，让调用者能够区分"无结果"和"获取失败"
     } finally {
       searchLoading.value = false;
     }
   }
 
-  // 防抖搜索
-  const debouncedSearch = debounce((query: string) => {
-    searchCommodities(query);
+  // 防抖搜索（支持异步函数）
+  const debouncedSearch = debounce(async (query: string) => {
+    return await searchCommodities(query);
   }, 300);
 
   // 执行防抖搜索
-  function executeSearch(query: string) {
+  function executeSearch(query: string): Promise<CommoditySearchResult[] | undefined> {
     searchQuery.value = query;
-    debouncedSearch(query);
+    return debouncedSearch(query);
   }
 
   // 清除搜索结果
@@ -531,7 +541,7 @@ export const useCommodityStore = defineStore('commodities', () => {
     } catch (err) {
       searchError.value = getFriendlyErrorMessage(err);
       console.error('[CommodityStore] fetchAvailableCommodities error:', err);
-      return [];
+      throw err; // 抛出异常，让调用者能够区分"无数据"和"获取失败"
     } finally {
       searchLoading.value = false;
     }

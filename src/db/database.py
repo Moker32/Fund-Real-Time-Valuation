@@ -10,7 +10,7 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -1110,9 +1110,10 @@ class FundIntradayCacheDAO:
                 return True
 
             try:
-                # 解析 ISO 格式的时间
+                # 解析 ISO 格式的时间（存储的是 UTC 时间）
                 fetched_time = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
-                now = datetime.now()
+                # 使用 UTC 时间进行比较，确保跨时区一致性
+                now = datetime.now(timezone.utc)
                 elapsed_seconds = (now - fetched_time).total_seconds()
                 return elapsed_seconds > self.cache_ttl
             except (ValueError, TypeError):
@@ -1440,7 +1441,8 @@ class FundDailyCacheDAO:
 
             try:
                 fetched_time = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
-                now = datetime.now()
+                # 使用 UTC 时间进行比较，确保跨时区一致性
+                now = datetime.now(timezone.utc)
                 elapsed_seconds = (now - fetched_time).total_seconds()
                 return elapsed_seconds > self.cache_ttl
             except (ValueError, TypeError):

@@ -4,6 +4,9 @@
 """
 
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,6 +15,7 @@ from src.config.commodities_config import CommoditiesConfig
 from src.datasources.base import DataSourceType
 from src.datasources.commodity_source import (
     AKShareCommoditySource,
+    CommoditySearchResult,
     YFinanceCommoditySource,
     get_all_available_commodities,
     get_all_commodity_types,
@@ -256,7 +260,6 @@ async def get_categories(
 async def get_history(
     commodity_type: str,
     days: int = 30,
-    db: DatabaseManager = Depends(DataSourceDependency()),
 ) -> CommodityHistoryResponse:
     """
     获取商品历史行情
@@ -264,11 +267,13 @@ async def get_history(
     Args:
         commodity_type: 商品类型 (gold, wti, brent, silver, natural_gas, gold_cny)
         days: 获取天数，默认 30 天
-        db: 数据库依赖
 
     Returns:
         CommodityHistoryResponse: 历史行情数据
     """
+    # 创建数据库管理器实例
+    db = DatabaseManager()
+
     # 验证商品类型
     all_types = get_all_commodity_types()
     if commodity_type not in all_types:
@@ -298,7 +303,7 @@ async def get_history(
         # 获取商品名称
         from src.datasources.commodity_source import YFinanceCommoditySource
         name_source = YFinanceCommoditySource()
-        name = name_source._get_name(commodity_type)
+        name = name_source.get_name(commodity_type)
 
         return {
             "commodity_type": commodity_type,
@@ -308,9 +313,10 @@ async def get_history(
         }
 
     except Exception as e:
+        logger.error(f"获取商品历史数据失败: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"获取历史数据失败: {str(e)}",
+            detail="获取历史数据失败，请稍后重试",
         )
 
 
@@ -481,10 +487,19 @@ class WatchlistResponse(TypedDict):
     timestamp: str
 
 
+class SearchResultItem(TypedDict):
+    """搜索结果项"""
+    symbol: str
+    name: str
+    exchange: str
+    currency: str
+    category: str
+
+
 class SearchResultResponse(TypedDict):
     """搜索结果响应"""
     query: str
-    results: list[dict]
+    results: list[SearchResultItem]
     count: int
     timestamp: str
 
@@ -519,7 +534,14 @@ async def search_commodities_handler(
     Returns:
         SearchResultResponse: 搜索结果
     """
-    results = search_commodities(q)
+    try:
+        results = search_commodities(q)
+    except Exception as e:
+        logger.error(f"搜索商品失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="搜索失败，请稍后重试",
+        )
     return {
         "query": q,
         "results": results,
@@ -545,7 +567,14 @@ async def get_available_commodities() -> SearchResultResponse:
     Returns:
         SearchResultResponse: 所有可用商品
     """
-    results = get_all_available_commodities()
+    try:
+        results = get_all_available_commodities()
+    except Exception as e:
+        logger.error(f"获取可用商品列表失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="获取商品列表失败，请稍后重试",
+        )
     return {
         "query": "",
         "results": results,

@@ -4,7 +4,7 @@
     <CommodityTabs
       :categories="categoryList"
       :active-category="store.activeCategory"
-      @select="handleCategorySelect"
+      @category-select="handleCategorySelect"
     />
 
     <!-- 商品列表 -->
