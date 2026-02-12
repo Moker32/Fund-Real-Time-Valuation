@@ -57,7 +57,8 @@
         </div>
 
         <div class="change-section" :class="changeClass">
-          <span class="change-indicator">
+          <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
+          <span class="change-indicator-value">
             <svg v-if="fund.estimateChangePercent > 0" viewBox="0 0 24 24" fill="none">
               <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
@@ -67,7 +68,6 @@
             <span v-else>—</span>
           </span>
           <span class="change-value font-mono">{{ formatChange(fund.estimateChange) }}</span>
-          <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
         </div>
       </div>
 
@@ -364,7 +364,7 @@ function formatNetValueDate(dateStr: string): string {
     background: var(--color-rise-bg);
     color: var(--color-rise);
 
-    .change-indicator svg {
+    .change-indicator-value svg {
       color: var(--color-rise);
     }
   }
@@ -373,7 +373,7 @@ function formatNetValueDate(dateStr: string): string {
     background: var(--color-fall-bg);
     color: var(--color-fall);
 
-    .change-indicator svg {
+    .change-indicator-value svg {
       color: var(--color-fall);
     }
   }
@@ -383,25 +383,27 @@ function formatNetValueDate(dateStr: string): string {
   }
 }
 
-.change-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  svg {
-    width: 16px;
-    height: 16px;
-  }
-}
-
 .change-value {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
 .change-percent {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.change-indicator-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 2px 0;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
 }
 
 .card-footer {

@@ -88,9 +88,9 @@ export const useFundStore = defineStore('funds', () => {
         return friendlyErrorMessages[err.detail] || err.detail;
       }
       if (err.code && friendlyErrorMessages[err.code]) {
-        return friendlyErrorMessages[err.code];
+        return friendlyErrorMessages[err.code] || err.message;
       }
-      return err.message;
+      return err.message || '获取基金列表失败';
     }
     if (err instanceof Error) {
       return friendlyErrorMessages[err.message] || err.message || '获取基金列表失败';
@@ -100,7 +100,9 @@ export const useFundStore = defineStore('funds', () => {
 
   // Actions
   async function fetchFunds(options: FetchOptions = DEFAULT_OPTIONS) {
-    const { retries, retryDelay, showError } = { ...DEFAULT_OPTIONS, ...options };
+    const retries = options.retries ?? DEFAULT_OPTIONS.retries;
+    const retryDelay = options.retryDelay ?? DEFAULT_OPTIONS.retryDelay;
+    const showError = options.showError ?? DEFAULT_OPTIONS.showError;
     loading.value = true;
     loadingProgress.value = 0;
     loadingTotal.value = 0;
@@ -114,6 +116,7 @@ export const useFundStore = defineStore('funds', () => {
       try {
         const response = await fundApi.getFunds();
         funds.value = response.funds || [];
+        loading.value = false;
         loadingProgress.value = 100;  // 加载完成
         lastUpdated.value = new Date().toLocaleTimeString('zh-CN');
         return; // 成功，退出函数
@@ -139,9 +142,7 @@ export const useFundStore = defineStore('funds', () => {
     loadingProgress.value = 0;
   }
 
-  async function fetchFundEstimate(code: string, options: FetchOptions = {}) {
-    const { retries = 1, retryDelay = 500, showError = false } = options;
-
+  async function fetchFundEstimate(code: string, _options: FetchOptions = {}) {
     try {
       const estimate = await fundApi.getFundEstimate(code);
       const index = funds.value.findIndex((f) => f.code === code);
@@ -150,21 +151,18 @@ export const useFundStore = defineStore('funds', () => {
         if (currentFund) {
           funds.value[index] = {
             ...currentFund,
-            code: estimate.code,
-            name: estimate.name,
-            netValue: estimate.netValue,
+            code: estimate.code ?? currentFund.code,
+            name: estimate.name ?? currentFund.name,
+            netValue: estimate.netValue ?? currentFund.netValue,
             netValueDate: currentFund.netValueDate || new Date().toISOString(),
-            estimateValue: estimate.estimateValue,
-            estimateChange: estimate.estimateChange,
-            estimateChangePercent: estimate.estimateChangePercent,
+            estimateValue: estimate.estimateValue ?? currentFund.estimateValue,
+            estimateChange: estimate.estimateChange ?? currentFund.estimateChange,
+            estimateChangePercent: estimate.estimateChangePercent ?? currentFund.estimateChangePercent,
           };
         }
       }
     } catch (err) {
       console.error(`[FundStore] fetchFundEstimate error for ${code}:`, err);
-      if (showError) {
-        error.value = getFriendlyErrorMessage(err);
-      }
     }
   }
 
@@ -317,7 +315,7 @@ export const useFundStore = defineStore('funds', () => {
       const index = funds.value.findIndex((f) => f.code === code);
       if (index !== -1) {
         const currentFund = funds.value[index];
-        funds.value[index] = { ...currentFund, intraday: cached.data };
+        funds.value[index] = { ...currentFund, intraday: cached.data } as Fund;
       }
       return cached.data;
     }
@@ -341,8 +339,7 @@ export const useFundStore = defineStore('funds', () => {
             funds.value[index] = {
               ...currentFund,
               intraday,
-              code: currentFund.code || code,
-            };
+            } as Fund;
           }
         }
 
