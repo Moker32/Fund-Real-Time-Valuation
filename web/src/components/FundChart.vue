@@ -1,7 +1,7 @@
 <template>
   <div class="fund-chart" ref="chartContainer">
     <div v-if="!data || data.length === 0" class="chart-empty">
-      <span class="chart-empty-text">暂无历史数据</span>
+      <span class="chart-empty-text">暂无数据</span>
     </div>
   </div>
 </template>
@@ -11,40 +11,25 @@ import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { createChart, ColorType, CrosshairMode, LineSeries } from 'lightweight-charts';
 import type { FundHistory, FundIntraday } from '@/types';
 
-// 类型定义
-interface ChartApi {
-  addSeries: (seriesType: typeof LineSeries, options: {
-    upColor?: string;
-    downColor?: string;
-    borderVisible?: boolean;
-    color?: string;
-    lineWidth?: number;
-    lineStyle?: number;
-  }) => {
-    setData: (data: FundHistory[] | { time: string; value: number }[]) => void;
-  };
-  applyOptions: (options: { width: number }) => void;
-  remove: () => void;
-}
-
 const props = withDefaults(defineProps<{
   data: FundHistory[] | FundIntraday[];
   height?: number;
-  showGrid?: boolean;  // 是否显示网格
-  gradientFill?: boolean;  // 是否显示渐变填充
 }>(), {
   height: 100,
-  showGrid: false,
-  gradientFill: true,
 });
 
 const chartContainer = ref<Element | null>(null);
 let chart: ReturnType<typeof createChart> | null = null;
-let series: { setData: (data: FundHistory[] | { time: string; value: number }[]) => void } | null = null;
+let series: {
+  setData: (data: FundHistory[] | { time: string; value: number }[]) => void;
+  applyOptions: (opts: { color: string }) => void;
+} | null = null;
 
-// 获取涨跌幅颜色
+// 缓存上次数据，用于比较
+let lastDataJson: string = '';
+
 const getTrendColor = (): string => {
-  if (props.data.length < 2) return '#22c55e'; // 默认绿色
+  if (!props.data || props.data.length < 2) return '#22c55e';
 
   const firstValue = 'close' in props.data[0]
     ? props.data[0].close
@@ -53,13 +38,19 @@ const getTrendColor = (): string => {
     ? props.data[props.data.length - 1].close
     : props.data[props.data.length - 1].price;
 
+  // 数值无效时默认绿色
+  if (typeof firstValue !== 'number' || typeof lastValue !== 'number') {
+    return '#22c55e';
+  }
+
   return lastValue >= firstValue ? '#ef4444' : '#22c55e';
 };
 
 const initChart = () => {
   if (!chartContainer.value) return;
 
-  const trendColor = getTrendColor();
+  // 清空容器
+  chartContainer.value.innerHTML = '';
 
   chart = createChart(chartContainer.value, {
     width: chartContainer.value.clientWidth,
@@ -68,12 +59,10 @@ const initChart = () => {
       background: { type: ColorType.Solid, color: 'transparent' },
       textColor: '#9ca3af',
     },
-    // iOS 风格：隐藏网格
     grid: {
-      vertLines: { visible: props.showGrid },
-      horzLines: { visible: props.showGrid, color: '#f3f4f6' },
+      vertLines: { visible: false },
+      horzLines: { visible: false },
     },
-    // 隐藏坐标轴
     timeScale: {
       visible: false,
       borderVisible: false,
@@ -82,86 +71,79 @@ const initChart = () => {
       visible: false,
       borderVisible: false,
     },
-    // 简化 crosshair - iOS 风格
     crosshair: {
       mode: CrosshairMode.Normal,
       vertLine: {
         width: 1,
         color: '#e5e7eb',
         style: 2,
-        // 不显示圆点，只显示线
         drawCrosshairMarker: false,
       },
       horzLine: {
-        visible: false,  // iOS 风格隐藏水平线
+        visible: false,
         width: 0,
       },
     },
-    // 禁用交互 - iOS 风格主要是展示
     handleScroll: false,
     handleScale: false,
-    // 禁用右侧价格刻度
     scaleMargins: {
       top: 0,
       bottom: 0,
     },
+    // 禁用所有插件，防止水印
+    plugins: [],
   });
 
-  // iOS 风格折线图
+  // 先添加 series
   series = chart.addSeries(LineSeries, {
-    color: trendColor,
+    color: getTrendColor(),
     lineWidth: 2,
     lineStyle: 0,
-    // 顶部圆点（可选）
     crosshairMarker: {
-      size: 6,  // iOS 风格小圆点
-      backgroundColor: trendColor,
-      borderColor: '#ffffff',
-      borderSize: 2,
-      radius: 6,
+      size: 0, // 隐藏十字星标记
     },
   });
 
-  if (props.data.length > 0) {
-    updateData();
-  }
-
-  // iOS 风格：显示渐变填充（线条下方）
-  if (props.gradientFill) {
-    // 创建渐变
-    const isRising = trendColor === '#ef4444';
-    const gradientStart = isRising ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)';
-    const gradientEnd = isRising ? 'rgba(239, 68, 68, 0.0)' : 'rgba(34, 197, 94, 0.0)';
-
-    chart.applyOptions({
-      rightPriceScale: {
-        visible: false,
-      },
-    });
-
-    // 注意：lightweight-charts v5 需要通过 AreaSeries 实现渐变填充
-    // LineSeries 不支持渐变，这里保持简洁线条
-  }
+  // 确保图表创建完成后再设置数据
+  setTimeout(() => {
+    if (props.data && props.data.length > 0) {
+      updateData();
+    }
+  }, 0);
 };
 
 const updateData = () => {
   if (!series || !props.data || props.data.length === 0) return;
 
-  const lineData = props.data.map((item) => {
+  // 过滤无效数据
+  const validData = props.data.filter((item): item is { time: string; price: number } => {
+    if (!item) return false;
+    const price = 'close' in item ? item.close : item.price;
+    return typeof price === 'number' && typeof item.time === 'string' && item.time.length > 0;
+  });
+
+  if (validData.length === 0) return;
+
+  // 比较数据是否变化
+  const currentDataJson = JSON.stringify(validData.map(d => d.time + d.price));
+  if (currentDataJson === lastDataJson) return;
+  lastDataJson = currentDataJson;
+
+  const lineData = validData.map((item) => {
     if ('close' in item) {
       return { time: item.time, value: item.close };
     } else {
-      // FundIntraday 格式
       const timeStr = item.time;
-      const match = timeStr.match(/(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
-      if (match) {
+      // 解析时间格式
+      const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?$/);
+      if (match && match[4]) {
         return {
           time: {
-            year: parseInt(match[1]),
-            month: parseInt(match[2]),
-            day: parseInt(match[3]),
-            hour: parseInt(match[4]),
-            minute: parseInt(match[5]),
+            year: parseInt(match[1], 10),
+            month: parseInt(match[2], 10),
+            day: parseInt(match[3], 10),
+            hour: parseInt(match[4], 10),
+            minute: parseInt(match[5], 10),
           },
           value: item.price,
         };
@@ -170,18 +152,30 @@ const updateData = () => {
     }
   });
 
-  series.setData(lineData as { time: string | { year: number; month: number; day: number; hour?: number; minute?: number; }; value: number }[]);
+  try {
+    series.setData(lineData as { time: string | { year: number; month: number; day: number; hour?: number; minute?: number; }; value: number }[]);
+  } catch (e) {
+    console.warn('[FundChart] setData error:', e);
+  }
 };
 
-watch(() => props.data, updateData, { deep: true });
+// 合并为一个 watch，避免竞态
+watch(() => props.data, (newData) => {
+  if (!newData || newData.length === 0) return;
 
-// 监听颜色变化
-watch(() => props.data, () => {
-  if (chart && props.data.length >= 2) {
+  // 更新颜色
+  if (newData.length >= 2 && series) {
     const newColor = getTrendColor();
-    series && 'applyOptions' in series && series.applyOptions({ color: newColor });
+    try {
+      series.applyOptions({ color: newColor });
+    } catch (e) {
+      // 忽略颜色更新错误
+    }
   }
-}, { deep: true });
+
+  // 更新数据
+  updateData();
+}, { deep: true, flush: 'post' });
 
 onMounted(() => {
   initChart();
@@ -194,6 +188,7 @@ onUnmounted(() => {
     chart.remove();
     chart = null;
   }
+  series = null;
 });
 
 const handleResize = () => {
@@ -213,9 +208,7 @@ const handleResize = () => {
   position: relative;
 }
 
-/* iOS 风格：简洁背景 */
 .fund-chart :deep(canvas) {
-  /* 移除不必要的阴影 */
   filter: none !important;
 }
 

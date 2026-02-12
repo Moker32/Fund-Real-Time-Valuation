@@ -41,6 +41,10 @@ export const useFundStore = defineStore('funds', () => {
   const retryCount = ref(0);
   const maxRetries = 2;
 
+  // 日内数据缓存（避免重复请求）
+  const intradayCache = new Map<string, { data: FundIntraday[]; timestamp: number }>();
+  const INTRADAY_CACHE_DURATION = 60 * 1000; // 缓存 60 秒
+
   // Getters
   const risingFunds = computed(() =>
     funds.value.filter((f) => f.estimateChangePercent > 0)
@@ -299,8 +303,20 @@ export const useFundStore = defineStore('funds', () => {
     }
   }
 
-  // 获取日内分时数据
-  async function fetchIntraday(code: string): Promise<FundIntraday[]> {
+  // 获取日内分时数据（带缓存）
+  async function fetchIntraday(code: string, forceRefresh = false): Promise<FundIntraday[]> {
+    // 检查缓存
+    const cached = intradayCache.get(code);
+    if (!forceRefresh && cached && Date.now() - cached.timestamp < INTRADAY_CACHE_DURATION) {
+      // 更新对应基金的日内数据
+      const index = funds.value.findIndex((f) => f.code === code);
+      if (index !== -1) {
+        const currentFund = funds.value[index];
+        funds.value[index] = { ...currentFund, intraday: cached.data };
+      }
+      return cached.data;
+    }
+
     try {
       // 获取当前估值的今日数据
       const estimateResponse = await fundApi.getFundEstimate(code);
@@ -358,6 +374,9 @@ export const useFundStore = defineStore('funds', () => {
           funds.value[index] = { ...currentFund, intraday };
         }
       }
+
+      // 更新缓存
+      intradayCache.set(code, { data: intraday, timestamp: Date.now() });
 
       return intraday;
     } catch (err) {
