@@ -1,9 +1,21 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { commodityApi } from '@/api';
-import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHistoryItem } from '@/types';
+import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHistoryItem, WatchedCommodity, CommoditySearchResult, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityResponse } from '@/types';
 import { ApiError } from '@/api';
 import { formatTime } from '@/utils/time';
+
+// 防抖函数
+function debounce<T extends (...args: Parameters<T>) => ReturnType<T>>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
 
 export interface FetchOptions {
   retries?: number;
@@ -366,6 +378,175 @@ export const useCommodityStore = defineStore('commodities', () => {
     await fetchCategories();
   }
 
+  // ========== 关注列表相关 ==========
+
+  // State - 关注列表
+  const watchedCommodities = ref<WatchedCommodity[]>([]);
+  const watchlistLoading = ref(false);
+  const watchlistError = ref<string | null>(null);
+
+  // 搜索相关
+  const searchQuery = ref('');
+  const searchResults = ref<CommoditySearchResult[]>([]);
+  const searchLoading = ref(false);
+  const searchError = ref<string | null>(null);
+  const lastSearchQuery = ref('');
+
+  // Getters - 关注列表按分类分组
+  const watchedByCategory = computed(() => {
+    const grouped: Record<string, WatchedCommodity[]> = {};
+    for (const item of watchedCommodities.value) {
+      const category = item.category || 'other';
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(item);
+    }
+    return grouped;
+  });
+
+  // 关注的分类列表
+  const watchedCategories = computed(() => {
+    return Object.keys(watchedByCategory.value);
+  });
+
+  // 获取某个分类的关注商品
+  function getWatchedByCategory(category: string): WatchedCommodity[] {
+    return watchedByCategory.value[category] || [];
+  }
+
+  // Actions - 关注列表
+
+  // 获取关注列表
+  async function fetchWatchedCommodities(options: FetchOptions = {}) {
+    const { showError = true } = options;
+    watchlistLoading.value = true;
+    watchlistError.value = null;
+
+    try {
+      const response = await commodityApi.getWatchlist();
+      watchedCommodities.value = response.watchlist || [];
+    } catch (err) {
+      watchlistError.value = getFriendlyErrorMessage(err);
+      if (showError) {
+        console.error('[CommodityStore] fetchWatchedCommodities error:', err);
+      }
+    } finally {
+      watchlistLoading.value = false;
+    }
+  }
+
+  // 添加关注
+  async function addToWatchlist(
+    symbol: string,
+    name: string,
+    category?: string
+  ): Promise<boolean> {
+    try {
+      const response = await commodityApi.addToWatchlist({ symbol, name, category });
+      if (response.success) {
+        // 刷新关注列表
+        await fetchWatchedCommodities({ showError: false });
+        return true;
+      }
+      watchlistError.value = response.message;
+      return false;
+    } catch (err) {
+      watchlistError.value = getFriendlyErrorMessage(err);
+      console.error('[CommodityStore] addToWatchlist error:', err);
+      return false;
+    }
+  }
+
+  // 移除关注
+  async function removeFromWatchlist(symbol: string): Promise<boolean> {
+    try {
+      const response = await commodityApi.removeFromWatchlist(symbol);
+      if (response.success) {
+        // 刷新关注列表
+        await fetchWatchedCommodities({ showError: false });
+        return true;
+      }
+      watchlistError.value = response.message;
+      return false;
+    } catch (err) {
+      watchlistError.value = getFriendlyErrorMessage(err);
+      console.error('[CommodityStore] removeFromWatchlist error:', err);
+      return false;
+    }
+  }
+
+  // 搜索商品
+  async function searchCommodities(query: string): Promise<CommoditySearchResult[]> {
+    if (!query.trim()) {
+      searchResults.value = [];
+      return [];
+    }
+
+    searchLoading.value = true;
+    searchError.value = null;
+
+    try {
+      const response = await commodityApi.searchCommodities(query);
+      searchResults.value = response.results || [];
+      lastSearchQuery.value = query;
+      return searchResults.value;
+    } catch (err) {
+      searchError.value = getFriendlyErrorMessage(err);
+      console.error('[CommodityStore] searchCommodities error:', err);
+      return [];
+    } finally {
+      searchLoading.value = false;
+    }
+  }
+
+  // 防抖搜索
+  const debouncedSearch = debounce((query: string) => {
+    searchCommodities(query);
+  }, 300);
+
+  // 执行防抖搜索
+  function executeSearch(query: string) {
+    searchQuery.value = query;
+    debouncedSearch(query);
+  }
+
+  // 清除搜索结果
+  function clearSearch() {
+    searchQuery.value = '';
+    searchResults.value = [];
+    searchError.value = null;
+    lastSearchQuery.value = '';
+  }
+
+  // 获取所有可用商品
+  async function fetchAvailableCommodities(): Promise<CommoditySearchResult[]> {
+    searchLoading.value = true;
+    searchError.value = null;
+
+    try {
+      const response = await commodityApi.getAvailableCommodities();
+      searchResults.value = response.results || [];
+      return searchResults.value;
+    } catch (err) {
+      searchError.value = getFriendlyErrorMessage(err);
+      console.error('[CommodityStore] fetchAvailableCommodities error:', err);
+      return [];
+    } finally {
+      searchLoading.value = false;
+    }
+  }
+
+  // 清除关注列表错误
+  function clearWatchlistError() {
+    watchlistError.value = null;
+  }
+
+  // 清除搜索错误
+  function clearSearchError() {
+    searchError.value = null;
+  }
+
   return {
     // State
     commodities,
@@ -376,6 +557,16 @@ export const useCommodityStore = defineStore('commodities', () => {
     lastUpdated,
     retryCount,
     maxRetries,
+    // 关注列表 State
+    watchedCommodities,
+    watchlistLoading,
+    watchlistError,
+    // 搜索 State
+    searchQuery,
+    searchResults,
+    searchLoading,
+    searchError,
+    lastSearchQuery,
     // Getters
     risingCommodities,
     fallingCommodities,
@@ -384,6 +575,9 @@ export const useCommodityStore = defineStore('commodities', () => {
     activeCategoryData,
     activeCommodities,
     categoryList,
+    // 关注列表 Getters
+    watchedByCategory,
+    watchedCategories,
     // Actions
     fetchCommodities,
     fetchCategories,
@@ -393,5 +587,17 @@ export const useCommodityStore = defineStore('commodities', () => {
     fetchOilWTI,
     clearError,
     retry,
+    // 关注列表 Actions
+    fetchWatchedCommodities,
+    addToWatchlist,
+    removeFromWatchlist,
+    getWatchedByCategory,
+    // 搜索 Actions
+    searchCommodities,
+    executeSearch,
+    clearSearch,
+    fetchAvailableCommodities,
+    clearWatchlistError,
+    clearSearchError,
   };
 });

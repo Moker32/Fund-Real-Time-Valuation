@@ -110,6 +110,53 @@ export interface CommodityHistoryResponse {
   timestamp: string;
 }
 
+// Watched Commodity Types
+export interface WatchedCommodity {
+  symbol: string;
+  name: string;
+  category: string;
+  added_at: string;
+}
+
+export interface WatchedCommodityItem {
+  symbol: string;
+  name: string;
+  category: string;
+  addedAt: string;
+}
+
+export interface WatchlistResponse {
+  watchlist: WatchedCommodity[];
+  count: number;
+  timestamp: string;
+}
+
+export interface CommoditySearchResult {
+  symbol: string;
+  name: string;
+  exchange: string;
+  currency: string;
+  category: string;
+}
+
+export interface CommoditySearchResponse {
+  query: string;
+  results: CommoditySearchResult[];
+  count: number;
+  timestamp: string;
+}
+
+export interface AddWatchedCommodityRequest {
+  symbol: string;
+  name: string;
+  category?: string;
+}
+
+export interface AddWatchedCommodityResponse {
+  success: boolean;
+  message: string;
+}
+
 // Market Index Types
 export interface MarketIndex {
   index: string;

@@ -14,10 +14,9 @@ import asyncio
 import logging
 import time
 from datetime import datetime
-from typing import Any
+from typing import Any, TypedDict
 
 from src.db.commodity_repo import CommodityCacheDAO, CommodityCategory
-from src.db.database import DatabaseManager
 
 from .base import DataSource, DataSourceResult, DataSourceType
 
@@ -552,3 +551,135 @@ def get_commodities_by_category() -> dict[CommodityCategory, list[str]]:
         CommodityCategory.ENERGY: ["wti", "brent", "natural_gas"],
         CommodityCategory.BASE_METAL: [],
     }
+
+
+# 搜索商品配置映射（用于自定义关注商品搜索）
+SEARCHABLE_COMMODITIES: dict[str, dict[str, str]] = {
+    # 贵金属
+    "GC=F": {"name": "黄金 (COMEX)", "category": "precious_metal", "exchange": "COMEX", "currency": "USD"},
+    "SI=F": {"name": "白银", "category": "precious_metal", "exchange": "COMEX", "currency": "USD"},
+    "PT=F": {"name": "铂金", "category": "precious_metal", "exchange": "NYMEX", "currency": "USD"},
+    "PA=F": {"name": "钯金", "category": "precious_metal", "exchange": "NYMEX", "currency": "USD"},
+    # 能源
+    "CL=F": {"name": "WTI 原油", "category": "energy", "exchange": "NYMEX", "currency": "USD"},
+    "BZ=F": {"name": "布伦特原油", "category": "energy", "exchange": "ICE", "currency": "USD"},
+    "NG=F": {"name": "天然气", "category": "energy", "exchange": "NYMEX", "currency": "USD"},
+    "HO=F": {"name": "燃油", "category": "energy", "exchange": "NYMEX", "currency": "USD"},
+    "RB=F": {"name": "汽油", "category": "energy", "exchange": "NYMEX", "currency": "USD"},
+    # 基本金属
+    "HG=F": {"name": "铜", "category": "base_metal", "exchange": "COMEX", "currency": "USD"},
+    "AL=F": {"name": "铝", "category": "base_metal", "exchange": "LME", "currency": "USD"},
+    "ZN=F": {"name": "锌", "category": "base_metal", "exchange": "LME", "currency": "USD"},
+    "NI=F": {"name": "镍", "category": "base_metal", "exchange": "LME", "currency": "USD"},
+    "PB=F": {"name": "铅", "category": "base_metal", "exchange": "LME", "currency": "USD"},
+    "SN=F": {"name": "锡", "category": "base_metal", "exchange": "LME", "currency": "USD"},
+    # 农产品
+    "ZS=F": {"name": "大豆", "category": "agriculture", "exchange": "CBOT", "currency": "USD"},
+    "ZC=F": {"name": "玉米", "category": "agriculture", "exchange": "CBOT", "currency": "USD"},
+    "ZW=F": {"name": "小麦", "category": "agriculture", "exchange": "CBOT", "currency": "USD"},
+    "KC=F": {"name": "咖啡", "category": "agriculture", "exchange": "ICE", "currency": "USD"},
+    "SB=F": {"name": "白糖", "category": "agriculture", "exchange": "ICE", "currency": "USD"},
+    "CC=F": {"name": "可可", "category": "agriculture", "exchange": "ICE", "currency": "USD"},
+    "CT=F": {"name": "棉花", "category": "agriculture", "exchange": "ICE", "currency": "USD"},
+    "LE=F": {"name": "活牛", "category": "agriculture", "exchange": "CME", "currency": "USD"},
+    "HE=F": {"name": "瘦肉猪", "category": "agriculture", "exchange": "CME", "currency": "USD"},
+    "ZR=F": {"name": "糙米", "category": "agriculture", "exchange": "CBOT", "currency": "USD"},
+    # 加密货币期货
+    "BTC=F": {"name": "比特币", "category": "crypto", "exchange": "CME", "currency": "USD"},
+    "ETH=F": {"name": "以太坊", "category": "crypto", "exchange": "CME", "currency": "USD"},
+}
+
+
+class CommoditySearchResult(TypedDict):
+    """商品搜索结果"""
+    symbol: str
+    name: str
+    exchange: str
+    currency: str
+    category: str
+
+
+class CommoditySearchResponse(TypedDict):
+    """商品搜索响应"""
+    query: str
+    results: list[CommoditySearchResult]
+    timestamp: str
+
+
+def identify_category(symbol: str) -> str:
+    """
+    识别商品分类
+
+    Args:
+        symbol: 商品代码
+
+    Returns:
+        str: 分类名称
+    """
+    clean_symbol = symbol.upper().strip()
+    if clean_symbol in SEARCHABLE_COMMODITIES:
+        return SEARCHABLE_COMMODITIES[clean_symbol]["category"]
+    return "other"
+
+
+def search_commodities(query: str) -> list[CommoditySearchResult]:
+    """
+    搜索可关注的大宗商品
+
+    支持按代码或名称模糊搜索，返回匹配的 yfinance 可期货商品。
+
+    Args:
+        query: 搜索关键词（代码或名称）
+
+    Returns:
+        list[CommoditySearchResult]: 搜索结果列表
+    """
+    if not query or len(query.strip()) < 1:
+        return []
+
+    query_lower = query.lower().strip()
+    results: list[CommoditySearchResult] = []
+
+    for symbol, info in SEARCHABLE_COMMODITIES.items():
+        # 检查代码是否匹配
+        if query_lower in symbol.lower():
+            results.append({
+                "symbol": symbol,
+                "name": info["name"],
+                "exchange": info["exchange"],
+                "currency": info["currency"],
+                "category": info["category"],
+            })
+            continue
+
+        # 检查名称是否匹配
+        if query_lower in info["name"].lower():
+            results.append({
+                "symbol": symbol,
+                "name": info["name"],
+                "exchange": info["exchange"],
+                "currency": info["currency"],
+                "category": info["category"],
+            })
+
+    return results
+
+
+def get_all_available_commodities() -> list[CommoditySearchResult]:
+    """
+    获取所有可关注的大宗商品列表
+
+    Returns:
+        list[CommoditySearchResult]: 所有可用商品列表
+    """
+    results: list[CommoditySearchResult] = []
+    for symbol, info in SEARCHABLE_COMMODITIES.items():
+        results.append({
+            "symbol": symbol,
+            "name": info["name"],
+            "exchange": info["exchange"],
+            "currency": info["currency"],
+            "category": info["category"],
+        })
+    return results
+

@@ -3,6 +3,12 @@
     <!-- Header -->
     <div class="view-header">
       <h2 class="section-title">大宗商品行情</h2>
+      <button class="add-button" @click="openSearchDialog">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+        <span>添加关注</span>
+      </button>
     </div>
 
     <!-- Commodity View with Categories -->
@@ -23,22 +29,46 @@
         <span class="stats-value neutral">{{ commodityStore.commodities.length - commodityStore.risingCommodities.length - commodityStore.fallingCommodities.length }}</span>
       </div>
     </div>
+
+    <!-- Search Dialog -->
+    <CommoditySearchDialog
+      :visible="searchDialogVisible"
+      @close="closeSearchDialog"
+      @added="handleCommodityAdded"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useCommodityStore } from '@/stores/commodityStore';
 import CommodityView from '@/components/CommodityView.vue';
+import CommoditySearchDialog from '@/components/CommoditySearchDialog.vue';
 
 const commodityStore = useCommodityStore();
+const searchDialogVisible = ref(false);
 
 onMounted(() => {
   // 只在数据为空时强制加载
   if (commodityStore.categories.length === 0) {
     commodityStore.fetchCategories({ force: true });
   }
+  // 同时加载关注列表
+  commodityStore.fetchWatchedCommodities({ showError: false });
 });
+
+function openSearchDialog() {
+  searchDialogVisible.value = true;
+}
+
+function closeSearchDialog() {
+  searchDialogVisible.value = false;
+}
+
+function handleCommodityAdded(symbol: string, name: string) {
+  // 可以在这里添加 toast 提示
+  console.log(`已添加关注: ${name} (${symbol})`);
+}
 </script>
 
 <style lang="scss" scoped>
@@ -62,6 +92,30 @@ onMounted(() => {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-primary);
+}
+
+.add-button {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    background: var(--color-primary-hover);
+  }
 }
 
 .quick-stats {

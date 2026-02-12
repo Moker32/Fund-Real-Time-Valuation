@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem } from '@/types';
+import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem, WatchedCommodity, WatchlistResponse, CommoditySearchResult, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse } from '@/types';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -269,6 +269,35 @@ export const commodityApi = {
     timestamp: string;
   }> {
     return api.get('/api/commodities/oil/wti');
+  },
+
+  // 关注列表相关 API
+  async searchCommodities(query: string): Promise<CommoditySearchResponse> {
+    return api.get('/api/commodities/search', { params: { q: query } });
+  },
+
+  async getAvailableCommodities(): Promise<CommoditySearchResponse> {
+    return api.get('/api/commodities/available');
+  },
+
+  async getWatchlist(): Promise<WatchlistResponse> {
+    return api.get('/api/commodities/watchlist');
+  },
+
+  async addToWatchlist(request: AddWatchedCommodityRequest): Promise<AddWatchedCommodityResponse> {
+    return api.post('/api/commodities/watchlist', request);
+  },
+
+  async removeFromWatchlist(symbol: string): Promise<AddWatchedCommodityResponse> {
+    return api.delete(`/api/commodities/watchlist/${encodeURIComponent(symbol)}`);
+  },
+
+  async updateWatchedCommodity(symbol: string, name: string): Promise<AddWatchedCommodityResponse> {
+    return api.put(`/api/commodities/watchlist/${encodeURIComponent(symbol)}`, { name });
+  },
+
+  async getWatchlistByCategory(category: string): Promise<WatchlistResponse> {
+    return api.get(`/api/commodities/watchlist/category/${category}`);
   },
 };
 

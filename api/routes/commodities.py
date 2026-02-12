@@ -6,17 +6,21 @@
 from datetime import datetime
 from typing import TypedDict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from src.config.commodities_config import CommoditiesConfig
 from src.datasources.base import DataSourceType
 from src.datasources.commodity_source import (
     AKShareCommoditySource,
     YFinanceCommoditySource,
-    get_commodities_by_category,
+    get_all_available_commodities,
     get_all_commodity_types,
+    get_commodities_by_category,
+    identify_category,
+    search_commodities,
 )
 from src.datasources.manager import DataSourceManager
-from src.db.commodity_repo import CommodityCacheDAO, CommodityCategory, CommodityCategoryDAO
+from src.db.commodity_repo import CommodityCacheDAO, CommodityCategory
 from src.db.database import DatabaseManager
 
 from ..dependencies import DataSourceDependency
@@ -310,64 +314,7 @@ async def get_history(
         )
 
 
-@router.get(
-    "/{commodity_type}",
-    response_model=CommodityResponse,
-    summary="获取单个商品行情",
-    description="根据商品类型获取单个商品的实时行情",
-    responses={
-        200: {"description": "成功获取商品行情"},
-        400: {"model": ErrorResponse, "description": "不支持的商品类型"},
-        500: {"model": ErrorResponse, "description": "服务器错误"},
-    },
-)
-async def get_commodity(
-    commodity_type: str,
-    manager: DataSourceManager = Depends(DataSourceDependency()),
-) -> dict:
-    """
-    获取单个商品行情
-
-    Args:
-        commodity_type: 商品类型 (gold, gold_cny, wti, brent, silver, natural_gas)
-        manager: 数据源管理器依赖
-
-    Returns:
-        CommodityResponse: 商品行情
-    """
-    # 验证商品类型
-    if commodity_type not in SUPPORTED_COMMODITIES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"不支持的商品类型: {commodity_type}，支持类型: {', '.join(SUPPORTED_COMMODITIES)}",
-        )
-
-    result = await manager.fetch(DataSourceType.COMMODITY, commodity_type)
-
-    if not result.success:
-        raise HTTPException(
-            status_code=500,
-            detail=result.error,
-        )
-
-    data = result.data
-    return CommodityResponse(
-        commodity=data.get("commodity", ""),
-        symbol=data.get("symbol", ""),
-        name=data.get("name", ""),
-        price=data.get("price", 0.0),
-        change=data.get("change"),
-        changePercent=data.get("change_percent"),
-        currency=data.get("currency"),
-        exchange=data.get("exchange"),
-        timestamp=data.get("time"),
-        source=result.source,
-        high=data.get("high"),
-        low=data.get("low"),
-        open=data.get("open"),
-        prevClose=data.get("prev_close"),
-    ).model_dump()
-
+# === 特定商品类型路由（在通用路由之前定义） ===
 
 @router.get(
     "/gold/cny",
@@ -495,6 +442,343 @@ async def get_wti_oil() -> dict:
         changePercent=data.get("change_percent"),
         currency=data.get("currency", "USD"),
         exchange=data.get("exchange", "NYMEX"),
+        timestamp=data.get("time"),
+        source=result.source,
+        high=data.get("high"),
+        low=data.get("low"),
+        open=data.get("open"),
+        prevClose=data.get("prev_close"),
+    ).model_dump()
+
+
+# === 关注列表 API ===
+# 注意：这些路由必须在 /{commodity_type} 之前定义，以避免路由冲突
+
+class WatchedCommodityResponse(TypedDict):
+    """关注商品响应"""
+    symbol: str
+    name: str
+    category: str
+    added_at: str
+
+
+class WatchedCommodityAddRequest(TypedDict):
+    """添加关注商品请求"""
+    symbol: str
+    name: str
+    category: str | None
+
+
+class WatchedCommodityUpdateRequest(TypedDict):
+    """更新关注商品请求"""
+    name: str
+
+
+class WatchlistResponse(TypedDict):
+    """关注列表响应"""
+    watchlist: list[WatchedCommodityResponse]
+    count: int
+    timestamp: str
+
+
+class SearchResultResponse(TypedDict):
+    """搜索结果响应"""
+    query: str
+    results: list[dict]
+    count: int
+    timestamp: str
+
+
+class AddWatchlistResponse(TypedDict):
+    """添加关注响应"""
+    success: bool
+    message: str
+
+
+@router.get(
+    "/search",
+    response_model=SearchResultResponse,
+    summary="搜索商品",
+    description="搜索可关注的大宗商品",
+    responses={
+        200: {"description": "成功获取搜索结果"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def search_commodities_handler(
+    q: str = Query(..., min_length=1, description="搜索关键词"),
+) -> SearchResultResponse:
+    """
+    搜索可关注的大宗商品
+
+    支持按代码或名称模糊搜索，返回匹配的商品列表。
+
+    Args:
+        q: 搜索关键词
+
+    Returns:
+        SearchResultResponse: 搜索结果
+    """
+    results = search_commodities(q)
+    return {
+        "query": q,
+        "results": results,
+        "count": len(results),
+        "timestamp": datetime.now().isoformat() + "Z",
+    }
+
+
+@router.get(
+    "/available",
+    response_model=SearchResultResponse,
+    summary="获取所有可用商品",
+    description="获取所有可关注的大宗商品列表",
+    responses={
+        200: {"description": "成功获取商品列表"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_available_commodities() -> SearchResultResponse:
+    """
+    获取所有可关注的大宗商品列表
+
+    Returns:
+        SearchResultResponse: 所有可用商品
+    """
+    results = get_all_available_commodities()
+    return {
+        "query": "",
+        "results": results,
+        "count": len(results),
+        "timestamp": datetime.now().isoformat() + "Z",
+    }
+
+
+@router.get(
+    "/watchlist",
+    response_model=WatchlistResponse,
+    summary="获取关注列表",
+    description="获取用户关注的大宗商品列表",
+    responses={
+        200: {"description": "成功获取关注列表"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_watchlist() -> WatchlistResponse:
+    """
+    获取关注的大宗商品列表
+
+    Returns:
+        WatchlistResponse: 关注列表
+    """
+    config = CommoditiesConfig()
+    watched = config.get_watched_commodities()
+
+    return {
+        "watchlist": watched,
+        "count": len(watched),
+        "timestamp": datetime.now().isoformat() + "Z",
+    }
+
+
+@router.post(
+    "/watchlist",
+    response_model=AddWatchlistResponse,
+    summary="添加关注商品",
+    description="将商品添加到关注列表",
+    responses={
+        200: {"description": "成功添加"},
+        400: {"model": ErrorResponse, "description": "请求参数错误"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def add_to_watchlist(
+    request: WatchedCommodityAddRequest,
+) -> AddWatchlistResponse:
+    """
+    添加商品到关注列表
+
+    Args:
+        request: 添加请求，包含 symbol, name, 可选的 category
+
+    Returns:
+        AddWatchlistResponse: 添加结果
+    """
+    symbol = request.get("symbol", "").strip()
+    name = request.get("name", "").strip()
+    category = request.get("category")
+
+    if not symbol:
+        return {"success": False, "message": "商品代码不能为空"}
+
+    if not name:
+        return {"success": False, "message": "商品名称不能为空"}
+
+    # 如果没有提供分类，自动识别
+    if category is None:
+        category = identify_category(symbol)
+
+    try:
+        config = CommoditiesConfig()
+        success, message = config.add_watched_commodity(symbol, name, category)
+        return {"success": success, "message": message}
+    except Exception as e:
+        return {"success": False, "message": f"添加失败: {e}"}
+
+
+@router.delete(
+    "/watchlist/{symbol}",
+    response_model=AddWatchlistResponse,
+    summary="移除关注商品",
+    description="将商品从关注列表移除",
+    responses={
+        200: {"description": "成功移除"},
+        400: {"model": ErrorResponse, "description": "商品不在关注列表中"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def remove_from_watchlist(
+    symbol: str,
+) -> AddWatchlistResponse:
+    """
+    从关注列表移除商品
+
+    Args:
+        symbol: 商品代码
+
+    Returns:
+        AddWatchlistResponse: 移除结果
+    """
+    try:
+        config = CommoditiesConfig()
+        success, message = config.remove_watched_commodity(symbol)
+        return {"success": success, "message": message}
+    except Exception as e:
+        return {"success": False, "message": f"移除失败: {e}"}
+
+
+@router.put(
+    "/watchlist/{symbol}",
+    response_model=AddWatchlistResponse,
+    summary="更新关注商品",
+    description="更新关注商品的名称",
+    responses={
+        200: {"description": "成功更新"},
+        400: {"model": ErrorResponse, "description": "请求参数错误"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def update_watchlist_commodity(
+    symbol: str,
+    request: WatchedCommodityUpdateRequest,
+) -> AddWatchlistResponse:
+    """
+    更新关注商品的名称
+
+    Args:
+        symbol: 商品代码
+        request: 更新请求，包含新的 name
+
+    Returns:
+        AddWatchlistResponse: 更新结果
+    """
+    name = request.get("name", "").strip()
+
+    if not name:
+        return {"success": False, "message": "商品名称不能为空"}
+
+    try:
+        config = CommoditiesConfig()
+        success, message = config.update_watched_commodity_name(symbol, name)
+        return {"success": success, "message": message}
+    except Exception as e:
+        return {"success": False, "message": f"更新失败: {e}"}
+
+
+@router.get(
+    "/watchlist/category/{category}",
+    response_model=WatchlistResponse,
+    summary="按分类获取关注",
+    description="按分类获取关注的大宗商品列表",
+    responses={
+        200: {"description": "成功获取关注列表"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_watchlist_by_category(
+    category: str,
+) -> WatchlistResponse:
+    """
+    按分类获取关注的大宗商品列表
+
+    Args:
+        category: 分类名称
+
+    Returns:
+        WatchlistResponse: 关注列表
+    """
+    config = CommoditiesConfig()
+    watched = config.get_watched_by_category(category)
+
+    return {
+        "watchlist": watched,
+        "count": len(watched),
+        "timestamp": datetime.now().isoformat() + "Z",
+    }
+
+
+# === 通用商品类型路由（必须在所有特定路由之后定义） ===
+
+@router.get(
+    "/{commodity_type}",
+    response_model=CommodityResponse,
+    summary="获取单个商品行情",
+    description="根据商品类型获取单个商品的实时行情",
+    responses={
+        200: {"description": "成功获取商品行情"},
+        400: {"model": ErrorResponse, "description": "不支持的商品类型"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_commodity(
+    commodity_type: str,
+    manager: DataSourceManager = Depends(DataSourceDependency()),
+) -> dict:
+    """
+    获取单个商品行情
+
+    Args:
+        commodity_type: 商品类型 (gold, gold_cny, wti, brent, silver, natural_gas)
+        manager: 数据源管理器依赖
+
+    Returns:
+        CommodityResponse: 商品行情
+    """
+    # 验证商品类型
+    if commodity_type not in SUPPORTED_COMMODITIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的商品类型: {commodity_type}，支持类型: {', '.join(SUPPORTED_COMMODITIES)}",
+        )
+
+    result = await manager.fetch(DataSourceType.COMMODITY, commodity_type)
+
+    if not result.success:
+        raise HTTPException(
+            status_code=500,
+            detail=result.error,
+        )
+
+    data = result.data
+    return CommodityResponse(
+        commodity=data.get("commodity", ""),
+        symbol=data.get("symbol", ""),
+        name=data.get("name", ""),
+        price=data.get("price", 0.0),
+        change=data.get("change"),
+        changePercent=data.get("change_percent"),
+        currency=data.get("currency"),
+        exchange=data.get("exchange"),
         timestamp=data.get("time"),
         source=result.source,
         high=data.get("high"),
