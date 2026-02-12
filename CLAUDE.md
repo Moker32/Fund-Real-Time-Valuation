@@ -64,6 +64,7 @@ pnpm run check                  # 运行所有检查 (lint + typecheck)
 │   └── routes/             # API 路由
 │       ├── funds.py        # 基金 API
 │       ├── commodities.py  # 商品 API
+│       ├── indices.py      # 指数 API
 │       └── overview.py     # 概览 API
 ├── web/                    # Vue 3 前端
 │   ├── src/                # 前端源码
@@ -72,8 +73,11 @@ pnpm run check                  # 运行所有检查 (lint + typecheck)
 ├── src/                    # Python 源码
 │   ├── datasources/        # 数据源层
 │   ├── config/             # 配置层
+│   ├── db/                 # 数据库层
 │   └── utils/              # 工具层
-└── tests/                  # 测试目录
+├── tests/                  # 测试目录
+└── docs/                   # 设计文档
+    └── plans/              # 功能设计文档
 ```
 
 ### 配置存储
@@ -98,12 +102,24 @@ pnpm run check                  # 运行所有检查 (lint + typecheck)
 | `/api/funds/{code}/holding` | PUT | 标记/取消持有基金 |
 | `/api/commodities` | GET | 获取商品行情列表 |
 | `/api/commodities/{type}` | GET | 获取单个商品行情 |
+| `/api/commodities/categories` | GET | 获取商品分类 |
+| `/api/commodities/history/{commodity_type}` | GET | 获取商品历史行情 |
+| `/api/commodities/search` | GET | 搜索商品 |
+| `/api/commodities/available` | GET | 获取所有可用商品 |
+| `/api/commodities/watchlist` | GET | 获取关注列表 |
+| `/api/commodities/watchlist` | POST | 添加关注商品 |
+| `/api/commodities/watchlist/{symbol}` | DELETE | 移除关注商品 |
+| `/api/commodities/watchlist/{symbol}` | PUT | 更新关注商品 |
+| `/api/commodities/watchlist/category/{category}` | GET | 按分类获取关注 |
 | `/api/commodities/gold/cny` | GET | 获取国内黄金行情 |
 | `/api/commodities/gold/international` | GET | 获取国际黄金行情 |
 | `/api/commodities/oil/wti` | GET | 获取 WTI 原油行情 |
 | `/api/commodities/oil/brent` | GET | 获取布伦特原油行情 |
 | `/api/commodities/silver` | GET | 获取白银行情 |
 | `/api/commodities/crypto` | GET | 获取加密货币行情 |
+| `/api/indices` | GET | 获取全球市场指数 |
+| `/api/indices/{index_type}` | GET | 获取单个指数 |
+| `/api/indices/regions` | GET | 获取支持的区域 |
 | `/api/health` | GET | 健康检查 (详细) |
 | `/api/health/simple` | GET | 健康检查 (简单) |
 | `/api/overview` | GET | 市场概览 |
@@ -155,9 +171,18 @@ pnpm run check                  # 运行所有检查 (lint + typecheck)
 ## 数据库缓存策略
 
 - **SQLite 数据库**: `~/.fund-tui/fund_data.db`
-- **缓存表**: `fund_basic_info`, `fund_daily_cache`, `fund_intraday_cache`
+- **缓存表**: `fund_basic_info`, `fund_daily_cache`, `fund_intraday_cache`, `commodity_cache`
 - **缓存优先级**: 内存 → 数据库 → 外部 API
 - **获取数据后必须保存到数据库**，减轻 API 压力
+
+### 数据库层 (src/db/)
+
+- `database.py` - DatabaseManager 类，管理 SQLite 连接和缓存
+- `commodity_repo.py` - 商品缓存 DAO，三级缓存实现
+
+### 配置层 (src/config/)
+
+- `commodities_config.py` - 商品配置管理，关注列表 YAML 读写
 
 ## 常见问题
 
