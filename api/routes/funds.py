@@ -21,6 +21,7 @@ from ..models import (
     ErrorResponse,
     FundDetailResponse,
     FundEstimateResponse,
+    FundIntradayResponse,
     FundResponse,
 )
 
@@ -358,6 +359,52 @@ async def get_fund_history(
         )
 
     return result.data
+
+
+@router.get(
+    "/{code}/intraday",
+    response_model=FundIntradayResponse,
+    summary="获取基金日内分时数据",
+    description="根据基金代码获取 fund123.cn 的完整日内分时数据",
+    responses={
+        200: {"description": "成功获取日内分时数据"},
+        404: {"model": ErrorResponse, "description": "基金不存在"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_fund_intraday(
+    code: str,
+    manager: DataSourceManager = Depends(DataSourceDependency()),
+) -> dict:
+    """
+    获取基金日内分时数据
+
+    Args:
+        code: 基金代码 (6位数字)
+        manager: 数据源管理器依赖
+
+    Returns:
+        FundIntradayResponse: 基金日内分时数据
+    """
+    from src.datasources.fund_source import Fund123DataSource
+
+    fund123_source = Fund123DataSource()
+    result = await fund123_source.fetch_intraday(code)
+
+    if not result.success:
+        raise HTTPException(
+            status_code=404 if "不存在" in result.error else 500,
+            detail=result.error,
+        )
+
+    return FundIntradayResponse(
+        fund_code=result.data.get("fund_code", code),
+        name=result.data.get("name", ""),
+        date=result.data.get("date", ""),
+        data=result.data.get("data", []),
+        count=result.data.get("count", 0),
+        source=result.source,
+    ).model_dump()
 
 
 @router.post(

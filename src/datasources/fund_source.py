@@ -22,6 +22,7 @@ from .base import (
     DataSourceType,
 )
 from .dual_cache import DualLayerCache
+from src.db.database import DatabaseManager, FundIntradayCacheDAO
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,8 @@ _fund_info_cache_ttl = 3600  # 1小时缓存
 # 基金信息缓存命中率统计
 _fund_info_hit_count = 0
 _fund_info_miss_count = 0
+# 日内分时缓存 DAO 单例
+_intraday_cache_dao: FundIntradayCacheDAO | None = None
 
 
 def get_fund_cache() -> DualLayerCache:
@@ -47,6 +50,15 @@ def get_fund_cache() -> DualLayerCache:
             max_memory_items=100
         )
     return _fund_cache
+
+
+def get_intraday_cache_dao() -> FundIntradayCacheDAO:
+    """获取日内分时缓存 DAO 单例"""
+    global _intraday_cache_dao
+    if _intraday_cache_dao is None:
+        db_manager = DatabaseManager()
+        _intraday_cache_dao = FundIntradayCacheDAO(db_manager)
+    return _intraday_cache_dao
 
 
 def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
@@ -742,7 +754,16 @@ class FundDataSource(DataSource):
 
 
 # 导出类
-__all__ = ["FundDataSource", "SinaFundDataSource", "FundHistorySource", "FundHistoryYFinanceSource", "get_fund_cache_stats"]
+__all__ = [
+    "FundDataSource",
+    "SinaFundDataSource",
+    "FundHistorySource",
+    "FundHistoryYFinanceSource",
+    "Fund123DataSource",
+    "get_fund_cache",
+    "get_fund_cache_stats",
+    "get_intraday_cache_dao",
+]
 
 
 def get_fund_cache_stats() -> dict:
@@ -1496,7 +1517,7 @@ class Fund123DataSource(DataSource):
 
         cache_key = f"fund:{self.name}:{fund_code}"
 
-        # 检查缓存
+        # 检查缓存（内存/文件缓存）
         if use_cache:
             cache = get_fund_cache()
             cached_value, cache_type = await cache.get(cache_key)
@@ -1509,6 +1530,17 @@ class Fund123DataSource(DataSource):
                     metadata={"fund_code": fund_code, "cache": cache_type}
                 )
 
+        # 优先从数据库读取日内分时缓存（60秒过期）
+        if use_cache:
+            intraday_dao = get_intraday_cache_dao()
+            if not intraday_dao.is_expired(fund_code):
+                cached_intraday = intraday_dao.get_intraday(fund_code)
+                if cached_intraday:
+                    # 构建基础数据（日内数据从缓存获取）
+                    # 注意：这里需要获取实时估值数据，但日内分时从缓存读取
+                    # 由于基础数据没有缓存，需要先获取实时数据
+                    pass  # 继续获取实时数据，稍后会保存日内数据到缓存
+
         for attempt in range(self.max_retries):
             try:
                 # 在线程池中执行同步请求
@@ -1520,9 +1552,17 @@ class Fund123DataSource(DataSource):
 
                 if result.success:
                     self._record_success()
-                    # 写入缓存
+
+                    # 写入内存/文件缓存
                     cache = get_fund_cache()
                     await cache.set(cache_key, result.data)
+
+                    # 保存日内分时数据到数据库缓存
+                    intraday_data = result.data.get("intraday", [])
+                    if intraday_data:
+                        intraday_dao = get_intraday_cache_dao()
+                        intraday_dao.save_intraday(fund_code, intraday_data)
+
                     return result
                 else:
                     # 如果失败且还有重试次数，刷新 token 后重试
@@ -1637,8 +1677,8 @@ class Fund123DataSource(DataSource):
             "intraday": [
                 {
                     "time": time.strftime("%H:%M", time.localtime(item.get("time", 0) / 1000)),
-                    "value": float(item.get("forecastNetValue", 0)),
-                    "change": float(item.get("forecastGrowth", 0)) * 100
+                    "price": float(item.get("forecastNetValue", 0)),
+                    "change": round(float(item.get("forecastGrowth", 0)) * 100, 4)
                 }
                 for item in intraday_list
             ]
@@ -1688,6 +1728,216 @@ class Fund123DataSource(DataSource):
     def _validate_fund_code(self, fund_code: str) -> bool:
         """验证基金代码格式"""
         return bool(re.match(r"^\d{6}$", str(fund_code)))
+
+    async def fetch_intraday(self, fund_code: str, use_cache: bool = True) -> DataSourceResult:
+        """
+        获取基金日内分时数据
+
+        缓存策略：
+        1. 优先从 SQLite 数据库读取（60秒过期）
+        2. 数据库缓存过期时，从 API 获取并更新数据库
+        3. 最后回退到内存/文件缓存
+
+        Args:
+            fund_code: 基金代码 (6位数字)
+            use_cache: 是否使用缓存
+
+        Returns:
+            DataSourceResult: 包含日内分时数据的结果
+        """
+        if not self._validate_fund_code(fund_code):
+            return DataSourceResult(
+                success=False,
+                error=f"无效的基金代码: {fund_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        cache_key = f"fund:{self.name}:{fund_code}:intraday"
+
+        # 1. 优先从数据库读取日内分时缓存（60秒过期）
+        if use_cache:
+            intraday_dao = get_intraday_cache_dao()
+            if not intraday_dao.is_expired(fund_code):
+                cached_records = intraday_dao.get_intraday(fund_code)
+                if cached_records:
+                    # 从数据库记录构建返回数据
+                    intraday_points = [
+                        {
+                            "time": record.time,
+                            "price": record.price,
+                            "change": record.change_rate
+                        }
+                        for record in cached_records
+                    ]
+                    result_data = {
+                        "fund_code": fund_code,
+                        "name": "",
+                        "date": time.strftime("%Y-%m-%d"),
+                        "data": intraday_points,
+                        "count": len(intraday_points),
+                        "from_cache": "database",
+                        "cache_expired": False
+                    }
+                    return DataSourceResult(
+                        success=True,
+                        data=result_data,
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"fund_code": fund_code, "cache": "database", "cache_expired": False}
+                    )
+
+        # 2. 检查内存/文件缓存
+        if use_cache:
+            cache = get_fund_cache()
+            cached_value, cache_type = await cache.get(cache_key)
+            if cached_value is not None:
+                cached_value["from_cache"] = cache_type
+                cached_value["cache_expired"] = True
+                return DataSourceResult(
+                    success=True,
+                    data=cached_value,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code, "cache": cache_type, "cache_expired": True}
+                )
+
+        for attempt in range(self.max_retries):
+            try:
+                # 在线程池中执行同步请求
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    None,
+                    lambda: self._fetch_intraday_data(fund_code)
+                )
+
+                if result.success:
+                    self._record_success()
+
+                    # 写入数据库缓存
+                    intraday_dao = get_intraday_cache_dao()
+                    intraday_dao.save_intraday(fund_code, result.data.get("data", []))
+
+                    # 写入内存/文件缓存（缓存时间较短，5分钟）
+                    cache = get_fund_cache()
+                    await cache.set(cache_key, result.data, ttl_seconds=300)
+
+                    result.data["from_cache"] = "api"
+                    result.data["cache_expired"] = False
+                    return result
+                else:
+                    if attempt < self.max_retries - 1:
+                        self._refresh_csrf_token()
+                        await asyncio.sleep(self.retry_delay * (attempt + 1))
+                        continue
+                    return result
+
+            except Exception as e:
+                logger.error(f"获取日内数据异常: {e}")
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay * (attempt + 1))
+                    continue
+
+        return DataSourceResult(
+            success=False,
+            error=f"获取日内数据失败，已重试 {self.max_retries} 次",
+            timestamp=time.time(),
+            source=self.name,
+            metadata={"fund_code": fund_code}
+        )
+
+    def _fetch_intraday_data(self, fund_code: str) -> DataSourceResult:
+        """同步获取基金日内分时数据"""
+        # 1. 获取基金基本信息（fund_key 和 fund_name）
+        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={self._csrf_token}"
+        search_response = self._session.post(
+            search_url,
+            json={"fundCode": fund_code},
+            timeout=self.timeout,
+            verify=False
+        )
+
+        if not search_response.ok:
+            return DataSourceResult(
+                success=False,
+                error=f"搜索基金失败: {search_response.status_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        search_data = search_response.json()
+        if not search_data.get("success"):
+            return DataSourceResult(
+                success=False,
+                error=f"基金不存在: {fund_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        fund_info = search_data.get("fundInfo", {})
+        fund_key = fund_info.get("key")
+        fund_name = fund_info.get("fundName", f"基金 {fund_code}")
+
+        # 2. 获取日内估值数据
+        today = time.strftime("%Y-%m-%d")
+        intraday_url = f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={self._csrf_token}"
+        intraday_response = self._session.post(
+            intraday_url,
+            json={
+                "startTime": today,
+                "endTime": today,
+                "limit": 200,
+                "productId": fund_key,
+                "format": True,
+                "source": "WEALTHBFFWEB"
+            },
+            timeout=self.timeout,
+            verify=False
+        )
+
+        if not intraday_response.ok:
+            return DataSourceResult(
+                success=False,
+                error=f"获取日内数据失败: {intraday_response.status_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        intraday_data = intraday_response.json()
+        intraday_list = intraday_data.get("list", [])
+
+        # 解析数据，返回前端直接可用的格式
+        intraday_points = []
+        if intraday_list:
+            for item in intraday_list:
+                time_ms = item.get("time", 0)
+                # 将毫秒时间戳转换为 HH:mm 格式
+                time_str = time.strftime("%H:%M", time.localtime(time_ms / 1000))
+                intraday_points.append({
+                    "time": time_str,
+                    "price": float(item.get("forecastNetValue", 0)),
+                    "change": round(float(item.get("forecastGrowth", 0)) * 100, 4)
+                })
+
+        result_data = {
+            "fund_code": fund_code,
+            "name": fund_name,
+            "date": today,
+            "data": intraday_points,
+            "count": len(intraday_points)
+        }
+
+        return DataSourceResult(
+            success=True,
+            data=result_data,
+            timestamp=time.time(),
+            source=self.name,
+            metadata={"fund_code": fund_code}
+        )
 
     async def health_check(self) -> bool:
         """

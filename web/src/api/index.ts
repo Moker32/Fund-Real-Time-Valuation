@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, Overview, HealthStatus, FundHistory } from '@/types';
+import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday } from '@/types';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -180,6 +180,17 @@ export const fundApi = {
     count: number;
   }> {
     return api.get(`/api/funds/${code}/history`, { params: { days } });
+  },
+
+  async getFundIntraday(code: string): Promise<{
+    fund_code: string;
+    name: string;
+    date: string;
+    data: FundIntraday[];
+    count: number;
+    source: string;
+  }> {
+    return api.get(`/api/funds/${code}/intraday`);
   },
 
   async addToWatchlist(code: string, name: string): Promise<{

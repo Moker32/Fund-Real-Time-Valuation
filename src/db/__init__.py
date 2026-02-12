@@ -6,6 +6,7 @@
 - 商品配置存储
 - 基金净值历史数据
 - 新闻缓存
+- 基金日内分时数据缓存
 
 使用示例：
     from src.db.database import DatabaseManager
@@ -15,6 +16,11 @@
     holdings = db.get_holdings()
 """
 
-from .database import ConfigDAO, DatabaseManager, FundHistoryDAO
+from .database import (
+    ConfigDAO,
+    DatabaseManager,
+    FundHistoryDAO,
+    FundIntradayCacheDAO,
+)
 
-__all__ = ["DatabaseManager", "FundHistoryDAO", "ConfigDAO"]
+__all__ = ["DatabaseManager", "FundHistoryDAO", "ConfigDAO", "FundIntradayCacheDAO"]

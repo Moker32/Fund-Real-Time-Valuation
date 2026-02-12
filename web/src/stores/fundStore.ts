@@ -318,67 +318,36 @@ export const useFundStore = defineStore('funds', () => {
     }
 
     try {
-      // 获取当前估值的今日数据
-      const estimateResponse = await fundApi.getFundEstimate(code);
+      // 调用后端 API 获取完整的日内分时数据
+      const response = await fundApi.getFundIntraday(code);
 
-      // API 返回 estimated_net_value，需要检查
-      const currentPrice = estimateResponse?.estimated_net_value || estimateResponse?.estimateValue;
-      if (!currentPrice) {
-        return [];
-      }
+      if (response.data && response.data.length > 0) {
+        // 转换数据格式为 FundIntraday
+        const intraday: FundIntraday[] = response.data.map((item: { time: string; price: number; change?: number }) => ({
+          time: item.time,
+          price: item.price,
+        }));
 
-      // 构建分时数据点
-      const intraday: FundIntraday[] = [];
-
-      // 获取历史数据用于开盘价
-      const historyResponse = await fundApi.getFundHistory(code, 10);
-      if (historyResponse.data && historyResponse.data.length > 0) {
-        // 找到最后一个有效数据（不是今日的 NaT）
-        let lastValidDay = null;
-        for (let i = historyResponse.data.length - 1; i >= 0; i--) {
-          const day = historyResponse.data[i];
-          if (day && day.close && day.time !== 'NaT') {
-            lastValidDay = day;
-            break;
+        // 更新对应基金的分时数据
+        const index = funds.value.findIndex((f) => f.code === code);
+        if (index !== -1) {
+          const currentFund = funds.value[index];
+          if (currentFund) {
+            funds.value[index] = {
+              ...currentFund,
+              intraday,
+              code: currentFund.code || code,
+            };
           }
         }
 
-        if (lastValidDay) {
-          // 开盘点 - 使用昨日日期 + 09:30
-          intraday.push({
-            time: `${lastValidDay.time} 09:30`,
-            price: lastValidDay.close,
-          });
-        }
+        // 更新缓存
+        intradayCache.set(code, { data: intraday, timestamp: Date.now() });
+
+        return intraday;
       }
 
-      // 当前估值为收盘点
-      const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
-      const currentTime = `${todayStr} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-      intraday.push({
-        time: currentTime,
-        price: currentPrice,
-      });
-
-      // 只有两个数据点才有效
-      if (intraday.length < 2) {
-        return [];
-      }
-
-      // 更新对应基金的分时数据
-      const index = funds.value.findIndex((f) => f.code === code);
-      if (index !== -1) {
-        const currentFund = funds.value[index];
-        if (currentFund) {
-          funds.value[index] = { ...currentFund, intraday };
-        }
-      }
-
-      // 更新缓存
-      intradayCache.set(code, { data: intraday, timestamp: Date.now() });
-
-      return intraday;
+      return [];
     } catch (err) {
       console.error(`[FundStore] fetchIntraday error for ${code}:`, err);
       return [];

@@ -102,6 +102,18 @@ class NewsRecord:
     fetched_at: str = ""
 
 
+@dataclass
+class FundIntradayRecord:
+    """基金日内分时数据记录"""
+
+    id: int | None = None  # 数据库自增ID
+    fund_code: str = ""
+    time: str = ""  # "HH:mm" 格式
+    price: float = 0.0  # 估算净值
+    change_rate: float | None = None  # 涨跌率
+    fetched_at: str = ""  # 抓取时间
+
+
 class DatabaseManager:
     """数据库管理器
 
@@ -209,6 +221,19 @@ class DatabaseManager:
                 )
             """)
 
+            # 基金日内分时缓存表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS fund_intraday_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fund_code TEXT NOT NULL,
+                    time TEXT NOT NULL,
+                    price REAL NOT NULL,
+                    change_rate REAL,
+                    fetched_at TEXT,
+                    UNIQUE(fund_code, time)
+                )
+            """)
+
             # 创建索引
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_fund_history_code_date ON fund_history(fund_code, date)"
@@ -218,6 +243,9 @@ class DatabaseManager:
             )
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_news_cache_fetched_at ON news_cache(fetched_at)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_fund_intraday_code ON fund_intraday_cache(fund_code)"
             )
 
             conn.commit()
@@ -805,3 +833,213 @@ class NewsDAO:
                 (f"-{hours} hours",),
             )
             return cursor.rowcount
+
+
+class FundIntradayCacheDAO:
+    """基金日内分时缓存数据访问对象
+
+    提供基金日内分时数据的存储和查询功能。
+    支持 60 秒缓存过期机制，用于减少 API 调用。
+    """
+
+    # 默认缓存过期时间（秒）
+    DEFAULT_CACHE_TTL = 60
+
+    def __init__(self, db_manager: DatabaseManager, cache_ttl: int = DEFAULT_CACHE_TTL):
+        """
+        初始化日内分时缓存 DAO
+
+        Args:
+            db_manager: 数据库管理器实例
+            cache_ttl: 缓存过期时间（秒），默认为 60 秒
+        """
+        self.db = db_manager
+        self.cache_ttl = cache_ttl
+
+    def save_intraday(self, fund_code: str, data: list[dict]) -> bool:
+        """
+        保存基金日内分时数据
+
+        Args:
+            fund_code: 基金代码
+            data: 日内分时数据列表，每个元素包含 time, price, change_rate
+
+        Returns:
+            bool: 是否保存成功
+        """
+        if not data:
+            return False
+
+        fetched_at = datetime.now().isoformat()
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            count = 0
+            for item in data:
+                try:
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO fund_intraday_cache
+                        (fund_code, time, price, change_rate, fetched_at)
+                        VALUES (?, ?, ?, ?, ?)
+                    """,
+                        (
+                            fund_code,
+                            item.get("time", ""),
+                            item.get("value", 0.0),
+                            item.get("change"),
+                            fetched_at,
+                        ),
+                    )
+                    count += 1
+                except sqlite3.IntegrityError:
+                    # 如果插入失败（唯一约束），尝试更新
+                    cursor.execute(
+                        """
+                        UPDATE fund_intraday_cache
+                        SET price = ?, change_rate = ?, fetched_at = ?
+                        WHERE fund_code = ? AND time = ?
+                    """,
+                        (
+                            item.get("value", 0.0),
+                            item.get("change"),
+                            fetched_at,
+                            fund_code,
+                            item.get("time", ""),
+                        ),
+                    )
+                    count += 1
+            return count > 0
+
+    def get_intraday(self, fund_code: str) -> list[FundIntradayRecord]:
+        """
+        获取基金日内分时缓存数据
+
+        Args:
+            fund_code: 基金代码
+
+        Returns:
+            list[FundIntradayRecord]: 日内分时数据列表，按时间排序
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM fund_intraday_cache
+                WHERE fund_code = ?
+                ORDER BY time ASC
+            """,
+                (fund_code,),
+            )
+            return [FundIntradayRecord(**row) for row in cursor.fetchall()]
+
+    def is_expired(self, fund_code: str) -> bool:
+        """
+        检查缓存是否过期
+
+        Args:
+            fund_code: 基金代码
+
+        Returns:
+            bool: True 表示缓存已过期或不存在，False 表示缓存有效
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT fetched_at FROM fund_intraday_cache
+                WHERE fund_code = ?
+                LIMIT 1
+            """,
+                (fund_code,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return True  # 不存在缓存，视为过期
+
+            # 检查是否过期
+            fetched_at = row["fetched_at"]
+            if not fetched_at:
+                return True
+
+            try:
+                # 解析 ISO 格式的时间
+                fetched_time = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
+                now = datetime.now()
+                elapsed_seconds = (now - fetched_time).total_seconds()
+                return elapsed_seconds > self.cache_ttl
+            except (ValueError, TypeError):
+                return True  # 时间解析失败，视为过期
+
+    def clear_cache(self, fund_code: str) -> int:
+        """
+        清除指定基金的日内缓存
+
+        Args:
+            fund_code: 基金代码
+
+        Returns:
+            int: 删除的记录数
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM fund_intraday_cache WHERE fund_code = ?",
+                (fund_code,),
+            )
+            return cursor.rowcount
+
+    def cleanup_expired_cache(self) -> int:
+        """
+        清理所有过期的日内缓存
+
+        Returns:
+            int: 删除的记录数
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                DELETE FROM fund_intraday_cache
+                WHERE fetched_at < datetime('now', ?)
+            """,
+                (f"-{self.cache_ttl} seconds",),
+            )
+            return cursor.rowcount
+
+    def get_cache_info(self, fund_code: str) -> dict[str, Any]:
+        """
+        获取缓存信息
+
+        Args:
+            fund_code: 基金代码
+
+        Returns:
+            dict: 包含缓存信息的字典
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT COUNT(*) as count, MAX(fetched_at) as last_fetched
+                FROM fund_intraday_cache
+                WHERE fund_code = ?
+            """,
+                (fund_code,),
+            )
+            row = cursor.fetchone()
+
+            if row is None or row["count"] == 0:
+                return {
+                    "fund_code": fund_code,
+                    "count": 0,
+                    "last_fetched": None,
+                    "expired": True,
+                }
+
+            return {
+                "fund_code": fund_code,
+                "count": row["count"],
+                "last_fetched": row["last_fetched"],
+                "expired": self.is_expired(fund_code),
+            }

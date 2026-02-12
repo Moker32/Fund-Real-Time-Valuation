@@ -8,7 +8,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { createChart, ColorType, CrosshairMode, LineSeries } from 'lightweight-charts';
+import uPlot from 'uplot';
+import 'uplot/dist/uPlot.min.css';
 import type { FundHistory, FundIntraday } from '@/types';
 
 const props = withDefaults(defineProps<{
@@ -19,11 +20,7 @@ const props = withDefaults(defineProps<{
 });
 
 const chartContainer = ref<Element | null>(null);
-let chart: ReturnType<typeof createChart> | null = null;
-let series: {
-  setData: (data: FundHistory[] | { time: string; value: number }[]) => void;
-  applyOptions: (opts: { color: string }) => void;
-} | null = null;
+let uplotInstance: uPlot | null = null;
 
 // 缓存上次数据，用于比较
 let lastDataJson: string = '';
@@ -46,77 +43,76 @@ const getTrendColor = (): string => {
   return lastValue >= firstValue ? '#ef4444' : '#22c55e';
 };
 
+// 解析时间字符串为秒级 Unix 时间戳
+const parseTimeToTimestamp = (timeStr: string): number => {
+  // 格式: "2024-01-01" 或 "2024-01-01 14:30:00" 或 ISO 格式
+  const date = new Date(timeStr);
+  if (isNaN(date.getTime())) {
+    // 尝试解析其他格式
+    const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:[\sT](\d{2}):(\d{2}):?(\d{2})?)?$/);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const day = parseInt(match[3], 10);
+      const hour = match[4] ? parseInt(match[4], 10) : 0;
+      const minute = match[5] ? parseInt(match[5], 10) : 0;
+      const second = match[6] ? parseInt(match[6], 10) : 0;
+      return Math.floor(new Date(year, month, day, hour, minute, second).getTime() / 1000);
+    }
+    return Math.floor(Date.now() / 1000);
+  }
+  return Math.floor(date.getTime() / 1000);
+};
+
 const initChart = () => {
   if (!chartContainer.value) return;
 
   // 清空容器
   chartContainer.value.innerHTML = '';
 
-  chart = createChart(chartContainer.value, {
+  const color = getTrendColor();
+
+  uplotInstance = new uPlot({
     width: chartContainer.value.clientWidth,
     height: props.height,
-    layout: {
-      background: { type: ColorType.Solid, color: 'transparent' },
-      textColor: '#9ca3af',
-    },
-    grid: {
-      vertLines: { visible: false },
-      horzLines: { visible: false },
-    },
-    timeScale: {
-      visible: false,
-      borderVisible: false,
-    },
-    rightPriceScale: {
-      visible: false,
-      borderVisible: false,
-    },
-    crosshair: {
-      mode: CrosshairMode.Normal,
-      vertLine: {
-        width: 1,
-        color: '#e5e7eb',
-        style: 2,
-        drawCrosshairMarker: false,
+    series: [
+      {
+        show: false, // 隐藏时间轴
       },
-      horzLine: {
-        visible: false,
-        width: 0,
+      {
+        show: false, // 隐藏图例
+        stroke: color,
+        width: 2,
+        fill: undefined,
+        points: { show: false }, // 隐藏数据点
+      },
+    ],
+    axes: [
+      { show: false }, // 隐藏 X 轴
+      { show: false }, // 隐藏 Y 轴
+    ],
+    scales: {
+      x: {
+        time: true,
+      },
+      y: {
+        auto: true,
       },
     },
-    handleScroll: false,
-    handleScale: false,
-    scaleMargins: {
-      top: 0,
-      bottom: 0,
+    // 禁用交互
+    cursor: {
+      drag: { x: false, y: false },
+      show: false,
     },
-    // 禁用所有插件，防止水印
-    plugins: [],
-  });
-
-  // 先添加 series
-  series = chart.addSeries(LineSeries, {
-    color: getTrendColor(),
-    lineWidth: 2,
-    lineStyle: 0,
-    crosshairMarker: {
-      size: 0, // 隐藏十字星标记
-    },
-  });
-
-  // 确保图表创建完成后再设置数据
-  setTimeout(() => {
-    if (props.data && props.data.length > 0) {
-      updateData();
-    }
-  }, 0);
+    // 无水印 - uPlot 无水印
+  }, [], chartContainer.value);
 };
 
 const updateData = () => {
-  if (!series || !props.data || props.data.length === 0) return;
+  if (!uplotInstance || !props.data || props.data.length === 0) return;
 
   // 过滤无效数据
-  const validData = props.data.filter((item): item is { time: string; price: number } => {
+  const validData = props.data.filter((item): item is { time: string; price: number; close?: number } => {
     if (!item) return false;
     const price = 'close' in item ? item.close : item.price;
     return typeof price === 'number' && typeof item.time === 'string' && item.time.length > 0;
@@ -125,52 +121,59 @@ const updateData = () => {
   if (validData.length === 0) return;
 
   // 比较数据是否变化
-  const currentDataJson = JSON.stringify(validData.map(d => d.time + d.price));
+  const currentDataJson = JSON.stringify(validData.map(d => d.time + (d.close ?? d.price)));
   if (currentDataJson === lastDataJson) return;
   lastDataJson = currentDataJson;
 
-  const lineData = validData.map((item) => {
-    if ('close' in item) {
-      return { time: item.time, value: item.close };
-    } else {
-      const timeStr = item.time;
-      // 解析时间格式
-      const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?$/);
-      if (match && match[4]) {
-        return {
-          time: {
-            year: parseInt(match[1], 10),
-            month: parseInt(match[2], 10),
-            day: parseInt(match[3], 10),
-            hour: parseInt(match[4], 10),
-            minute: parseInt(match[5], 10),
-          },
-          value: item.price,
-        };
-      }
-      return { time: timeStr.split(' ')[0], value: item.price };
-    }
-  });
+  // 构建 uPlot 数据格式: [timestamps, values]
+  const timestamps: number[] = [];
+  const values: number[] = [];
+
+  for (const item of validData) {
+    const ts = parseTimeToTimestamp(item.time);
+    const price = 'close' in item ? item.close : item.price;
+    timestamps.push(ts);
+    values.push(price);
+  }
+
+  // 按时间排序
+  const sortedIndices = timestamps.map((ts, i) => ({ ts, i })).sort((a, b) => a.ts - b.ts);
+  const sortedTimestamps: number[] = [];
+  const sortedValues: number[] = [];
+
+  for (const { ts, i } of sortedIndices) {
+    sortedTimestamps.push(ts);
+    sortedValues.push(values[i]);
+  }
+
+  const newData: [number[], number[]] = [sortedTimestamps, sortedValues];
 
   try {
-    series.setData(lineData as { time: string | { year: number; month: number; day: number; hour?: number; minute?: number; }; value: number }[]);
+    uplotInstance.setData(newData);
   } catch (e) {
     console.warn('[FundChart] setData error:', e);
   }
 };
 
-// 合并为一个 watch，避免竞态
+const updateColor = () => {
+  if (!uplotInstance) return;
+
+  const newColor = getTrendColor();
+  try {
+    // uPlot 通过 series[1].stroke 设置颜色
+    uplotInstance.setSeries(1, { stroke: newColor });
+  } catch (e) {
+    // 忽略颜色更新错误
+  }
+};
+
+// 监听数据变化
 watch(() => props.data, (newData) => {
   if (!newData || newData.length === 0) return;
 
   // 更新颜色
-  if (newData.length >= 2 && series) {
-    const newColor = getTrendColor();
-    try {
-      series.applyOptions({ color: newColor });
-    } catch (e) {
-      // 忽略颜色更新错误
-    }
+  if (newData.length >= 2) {
+    updateColor();
   }
 
   // 更新数据
@@ -184,16 +187,18 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
-  if (chart) {
-    chart.remove();
-    chart = null;
+  if (uplotInstance) {
+    uplotInstance.destroy();
+    uplotInstance = null;
   }
-  series = null;
 });
 
 const handleResize = () => {
-  if (chart && chartContainer.value) {
-    chart.applyOptions({ width: chartContainer.value.clientWidth });
+  if (uplotInstance && chartContainer.value) {
+    uplotInstance.setSize({
+      width: chartContainer.value.clientWidth,
+      height: props.height,
+    });
   }
 };
 </script>
@@ -208,8 +213,12 @@ const handleResize = () => {
   position: relative;
 }
 
-.fund-chart :deep(canvas) {
+.fund-chart :deep(.uplot) {
   filter: none !important;
+}
+
+.fund-chart :deep(.uplot .u-over) {
+  cursor: default !important;
 }
 
 .chart-empty {

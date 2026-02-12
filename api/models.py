@@ -137,3 +137,20 @@ class AddFundResponse(BaseModel):
     success: bool = Field(default=True, description="是否成功")
     message: str = Field(..., description="响应消息")
     fund: dict = Field(..., description="添加的基金信息")
+
+
+class FundIntradayPoint(BaseModel):
+    """基金日内分时数据点"""
+    time: str = Field(..., description="时间，格式: HH:mm")
+    price: float = Field(..., description="估算净值/价格")
+    change: float | None = Field(None, description="估算增长率(%)")
+
+
+class FundIntradayResponse(BaseModel):
+    """基金日内分时数据响应模型"""
+    fund_code: str = Field(..., description="基金代码")
+    name: str = Field(..., description="基金名称")
+    date: str = Field(..., description="日期，格式: YYYY-MM-DD")
+    data: list[FundIntradayPoint] = Field(default_factory=list, description="日内分时数据点列表")
+    count: int = Field(..., description="数据点数量")
+    source: str = Field(default="fund123", description="数据源")
