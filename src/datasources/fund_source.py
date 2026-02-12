@@ -22,7 +22,7 @@ from .base import (
     DataSourceType,
 )
 from .dual_cache import DualLayerCache
-from src.db.database import DatabaseManager, FundDailyCacheDAO, FundIntradayCacheDAO
+from src.db.database import DatabaseManager, FundBasicInfoDAO, FundDailyCacheDAO, FundIntradayCacheDAO
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,8 @@ _fund_info_miss_count = 0
 _intraday_cache_dao: FundIntradayCacheDAO | None = None
 # 每日缓存 DAO 单例
 _daily_cache_dao: FundDailyCacheDAO | None = None
+# 基金基本信息缓存 DAO 单例
+_basic_info_dao: FundBasicInfoDAO | None = None
 
 
 def get_fund_cache() -> DualLayerCache:
@@ -72,9 +74,150 @@ def get_daily_cache_dao() -> FundDailyCacheDAO:
     return _daily_cache_dao
 
 
+def get_basic_info_dao() -> FundBasicInfoDAO:
+    """获取基金基本信息 DAO 单例"""
+    global _basic_info_dao
+    if _basic_info_dao is None:
+        db_manager = DatabaseManager()
+        _basic_info_dao = FundBasicInfoDAO(db_manager)
+    return _basic_info_dao
+
+
+def get_basic_info_db(fund_code: str) -> dict[str, Any] | None:
+    """
+    从数据库读取基金基本信息
+
+    Args:
+        fund_code: 基金代码
+
+    Returns:
+        基金基本信息字典，如果不存在返回 None
+    """
+    dao = get_basic_info_dao()
+    info = dao.get(fund_code)
+    if info:
+        return {
+            "code": info.code,
+            "name": info.name,
+            "short_name": info.short_name,
+            "type": info.type,
+            "fund_key": info.fund_key,
+            "net_value": info.net_value,
+            "net_value_date": info.net_value_date,
+            "establishment_date": info.establishment_date,
+            "manager": info.manager,
+            "custodian": info.custodian,
+            "fund_scale": info.fund_scale,
+            "scale_date": info.scale_date,
+            "risk_level": info.risk_level,
+            "full_name": info.full_name,
+        }
+    return None
+
+
+def save_basic_info_to_db(fund_code: str, info: dict[str, Any]) -> bool:
+    """
+    保存基金基本信息到数据库
+
+    Args:
+        fund_code: 基金代码
+        info: 基金信息字典
+
+    Returns:
+        是否保存成功
+    """
+    dao = get_basic_info_dao()
+    return dao.save_from_dict(fund_code, info)
+
+
+def get_full_fund_info(fund_code: str) -> dict[str, Any] | None:
+    """
+    获取完整基金信息（从 akshare 获取更多字段）
+
+    Args:
+        fund_code: 基金代码
+
+    Returns:
+        包含完整基金信息的字典，失败返回 None
+    """
+    try:
+        import akshare as ak
+
+        info_dict: dict[str, Any] = {}
+
+        # 1. 获取基金简称和全称
+        try:
+            daily_df = ak.fund_open_fund_daily_em()
+            if "基金代码" in daily_df.columns:
+                name_rows = daily_df[daily_df["基金代码"] == fund_code]
+                if not name_rows.empty:
+                    info_dict["short_name"] = str(name_rows.iloc[0].get("基金简称", ""))
+                    info_dict["name"] = info_dict["short_name"]
+        except Exception as e:
+            logger.debug(f"获取基金简称失败: {fund_code}, error: {e}")
+
+        # 2. 获取基金详细信息
+        try:
+            info_df = ak.fund_individual_basic_info_xq(symbol=fund_code)
+            if info_df is not None and not info_df.empty:
+                # 遍历所有字段
+                for _, row in info_df.iterrows():
+                    item = str(row.get("item", ""))
+                    value = str(row.get("value", ""))
+
+                    if "基金全称" in item:
+                        info_dict["full_name"] = value
+                    elif "基金简称" in item:
+                        info_dict["short_name"] = value
+                    elif "基金类型" in item:
+                        info_dict["type"] = value.split("-")[0] if "-" in value else value
+                    elif "基金管理人" in item:
+                        info_dict["manager"] = value
+                    elif "基金托管人" in item:
+                        info_dict["custodian"] = value
+                    elif "成立日期" in item:
+                        info_dict["establishment_date"] = value
+                    elif "风险等级" in item:
+                        info_dict["risk_level"] = value
+        except Exception as e:
+            logger.debug(f"获取基金详细信息失败: {fund_code}, error: {e}")
+
+        # 3. 获取基金规模和净值信息
+        try:
+            fund_info = ak.fund_info_fund_code_em(fund_code=fund_code)
+            if fund_info is not None:
+                info_dict["fund_scale"] = fund_info.get("基金规模")
+                info_dict["scale_date"] = fund_info.get("规模日期", "")
+        except Exception as e:
+            logger.debug(f"获取基金规模信息失败: {fund_code}, error: {e}")
+
+        # 设置默认值
+        info_dict.setdefault("short_name", "")
+        info_dict.setdefault("name", "")
+        info_dict.setdefault("full_name", "")
+        info_dict.setdefault("type", "")
+        info_dict.setdefault("manager", "")
+        info_dict.setdefault("custodian", "")
+        info_dict.setdefault("establishment_date", "")
+        info_dict.setdefault("risk_level", "")
+        info_dict.setdefault("fund_scale", None)
+        info_dict.setdefault("scale_date", "")
+
+        # 保存到数据库
+        save_basic_info_to_db(fund_code, info_dict)
+
+        return info_dict
+
+    except Exception as e:
+        logger.warning(f"获取完整基金信息失败: {fund_code}, error: {e}")
+        return None
+
+
 def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
     """
-    获取基金基本信息（名称和类型），使用全局缓存
+    获取基金基本信息（名称和类型），使用全局缓存和数据库
+
+    优先从数据库读取，如果不存在则从 akshare 获取并保存到数据库
 
     Args:
         fund_code: 基金代码
@@ -85,13 +228,24 @@ def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
     global _fund_info_cache, _fund_info_hit_count, _fund_info_miss_count
     now = time.time()
 
-    # 检查缓存
+    # 1. 检查内存缓存
     if fund_code in _fund_info_cache:
         info, timestamp = _fund_info_cache[fund_code]
         if now - timestamp < _fund_info_cache_ttl:
             _fund_info_hit_count += 1
             return info
 
+    # 2. 尝试从数据库读取
+    db_info = get_basic_info_db(fund_code)
+    if db_info:
+        result = (db_info.get("short_name", "") or "", db_info.get("type", "") or "")
+        _fund_info_cache[fund_code] = (result, now)
+        _fund_info_hit_count += 1
+        return result
+
+    _fund_info_miss_count += 1
+
+    # 3. 从 akshare 获取
     try:
         import akshare as ak
 
@@ -121,6 +275,15 @@ def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
 
         result = (fund_name, fund_type)
         _fund_info_cache[fund_code] = (result, now)
+
+        # 保存到数据库
+        if fund_name or fund_type:
+            save_basic_info_to_db(fund_code, {
+                "short_name": fund_name,
+                "name": fund_name,
+                "type": fund_type,
+            })
+
         return result
 
     except Exception as e:
@@ -375,6 +538,15 @@ class FundDataSource(DataSource):
 
                     self._record_success()
 
+                    # 保存基金基本信息到数据库
+                    save_basic_info_to_db(fund_code, {
+                        "short_name": data.get("name", ""),
+                        "name": data.get("name", ""),
+                        "type": data.get("type", ""),
+                        "net_value": data.get("unit_net_value"),
+                        "net_value_date": data.get("net_value_date", ""),
+                    })
+
                     # 写入数据库缓存
                     daily_dao = get_daily_cache_dao()
                     daily_dao.save_daily_from_fund_data(fund_code, data)
@@ -502,6 +674,16 @@ class FundDataSource(DataSource):
             }
 
             self._record_success()
+
+            # 保存基金基本信息到数据库
+            save_basic_info_to_db(fund_code, {
+                "short_name": fund_name,
+                "name": fund_name,
+                "type": fund_type,
+                "net_value": data.get("unit_net_value"),
+                "net_value_date": data.get("net_value_date", ""),
+            })
+
             return DataSourceResult(
                 success=True,
                 data=data,
@@ -608,6 +790,16 @@ class FundDataSource(DataSource):
             }
 
             self._record_success()
+
+            # 保存基金基本信息到数据库
+            save_basic_info_to_db(fund_code, {
+                "short_name": fund_name,
+                "name": fund_name,
+                "type": fund_type,
+                "net_value": unit_net,
+                "net_value_date": net_date,
+            })
+
             return DataSourceResult(
                 success=True,
                 data=data,
@@ -811,6 +1003,11 @@ __all__ = [
     "get_fund_cache_stats",
     "get_intraday_cache_dao",
     "get_daily_cache_dao",
+    "get_basic_info_dao",
+    "get_basic_info_db",
+    "save_basic_info_to_db",
+    "get_fund_basic_info",
+    "get_full_fund_info",
 ]
 
 
@@ -1627,6 +1824,15 @@ class Fund123DataSource(DataSource):
                     # 写入数据库每日缓存
                     daily_dao = get_daily_cache_dao()
                     daily_dao.save_daily_from_fund_data(fund_code, result.data)
+
+                    # 保存基金基本信息到数据库
+                    save_basic_info_to_db(fund_code, {
+                        "short_name": result.data.get("name", ""),
+                        "name": result.data.get("name", ""),
+                        "type": "",
+                        "net_value": result.data.get("unit_net_value"),
+                        "net_value_date": result.data.get("net_value_date", ""),
+                    })
 
                     # 写入内存/文件缓存
                     cache = get_fund_cache()
