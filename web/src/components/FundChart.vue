@@ -8,37 +8,39 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { createChart, ColorType, CrosshairMode, CandlestickSeries } from 'lightweight-charts';
-import type { FundHistory } from '@/types';
+import { createChart, ColorType, CrosshairMode, CandlestickSeries, LineSeries } from 'lightweight-charts';
+import type { FundHistory, FundIntraday } from '@/types';
 
 // 类型定义
 interface ChartApi {
-  addCandlestickSeries: (options: {
-    upColor: string;
-    downColor: string;
-    borderVisible: boolean;
-    wickUpColor: string;
-    wickDownColor: string;
+  addSeries: (seriesType: typeof CandlestickSeries | typeof LineSeries, options: {
+    upColor?: string;
+    downColor?: string;
+    borderVisible?: boolean;
+    wickUpColor?: string;
+    wickDownColor?: string;
+    color?: string;
+    lineWidth?: number;
+    lineStyle?: number;
   }) => {
-    setData: (data: FundHistory[]) => void;
+    setData: (data: FundHistory[] | { time: string; value: number }[]) => void;
   };
   applyOptions: (options: { width: number }) => void;
   remove: () => void;
-  getSeries: () => {
-    setData: (data: FundHistory[]) => void;
-  } | null;
 }
 
 const props = withDefaults(defineProps<{
-  data: FundHistory[];
+  data: FundHistory[] | FundIntraday[];
   height?: number;
+  chartType?: 'candlestick' | 'line';
 }>(), {
   height: 100,
+  chartType: 'line',  // 默认为折线图（分时图）
 });
 
 const chartContainer = ref<Element | null>(null);
-let chart: ChartApi | null = null;
-let candleSeries: { setData: (data: FundHistory[]) => void } | null = null;
+let chart: ReturnType<typeof createChart> | null = null;
+let series: { setData: (data: FundHistory[] | { time: string; value: number }[]) => void } | null = null;
 
 const initChart = () => {
   if (!chartContainer.value) return;
@@ -79,22 +81,56 @@ const initChart = () => {
     handleScale: false,
   });
 
-  candleSeries = chart.addSeries(CandlestickSeries, {
-    upColor: '#ef4444',
-    downColor: '#22c55e',
-    borderVisible: false,
-    wickUpColor: '#ef4444',
-    wickDownColor: '#22c55e',
-  });
+  if (props.chartType === 'candlestick') {
+    // K 线图模式
+    series = chart.addSeries(CandlestickSeries, {
+      upColor: '#ef4444',
+      downColor: '#22c55e',
+      borderVisible: false,
+      wickUpColor: '#ef4444',
+      wickDownColor: '#22c55e',
+    });
+  } else {
+    // 折线图模式（分时图）
+    // 根据涨跌设置颜色
+    const isRising = props.data.length >= 2 && (
+      ('close' in props.data[props.data.length - 1]
+        ? props.data[props.data.length - 1].close > props.data[0].close
+        : props.data[props.data.length - 1].price > props.data[0].price
+      )
+    );
+    series = chart.addSeries(LineSeries, {
+      color: isRising ? '#ef4444' : '#22c55e',
+      lineWidth: 2,
+      lineStyle: 0,  // Solid
+    });
+  }
 
   if (props.data.length > 0) {
-    candleSeries.setData(props.data);
+    updateData();
   }
+};
 };
 
 const updateData = () => {
-  if (!candleSeries || !props.data || props.data.length === 0) return;
-  candleSeries.setData(props.data);
+  if (!series || !props.data || props.data.length === 0) return;
+
+  if (props.chartType === 'candlestick') {
+    // K 线图：使用 FundHistory 格式
+    series.setData(props.data as FundHistory[]);
+  } else {
+    // 折线图：转换为 { time, value } 格式
+    const lineData = props.data.map((item) => {
+      if ('close' in item) {
+        // FundHistory 格式
+        return { time: item.time, value: item.close };
+      } else {
+        // FundIntraday 格式
+        return { time: item.time, value: item.price };
+      }
+    });
+    series.setData(lineData as { time: string; value: number }[]);
+  }
 };
 
 watch(() => props.data, updateData, { deep: true });

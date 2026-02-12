@@ -78,9 +78,9 @@
         <span class="source" v-if="fund.source">{{ fund.source }}</span>
       </div>
 
-      <!-- K 线图区域（当有历史数据时显示） -->
-      <div v-if="fund.history && fund.history.length > 0" class="fund-card-chart">
-        <FundChart :data="fund.history" :height="100" />
+      <!-- 分时图区域（当有日内数据时显示） -->
+      <div v-if="fund.intraday && fund.intraday.length > 0" class="fund-card-chart">
+        <FundChart :data="fund.intraday" :height="80" chart-type="line" />
       </div>
     </template>
   </div>

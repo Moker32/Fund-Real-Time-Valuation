@@ -159,9 +159,9 @@ onMounted(async () => {
   isMounted = true;
   await fundStore.fetchFunds();
 
-  // 加载每个基金的 K 线数据（包含今日实时 K 线）
+  // 加载每个基金的分时数据
   fundStore.holdingFirstFunds.forEach((fund) => {
-    fundStore.fetchHistory(fund.code);
+    fundStore.fetchIntraday(fund.code);
   });
 });
 

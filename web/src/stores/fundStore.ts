@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { fundApi } from '@/api';
-import type { Fund, FundHistory } from '@/types';
+import type { Fund, FundHistory, FundIntraday } from '@/types';
 import { ApiError } from '@/api';
 
 export interface FetchOptions {
@@ -299,6 +299,58 @@ export const useFundStore = defineStore('funds', () => {
     }
   }
 
+  // 获取日内分时数据
+  async function fetchIntraday(code: string): Promise<FundIntraday[]> {
+    try {
+      // 获取当前估值的今日数据
+      const estimateResponse = await fundApi.getFundEstimate(code);
+
+      if (estimateResponse && estimateResponse.netValue) {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        // 构建两个分时数据点：开盘（昨日收盘）和当前（今日估值）
+        const intraday: FundIntraday[] = [];
+
+        // 获取昨日收盘价作为开盘价
+        const historyResponse = await fundApi.getFundHistory(code, 2);
+        if (historyResponse.data && historyResponse.data.length > 0) {
+          const lastDay = historyResponse.data[historyResponse.data.length - 1];
+          if (lastDay && lastDay.close) {
+            // 开盘点
+            intraday.push({
+              time: '09:30',  // 股市开盘时间
+              price: lastDay.close,
+            });
+          }
+        }
+
+        // 当前估值为收盘点
+        const now = new Date();
+        const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        intraday.push({
+          time: currentTime,
+          price: estimateResponse.netValue,
+        });
+
+        // 更新对应基金的分时数据
+        const index = funds.value.findIndex((f) => f.code === code);
+        if (index !== -1) {
+          const currentFund = funds.value[index];
+          if (currentFund) {
+            funds.value[index] = { ...currentFund, intraday };
+          }
+        }
+
+        return intraday;
+      }
+
+      return [];
+    } catch (err) {
+      console.error(`[FundStore] fetchIntraday error for ${code}:`, err);
+      return [];
+    }
+  }
+
   return {
     // State
     funds,
@@ -321,6 +373,7 @@ export const useFundStore = defineStore('funds', () => {
     fetchFunds,
     fetchFundEstimate,
     fetchHistory,
+    fetchIntraday,
     setRefreshInterval,
     setAutoRefresh,
     clearError,

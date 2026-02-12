@@ -10,6 +10,13 @@ export interface FundHistory {
   volume: number;     // 成交量
 }
 
+// 分时数据点类型
+export interface FundIntraday {
+  time: string;       // 时间 (HH:mm 格式)
+  price: number;      // 实时价格
+}
+
+// Fund 类型添加日内数据字段
 export interface Fund {
   code: string;
   name: string;
@@ -26,6 +33,7 @@ export interface Fund {
   isHolding?: boolean;  // 是否持有
   hasRealTimeEstimate?: boolean;  // 是否有实时估值（QDII/FOF等为false）
   history?: FundHistory[];  // 可选的历史 K 线数据
+  intraday?: FundIntraday[];  // 可选的日内分时数据
 }
 
 export interface FundListResponse {
