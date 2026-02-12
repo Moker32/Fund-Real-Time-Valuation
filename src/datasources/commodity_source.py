@@ -1,18 +1,27 @@
 """
 商品数据源模块
+
 实现从 yfinance 和 AKShare 获取商品数据
 - 黄金: yfinance (GC=F)
 - WTI原油: yfinance (CL=F)
 - 布伦特原油: yfinance (BZ=F)
 - Au99.99: AKShare (spot_golden_benchmark_sge)
+
+支持三级缓存：内存 → 数据库 → 外部API
 """
 
 import asyncio
+import logging
 import time
 from datetime import datetime
 from typing import Any
 
+from src.db.commodity_repo import CommodityCacheDAO, CommodityCategory
+from src.db.database import DatabaseManager
+
 from .base import DataSource, DataSourceResult, DataSourceType
+
+logger = logging.getLogger(__name__)
 
 
 class CommodityDataSource(DataSource):
@@ -31,6 +40,23 @@ class CommodityDataSource(DataSource):
             source_type=DataSourceType.COMMODITY,
             timeout=timeout
         )
+        self._cache: dict[str, dict[str, Any]] = {}
+        self._cache_timeout = 60.0  # 内存缓存60秒
+        self._db_dao: CommodityCacheDAO | None = None
+
+    def set_db_dao(self, dao: CommodityCacheDAO) -> None:
+        """设置数据库 DAO 用于缓存数据"""
+        self._db_dao = dao
+
+    async def _save_to_database(
+        self, commodity_type: str, data: dict[str, Any], source: str
+    ) -> None:
+        """保存数据到数据库"""
+        if self._db_dao:
+            try:
+                self._db_dao.save_from_api(commodity_type, data, source)
+            except Exception as e:
+                logger.warning(f"保存商品数据到数据库失败: {e}")
 
     async def close(self):
         """关闭数据源（子类应重写此方法）"""
@@ -64,8 +90,6 @@ class YFinanceCommoditySource(CommodityDataSource):
             name="yfinance_commodity",
             timeout=timeout
         )
-        self._cache: dict[str, dict[str, Any]] = {}
-        self._cache_timeout = 60.0  # 缓存60秒
 
     async def fetch(self, commodity_type: str = "gold") -> DataSourceResult:
         """
@@ -77,7 +101,28 @@ class YFinanceCommoditySource(CommodityDataSource):
         Returns:
             DataSourceResult: 商品数据结果
         """
-        # 检查缓存
+        # 检查数据库缓存
+        if self._db_dao:
+            try:
+                db_record = self._db_dao.get_latest(commodity_type)
+                if db_record and not self._db_dao.is_expired(commodity_type):
+                    data = db_record.to_dict()
+                    # 移除内部字段
+                    data.pop("id", None)
+                    data.pop("created_at", None)
+                    return DataSourceResult(
+                        success=True,
+                        data=data,
+                        timestamp=datetime.fromisoformat(
+                            data.get("timestamp", "").replace("Z", "+00:00")
+                        ).timestamp() if data.get("timestamp") else time.time(),
+                        source=self.name,
+                        metadata={"commodity_type": commodity_type, "from_cache": "database"}
+                    )
+            except Exception as e:
+                logger.warning(f"查询数据库缓存失败: {e}")
+
+        # 检查内存缓存
         cache_key = commodity_type
         if self._is_cache_valid(cache_key):
             return DataSourceResult(
@@ -85,7 +130,7 @@ class YFinanceCommoditySource(CommodityDataSource):
                 data=self._cache[cache_key],
                 timestamp=self._cache[cache_key].get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"commodity_type": commodity_type, "from_cache": True}
+                metadata={"commodity_type": commodity_type, "from_cache": "memory"}
             )
 
         try:
@@ -130,20 +175,22 @@ class YFinanceCommoditySource(CommodityDataSource):
 
             data = {
                 "commodity": commodity_type,
-                "symbol": ticker,  # 添加 ticker symbol
+                "symbol": ticker,
                 "name": self._get_name(commodity_type),
                 "price": float(price),
                 "change": float(change) if change else 0.0,
-                # yfinance 返回的 change_percent 已经是百分比格式（如 3.37 表示 3.37%）
                 "change_percent": float(change_percent) if change_percent else 0.0,
                 "currency": info.get('currency', 'USD'),
                 "exchange": info.get('exchange', ''),
                 "time": time_str,
             }
 
-            # 缓存数据
+            # 更新缓存
             data["_cache_time"] = time.time()
             self._cache[cache_key] = data
+
+            # 异步保存到数据库
+            await self._save_to_database(commodity_type, data, self.name)
 
             self._record_success()
             return DataSourceResult(
@@ -245,11 +292,31 @@ class AKShareCommoditySource(CommodityDataSource):
             name="akshare_commodity",
             timeout=timeout
         )
-        self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 10.0  # 缓存10秒，商品价格实时性要求高
 
     async def fetch(self, commodity_type: str = "gold_cny") -> DataSourceResult:
         """获取国内商品数据"""
+        # 检查数据库缓存
+        if self._db_dao:
+            try:
+                db_record = self._db_dao.get_latest(commodity_type)
+                if db_record and not self._db_dao.is_expired(commodity_type):
+                    data = db_record.to_dict()
+                    data.pop("id", None)
+                    data.pop("created_at", None)
+                    return DataSourceResult(
+                        success=True,
+                        data=data,
+                        timestamp=datetime.fromisoformat(
+                            data.get("timestamp", "").replace("Z", "+00:00")
+                        ).timestamp() if data.get("timestamp") else time.time(),
+                        source=self.name,
+                        metadata={"commodity_type": commodity_type, "from_cache": "database"}
+                    )
+            except Exception as e:
+                logger.warning(f"查询数据库缓存失败: {e}")
+
+        # 检查内存缓存
         cache_key = commodity_type
         if self._is_cache_valid(cache_key):
             return DataSourceResult(
@@ -257,7 +324,7 @@ class AKShareCommoditySource(CommodityDataSource):
                 data=self._cache[cache_key],
                 timestamp=self._cache[cache_key].get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"commodity_type": commodity_type, "from_cache": True}
+                metadata={"commodity_type": commodity_type, "from_cache": "memory"}
             )
 
         try:
@@ -277,6 +344,8 @@ class AKShareCommoditySource(CommodityDataSource):
             if data:
                 data["_cache_time"] = time.time()
                 self._cache[cache_key] = data
+                # 异步保存到数据库
+                await self._save_to_database(commodity_type, data, self.name)
                 self._record_success()
                 return DataSourceResult(
                     success=True,
@@ -315,12 +384,18 @@ class AKShareCommoditySource(CommodityDataSource):
             latest = df.iloc[0]
             return {
                 "commodity": "gold_cny",
-                "symbol": "Au99.99",  # 添加 symbol
+                "symbol": "Au99.99",
                 "name": "Au99.99 (上海黄金)",
                 "price": float(latest.get("价格", 0)),
+                "change": float(latest.get("涨跌", 0)),
                 "change_percent": float(latest.get("涨跌幅", 0)),
                 "time": str(latest.get("时间", "")),
-                "raw_data": df.to_dict("records")[:3]
+                "high": float(latest.get("最高", 0)),
+                "low": float(latest.get("最低", 0)),
+                "open": float(latest.get("开盘", 0)),
+                "prev_close": float(latest.get("昨收", 0)),
+                "currency": "CNY",
+                "exchange": "SGE",
             }
         return None
 
@@ -449,3 +524,31 @@ class CommodityDataAggregator(CommodityDataSource):
                     await source.close()
                 except Exception:
                     pass
+
+
+def get_all_commodity_types() -> list[str]:
+    """获取所有支持的商品类型"""
+    return [
+        # 贵金属
+        "gold",
+        "gold_cny",
+        "silver",
+        # 能源
+        "wti",
+        "brent",
+        "natural_gas",
+        # 基本金属（预留）
+        # "copper",
+        # "aluminum",
+        # "zinc",
+        # "nickel",
+    ]
+
+
+def get_commodities_by_category() -> dict[CommodityCategory, list[str]]:
+    """获取按分类组织的商品类型"""
+    return {
+        CommodityCategory.PRECIOUS_METAL: ["gold", "gold_cny", "silver"],
+        CommodityCategory.ENERGY: ["wti", "brent", "natural_gas"],
+        CommodityCategory.BASE_METAL: [],
+    }

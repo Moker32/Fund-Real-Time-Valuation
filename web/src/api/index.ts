@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse } from '@/types';
+import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem } from '@/types';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -223,6 +223,19 @@ export const commodityApi = {
 
   async getCommodity(type: string): Promise<Commodity> {
     return api.get(`/api/commodities/${type}`);
+  },
+
+  async getCategories(): Promise<{ categories: CommodityCategory[]; timestamp: string }> {
+    return api.get('/api/commodities/categories');
+  },
+
+  async getHistory(commodityType: string, days: number = 30): Promise<{
+    commodity_type: string;
+    name: string;
+    history: CommodityHistoryItem[];
+    timestamp: string;
+  }> {
+    return api.get(`/api/commodities/history/${commodityType}`, { params: { days } });
   },
 
   async getGoldCNY(): Promise<{

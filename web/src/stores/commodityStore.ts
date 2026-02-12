@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { commodityApi } from '@/api';
-import type { Commodity } from '@/types';
+import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHistoryItem } from '@/types';
 import { ApiError } from '@/api';
 
 export interface FetchOptions {
@@ -29,9 +29,18 @@ const friendlyErrorMessages: Record<string, string> = {
   '503': '商品服务暂时不可用',
 };
 
+// 分类图标映射
+const categoryIcons: Record<string, string> = {
+  'precious_metal': 'diamond',
+  'energy': 'flame',
+  'base_metal': 'cube',
+};
+
 export const useCommodityStore = defineStore('commodities', () => {
   // State
   const commodities = ref<Commodity[]>([]);
+  const categories = ref<CommodityCategory[]>([]);
+  const activeCategory = ref<string | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const lastUpdated = ref<string | null>(null);
@@ -62,6 +71,50 @@ export const useCommodityStore = defineStore('commodities', () => {
       c.name.includes('原油')
     )
   );
+
+  // 获取当前选中的分类数据
+  const activeCategoryData = computed(() => {
+    if (!activeCategory.value) {
+      return null;
+    }
+    return categories.value.find(c => c.id === activeCategory.value) || null;
+  });
+
+  // 获取当前选中分类的商品列表
+  const activeCommodities = computed(() => {
+    if (!activeCategory.value) {
+      return commodities.value;
+    }
+    const category = categories.value.find(c => c.id === activeCategory.value);
+    return category?.commodities || [];
+  });
+
+  // 获取分类列表（用于Tab显示）
+  const categoryList = computed(() => {
+    return categories.value.map(c => ({
+      id: c.id,
+      name: c.name,
+      icon: c.icon,
+    }));
+  });
+
+  // 预处理 API 响应中的 commodities 字段
+  function processApiCommodities(apiCommodities: CommodityCategoryItem[]): Commodity[] {
+    return apiCommodities.map(item => ({
+      symbol: item.symbol,
+      name: item.name,
+      price: item.price,
+      currency: item.currency,
+      change: item.change ?? 0,
+      changePercent: item.changePercent,
+      high: item.high ?? 0,
+      low: item.low ?? 0,
+      open: item.open ?? 0,
+      prevClose: item.prevClose ?? 0,
+      source: item.source,
+      timestamp: item.timestamp,
+    }));
+  }
 
   // 获取友好的错误消息
   function getFriendlyErrorMessage(err: unknown): string {
@@ -116,6 +169,73 @@ export const useCommodityStore = defineStore('commodities', () => {
       console.error('[CommodityStore] fetchCommodities failed after retries:', error.value);
     }
     loading.value = false;
+  }
+
+  // 获取分类列表
+  async function fetchCategories(options: FetchOptions = DEFAULT_OPTIONS) {
+    const { retries, retryDelay, showError } = { ...DEFAULT_OPTIONS, ...options };
+    loading.value = true;
+    error.value = null;
+    retryCount.value = 0;
+
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      retryCount.value = attempt;
+      try {
+        const response = await commodityApi.getCategories();
+        categories.value = response.categories || [];
+        // 如果还没有激活的分类，默认选中第一个有数据的分类
+        if (!activeCategory.value && categories.value.length > 0) {
+          const firstWithData = categories.value.find(c => c.commodities.length > 0);
+          activeCategory.value = firstWithData?.id || categories.value[0].id;
+        }
+        lastUpdated.value = new Date().toLocaleTimeString('zh-CN');
+
+        // 同时更新 commodities 以保持向后兼容
+        const flatCommodities: Commodity[] = [];
+        for (const category of categories.value) {
+          flatCommodities.push(...processApiCommodities(category.commodities));
+        }
+        commodities.value = flatCommodities;
+
+        return;
+      } catch (err) {
+        lastError = err;
+        console.error(`[CommodityStore] fetchCategories attempt ${attempt + 1} error:`, err);
+
+        if (attempt < retries && !(err instanceof ApiError && err.statusCode === 404)) {
+          await delay(retryDelay * (attempt + 1));
+          continue;
+        }
+        break;
+      }
+    }
+
+    error.value = getFriendlyErrorMessage(lastError);
+    if (showError) {
+      console.error('[CommodityStore] fetchCategories failed after retries:', error.value);
+    }
+    loading.value = false;
+  }
+
+  // 设置当前选中的分类
+  function setActiveCategory(categoryId: string) {
+    activeCategory.value = categoryId;
+  }
+
+  // 获取商品历史数据
+  async function fetchHistory(
+    commodityType: string,
+    days: number = 30
+  ): Promise<CommodityHistoryItem[]> {
+    try {
+      const response = await commodityApi.getHistory(commodityType, days);
+      return response.history || [];
+    } catch (err) {
+      console.error(`[CommodityStore] fetchHistory error for ${commodityType}:`, err);
+      return [];
+    }
   }
 
   async function fetchGoldCNY(options: FetchOptions = {}) {
@@ -242,12 +362,14 @@ export const useCommodityStore = defineStore('commodities', () => {
 
   // 重试函数
   async function retry() {
-    await fetchCommodities();
+    await fetchCategories();
   }
 
   return {
     // State
     commodities,
+    categories,
+    activeCategory,
     loading,
     error,
     lastUpdated,
@@ -258,8 +380,14 @@ export const useCommodityStore = defineStore('commodities', () => {
     fallingCommodities,
     goldCommodities,
     oilCommodities,
+    activeCategoryData,
+    activeCommodities,
+    categoryList,
     // Actions
     fetchCommodities,
+    fetchCategories,
+    setActiveCategory,
+    fetchHistory,
     fetchGoldCNY,
     fetchOilWTI,
     clearError,

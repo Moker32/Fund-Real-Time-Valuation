@@ -63,6 +63,53 @@ export interface CommodityListResponse {
   timestamp: string;
 }
 
+// Commodity Category Types
+export interface CommodityCategoryItem {
+  symbol: string;
+  name: string;
+  price: number;
+  currency: string;
+  change: number | null;
+  changePercent: number;
+  high: number | null;
+  low: number | null;
+  open: number | null;
+  prevClose: number | null;
+  source: string;
+  timestamp: string;
+}
+
+export interface CommodityCategory {
+  id: string;
+  name: string;
+  icon: string;
+  commodities: CommodityCategoryItem[];
+}
+
+export interface CommodityCategoriesResponse {
+  categories: CommodityCategory[];
+  timestamp: string;
+}
+
+// Commodity History Types
+export interface CommodityHistoryItem {
+  date: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  high: number;
+  low: number;
+  open: number;
+  prevClose: number;
+}
+
+export interface CommodityHistoryResponse {
+  commodity_type: string;
+  name: string;
+  history: CommodityHistoryItem[];
+  timestamp: string;
+}
+
 // Market Index Types
 export interface MarketIndex {
   index: string;
@@ -123,6 +170,8 @@ export interface FundState {
 
 export interface CommodityState {
   commodities: Commodity[];
+  categories: CommodityCategory[];
+  activeCategory: string | null;
   loading: boolean;
   error: string | null;
   lastUpdated: string | null;

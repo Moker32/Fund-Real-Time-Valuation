@@ -312,6 +312,28 @@ class DatabaseManager:
                 )
             """)
 
+            # 商品行情缓存表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS commodity_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    commodity_type TEXT NOT NULL,
+                    symbol TEXT,
+                    name TEXT,
+                    price REAL DEFAULT 0,
+                    change REAL DEFAULT 0,
+                    change_percent REAL DEFAULT 0,
+                    currency TEXT DEFAULT 'USD',
+                    exchange TEXT,
+                    high REAL DEFAULT 0,
+                    low REAL DEFAULT 0,
+                    open REAL DEFAULT 0,
+                    prev_close REAL DEFAULT 0,
+                    source TEXT,
+                    timestamp TEXT NOT NULL,
+                    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+                )
+            """)
+
             # 创建索引
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_fund_history_code_date ON fund_history(fund_code, date)"
@@ -327,6 +349,12 @@ class DatabaseManager:
             )
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_fund_daily_code ON fund_daily_cache(fund_code, date)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_commodity_type ON commodity_cache(commodity_type)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_commodity_timestamp ON commodity_cache(created_at)"
             )
 
             conn.commit()
