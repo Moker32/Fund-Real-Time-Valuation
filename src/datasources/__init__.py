@@ -41,6 +41,7 @@ from .base import (
     NetworkError,
 )
 from .bond_source import AKShareBondSource, EastMoneyBondSource, SinaBondDataSource
+from .cache_cleaner import CacheCleaner, get_cache_cleaner, startup_cleanup
 from .commodity_source import (
     AKShareCommoditySource,
     CommodityDataAggregator,
@@ -104,7 +105,12 @@ __all__ = [
     # 管理器
     "DataSourceManager",
     "DataSourceConfig",
-    "create_default_manager"
+    "create_default_manager",
+
+    # 缓存清理器
+    "CacheCleaner",
+    "get_cache_cleaner",
+    "startup_cleanup"
 ]
 
 

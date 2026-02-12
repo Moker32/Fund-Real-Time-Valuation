@@ -108,9 +108,27 @@ class FundIntradayRecord:
 
     id: int | None = None  # 数据库自增ID
     fund_code: str = ""
+    date: str = ""  # 日期 (YYYY-MM-DD 格式)
     time: str = ""  # "HH:mm" 格式
     price: float = 0.0  # 估算净值
     change_rate: float | None = None  # 涨跌率
+    fetched_at: str = ""  # 抓取时间
+
+
+@dataclass
+class FundDailyRecord:
+    """基金每日缓存数据记录
+
+    用于存储近一周的每日基础数据，支持展示基金历史走势。
+    """
+
+    id: int | None = None  # 数据库自增ID
+    fund_code: str = ""
+    date: str = ""  # 日期 (YYYY-MM-DD 格式)
+    unit_net_value: float | None = None  # 单位净值
+    accumulated_net_value: float | None = None  # 累计净值
+    estimated_value: float | None = None  # 估算净值
+    change_rate: float | None = None  # 日增长率
     fetched_at: str = ""  # 抓取时间
 
 
@@ -226,11 +244,27 @@ class DatabaseManager:
                 CREATE TABLE IF NOT EXISTS fund_intraday_cache (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     fund_code TEXT NOT NULL,
+                    date TEXT NOT NULL,
                     time TEXT NOT NULL,
                     price REAL NOT NULL,
                     change_rate REAL,
                     fetched_at TEXT,
-                    UNIQUE(fund_code, time)
+                    UNIQUE(fund_code, date, time)
+                )
+            """)
+
+            # 基金每日缓存表（存储近一周的每日基础数据）
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS fund_daily_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fund_code TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    unit_net_value REAL,
+                    accumulated_net_value REAL,
+                    estimated_value REAL,
+                    change_rate REAL,
+                    fetched_at TEXT,
+                    UNIQUE(fund_code, date)
                 )
             """)
 
@@ -245,7 +279,10 @@ class DatabaseManager:
                 "CREATE INDEX IF NOT EXISTS idx_news_cache_fetched_at ON news_cache(fetched_at)"
             )
             cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_fund_intraday_code ON fund_intraday_cache(fund_code)"
+                "CREATE INDEX IF NOT EXISTS idx_fund_intraday_code ON fund_intraday_cache(fund_code, date)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_fund_daily_code ON fund_daily_cache(fund_code, date)"
             )
 
             conn.commit()
@@ -261,6 +298,16 @@ class DatabaseManager:
             if "is_hold" not in columns:
                 cursor.execute(
                     "ALTER TABLE fund_config ADD COLUMN is_hold INTEGER DEFAULT 0"
+                )
+
+            # 检查 fund_intraday_cache 表是否有 date 列
+            cursor.execute("PRAGMA table_info(fund_intraday_cache)")
+            intraday_columns = [row[1] for row in cursor.fetchall()]
+
+            # 添加 date 列（如果不存在）
+            if "date" not in intraday_columns:
+                cursor.execute(
+                    "ALTER TABLE fund_intraday_cache ADD COLUMN date TEXT DEFAULT ''"
                 )
 
         except Exception as e:
@@ -856,12 +903,13 @@ class FundIntradayCacheDAO:
         self.db = db_manager
         self.cache_ttl = cache_ttl
 
-    def save_intraday(self, fund_code: str, data: list[dict]) -> bool:
+    def save_intraday(self, fund_code: str, date: str, data: list[dict]) -> bool:
         """
         保存基金日内分时数据
 
         Args:
             fund_code: 基金代码
+            date: 日期 (YYYY-MM-DD 格式)
             data: 日内分时数据列表，每个元素包含 time, price, change_rate
 
         Returns:
@@ -879,11 +927,12 @@ class FundIntradayCacheDAO:
                     cursor.execute(
                         """
                         INSERT OR REPLACE INTO fund_intraday_cache
-                        (fund_code, time, price, change_rate, fetched_at)
-                        VALUES (?, ?, ?, ?, ?)
+                        (fund_code, date, time, price, change_rate, fetched_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     """,
                         (
                             fund_code,
+                            date,
                             item.get("time", ""),
                             item.get("price", 0.0),
                             item.get("change"),
@@ -897,61 +946,87 @@ class FundIntradayCacheDAO:
                         """
                         UPDATE fund_intraday_cache
                         SET price = ?, change_rate = ?, fetched_at = ?
-                        WHERE fund_code = ? AND time = ?
+                        WHERE fund_code = ? AND date = ? AND time = ?
                     """,
                         (
                             item.get("price", 0.0),
                             item.get("change"),
                             fetched_at,
                             fund_code,
+                            date,
                             item.get("time", ""),
                         ),
                     )
                     count += 1
             return count > 0
 
-    def get_intraday(self, fund_code: str) -> list[FundIntradayRecord]:
+    def get_intraday(
+        self, fund_code: str, date: str | None = None
+    ) -> list[FundIntradayRecord]:
         """
         获取基金日内分时缓存数据
 
         Args:
             fund_code: 基金代码
+            date: 可选的日期 (YYYY-MM-DD 格式)，不指定则返回最新的记录
 
         Returns:
             list[FundIntradayRecord]: 日内分时数据列表，按时间排序
         """
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT * FROM fund_intraday_cache
-                WHERE fund_code = ?
-                ORDER BY time ASC
-            """,
-                (fund_code,),
-            )
+            if date:
+                cursor.execute(
+                    """
+                    SELECT * FROM fund_intraday_cache
+                    WHERE fund_code = ? AND date = ?
+                    ORDER BY time ASC
+                """,
+                    (fund_code, date),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT * FROM fund_intraday_cache
+                    WHERE fund_code = ?
+                    ORDER BY date DESC, time ASC
+                """,
+                    (fund_code,),
+                )
             return [FundIntradayRecord(**row) for row in cursor.fetchall()]
 
-    def is_expired(self, fund_code: str) -> bool:
+    def is_expired(self, fund_code: str, date: str | None = None) -> bool:
         """
         检查缓存是否过期
 
         Args:
             fund_code: 基金代码
+            date: 可选的日期 (YYYY-MM-DD 格式)
 
         Returns:
             bool: True 表示缓存已过期或不存在，False 表示缓存有效
         """
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT fetched_at FROM fund_intraday_cache
-                WHERE fund_code = ?
-                LIMIT 1
-            """,
-                (fund_code,),
-            )
+            if date:
+                cursor.execute(
+                    """
+                    SELECT fetched_at FROM fund_intraday_cache
+                    WHERE fund_code = ? AND date = ?
+                    LIMIT 1
+                """,
+                    (fund_code, date),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT fetched_at FROM fund_intraday_cache
+                    WHERE fund_code = ?
+                    ORDER BY date DESC, fetched_at DESC
+                    LIMIT 1
+                """,
+                    (fund_code,),
+                )
             row = cursor.fetchone()
 
             if row is None:
@@ -971,22 +1046,29 @@ class FundIntradayCacheDAO:
             except (ValueError, TypeError):
                 return True  # 时间解析失败，视为过期
 
-    def clear_cache(self, fund_code: str) -> int:
+    def clear_cache(self, fund_code: str, date: str | None = None) -> int:
         """
         清除指定基金的日内缓存
 
         Args:
             fund_code: 基金代码
+            date: 可选的日期 (YYYY-MM-DD 格式)，不指定则清除该基金所有缓存
 
         Returns:
             int: 删除的记录数
         """
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "DELETE FROM fund_intraday_cache WHERE fund_code = ?",
-                (fund_code,),
-            )
+            if date:
+                cursor.execute(
+                    "DELETE FROM fund_intraday_cache WHERE fund_code = ? AND date = ?",
+                    (fund_code, date),
+                )
+            else:
+                cursor.execute(
+                    "DELETE FROM fund_intraday_cache WHERE fund_code = ?",
+                    (fund_code,),
+                )
             return cursor.rowcount
 
     def cleanup_expired_cache(self) -> int:
@@ -1007,6 +1089,337 @@ class FundIntradayCacheDAO:
             )
             return cursor.rowcount
 
+    def get_cache_info(
+        self, fund_code: str, date: str | None = None
+    ) -> dict[str, Any]:
+        """
+        获取缓存信息
+
+        Args:
+            fund_code: 基金代码
+            date: 可选的日期 (YYYY-MM-DD 格式)
+
+        Returns:
+            dict: 包含缓存信息的字典
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            if date:
+                cursor.execute(
+                    """
+                    SELECT COUNT(*) as count, MAX(fetched_at) as last_fetched
+                    FROM fund_intraday_cache
+                    WHERE fund_code = ? AND date = ?
+                """,
+                    (fund_code, date),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT COUNT(*) as count, MAX(fetched_at) as last_fetched
+                    FROM fund_intraday_cache
+                    WHERE fund_code = ?
+                """,
+                    (fund_code,),
+                )
+            row = cursor.fetchone()
+
+            if row is None or row["count"] == 0:
+                return {
+                    "fund_code": fund_code,
+                    "date": date,
+                    "count": 0,
+                    "last_fetched": None,
+                    "expired": True,
+                }
+
+            return {
+                "fund_code": fund_code,
+                "date": date,
+                "count": row["count"],
+                "last_fetched": row["last_fetched"],
+                "expired": self.is_expired(fund_code, date),
+            }
+
+
+class FundDailyCacheDAO:
+    """基金每日缓存数据访问对象
+
+    提供基金每日估值数据的存储和查询功能。
+    用于缓存当日基金估值数据，减少 API 调用频率。
+    """
+
+    # 默认缓存过期时间（秒）- 5分钟
+    DEFAULT_CACHE_TTL = 300
+
+    def __init__(self, db_manager: DatabaseManager, cache_ttl: int = DEFAULT_CACHE_TTL):
+        """
+        初始化每日缓存 DAO
+
+        Args:
+            db_manager: 数据库管理器实例
+            cache_ttl: 缓存过期时间（秒），默认为 300 秒（5分钟）
+        """
+        self.db = db_manager
+        self.cache_ttl = cache_ttl
+
+    def save_daily(
+        self,
+        fund_code: str,
+        date: str,
+        unit_net_value: float | None = None,
+        accumulated_net_value: float | None = None,
+        estimated_value: float | None = None,
+        change_rate: float | None = None,
+    ) -> bool:
+        """
+        保存基金每日数据
+
+        Args:
+            fund_code: 基金代码
+            date: 日期 (YYYY-MM-DD 格式)
+            unit_net_value: 单位净值
+            accumulated_net_value: 累计净值
+            estimated_value: 估算净值
+            change_rate: 日增长率
+
+        Returns:
+            bool: 是否保存成功
+        """
+        fetched_at = datetime.now().isoformat()
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO fund_daily_cache
+                    (fund_code, date, unit_net_value, accumulated_net_value,
+                     estimated_value, change_rate, fetched_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        fund_code,
+                        date,
+                        unit_net_value,
+                        accumulated_net_value,
+                        estimated_value,
+                        change_rate,
+                        fetched_at,
+                    ),
+                )
+                return True
+            except sqlite3.IntegrityError:
+                # 如果插入失败，尝试更新
+                cursor.execute(
+                    """
+                    UPDATE fund_daily_cache
+                    SET unit_net_value = ?, accumulated_net_value = ?,
+                        estimated_value = ?, change_rate = ?, fetched_at = ?
+                    WHERE fund_code = ? AND date = ?
+                """,
+                    (
+                        unit_net_value,
+                        accumulated_net_value,
+                        estimated_value,
+                        change_rate,
+                        fetched_at,
+                        fund_code,
+                        date,
+                    ),
+                )
+                return True
+
+    def save_daily_from_fund_data(self, fund_code: str, data: dict[str, Any]) -> bool:
+        """
+        从基金数据字典保存每日数据
+
+        Args:
+            fund_code: 基金代码
+            data: 基金数据字典，包含 net_value_date, unit_net_value,
+                  accumulated_net_value, estimated_net_value, estimated_growth_rate
+
+        Returns:
+            bool: 是否保存成功
+        """
+        date = data.get("net_value_date", "") or data.get("date", "")
+        if not date:
+            return False
+
+        return self.save_daily(
+            fund_code=fund_code,
+            date=date,
+            unit_net_value=data.get("unit_net_value"),
+            accumulated_net_value=data.get("accumulated_net_value"),
+            estimated_value=data.get("estimated_net_value"),
+            change_rate=data.get("estimated_growth_rate") or data.get("change_rate"),
+        )
+
+    def get_daily(self, fund_code: str, date: str) -> FundDailyRecord | None:
+        """
+        获取基金指定日期的每日数据
+
+        Args:
+            fund_code: 基金代码
+            date: 日期 (YYYY-MM-DD 格式)
+
+        Returns:
+            FundDailyRecord | None: 每日数据记录，不存在返回 None
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM fund_daily_cache
+                WHERE fund_code = ? AND date = ?
+            """,
+                (fund_code, date),
+            )
+            row = cursor.fetchone()
+            return FundDailyRecord(**row) if row else None
+
+    def get_latest(self, fund_code: str) -> FundDailyRecord | None:
+        """
+        获取基金最新的每日数据
+
+        Args:
+            fund_code: 基金代码
+
+        Returns:
+            FundDailyRecord | None: 最新每日数据记录，不存在返回 None
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM fund_daily_cache
+                WHERE fund_code = ?
+                ORDER BY date DESC
+                LIMIT 1
+            """,
+                (fund_code,),
+            )
+            row = cursor.fetchone()
+            return FundDailyRecord(**row) if row else None
+
+    def get_recent_days(self, fund_code: str, days: int = 7) -> list[FundDailyRecord]:
+        """
+        获取基金最近几天的每日数据
+
+        Args:
+            fund_code: 基金代码
+            days: 获取天数，默认为 7 天
+
+        Returns:
+            list[FundDailyRecord]: 每日数据列表，按日期降序排列
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM fund_daily_cache
+                WHERE fund_code = ?
+                ORDER BY date DESC
+                LIMIT ?
+            """,
+                (fund_code, days),
+            )
+            return [FundDailyRecord(**row) for row in cursor.fetchall()]
+
+    def is_expired(self, fund_code: str, date: str | None = None) -> bool:
+        """
+        检查缓存是否过期
+
+        Args:
+            fund_code: 基金代码
+            date: 可选，指定日期，默认检查最新日期
+
+        Returns:
+            bool: True 表示缓存已过期或不存在，False 表示缓存有效
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            if date:
+                cursor.execute(
+                    """
+                    SELECT fetched_at FROM fund_daily_cache
+                    WHERE fund_code = ? AND date = ?
+                    LIMIT 1
+                """,
+                    (fund_code, date),
+                )
+            else:
+                cursor.execute(
+                    """
+                    SELECT fetched_at FROM fund_daily_cache
+                    WHERE fund_code = ?
+                    ORDER BY date DESC
+                    LIMIT 1
+                """,
+                    (fund_code,),
+                )
+            row = cursor.fetchone()
+
+            if row is None:
+                return True  # 不存在缓存，视为过期
+
+            fetched_at = row["fetched_at"]
+            if not fetched_at:
+                return True
+
+            try:
+                fetched_time = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
+                now = datetime.now()
+                elapsed_seconds = (now - fetched_time).total_seconds()
+                return elapsed_seconds > self.cache_ttl
+            except (ValueError, TypeError):
+                return True  # 时间解析失败，视为过期
+
+    def clear_cache(self, fund_code: str, date: str | None = None) -> int:
+        """
+        清除指定基金的每日缓存
+
+        Args:
+            fund_code: 基金代码
+            date: 可选，指定日期，默认清除所有日期
+
+        Returns:
+            int: 删除的记录数
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            if date:
+                cursor.execute(
+                    "DELETE FROM fund_daily_cache WHERE fund_code = ? AND date = ?",
+                    (fund_code, date),
+                )
+            else:
+                cursor.execute(
+                    "DELETE FROM fund_daily_cache WHERE fund_code = ?",
+                    (fund_code,),
+                )
+            return cursor.rowcount
+
+    def cleanup_expired_cache(self, days: int = 7) -> int:
+        """
+        清理过期的每日缓存（保留最近 N 天）
+
+        Args:
+            days: 保留天数，默认为 7 天
+
+        Returns:
+            int: 删除的记录数
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                DELETE FROM fund_daily_cache
+                WHERE date < date('now', ?)
+            """,
+                (f"-{days} days",),
+            )
+            return cursor.rowcount
+
     def get_cache_info(self, fund_code: str) -> dict[str, Any]:
         """
         获取缓存信息
@@ -1021,8 +1434,8 @@ class FundIntradayCacheDAO:
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT COUNT(*) as count, MAX(fetched_at) as last_fetched
-                FROM fund_intraday_cache
+                SELECT COUNT(*) as count, MAX(date) as latest_date, MAX(fetched_at) as last_fetched
+                FROM fund_daily_cache
                 WHERE fund_code = ?
             """,
                 (fund_code,),
@@ -1033,6 +1446,7 @@ class FundIntradayCacheDAO:
                 return {
                     "fund_code": fund_code,
                     "count": 0,
+                    "latest_date": None,
                     "last_fetched": None,
                     "expired": True,
                 }
@@ -1040,6 +1454,7 @@ class FundIntradayCacheDAO:
             return {
                 "fund_code": fund_code,
                 "count": row["count"],
+                "latest_date": row["latest_date"],
                 "last_fetched": row["last_fetched"],
                 "expired": self.is_expired(fund_code),
             }

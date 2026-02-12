@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.datasources.cache_warmer import CacheWarmer
+from src.datasources.cache_cleaner import CacheCleaner, get_cache_cleaner
 from src.datasources.manager import create_default_manager
 
 from .dependencies import (
@@ -25,6 +26,8 @@ from .routes import cache, commodities, funds, overview
 
 # 全局预热器实例
 _cache_warmer: CacheWarmer | None = None
+# 全局缓存清理器实例
+_cache_cleaner: CacheCleaner | None = None
 
 
 @asynccontextmanager
@@ -35,7 +38,7 @@ async def lifespan(app: FastAPI):
     Args:
         app: FastAPI 应用实例
     """
-    global _cache_warmer
+    global _cache_warmer, _cache_cleaner
 
     # 启动时初始化数据源管理器
     manager = create_default_manager()
@@ -60,11 +63,37 @@ async def lifespan(app: FastAPI):
     # 启动缓存预热（不阻塞服务启动）
     asyncio.create_task(_cache_warmer.start_background_warmup(interval=300))
 
+    # 启动时清理过期缓存（不阻塞服务启动）
+    try:
+        from src.datasources.cache_cleaner import startup_cleanup
+
+        startup_task = asyncio.create_task(startup_cleanup())
+        logger.info("启动时缓存清理任务已提交")
+    except Exception as e:
+        logger.warning(f"启动清理任务失败: {e}")
+
+    # 启动后台定时清理任务（每小时执行一次）
+    try:
+        from src.datasources.cache_cleaner import start_background_cleanup_task
+
+        start_background_cleanup_task(interval=3600)
+        logger.info("后台定时清理任务已启动")
+    except Exception as e:
+        logger.warning(f"启动后台清理任务失败: {e}")
+
     yield
 
     # 停止后台预热
     if _cache_warmer:
         _cache_warmer.stop()
+
+    # 停止后台清理任务
+    try:
+        cleaner = get_cache_cleaner()
+        if cleaner:
+            cleaner.stop()
+    except Exception:
+        pass
 
     # 关闭时清理资源
     await close_data_source_manager()

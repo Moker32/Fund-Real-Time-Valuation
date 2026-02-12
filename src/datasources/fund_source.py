@@ -22,7 +22,7 @@ from .base import (
     DataSourceType,
 )
 from .dual_cache import DualLayerCache
-from src.db.database import DatabaseManager, FundIntradayCacheDAO
+from src.db.database import DatabaseManager, FundDailyCacheDAO, FundIntradayCacheDAO
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,8 @@ _fund_info_hit_count = 0
 _fund_info_miss_count = 0
 # 日内分时缓存 DAO 单例
 _intraday_cache_dao: FundIntradayCacheDAO | None = None
+# 每日缓存 DAO 单例
+_daily_cache_dao: FundDailyCacheDAO | None = None
 
 
 def get_fund_cache() -> DualLayerCache:
@@ -59,6 +61,15 @@ def get_intraday_cache_dao() -> FundIntradayCacheDAO:
         db_manager = DatabaseManager()
         _intraday_cache_dao = FundIntradayCacheDAO(db_manager)
     return _intraday_cache_dao
+
+
+def get_daily_cache_dao() -> FundDailyCacheDAO:
+    """获取每日缓存 DAO 单例"""
+    global _daily_cache_dao
+    if _daily_cache_dao is None:
+        db_manager = DatabaseManager()
+        _daily_cache_dao = FundDailyCacheDAO(db_manager)
+    return _daily_cache_dao
 
 
 def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
@@ -155,6 +166,11 @@ class FundDataSource(DataSource):
         """
         获取单个基金数据
 
+        缓存策略：
+        1. 优先从数据库读取（5分钟过期）
+        2. 数据库缓存过期时，从 API 获取并更新数据库
+        3. 最后回退到内存/文件缓存
+
         Args:
             fund_code: 基金代码 (6位数字)
             use_cache: 是否使用缓存
@@ -173,7 +189,32 @@ class FundDataSource(DataSource):
 
         cache_key = f"fund:{self.name}:{fund_code}"
 
-        # 检查缓存
+        # 1. 优先从数据库读取每日缓存（5分钟过期）
+        if use_cache:
+            daily_dao = get_daily_cache_dao()
+            if not daily_dao.is_expired(fund_code):
+                cached_daily = daily_dao.get_latest(fund_code)
+                if cached_daily:
+                    # 构建返回数据格式
+                    result_data = {
+                        "fund_code": fund_code,
+                        "name": cached_daily.fund_name or "",
+                        "net_value_date": cached_daily.date,
+                        "unit_net_value": cached_daily.unit_net_value,
+                        "estimated_net_value": cached_daily.estimated_value,
+                        "estimated_growth_rate": cached_daily.change_rate,
+                        "estimate_time": cached_daily.date,
+                        "has_real_time_estimate": cached_daily.estimated_value is not None,
+                    }
+                    return DataSourceResult(
+                        success=True,
+                        data=result_data,
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"fund_code": fund_code, "cache": "database"}
+                    )
+
+        # 2. 检查内存/文件缓存
         if use_cache:
             cache = get_fund_cache()
             cached_value, cache_type = await cache.get(cache_key)
@@ -187,7 +228,7 @@ class FundDataSource(DataSource):
                     metadata={"fund_code": fund_code, "cache": cache_type}
                 )
 
-        # 判断基金类型
+        # 3. 从 API 获取数据
         # 场内基金（交易所交易）
         is_etf = fund_code.startswith("5") or fund_code.startswith("15")  # ETF
         is_lof = fund_code.startswith("16")  # LOF 基金
@@ -198,8 +239,10 @@ class FundDataSource(DataSource):
                 if is_lof:
                     result = await self._fetch_lof(fund_code, has_real_time_estimate=True)
                     if result.success:
-                        # 写入缓存
-                        cache_key = f"fund:{self.name}:{fund_code}"
+                        # 写入数据库缓存
+                        daily_dao = get_daily_cache_dao()
+                        daily_dao.save_daily_from_fund_data(fund_code, result.data)
+                        # 写入内存/文件缓存
                         cache = get_fund_cache()
                         await cache.set(cache_key, result.data)
                         return result
@@ -216,8 +259,10 @@ class FundDataSource(DataSource):
                 if is_etf:
                     result = await self._fetch_etf(fund_code)
                     if result.success:
-                        # 写入缓存
-                        cache_key = f"fund:{self.name}:{fund_code}"
+                        # 写入数据库缓存
+                        daily_dao = get_daily_cache_dao()
+                        daily_dao.save_daily_from_fund_data(fund_code, result.data)
+                        # 写入内存/文件缓存
                         cache = get_fund_cache()
                         await cache.set(cache_key, result.data)
                         return result
@@ -330,8 +375,10 @@ class FundDataSource(DataSource):
 
                     self._record_success()
 
-                    # 写入缓存
-                    cache_key = f"fund:{self.name}:{fund_code}"
+                    # 写入数据库缓存
+                    daily_dao = get_daily_cache_dao()
+                    daily_dao.save_daily_from_fund_data(fund_code, data)
+                    # 写入内存/文件缓存
                     cache = get_fund_cache()
                     await cache.set(cache_key, data)
 
@@ -763,6 +810,7 @@ __all__ = [
     "get_fund_cache",
     "get_fund_cache_stats",
     "get_intraday_cache_dao",
+    "get_daily_cache_dao",
 ]
 
 
@@ -1499,6 +1547,11 @@ class Fund123DataSource(DataSource):
         """
         获取单个基金数据
 
+        缓存策略：
+        1. 优先从数据库读取每日缓存（5分钟过期）
+        2. 数据库缓存过期时，从 API 获取并更新数据库
+        3. 最后回退到内存/文件缓存
+
         Args:
             fund_code: 基金代码 (6位数字)
             use_cache: 是否使用缓存
@@ -1515,13 +1568,41 @@ class Fund123DataSource(DataSource):
                 metadata={"fund_code": fund_code}
             )
 
+        today = time.strftime("%Y-%m-%d")
         cache_key = f"fund:{self.name}:{fund_code}"
 
-        # 检查缓存（内存/文件缓存）
+        # 1. 优先从数据库读取每日缓存（5分钟过期）
+        if use_cache:
+            daily_dao = get_daily_cache_dao()
+            if not daily_dao.is_expired(fund_code):
+                cached_daily = daily_dao.get_latest(fund_code)
+                if cached_daily:
+                    # 构建返回数据格式
+                    result_data = {
+                        "fund_code": fund_code,
+                        "name": cached_daily.fund_name or "",
+                        "net_value_date": cached_daily.date,
+                        "unit_net_value": cached_daily.unit_net_value,
+                        "estimated_net_value": cached_daily.estimated_value,
+                        "estimated_growth_rate": cached_daily.change_rate,
+                        "estimate_time": cached_daily.date,
+                        "has_real_time_estimate": cached_daily.estimated_value is not None,
+                        "from_cache": "database"
+                    }
+                    return DataSourceResult(
+                        success=True,
+                        data=result_data,
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"fund_code": fund_code, "cache": "database"}
+                    )
+
+        # 2. 检查内存/文件缓存
         if use_cache:
             cache = get_fund_cache()
             cached_value, cache_type = await cache.get(cache_key)
             if cached_value is not None:
+                cached_value["from_cache"] = cache_type
                 return DataSourceResult(
                     success=True,
                     data=cached_value,
@@ -1530,17 +1611,7 @@ class Fund123DataSource(DataSource):
                     metadata={"fund_code": fund_code, "cache": cache_type}
                 )
 
-        # 优先从数据库读取日内分时缓存（60秒过期）
-        if use_cache:
-            intraday_dao = get_intraday_cache_dao()
-            if not intraday_dao.is_expired(fund_code):
-                cached_intraday = intraday_dao.get_intraday(fund_code)
-                if cached_intraday:
-                    # 构建基础数据（日内数据从缓存获取）
-                    # 注意：这里需要获取实时估值数据，但日内分时从缓存读取
-                    # 由于基础数据没有缓存，需要先获取实时数据
-                    pass  # 继续获取实时数据，稍后会保存日内数据到缓存
-
+        # 3. 从 API 获取数据
         for attempt in range(self.max_retries):
             try:
                 # 在线程池中执行同步请求
@@ -1553,6 +1624,10 @@ class Fund123DataSource(DataSource):
                 if result.success:
                     self._record_success()
 
+                    # 写入数据库每日缓存
+                    daily_dao = get_daily_cache_dao()
+                    daily_dao.save_daily_from_fund_data(fund_code, result.data)
+
                     # 写入内存/文件缓存
                     cache = get_fund_cache()
                     await cache.set(cache_key, result.data)
@@ -1561,8 +1636,9 @@ class Fund123DataSource(DataSource):
                     intraday_data = result.data.get("intraday", [])
                     if intraday_data:
                         intraday_dao = get_intraday_cache_dao()
-                        intraday_dao.save_intraday(fund_code, intraday_data)
+                        intraday_dao.save_intraday(fund_code, today, intraday_data)
 
+                    result.data["from_cache"] = "api"
                     return result
                 else:
                     # 如果失败且还有重试次数，刷新 token 后重试
@@ -1755,12 +1831,13 @@ class Fund123DataSource(DataSource):
             )
 
         cache_key = f"fund:{self.name}:{fund_code}:intraday"
+        today = time.strftime("%Y-%m-%d")
 
         # 1. 优先从数据库读取日内分时缓存（60秒过期）
         if use_cache:
             intraday_dao = get_intraday_cache_dao()
-            if not intraday_dao.is_expired(fund_code):
-                cached_records = intraday_dao.get_intraday(fund_code)
+            if not intraday_dao.is_expired(fund_code, today):
+                cached_records = intraday_dao.get_intraday(fund_code, today)
                 if cached_records:
                     # 从数据库记录构建返回数据
                     intraday_points = [
@@ -1774,7 +1851,7 @@ class Fund123DataSource(DataSource):
                     result_data = {
                         "fund_code": fund_code,
                         "name": "",
-                        "date": time.strftime("%Y-%m-%d"),
+                        "date": today,
                         "data": intraday_points,
                         "count": len(intraday_points),
                         "from_cache": "database",
@@ -1817,7 +1894,7 @@ class Fund123DataSource(DataSource):
 
                     # 写入数据库缓存
                     intraday_dao = get_intraday_cache_dao()
-                    intraday_dao.save_intraday(fund_code, result.data.get("data", []))
+                    intraday_dao.save_intraday(fund_code, today, result.data.get("data", []))
 
                     # 写入内存/文件缓存（缓存时间较短，5分钟）
                     cache = get_fund_cache()
