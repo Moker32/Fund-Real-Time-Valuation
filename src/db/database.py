@@ -885,7 +885,7 @@ class FundIntradayCacheDAO:
                         (
                             fund_code,
                             item.get("time", ""),
-                            item.get("value", 0.0),
+                            item.get("price", 0.0),
                             item.get("change"),
                             fetched_at,
                         ),
@@ -900,7 +900,7 @@ class FundIntradayCacheDAO:
                         WHERE fund_code = ? AND time = ?
                     """,
                         (
-                            item.get("value", 0.0),
+                            item.get("price", 0.0),
                             item.get("change"),
                             fetched_at,
                             fund_code,

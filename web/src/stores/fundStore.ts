@@ -38,7 +38,7 @@ export const useFundStore = defineStore('funds', () => {
   const lastUpdated = ref<string | null>(null);
   const refreshInterval = ref(30); // seconds
   const autoRefresh = ref(true);
-  const showChart = ref(true); // 是否显示基金卡片图表
+  const showChart = ref(false); // 是否显示基金卡片图表，默认关闭
   const retryCount = ref(0);
   const maxRetries = 2;
 
