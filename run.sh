@@ -52,5 +52,52 @@ echo ""
 echo -e "${GREEN}启动服务...${NC}"
 echo ""
 
-# 启动前后端
-exec pnpm run dev "$@"
+# 启动后端（后台运行）
+echo -e "${YELLOW}启动后端服务...${NC}"
+BACKEND_PID_FILE="/tmp/fund-api.pid"
+API_PORT=8000
+
+# 如果已有后端进程在运行，先停止
+if [ -f "$BACKEND_PID_FILE" ]; then
+    OLD_PID=$(cat "$BACKEND_PID_FILE")
+    if ps -p "$OLD_PID" &>/dev/null; then
+        echo "停止旧的后端进程 (PID: $OLD_PID)..."
+        kill "$OLD_PID" 2>/dev/null || true
+        sleep 1
+    fi
+    rm -f "$BACKEND_PID_FILE"
+fi
+
+# 启动后端
+$PYTHON_CMD run_api.py --reload &
+BACKEND_PID=$!
+echo $BACKEND_PID > "$BACKEND_PID_FILE"
+echo -e "${YELLOW}后端进程 PID: $BACKEND_PID${NC}"
+
+# 等待后端就绪
+echo -e "${YELLOW}等待后端服务就绪...${NC}"
+MAX_RETRIES=30
+RETRY_COUNT=0
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    # 尝试访问健康检查端点
+    if curl -s "http://localhost:$API_PORT/api/health/simple" &>/dev/null; then
+        echo -e "${GREEN}后端服务已就绪！${NC}"
+        break
+    fi
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    echo -e "${YELLOW}等待后端响应... ($RETRY_COUNT/$MAX_RETRIES)${NC}"
+    sleep 1
+done
+
+if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+    echo -e "${RED}错误: 后端服务启动超时${NC}"
+    rm -f "$BACKEND_PID_FILE"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}启动前端服务...${NC}"
+echo ""
+
+# 启动前端（前台运行）
+cd web && pnpm run dev

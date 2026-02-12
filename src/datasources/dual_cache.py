@@ -30,22 +30,27 @@ class MemoryCache:
         self._cache: dict[str, dict] = {}
         self._access_order: list[str] = []
         self._lock = asyncio.Lock()
+        self._hit_count = 0
+        self._miss_count = 0
 
     async def get(self, key: str) -> Any | None:
         """获取缓存"""
         async with self._lock:
             if key not in self._cache:
+                self._miss_count += 1
                 return None
 
             entry = self._cache[key]
             # 检查 TTL
             if datetime.now() >= entry["expires_at"]:
                 self._remove(key)
+                self._miss_count += 1
                 return None
 
             # 更新访问顺序
             self._access_order.remove(key)
             self._access_order.append(key)
+            self._hit_count += 1
 
             return entry["value"]
 
@@ -84,6 +89,19 @@ class MemoryCache:
         self._cache.clear()
         self._access_order.clear()
 
+    def get_stats(self) -> dict:
+        """获取缓存统计信息"""
+        total = self._hit_count + self._miss_count
+        hit_rate = self._hit_count / total if total > 0 else 0.0
+        return {
+            "hit_count": self._hit_count,
+            "miss_count": self._miss_count,
+            "hit_rate": round(hit_rate, 4),
+            "total_requests": total,
+            "current_size": len(self._cache),
+            "max_size": self.max_size,
+        }
+
 
 class DualLayerCache:
     """双层缓存 (L1 内存 + L2 文件)"""
@@ -107,6 +125,8 @@ class DualLayerCache:
         self.memory_cache = MemoryCache(max_size=max_memory_items, ttl_seconds=memory_ttl)
         self._ensure_cache_dir()
         self._lock = asyncio.Lock()
+        self._hit_count = 0
+        self._miss_count = 0
 
     def _ensure_cache_dir(self):
         """确保缓存目录存在"""
@@ -126,6 +146,7 @@ class DualLayerCache:
         # L1: 内存缓存
         value = await self.memory_cache.get(key)
         if value is not None:
+            self._hit_count += 1
             return value, "memory"
 
         # L2: 文件缓存
@@ -133,6 +154,7 @@ class DualLayerCache:
         file_path = self.cache_dir / f"{file_key}.json"
 
         if not file_path.exists():
+            self._miss_count += 1
             return None, None
 
         try:
@@ -144,14 +166,17 @@ class DualLayerCache:
                 if datetime.now() >= expires_at:
                     # 过期，删除文件
                     file_path.unlink(missing_ok=True)
+                    self._miss_count += 1
                     return None, None
 
                 value = cache_data.get('value')
                 # 回填 L1 缓存
                 await self.memory_cache.set(key, value, self.file_ttl)
+                self._hit_count += 1
                 return value, "file"
 
         except (json.JSONDecodeError, KeyError, ValueError, OSError):
+            self._miss_count += 1
             return None, None
 
     async def set(self, key: str, value: Any, ttl_seconds: int | None = None):
@@ -200,7 +225,7 @@ class DualLayerCache:
                 pass
 
     def get_stats(self) -> dict:
-        """获取缓存统计"""
+        """获取缓存统计信息"""
         total_files = 0
         valid_files = 0
         total_size = 0
@@ -221,8 +246,16 @@ class DualLayerCache:
             except (json.JSONDecodeError, KeyError, ValueError, OSError):
                 pass
 
+        # 计算命中率
+        total = self._hit_count + self._miss_count
+        hit_rate = self._hit_count / total if total > 0 else 0.0
+
         return {
-            "memory_cache_size": len(self.memory_cache._cache),
+            "hit_count": self._hit_count,
+            "miss_count": self._miss_count,
+            "hit_rate": round(hit_rate, 4),
+            "total_requests": total,
+            "memory_cache": self.memory_cache.get_stats(),
             "file_cache_total": total_files,
             "file_cache_valid": valid_files,
             "file_cache_size_bytes": total_size

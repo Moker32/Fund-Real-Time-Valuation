@@ -80,6 +80,60 @@ class CacheWarmer:
             logger.error(f"缓存预加载失败: {e}")
             self._cache_loaded = True  # 标记已尝试加载，避免重复
 
+    async def preload_fund_info_cache(self, timeout: float = 60.0):
+        """
+        预热基金信息缓存（名称、类型等）
+
+        在服务启动时并行获取所有基金的名称和类型，缓存起来供后续请求使用。
+
+        Args:
+            timeout: 超时时间（秒）
+        """
+        try:
+            from src.datasources.fund_source import get_fund_basic_info
+
+            # 加载基金列表
+            config_manager = ConfigManager()
+            fund_list: FundList = config_manager.load_funds()
+            fund_codes = fund_list.get_all_codes()
+
+            if not fund_codes:
+                # 使用默认基金列表
+                fund_codes = [
+                    "161039",  # 易方达消费行业股票
+                    "161725",  # 招商中证白酒指数
+                    "110022",  # 易方达消费行业
+                    "000015",  # 华夏策略精选混合
+                    "161032",  # 富国中证新能源汽车指数
+                ]
+
+            logger.info(f"开始预热基金信息缓存，共 {len(fund_codes)} 个基金...")
+
+            # 并行获取所有基金的名称和类型
+            async def fetch_fund_info(code: str):
+                try:
+                    get_fund_basic_info(code)
+                    return code, True
+                except Exception as e:
+                    logger.debug(f"预热基金信息失败: {code}, error: {e}")
+                    return code, False
+
+            # 使用 semaphore 限制并发数
+            semaphore = asyncio.Semaphore(10)
+
+            async def fetch_with_limit(code: str):
+                async with semaphore:
+                    return await fetch_fund_info(code)
+
+            tasks = [fetch_with_limit(code) for code in fund_codes]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            success_count = sum(1 for r in results if r and r[1])
+            logger.info(f"基金信息缓存预热完成: 成功 {success_count}/{len(fund_codes)}")
+
+        except Exception as e:
+            logger.error(f"基金信息缓存预热失败: {e}")
+
     async def warmup(self, timeout: float = 120.0):
         """
         预热缓存 - 获取所有自选基金数据
@@ -163,3 +217,74 @@ class CacheWarmer:
                 pass
 
         logger.info("后台缓存预热任务已停止")
+
+
+async def prewarm_new_fund(fund_code: str, timeout: float = 30.0):
+    """
+    预热单个基金数据
+
+    在添加基金到自选后立即触发数据预热，将数据写入缓存供后续请求使用。
+
+    Args:
+        fund_code: 基金代码
+        timeout: 超时时间（秒）
+    """
+    try:
+        logger.info(f"开始预热基金数据: {fund_code}")
+
+        # 获取基金实时数据并写入缓存
+        try:
+            from src.datasources.fund_source import FundDataSource
+
+            source = FundDataSource()
+            result = await asyncio.wait_for(
+                source.fetch(fund_code),
+                timeout=timeout
+            )
+
+            if result.success:
+                logger.info(f"基金数据预热成功: {fund_code}")
+            else:
+                logger.warning(f"基金数据预热失败: {fund_code} - {result.error}")
+
+        except asyncio.TimeoutError:
+            logger.warning(f"基金数据预热超时: {fund_code}")
+        except Exception as e:
+            logger.error(f"基金数据预热异常: {fund_code} - {e}")
+
+    except Exception as e:
+        logger.error(f"预热基金数据失败: {fund_code} - {e}")
+
+
+async def cleanup_fund_cache(fund_code: str):
+    """
+    清理基金缓存
+
+    在从自选移除基金后清理相关缓存条目。
+
+    Args:
+        fund_code: 基金代码
+    """
+    try:
+        from src.datasources.fund_source import get_fund_cache
+
+        # 清理双层缓存中的基金数据
+        cache = get_fund_cache()
+        cache_key = f"fund:tiantian:{fund_code}"
+        await cache.delete(cache_key)
+
+        logger.info(f"已清理基金缓存: {fund_code}")
+
+    except Exception as e:
+        logger.error(f"清理基金缓存失败: {fund_code} - {e}")
+
+    try:
+        # 清理基金基本信息缓存
+        from src.datasources import fund_source
+
+        if fund_code in fund_source._fund_info_cache:
+            del fund_source._fund_info_cache[fund_code]
+            logger.info(f"已清理基金信息缓存: {fund_code}")
+
+    except Exception as e:
+        logger.error(f"清理基金信息缓存失败: {fund_code} - {e}")

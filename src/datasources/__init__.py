@@ -47,7 +47,7 @@ from .commodity_source import (
     CommodityDataSource,
     YFinanceCommoditySource,
 )
-from .fund_source import FundDataSource, SinaFundDataSource
+from .fund_source import Fund123DataSource, FundDataSource, SinaFundDataSource
 from .manager import DataSourceConfig, DataSourceManager, create_default_manager
 from .news_source import NewsAggregatorDataSource, SinaNewsDataSource
 from .portfolio import (
@@ -71,6 +71,7 @@ __all__ = [
     # 基金数据源
     "FundDataSource",
     "SinaFundDataSource",
+    "Fund123DataSource",
 
     # 商品数据源
     "CommodityDataSource",

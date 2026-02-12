@@ -1,6 +1,6 @@
 """
 基金数据源模块
-实现从天天基金/新浪接口获取基金实时估值数据
+实现从天天基金/fund123.cn 接口获取基金实时估值数据
 """
 
 import asyncio
@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 import pandas as pd
+import requests
 
 from .base import (
     DataParseError,
@@ -26,6 +27,12 @@ logger = logging.getLogger(__name__)
 
 # 全局缓存实例（单例模式）
 _fund_cache: DualLayerCache | None = None
+# 基金基本信息缓存（全局 akshare 调用结果）
+_fund_info_cache: dict[str, tuple[dict, float]] = {}  # {code: (info, timestamp)}
+_fund_info_cache_ttl = 3600  # 1小时缓存
+# 基金信息缓存命中率统计
+_fund_info_hit_count = 0
+_fund_info_miss_count = 0
 
 
 def get_fund_cache() -> DualLayerCache:
@@ -35,11 +42,67 @@ def get_fund_cache() -> DualLayerCache:
         cache_dir = Path.home() / ".fund-tui" / "cache" / "funds"
         _fund_cache = DualLayerCache(
             cache_dir=cache_dir,
-            memory_ttl=30,      # 内存缓存 30 秒
+            memory_ttl=300,      # 内存缓存 5 分钟
             file_ttl=300,        # 文件缓存 5 分钟
             max_memory_items=100
         )
     return _fund_cache
+
+
+def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
+    """
+    获取基金基本信息（名称和类型），使用全局缓存
+
+    Args:
+        fund_code: 基金代码
+
+    Returns:
+        (name, type) 或 None（如果获取失败）
+    """
+    global _fund_info_cache, _fund_info_hit_count, _fund_info_miss_count
+    now = time.time()
+
+    # 检查缓存
+    if fund_code in _fund_info_cache:
+        info, timestamp = _fund_info_cache[fund_code]
+        if now - timestamp < _fund_info_cache_ttl:
+            _fund_info_hit_count += 1
+            return info
+
+    try:
+        import akshare as ak
+
+        # 获取基金简称
+        fund_name = ""
+        try:
+            daily_df = ak.fund_open_fund_daily_em()
+            if "基金代码" in daily_df.columns:
+                name_rows = daily_df[daily_df["基金代码"] == fund_code]
+                if not name_rows.empty:
+                    fund_name = str(name_rows.iloc[0].get("基金简称", ""))
+        except Exception as e:
+            logger.debug(f"获取基金简称失败: {fund_code}, error: {e}")
+
+        # 获取基金类型
+        fund_type = ""
+        try:
+            info_df = ak.fund_individual_basic_info_xq(symbol=fund_code)
+            if info_df is not None and not info_df.empty:
+                type_row = info_df[info_df["item"] == "基金类型"]
+                if not type_row.empty:
+                    fund_type = str(type_row.iloc[0]["value"]).strip()
+                    if "-" in fund_type:
+                        fund_type = fund_type.split("-")[0]
+        except Exception as e:
+            logger.debug(f"获取基金类型失败: {fund_code}, error: {e}")
+
+        result = (fund_name, fund_type)
+        _fund_info_cache[fund_code] = (result, now)
+        return result
+
+    except Exception as e:
+        logger.warning(f"获取基金基本信息失败: {fund_code}, error: {e}")
+        return None
 
 
 class FundDataSource(DataSource):
@@ -355,10 +418,22 @@ class FundDataSource(DataSource):
             # 获取最新一条数据
             latest = df.iloc[0]
 
+            # 使用缓存获取基金名称
+            fund_info = get_fund_basic_info(fund_code)
+            if fund_info:
+                fund_name, fund_type = fund_info
+            else:
+                fund_name, fund_type = "", ""
+
+            # 如果没获取到名称，使用基金代码作为名称
+            if not fund_name:
+                fund_name = f"ETF {fund_code}"
+
             # 提取数据
             data = {
                 "fund_code": fund_code,
-                "name": f"ETF {fund_code}",  # ETF 接口不直接返回名称
+                "name": fund_name,
+                "type": fund_type,
                 "net_value_date": str(latest.get("净值日期", "")),
                 "unit_net_value": float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None,
                 "estimated_net_value": float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None,
@@ -433,35 +508,16 @@ class FundDataSource(DataSource):
             # 获取最新一条数据（最后一行是最新的，因为数据是按日期升序排列的）
             latest = df.iloc[-1]
 
-            # 获取基金简称和类型
-            fund_name = ""
-            fund_type = ""
-            try:
-                daily_df = ak.fund_open_fund_daily_em()
-                if "基金代码" in daily_df.columns:
-                    name_rows = daily_df[daily_df["基金代码"] == fund_code]
-                    if not name_rows.empty:
-                        fund_name = str(name_rows.iloc[0].get("基金简称", ""))
-            except Exception as e:
-                logger.debug(f"获取基金简称失败: {fund_code}, error: {e}")
+            # 使用缓存获取基金简称和类型
+            fund_info = get_fund_basic_info(fund_code)
+            if fund_info:
+                fund_name, fund_type = fund_info
+            else:
+                fund_name, fund_type = "", ""
 
             # 如果没获取到名称，使用基金代码作为名称
             if not fund_name:
                 fund_name = f"基金 {fund_code}"
-
-            # 获取基金详细信息（包含类型）
-            try:
-                info_df = ak.fund_individual_basic_info_xq(symbol=fund_code)
-                if info_df is not None and not info_df.empty:
-                    # 查找基金类型
-                    type_row = info_df[info_df["item"] == "基金类型"]
-                    if not type_row.empty:
-                        fund_type = str(type_row.iloc[0]["value"]).strip()
-                        # 简化类型名称
-                        if "-" in fund_type:
-                            fund_type = fund_type.split("-")[0]  # "QDII-商品" -> "QDII"
-            except Exception as e:
-                logger.debug(f"获取基金类型失败: {fund_code}, error: {e}")
 
             # 根据基金类型判断是否有实时估值（QDII/FOF 等投资海外市场或为基金中基金，净值更新延迟）
             no_realtime_types = {"QDII", "FOF", "ETF-联接"}
@@ -574,25 +630,12 @@ class FundDataSource(DataSource):
         Returns:
             str: 基金类型（如：股票型、混合型、债券型、QDII、ETF等）
         """
-        try:
-            import akshare as ak
-
-            # 获取基金详细信息
-            info_df = ak.fund_individual_basic_info_xq(symbol=fund_code)
-            if info_df is not None and not info_df.empty:
-                # 查找基金类型
-                type_row = info_df[info_df["item"] == "基金类型"]
-                if not type_row.empty:
-                    fund_type = str(type_row.iloc[0]["value"]).strip()
-                    # 简化类型名称
-                    if "-" in fund_type:
-                        fund_type = fund_type.split("-")[0]  # "QDII-商品" -> "QDII"
-                    return fund_type
-
-            return ""
-        except Exception as e:
-            logger.warning(f"获取基金类型失败: {fund_code}, error: {e}")
-            return ""
+        # 使用缓存获取基金信息
+        fund_info = get_fund_basic_info(fund_code)
+        if fund_info:
+            _, fund_type = fund_info
+            return fund_type
+        return ""
 
     def _parse_response(self, response_text: str, fund_code: str) -> dict[str, Any] | None:
         """
@@ -699,7 +742,37 @@ class FundDataSource(DataSource):
 
 
 # 导出类
-__all__ = ["FundDataSource", "SinaFundDataSource", "FundHistorySource", "FundHistoryYFinanceSource"]
+__all__ = ["FundDataSource", "SinaFundDataSource", "FundHistorySource", "FundHistoryYFinanceSource", "get_fund_cache_stats"]
+
+
+def get_fund_cache_stats() -> dict:
+    """
+    获取基金缓存统计信息
+
+    Returns:
+        dict: 包含 fund_cache 和 fund_info_cache 的统计信息
+    """
+    global _fund_info_hit_count, _fund_info_miss_count
+
+    # 获取基金信息缓存统计
+    info_total = _fund_info_hit_count + _fund_info_miss_count
+    info_hit_rate = _fund_info_hit_count / info_total if info_total > 0 else 0.0
+
+    # 获取基金数据缓存统计
+    fund_cache = get_fund_cache()
+    fund_cache_stats = fund_cache.get_stats() if fund_cache else {}
+
+    return {
+        "fund_cache": fund_cache_stats,
+        "fund_info_cache": {
+            "hit_count": _fund_info_hit_count,
+            "miss_count": _fund_info_miss_count,
+            "hit_rate": round(info_hit_rate, 4),
+            "total_requests": info_total,
+            "cached_items": len(_fund_info_cache),
+            "ttl_seconds": _fund_info_cache_ttl
+        }
+    }
 
 
 class FundHistorySource(DataSource):
@@ -1298,3 +1371,340 @@ class EastMoneyFundDataSource(DataSource):
                 processed_results.append(result)
 
         return processed_results
+
+
+class Fund123DataSource(DataSource):
+    """
+    fund123.cn 基金数据源
+
+    特点：
+    - 速度快（~0.1秒/请求）
+    - 需要 CSRF token 和 Cookie
+    - 支持日内估值、历史净值查询
+    """
+
+    BASE_URL = "https://www.fund123.cn"
+
+    # 全局 Session 和 CSRF token（单例模式）
+    _session: requests.Session | None = None
+    _csrf_token: str | None = None
+    _csrf_token_time: float = 0.0
+    _csrf_token_ttl = 1800  # 30 分钟过期
+
+    def __init__(
+        self,
+        timeout: float = 15.0,
+        max_retries: int = 3,
+        retry_delay: float = 0.5
+    ):
+        """
+        初始化 fund123 基金数据源
+
+        Args:
+            timeout: 请求超时时间(秒)
+            max_retries: 最大重试次数
+            retry_delay: 重试间隔(秒)
+        """
+        super().__init__(
+            name="fund123",
+            source_type=DataSourceType.FUND,
+            timeout=timeout
+        )
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        self._ensure_session()
+
+    @classmethod
+    def _ensure_session(cls):
+        """确保存在全局 Session"""
+        if cls._session is None:
+            cls._session = requests.Session()
+            cls._session.headers.update({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+                "Accept-Language": "zh-CN,zh;q=0.9",
+                "Referer": "https://www.fund123.cn/fund",
+                "Origin": "https://www.fund123.cn",
+                "X-API-Key": "foobar",
+            })
+
+    @classmethod
+    def _get_csrf_token(cls) -> str | None:
+        """
+        获取 CSRF token
+
+        Returns:
+            CSRF token 字符串，获取失败返回 None
+        """
+        now = time.time()
+
+        # 检查缓存的 token 是否有效
+        if cls._csrf_token and (now - cls._csrf_token_time) < cls._csrf_token_ttl:
+            return cls._csrf_token
+
+        try:
+            # 访问首页获取 token
+            response = cls._session.get(
+                f"{cls.BASE_URL}/fund",
+                timeout=15,
+                verify=False
+            )
+            response.raise_for_status()
+
+            # 从响应文本中提取 CSRF
+            csrf_match = re.search(r'"csrf":"([^"]+)"', response.text)
+            if csrf_match:
+                cls._csrf_token = csrf_match.group(1)
+                cls._csrf_token_time = now
+                logger.debug(f"获取到新的 CSRF token: {cls._csrf_token[:20]}...")
+                return cls._csrf_token
+
+            logger.warning("无法从响应中提取 CSRF token")
+            return None
+
+        except Exception as e:
+            logger.error(f"获取 CSRF token 失败: {e}")
+            return None
+
+    @classmethod
+    def _refresh_csrf_token(cls) -> bool:
+        """刷新 CSRF token"""
+        cls._csrf_token = None
+        cls._csrf_token_time = 0
+        token = cls._get_csrf_token()
+        return token is not None
+
+    async def fetch(self, fund_code: str, use_cache: bool = True) -> DataSourceResult:
+        """
+        获取单个基金数据
+
+        Args:
+            fund_code: 基金代码 (6位数字)
+            use_cache: 是否使用缓存
+
+        Returns:
+            DataSourceResult: 包含基金数据的结果
+        """
+        if not self._validate_fund_code(fund_code):
+            return DataSourceResult(
+                success=False,
+                error=f"无效的基金代码: {fund_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        cache_key = f"fund:{self.name}:{fund_code}"
+
+        # 检查缓存
+        if use_cache:
+            cache = get_fund_cache()
+            cached_value, cache_type = await cache.get(cache_key)
+            if cached_value is not None:
+                return DataSourceResult(
+                    success=True,
+                    data=cached_value,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code, "cache": cache_type}
+                )
+
+        for attempt in range(self.max_retries):
+            try:
+                # 在线程池中执行同步请求
+                loop = asyncio.get_event_loop()
+                result = await loop.run_in_executor(
+                    None,
+                    lambda: self._fetch_fund_data(fund_code)
+                )
+
+                if result.success:
+                    self._record_success()
+                    # 写入缓存
+                    cache = get_fund_cache()
+                    await cache.set(cache_key, result.data)
+                    return result
+                else:
+                    # 如果失败且还有重试次数，刷新 token 后重试
+                    if attempt < self.max_retries - 1:
+                        self._refresh_csrf_token()
+                        await asyncio.sleep(self.retry_delay * (attempt + 1))
+                        continue
+                    return result
+
+            except Exception as e:
+                logger.error(f"获取基金数据异常: {e}")
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(self.retry_delay * (attempt + 1))
+                    continue
+
+        return DataSourceResult(
+            success=False,
+            error=f"获取基金数据失败，已重试 {self.max_retries} 次",
+            timestamp=time.time(),
+            source=self.name,
+            metadata={"fund_code": fund_code}
+        )
+
+    def _fetch_fund_data(self, fund_code: str) -> DataSourceResult:
+        """同步获取基金数据"""
+        # 1. 获取基金基本信息（fund_key 和 fund_name）
+        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={self._csrf_token}"
+        search_response = self._session.post(
+            search_url,
+            json={"fundCode": fund_code},
+            timeout=self.timeout,
+            verify=False
+        )
+
+        if not search_response.ok:
+            return DataSourceResult(
+                success=False,
+                error=f"搜索基金失败: {search_response.status_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        search_data = search_response.json()
+        if not search_data.get("success"):
+            return DataSourceResult(
+                success=False,
+                error=f"基金不存在: {fund_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        fund_info = search_data.get("fundInfo", {})
+        fund_key = fund_info.get("key")
+        fund_name = fund_info.get("fundName", f"基金 {fund_code}")
+
+        # 2. 获取日内估值数据
+        today = time.strftime("%Y-%m-%d")
+        intraday_url = f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={self._csrf_token}"
+        intraday_response = self._session.post(
+            intraday_url,
+            json={
+                "startTime": today,
+                "endTime": today,
+                "limit": 200,
+                "productId": fund_key,
+                "format": True,
+                "source": "WEALTHBFFWEB"
+            },
+            timeout=self.timeout,
+            verify=False
+        )
+
+        if not intraday_response.ok:
+            return DataSourceResult(
+                success=False,
+                error=f"获取日内数据失败: {intraday_response.status_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code}
+            )
+
+        intraday_data = intraday_response.json()
+        intraday_list = intraday_data.get("list", [])
+
+        # 解析数据
+        if intraday_list:
+            latest = intraday_list[-1]
+            estimate_value = float(latest.get("forecastNetValue", 0))
+            growth_rate = float(latest.get("forecastGrowth", 0)) * 100
+            estimate_time = time.strftime("%Y-%m-%d %H:%M:%S",
+                                        time.localtime(latest.get("time", 0) / 1000))
+        else:
+            estimate_value = None
+            growth_rate = 0.0
+            estimate_time = ""
+
+        # 3. 获取最新净值信息（从 search 结果中）
+        net_value = float(fund_info.get("netValue", 0)) if fund_info.get("netValue") else None
+        net_date = str(fund_info.get("netValueDate", ""))
+
+        result_data = {
+            "fund_code": fund_code,
+            "name": fund_name,
+            "net_value_date": net_date,
+            "unit_net_value": net_value,
+            "estimated_net_value": estimate_value,
+            "estimated_growth_rate": growth_rate if growth_rate else None,
+            "estimate_time": estimate_time,
+            "has_real_time_estimate": estimate_value is not None,
+            "intraday": [
+                {
+                    "time": time.strftime("%H:%M", time.localtime(item.get("time", 0) / 1000)),
+                    "value": float(item.get("forecastNetValue", 0)),
+                    "change": float(item.get("forecastGrowth", 0)) * 100
+                }
+                for item in intraday_list
+            ]
+        }
+
+        return DataSourceResult(
+            success=True,
+            data=result_data,
+            timestamp=time.time(),
+            source=self.name,
+            metadata={"fund_code": fund_code}
+        )
+
+    async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
+        """
+        批量获取基金数据
+
+        Args:
+            fund_codes: 基金代码列表
+
+        Returns:
+            List[DataSourceResult]: 每个基金的结果列表
+        """
+        async def fetch_one(code: str) -> DataSourceResult:
+            return await self.fetch(code)
+
+        tasks = [fetch_one(code) for code in fund_codes]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append(
+                    DataSourceResult(
+                        success=False,
+                        error=str(result),
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"fund_code": fund_codes[i]}
+                    )
+                )
+            else:
+                processed_results.append(result)
+
+        return processed_results
+
+    def _validate_fund_code(self, fund_code: str) -> bool:
+        """验证基金代码格式"""
+        return bool(re.match(r"^\d{6}$", str(fund_code)))
+
+    async def health_check(self) -> bool:
+        """
+        健康检查
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            token = self._get_csrf_token()
+            return token is not None
+        except Exception:
+            return False
+
+    def close(self):
+        """关闭全局 Session"""
+        if self._session is not None:
+            self._session.close()
+            self._session = None
+            self._csrf_token = None

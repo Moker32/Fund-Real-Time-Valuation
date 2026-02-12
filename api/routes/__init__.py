@@ -2,6 +2,6 @@
 API 路由模块
 """
 
-from . import commodities, funds
+from . import cache, commodities, funds
 
-__all__ = ["commodities", "funds"]
+__all__ = ["cache", "commodities", "funds"]

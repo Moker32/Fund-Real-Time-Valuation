@@ -21,7 +21,7 @@ from .dependencies import (
     set_data_source_manager,
 )
 from .models import HealthDetailResponse, HealthResponse
-from .routes import commodities, funds, overview
+from .routes import cache, commodities, funds, overview
 
 # 全局预热器实例
 _cache_warmer: CacheWarmer | None = None
@@ -48,10 +48,13 @@ async def lifespan(app: FastAPI):
     # 这样前端首次请求就能拿到缓存数据，而不必等待数据刷新
     await _cache_warmer.preload_all_cache(timeout=10)
 
+    # 预热基金信息缓存（名称、类型等）- 并行获取，不阻塞服务启动
+    asyncio.create_task(_cache_warmer.preload_fund_info_cache(timeout=60))
+
     # 启动后台健康检查（会立即执行一次检查）
     await manager.start_background_health_check()
 
-    # 等待一段时间让健康检查完成初始化，避免与缓存预热并发触发 akshare
+    # 等待一段时间让健康检查完成初始化
     await asyncio.sleep(2)
 
     # 启动缓存预热（不阻塞服务启动）
@@ -185,6 +188,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(funds.router)
 app.include_router(commodities.router)
 app.include_router(overview.router)
+app.include_router(cache.router)
 
 
 @app.get(

@@ -3,6 +3,7 @@
 提供基金相关的 REST API 端点
 """
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import TypedDict
@@ -403,6 +404,9 @@ async def add_to_watchlist(
     fund = Fund(code=request.code, name=fund_name)
     config_manager.add_watchlist(fund)
 
+    # 添加成功后，触发新基金数据预热（非阻塞）
+    asyncio.create_task(_prewarm_added_fund(request.code))
+
     return {
         "success": True,
         "message": f"基金 {request.code} 已添加到自选",
@@ -470,6 +474,10 @@ async def toggle_holding(
 
         new_holding = Holding(code=code, name=fund_name)
         config_manager.add_holding(new_holding)
+
+        # 标记为持有后，触发基金数据预热（非阻塞）
+        asyncio.create_task(_prewarm_added_fund(code))
+
         return {
             "success": True,
             "message": f"基金 {code} 已标记为持有",
@@ -483,6 +491,10 @@ async def toggle_holding(
             }
 
         config_manager.remove_holding(code)
+
+        # 取消持有后，清理相关缓存
+        asyncio.create_task(_cleanup_removed_fund(code))
+
         return {
             "success": True,
             "message": f"基金 {code} 已取消持有",
@@ -523,7 +535,46 @@ async def remove_from_watchlist(code: str) -> dict:
     # 从自选列表中移除
     config_manager.remove_watchlist(code)
 
+    # 移除成功后，清理相关缓存
+    asyncio.create_task(_cleanup_removed_fund(code))
+
     return {
         "success": True,
         "message": f"基金 {code} 已从自选移除",
     }
+
+
+async def _prewarm_added_fund(fund_code: str):
+    """
+    预热新添加的基金数据
+
+    在添加基金到自选后触发预热，将数据写入缓存供后续请求使用。
+    这是非阻塞操作，在后台执行。
+
+    Args:
+        fund_code: 基金代码
+    """
+    try:
+        from src.datasources.cache_warmer import prewarm_new_fund
+
+        await prewarm_new_fund(fund_code, timeout=30.0)
+    except Exception as e:
+        logger.warning(f"预热基金数据失败: {fund_code} - {e}")
+
+
+async def _cleanup_removed_fund(fund_code: str):
+    """
+    清理移除的基金缓存
+
+    在从自选移除基金后清理相关缓存条目。
+    这是非阻塞操作，在后台执行。
+
+    Args:
+        fund_code: 基金代码
+    """
+    try:
+        from src.datasources.cache_warmer import cleanup_fund_cache
+
+        await cleanup_fund_cache(fund_code)
+    except Exception as e:
+        logger.warning(f"清理基金缓存失败: {fund_code} - {e}")
