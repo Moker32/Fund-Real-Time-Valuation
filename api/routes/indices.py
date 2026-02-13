@@ -52,9 +52,16 @@ def get_trading_status(index_type: str) -> dict:
     # 转换为目标时区
     local_now = utc_now.astimezone(tz)
 
-    # 解析开盘和收盘时间
-    open_time = datetime.strptime(market_info["open"], "%H:%M").time()
-    close_time = datetime.strptime(market_info["close"], "%H:%M").time()
+    # 解析开盘和收盘时间 (存储的是 UTC 时间，需要转换为目标时区)
+    open_utc = datetime.strptime(market_info["open"], "%H:%M")
+    close_utc = datetime.strptime(market_info["close"], "%H:%M")
+
+    # 构造 UTC 时间并转换为目标时区
+    today = local_now.date()
+    open_utc_dt = datetime.combine(today, open_utc.time(), tzinfo=pytz.UTC)
+    close_utc_dt = datetime.combine(today, close_utc.time(), tzinfo=pytz.UTC)
+    open_time = open_utc_dt.astimezone(tz).time()
+    close_time = close_utc_dt.astimezone(tz).time()
 
     # 判断交易状态
     current_time = local_now.time()
