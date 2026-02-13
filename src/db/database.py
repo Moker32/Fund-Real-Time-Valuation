@@ -961,8 +961,8 @@ class FundIntradayCacheDAO:
     支持 60 秒缓存过期机制，用于减少 API 调用。
     """
 
-    # 默认缓存过期时间（秒）
-    DEFAULT_CACHE_TTL = 60
+    # 默认缓存过期时间（秒）- 0 表示禁用缓存
+    DEFAULT_CACHE_TTL = 0
 
     def __init__(self, db_manager: DatabaseManager, cache_ttl: int = DEFAULT_CACHE_TTL):
         """
@@ -1222,8 +1222,8 @@ class FundDailyCacheDAO:
     用于缓存当日基金估值数据，减少 API 调用频率。
     """
 
-    # 默认缓存过期时间（秒）- 5分钟
-    DEFAULT_CACHE_TTL = 300
+    # 默认缓存过期时间（秒）- 0 表示禁用缓存
+    DEFAULT_CACHE_TTL = 0
 
     def __init__(self, db_manager: DatabaseManager, cache_ttl: int = DEFAULT_CACHE_TTL):
         """

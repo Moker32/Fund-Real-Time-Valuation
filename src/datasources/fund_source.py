@@ -49,8 +49,8 @@ def get_fund_cache() -> DualLayerCache:
         cache_dir = Path.home() / ".fund-tui" / "cache" / "funds"
         _fund_cache = DualLayerCache(
             cache_dir=cache_dir,
-            memory_ttl=300,      # 内存缓存 5 分钟
-            file_ttl=300,        # 文件缓存 5 分钟
+            memory_ttl=0,       # 禁用内存缓存
+            file_ttl=0,         # 禁用文件缓存
             max_memory_items=100
         )
     return _fund_cache
@@ -421,7 +421,7 @@ class FundDataSource(DataSource):
                         "unit_net_value": cached_daily.unit_net_value,
                         "estimated_net_value": cached_daily.estimated_value,
                         "estimated_growth_rate": cached_daily.change_rate,
-                        "estimate_time": cached_daily.date,
+                        "estimate_time": cached_daily.fetched_at or cached_daily.date,
                         "has_real_time_estimate": cached_daily.estimated_value is not None,
                     }
                     return DataSourceResult(
@@ -1844,7 +1844,7 @@ class Fund123DataSource(DataSource):
                         "unit_net_value": cached_daily.unit_net_value,
                         "estimated_net_value": cached_daily.estimated_value,
                         "estimated_growth_rate": cached_daily.change_rate,
-                        "estimate_time": cached_daily.date,
+                        "estimate_time": cached_daily.fetched_at or cached_daily.date,
                         "has_real_time_estimate": cached_daily.estimated_value is not None,
                         "from_cache": "database"
                     }
