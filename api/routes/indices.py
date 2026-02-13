@@ -136,6 +136,67 @@ def get_trading_status(index_type: str, data_timestamp: str | None = None) -> di
     }
 
 
+def get_display_timestamp(index_type: str, data_timestamp: str | None) -> str | None:
+    """
+    获取显示用的时间戳（不超过市场收盘时间）
+
+    Args:
+        index_type: 指数类型
+        data_timestamp: 数据源返回的时间戳 (ISO格式)
+
+    Returns:
+        处理后的时间戳，如果数据时间超过收盘时间则返回收盘时间
+    """
+    market_info = MARKET_HOURS.get(index_type, {})
+    if not market_info or not data_timestamp:
+        return data_timestamp
+
+    # 解析数据时间
+    try:
+        # 处理 Z 后缀和 +00:00 格式
+        ts_str = data_timestamp.replace('Z', '+00:00')
+        data_dt = datetime.fromisoformat(ts_str)
+    except (ValueError, TypeError):
+        return data_timestamp
+
+    # 获取市场时区
+    tz_str = market_info.get("tz", "UTC")
+    try:
+        tz = pytz.timezone(tz_str)
+    except pytz.exceptions.UnknownTimeZoneError:
+        return data_timestamp
+
+    data_dt_tz = data_dt.astimezone(tz)
+
+    # 计算当天收盘时间
+    today = data_dt_tz.date()
+    close_time_str = market_info.get("close")  # 如 "08:00" (UTC时间)
+    try:
+        close_time = datetime.strptime(close_time_str, "%H:%M").time()
+    except ValueError:
+        return data_timestamp
+
+    # 特殊处理A股午间休市
+    if index_type in ["shanghai", "shenzhen", "shanghai50", "chi_next", "star50",
+                      "csi500", "csi1000", "hs300", "csiall"]:
+        # A股午间休市时间是 11:30-13:00
+        # 如果数据时间在休市时段，使用上午收盘时间 11:30
+        morning_close = time(11, 30)
+        afternoon_open = time(13, 0)
+
+        if morning_close < data_dt_tz.time() < afternoon_open:
+            # 在午间休市时段，返回上午收盘时间
+            display_dt = datetime.combine(today, morning_close, tzinfo=tz)
+            return display_dt.isoformat()
+
+    # 如果数据时间超过收盘时间，返回收盘时间
+    if data_dt_tz.time() > close_time:
+        display_dt = datetime.combine(today, close_time, tzinfo=tz)
+        return display_dt.isoformat()
+
+    return data_timestamp
+
+
 @router.get(
     "",
     response_model=IndexListData,
