@@ -18,6 +18,13 @@
           <span class="status-dot"></span>
           <span class="status-text">{{ statusText }}</span>
         </div>
+        <div v-if="isDelayed" class="delay-tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6V12L16 14"/>
+          </svg>
+          <span>延时</span>
+        </div>
       </div>
 
       <div class="card-body">
@@ -147,6 +154,9 @@ const statusText = computed(() => {
   };
   return labels[props.index.tradingStatus || 'unknown'] || '未知';
 });
+
+// 判断是否为延时数据源
+const isDelayed = computed(() => props.index.source === 'yfinance_index');
 
 function formatPrice(value: number | undefined): string {
   if (value == null) return '--';
@@ -331,6 +341,23 @@ function formatMarketTime(dateStr: string | undefined): string {
     .status-dot {
       background: #8e8e93;
     }
+  }
+}
+
+.delay-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  background: rgba(255, 159, 10, 0.15);
+  color: #ff9f0a;
+  margin-left: var(--spacing-xs);
+
+  svg {
+    width: 12px;
+    height: 12px;
   }
 }
 
