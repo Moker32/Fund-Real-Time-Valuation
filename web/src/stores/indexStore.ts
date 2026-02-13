@@ -113,11 +113,12 @@ export const useIndexStore = defineStore('indices', () => {
     const force = options.force ?? false;
 
     // 如果已有数据且不是强制刷新，不显示 loading
-    if (!force && indices.value.length > 0) {
-      return;
+    const hasExistingData = indices.value.length > 0;
+    if (!force && hasExistingData) {
+      loading.value = false;
+    } else {
+      loading.value = true;
     }
-
-    loading.value = true;
     error.value = null;
     retryCount.value = 0;
 
