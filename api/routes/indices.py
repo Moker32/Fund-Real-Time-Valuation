@@ -253,6 +253,10 @@ async def get_indices(
         data_timestamp = data.get("data_timestamp")
         trading_status = get_trading_status(index_type, data_timestamp)
 
+        # 计算显示用的时间戳（不超过收盘时间）
+        display_timestamp = get_display_timestamp(index_type, data_timestamp)
+        market_info = MARKET_HOURS.get(index_type, {})
+
         # 判断是否为延时数据（腾讯的美股数据延时15分钟）
         is_delayed = result.source == "tencent_index" and index_type in TENCENT_DELAYED_INDICES
 
@@ -275,6 +279,8 @@ async def get_indices(
             "tradingStatus": trading_status.get("status"),
             "marketTime": trading_status.get("market_time"),
             "isDelayed": is_delayed,
+            "dataTimestamp": display_timestamp,  # 新增
+            "timezone": market_info.get("tz"),  # 新增
         })
 
     return {"indices": all_indices, "timestamp": current_time}
@@ -321,6 +327,10 @@ async def get_index(
     data_timestamp = data.get("data_timestamp")
     trading_status = get_trading_status(index_type, data_timestamp)
 
+    # 计算显示用的时间戳
+    display_timestamp = get_display_timestamp(index_type, data_timestamp)
+    market_info = MARKET_HOURS.get(index_type, {})
+
     # 判断是否为延时数据（腾讯的美股数据延时15分钟）
     is_delayed = result.source == "tencent_index" and index_type in TENCENT_DELAYED_INDICES
 
@@ -343,6 +353,8 @@ async def get_index(
         "tradingStatus": trading_status.get("status"),
         "marketTime": trading_status.get("market_time"),
         "isDelayed": is_delayed,
+        "dataTimestamp": display_timestamp,  # 新增
+        "timezone": market_info.get("tz"),  # 新增
     }
 
 
