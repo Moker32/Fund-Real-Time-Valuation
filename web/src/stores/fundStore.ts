@@ -37,9 +37,24 @@ export const useFundStore = defineStore('funds', () => {
   const loadingTotal = ref(0);     // 需要加载的总数
   const error = ref<string | null>(null);
   const lastUpdated = ref<string | null>(null);
-  const refreshInterval = ref(30); // seconds
-  const autoRefresh = ref(true);
-  const showChart = ref(false); // 是否显示基金卡片图表，默认关闭
+  // 从 localStorage 读取设置
+  const STORAGE_KEY = 'fund-app-settings';
+  function loadSettings(): { refreshInterval: number; autoRefresh: boolean; showChart: boolean } {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('[FundStore] Failed to load settings:', e);
+    }
+    return { refreshInterval: 30, autoRefresh: true, showChart: false };
+  }
+
+  const savedSettings = loadSettings();
+  const refreshInterval = ref(savedSettings.refreshInterval); // seconds
+  const autoRefresh = ref(savedSettings.autoRefresh);
+  const showChart = ref(savedSettings.showChart); // 是否显示基金卡片图表，默认关闭
   const retryCount = ref(0);
   const maxRetries = 2;
 
@@ -167,16 +182,32 @@ export const useFundStore = defineStore('funds', () => {
     }
   }
 
+  // 保存设置到 localStorage
+  function saveSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        refreshInterval: refreshInterval.value,
+        autoRefresh: autoRefresh.value,
+        showChart: showChart.value,
+      }));
+    } catch (e) {
+      console.error('[FundStore] Failed to save settings:', e);
+    }
+  }
+
   function setRefreshInterval(seconds: number) {
     refreshInterval.value = seconds;
+    saveSettings();
   }
 
   function setAutoRefresh(enabled: boolean) {
     autoRefresh.value = enabled;
+    saveSettings();
   }
 
   function setShowChart(enabled: boolean) {
     showChart.value = enabled;
+    saveSettings();
   }
 
   function clearError() {

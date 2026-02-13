@@ -157,6 +157,8 @@ function formatPercent(value: number | undefined): string {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   color: var(--color-text-primary);
+  min-width: 80px;
+  text-align: right;
 }
 
 .item-change {
@@ -203,10 +205,13 @@ function formatPercent(value: number | undefined): string {
 .change-value {
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
+  min-width: 50px;
+  text-align: right;
 }
 
 .change-percent {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
+  min-width: 50px;
 }
 </style>

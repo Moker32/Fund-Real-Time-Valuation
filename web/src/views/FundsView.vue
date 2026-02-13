@@ -293,9 +293,10 @@ onUnmounted(() => {
   transform: scale(0.95);
 }
 
-.fund-card-move {
+/* 移除 move 动画避免自动刷新时页面抖动 */
+/* .fund-card-move {
   transition: transform 0.3s ease;
-}
+} */
 
 .error-state,
 .loading-state,

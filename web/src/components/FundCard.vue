@@ -396,16 +396,22 @@ function formatNetValueDate(dateStr: string): string {
   0% {
     transform: scale(1);
     color: var(--color-text-primary);
+    background: transparent;
   }
-  30% {
-    color: var(--color-rise);
+  25% {
+    background: var(--color-rise-bg);
   }
   50% {
-    transform: scale(1.05);
+    transform: scale(1.1);
+    color: var(--color-rise);
+  }
+  75% {
+    background: var(--color-rise-bg);
   }
   100% {
     transform: scale(1);
     color: var(--color-text-primary);
+    background: transparent;
   }
 }
 
@@ -450,7 +456,7 @@ function formatNetValueDate(dateStr: string): string {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.05);
+    transform: scale(1.15);
   }
   100% {
     transform: scale(1);
