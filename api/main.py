@@ -25,7 +25,7 @@ from .dependencies import (
     set_data_source_manager,
 )
 from .models import DataSourceHealthItem, HealthDetailResponse, HealthResponse
-from .routes import cache, commodities, funds, indices, overview
+from .routes import cache, commodities, funds, indices, overview, sectors
 
 # 全局预热器实例
 _cache_warmer: CacheWarmer | None = None
@@ -220,6 +220,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 app.include_router(funds.router)
 app.include_router(commodities.router)
 app.include_router(indices.router)
+app.include_router(sectors.router)
 app.include_router(overview.router)
 app.include_router(cache.router)
 

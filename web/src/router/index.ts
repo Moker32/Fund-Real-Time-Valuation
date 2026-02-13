@@ -29,6 +29,11 @@ const router = createRouter({
           component: () => import('@/views/IndicesView.vue'),
         },
         {
+          path: 'sectors',
+          name: 'sectors',
+          component: () => import('@/views/SectorsView.vue'),
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/SettingsView.vue'),

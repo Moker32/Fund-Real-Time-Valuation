@@ -38,6 +38,16 @@
           <span v-if="!sidebarCollapsed" class="nav-text">全球市场</span>
         </router-link>
 
+        <router-link to="/sectors" class="nav-item" :class="{ active: currentRoute === 'sectors' }">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <span v-if="!sidebarCollapsed" class="nav-text">行业板块</span>
+        </router-link>
+
         <router-link to="/settings" class="nav-item" :class="{ active: currentRoute === 'settings' }">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="12" cy="12" r="3"/>
@@ -107,12 +117,14 @@ import { useRoute } from 'vue-router';
 import { useFundStore } from '@/stores/fundStore';
 import { useCommodityStore } from '@/stores/commodityStore';
 import { useIndexStore } from '@/stores/indexStore';
+import { useSectorStore } from '@/stores/sectorStore';
 import { healthApi } from '@/api';
 
 const route = useRoute();
 const fundStore = useFundStore();
 const commodityStore = useCommodityStore();
 const indexStore = useIndexStore();
+const sectorStore = useSectorStore();
 
 const sidebarCollapsed = ref(false);
 const healthStatus = ref<'healthy' | 'degraded' | 'unhealthy'>('healthy');
@@ -129,6 +141,7 @@ const pageTitle = computed(() => {
     funds: '基金自选',
     commodities: '商品行情',
     indices: '全球市场',
+    sectors: '行业板块',
     settings: '设置',
   };
   return titles[currentRoute.value] || 'FundVue';
@@ -162,6 +175,7 @@ async function refresh() {
     commodityStore.fetchCategories();
     await new Promise(resolve => setTimeout(resolve, 2000)); // 再过2秒后刷新指数
     indexStore.fetchIndices();
+    sectorStore.refresh();
     await checkHealth();
   } finally {
     setTimeout(() => {

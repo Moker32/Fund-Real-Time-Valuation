@@ -179,6 +179,43 @@ export interface IndexListResponse {
   timestamp: string;
 }
 
+// Sector Types
+export interface Sector {
+  rank: number;
+  name: string;
+  code: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  totalMarket?: string;
+  turnover?: string;
+  upCount: number;
+  downCount: number;
+  leadStock?: string;
+  leadChange: number;
+}
+
+export interface SectorListResponse {
+  sectors: Sector[];
+  timestamp: string;
+  type: 'industry' | 'concept';
+}
+
+export interface SectorStock {
+  rank: number;
+  code: string;
+  name: string;
+  price: number;
+  changePercent: number;
+}
+
+export interface SectorDetailResponse {
+  sector_name: string;
+  stocks: SectorStock[];
+  count: number;
+  timestamp: string;
+}
+
 // Overview Types
 export interface Overview {
   totalValue: number;

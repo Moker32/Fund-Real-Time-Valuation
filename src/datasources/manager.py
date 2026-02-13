@@ -654,7 +654,12 @@ def create_default_manager(
         SinaFundDataSource,
     )
     from .news_source import SinaNewsDataSource
-    from .sector_source import EastMoneySectorSource, SinaSectorDataSource
+    from .sector_source import (
+        EastMoneySectorSource,
+        EastMoneyIndustryDetailSource,
+        EastMoneyConceptDetailSource,
+        SinaSectorDataSource,
+    )
 
     manager = DataSourceManager(
         enable_load_balancing=enable_load_balancing,
@@ -723,6 +728,25 @@ def create_default_manager(
     # 注册东方财富板块数据源 (预留接口)
     eastmoney_sector_source = EastMoneySectorSource()
     manager.register(eastmoney_sector_source)
+
+    # 注册东方财富板块详情数据源
+    industry_detail_source = EastMoneyIndustryDetailSource()
+    manager.register(industry_detail_source, DataSourceConfig(
+        source_class=type(industry_detail_source),
+        name=industry_detail_source.name,
+        source_type=DataSourceType.SECTOR,
+        enabled=True,
+        priority=10
+    ))
+
+    concept_detail_source = EastMoneyConceptDetailSource()
+    manager.register(concept_detail_source, DataSourceConfig(
+        source_class=type(concept_detail_source),
+        name=concept_detail_source.name,
+        source_type=DataSourceType.SECTOR,
+        enabled=True,
+        priority=10
+    ))
 
     # === 新增股票数据源 ===
     from .stock_source import SinaStockDataSource, YahooStockSource

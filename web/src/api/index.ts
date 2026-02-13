@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem, WatchedCommodity, WatchlistResponse, CommoditySearchResult, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse } from '@/types';
+import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem, WatchedCommodity, WatchlistResponse, CommoditySearchResult, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse } from '@/types';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -344,6 +344,24 @@ export const indexApi = {
     supported_indices: string[];
   }> {
     return api.get('/api/indices/regions');
+  },
+};
+
+export const sectorApi = {
+  async getIndustrySectors(): Promise<SectorListResponse> {
+    return api.get('/api/sectors/industry');
+  },
+
+  async getConceptSectors(): Promise<SectorListResponse> {
+    return api.get('/api/sectors/concept');
+  },
+
+  async getIndustryDetail(sectorName: string): Promise<SectorDetailResponse> {
+    return api.get(`/api/sectors/industry/${encodeURIComponent(sectorName)}`);
+  },
+
+  async getConceptDetail(sectorName: string): Promise<SectorDetailResponse> {
+    return api.get(`/api/sectors/concept/${encodeURIComponent(sectorName)}`);
   },
 };
 
