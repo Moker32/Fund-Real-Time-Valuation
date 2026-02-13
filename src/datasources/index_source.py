@@ -115,8 +115,8 @@ MARKET_HOURS = {
     "hs300": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
     "csiall": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
     # 港股 (9:30-16:00 UTC+8)
-    "hang_seng": {"open": "01:30", "close": "09:00", "tz": "Asia/Hong_Kong"},
-    "hang_seng_tech": {"open": "01:30", "close": "09:00", "tz": "Asia/Hong_Kong"},
+    "hang_seng": {"open": "01:30", "close": "08:00", "tz": "Asia/Hong_Kong"},
+    "hang_seng_tech": {"open": "01:30", "close": "08:00", "tz": "Asia/Hong_Kong"},
     # 日经 (9:00-15:00 UTC+9)
     "nikkei225": {"open": "00:00", "close": "06:00", "tz": "Asia/Tokyo"},
     # 欧洲 (9:00-17:30 CET)
