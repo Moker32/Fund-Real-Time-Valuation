@@ -7,7 +7,7 @@ from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -88,7 +88,7 @@ CATEGORY_ICONS = {
 SUPPORTED_COMMODITIES = get_all_commodity_types()
 
 
-def _commodity_to_item(data: dict, source: str) -> CommodityCategoryItem:
+def _commodity_to_item(data: dict[str, Any], source: str) -> CommodityCategoryItem:
     """将商品数据转换为分类项格式"""
     return {
         "symbol": data.get("symbol", ""),
@@ -152,7 +152,7 @@ async def get_commodities(
         results = await source.fetch_batch(commodity_types)
 
         for result in results:
-            if result.success:
+            if result.success and result.data:
                 data = result.data
                 commodity_key = data.get("commodity", "")
 
@@ -165,15 +165,15 @@ async def get_commodities(
                         name=data.get("name", ""),
                         price=data.get("price", 0.0),
                         change=data.get("change"),
-                        changePercent=data.get("change_percent"),
+                        change_percent=data.get("change_percent"),
                         currency=data.get("currency"),
                         exchange=data.get("exchange"),
-                        timestamp=data.get("time"),
+                        time=data.get("time"),
                         source=result.source,
                         high=data.get("high"),
                         low=data.get("low"),
                         open=data.get("open"),
-                        prevClose=data.get("prev_close"),
+                        prev_close=data.get("prev_close"),
                     ).model_dump())
 
     return {"commodities": all_results, "timestamp": current_time}
@@ -229,7 +229,7 @@ async def get_categories(
             results = await source.fetch_batch(commodity_types)
 
             for result in results:
-                if result.success:
+                if result.success and result.data:
                     data = result.data
                     commodity_type = data.get("commodity", "")
                     if commodity_type:
@@ -342,10 +342,10 @@ async def get_gold_cny() -> dict:
     source = AKShareCommoditySource()
     result = await source.fetch("gold_cny")
 
-    if not result.success:
+    if not result.success or not result.data:
         raise HTTPException(
             status_code=500,
-            detail=result.error,
+            detail=result.error or "获取数据失败",
         )
 
     data = result.data
@@ -355,15 +355,15 @@ async def get_gold_cny() -> dict:
         name=data.get("name", ""),
         price=data.get("price", 0.0),
         change=None,
-        changePercent=data.get("change_percent"),
+        change_percent=data.get("change_percent"),
         currency="CNY",
         exchange="SGE",
-        timestamp=data.get("time"),
+        time=data.get("time"),
         source=result.source,
         high=data.get("high"),
         low=data.get("low"),
         open=data.get("open"),
-        prevClose=data.get("prev_close"),
+        prev_close=data.get("prev_close"),
     ).model_dump()
 
 
@@ -387,10 +387,10 @@ async def get_gold_international() -> dict:
     source = YFinanceCommoditySource()
     result = await source.fetch("gold")
 
-    if not result.success:
+    if not result.success or not result.data:
         raise HTTPException(
             status_code=500,
-            detail=result.error,
+            detail=result.error or "获取数据失败",
         )
 
     data = result.data
@@ -400,15 +400,15 @@ async def get_gold_international() -> dict:
         name=data.get("name", ""),
         price=data.get("price", 0.0),
         change=data.get("change"),
-        changePercent=data.get("change_percent"),
+        change_percent=data.get("change_percent"),
         currency=data.get("currency", "USD"),
         exchange=data.get("exchange", "COMEX"),
-        timestamp=data.get("time"),
+        time=data.get("time"),
         source=result.source,
         high=data.get("high"),
         low=data.get("low"),
         open=data.get("open"),
-        prevClose=data.get("prev_close"),
+        prev_close=data.get("prev_close"),
     ).model_dump()
 
 
@@ -432,10 +432,10 @@ async def get_wti_oil() -> dict:
     source = YFinanceCommoditySource()
     result = await source.fetch("wti")
 
-    if not result.success:
+    if not result.success or not result.data:
         raise HTTPException(
             status_code=500,
-            detail=result.error,
+            detail=result.error or "获取数据失败",
         )
 
     data = result.data
@@ -445,15 +445,15 @@ async def get_wti_oil() -> dict:
         name=data.get("name", ""),
         price=data.get("price", 0.0),
         change=data.get("change"),
-        changePercent=data.get("change_percent"),
+        change_percent=data.get("change_percent"),
         currency=data.get("currency", "USD"),
         exchange=data.get("exchange", "NYMEX"),
-        timestamp=data.get("time"),
+        time=data.get("time"),
         source=result.source,
         high=data.get("high"),
         low=data.get("low"),
         open=data.get("open"),
-        prevClose=data.get("prev_close"),
+        prev_close=data.get("prev_close"),
     ).model_dump()
 
 
@@ -792,10 +792,10 @@ async def get_commodity(
 
     result = await manager.fetch(DataSourceType.COMMODITY, commodity_type)
 
-    if not result.success:
+    if not result.success or not result.data:
         raise HTTPException(
             status_code=500,
-            detail=result.error,
+            detail=result.error or "获取数据失败",
         )
 
     data = result.data
@@ -805,13 +805,13 @@ async def get_commodity(
         name=data.get("name", ""),
         price=data.get("price", 0.0),
         change=data.get("change"),
-        changePercent=data.get("change_percent"),
+        change_percent=data.get("change_percent"),
         currency=data.get("currency"),
         exchange=data.get("exchange"),
-        timestamp=data.get("time"),
+        time=data.get("time"),
         source=result.source,
         high=data.get("high"),
         low=data.get("low"),
         open=data.get("open"),
-        prevClose=data.get("prev_close"),
+        prev_close=data.get("prev_close"),
     ).model_dump()

@@ -88,7 +88,8 @@ async def get_overview(
         ).model_dump()
 
     # 批量获取基金数据
-    results = await manager.fetch_batch(DataSourceType.FUND, fund_codes)
+    params_list = [{"args": [code]} for code in fund_codes]
+    results = await manager.fetch_batch(DataSourceType.FUND, params_list)
 
     # 计算统计数据
     total_value = 0.0
@@ -97,7 +98,7 @@ async def get_overview(
     latest_update = None
 
     for result in results:
-        if result.success:
+        if result.success and result.data:
             data = result.data
 
             # 获取估值和净值

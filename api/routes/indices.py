@@ -4,7 +4,7 @@
 """
 
 from datetime import datetime
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import pytz
 from fastapi import APIRouter, Depends
@@ -118,7 +118,7 @@ async def get_indices(
     # 解析结果
     all_indices = []
 
-    for i, result in enumerate(results):
+    for _, result in enumerate(results):
         if not result.success or not result.data:
             continue
 
@@ -181,8 +181,9 @@ async def get_index(
 
     result = await manager.fetch(DataSourceType.STOCK, index_type)
 
-    if not result.success:
-        raise ValueError(result.error)
+    if not result.success or not result.data:
+        error_msg = result.error or "获取数据失败"
+        raise ValueError(error_msg)
 
     data = result.data
     trading_status = get_trading_status(index_type)
@@ -220,7 +221,7 @@ async def get_regions() -> dict:
     Returns:
         dict: 区域信息
     """
-    regions = {}
+    regions: dict[str, dict[str, Any]] = {}
     for index_type, region in INDEX_REGIONS.items():
         if region not in regions:
             regions[region] = {

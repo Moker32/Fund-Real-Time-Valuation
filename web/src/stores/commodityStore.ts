@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { commodityApi } from '@/api';
-import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHistoryItem, WatchedCommodity, CommoditySearchResult, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityResponse } from '@/types';
+import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHistoryItem, WatchedCommodity, CommoditySearchResult } from '@/types';
 import { ApiError } from '@/api';
 import { formatTime } from '@/utils/time';
 
@@ -90,22 +90,59 @@ export const useCommodityStore = defineStore('commodities', () => {
     return categories.value.find(c => c.id === activeCategory.value) || null;
   });
 
-  // 获取当前选中分类的商品列表
+  // 获取当前选中分类的商品列表（包含关注列表 + 行情数据）
   const activeCommodities = computed(() => {
-    if (!activeCategory.value) {
-      return commodities.value;
+    // 创建 symbol 到行情数据的映射
+    const commodityMap = new Map(commodities.value.map(c => [c.symbol, c]));
+
+    // 如果有选中分类，返回该分类的商品
+    if (activeCategory.value) {
+      const category = categories.value.find(c => c.id === activeCategory.value);
+      const categoryCommodities = category?.commodities || [];
+
+      // 如果是"我的关注"分类，显示用户添加的关注列表（带实时数据）
+      if (activeCategory.value === 'watched') {
+        return watchedCommodities.value
+          .map(watched => {
+            const marketData = commodityMap.get(watched.symbol);
+            return marketData || {
+              symbol: watched.symbol,
+              name: watched.name,
+              category: watched.category,
+              price: undefined,
+              change: undefined,
+              changePercent: undefined,
+              prevClose: undefined,
+              time: undefined,
+            };
+          });
+      }
+
+      return categoryCommodities;
     }
-    const category = categories.value.find(c => c.id === activeCategory.value);
-    return category?.commodities || [];
+
+    // 没有选中分类时，返回所有行情数据
+    return commodities.value;
   });
 
-  // 获取分类列表（用于Tab显示）
+  // 获取分类列表（用于Tab显示，包含"我的关注"）
   const categoryList = computed(() => {
-    return categories.value.map(c => ({
+    const list = categories.value.map(c => ({
       id: c.id,
       name: c.name,
       icon: c.icon,
     }));
+
+    // 如果有关注商品，添加"我的关注"分类
+    if (watchedCommodities.value.length > 0) {
+      list.unshift({
+        id: 'watched',
+        name: '我的关注',
+        icon: '⭐',
+      });
+    }
+
+    return list;
   });
 
   // 预处理 API 响应中的 commodities 字段
@@ -134,7 +171,7 @@ export const useCommodityStore = defineStore('commodities', () => {
         return friendlyErrorMessages[err.detail] || err.detail;
       }
       if (err.code && friendlyErrorMessages[err.code]) {
-        return friendlyErrorMessages[err.code];
+        return friendlyErrorMessages[err.code] as string;
       }
       return err.message || '获取商品列表失败';
     }
@@ -436,6 +473,11 @@ export const useCommodityStore = defineStore('commodities', () => {
     try {
       const response = await commodityApi.getWatchlist();
       watchedCommodities.value = response.watchlist || [];
+
+      // 如果有关注的商品且当前没有选中分类，默认选中"我的关注"
+      if (watchedCommodities.value.length > 0 && !activeCategory.value) {
+        activeCategory.value = 'watched';
+      }
     } catch (err) {
       watchlistError.value = getFriendlyErrorMessage(err);
       if (showError) {

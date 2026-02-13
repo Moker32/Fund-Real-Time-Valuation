@@ -24,7 +24,7 @@ from .dependencies import (
     get_data_source_manager,
     set_data_source_manager,
 )
-from .models import HealthDetailResponse, HealthResponse
+from .models import DataSourceHealthItem, HealthDetailResponse, HealthResponse
 from .routes import cache, commodities, funds, indices, overview
 
 # 全局预热器实例
@@ -268,13 +268,13 @@ async def health_check() -> HealthDetailResponse:
     health_result = await manager.health_check()
 
     # 构建数据源状态列表
-    data_sources = []
+    data_sources: list[DataSourceHealthItem] = []
     for source_name, result in health_result.get("sources", {}).items():
-        data_sources.append({
-            "source": source_name,
-            "status": result.get("status", "unknown"),
-            "response_time_ms": result.get("response_time_ms"),
-        })
+        data_sources.append(DataSourceHealthItem(
+            source=source_name,
+            status=result.get("status", "unknown"),
+            response_time_ms=result.get("response_time_ms"),
+        ))
 
     return HealthDetailResponse(
         status="healthy" if health_result.get("healthy_count", 0) > 0 else "degraded",
