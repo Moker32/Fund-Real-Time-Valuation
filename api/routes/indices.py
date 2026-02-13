@@ -172,7 +172,11 @@ def get_display_timestamp(index_type: str, data_timestamp: str | None) -> str | 
     today = data_dt_tz.date()
     close_time_str = market_info.get("close")  # 如 "08:00" (UTC时间)
     try:
-        close_time = datetime.strptime(close_time_str, "%H:%M").time()
+        # 将 UTC 收盘时间转换为市场时区时间
+        close_utc_dt = datetime.strptime(close_time_str, "%H:%M")
+        close_utc_dt_aware = datetime.combine(today, close_utc_dt.time(), tzinfo=pytz.UTC)
+        close_market_dt = close_utc_dt_aware.astimezone(tz)
+        close_time = close_market_dt.time()
     except ValueError:
         return data_timestamp
 
