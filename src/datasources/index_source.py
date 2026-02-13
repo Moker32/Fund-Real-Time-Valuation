@@ -17,16 +17,16 @@ from .base import DataSource, DataSourceResult, DataSourceType
 
 # 腾讯财经代码映射 (A股、港股、美股)
 TENCENT_CODES = {
-    # A股 (s_ 前缀)
-    "shanghai": "s_sh000001",
-    "shenzhen": "s_sz399001",
-    "shanghai50": "s_sh000016",
-    "chi_next": "s_sz399006",
-    "star50": "s_sh000688",
-    "csi500": "s_sh000905",
-    "csi1000": "s_sh000852",
-    "hs300": "s_sh000300",
-    "csiall": "s_sh000001",  # 暂用上证指数
+    # A股 (无 s_ 前缀才能获取完整盘口数据)
+    "shanghai": "sh000001",
+    "shenzhen": "sz399001",
+    "shanghai50": "sh000016",
+    "chi_next": "sz399006",
+    "star50": "sh000688",
+    "csi500": "sh000905",
+    "csi1000": "sh000852",
+    "hs300": "sh000300",
+    "csiall": "sh000001",  # 暂用上证指数
     # 港股 (hk 前缀)
     "hang_seng": "hkHSI",
     # 美股 (us 前缀)
@@ -384,19 +384,26 @@ class TencentIndexSource(IndexDataSource):
             if is_us:
                 # 美股格式
                 price = float(parts[3]) if parts[3] else 0.0
-                change = float(parts[32]) if len(parts) > 32 and parts[32] else 0.0
+                open_price = float(parts[5]) if len(parts) > 5 and parts[5] else 0.0
+                prev_close = float(parts[4]) if parts[4] else 0.0
+                high = float(parts[33]) if len(parts) > 33 and parts[33] else 0.0
+                low = float(parts[34]) if len(parts) > 34 and parts[34] else 0.0
+                change = float(parts[31]) if len(parts) > 31 and parts[31] else 0.0
                 # 涨跌幅计算
-                if price > 0 and change != 0:
-                    change_percent = (change / (price - change)) * 100
+                if price > 0 and prev_close > 0:
+                    change_percent = (change / prev_close) * 100
                 else:
                     change_percent = 0.0
                 currency = "USD"
                 exchange = "US"
             elif is_hk:
-                # 港股格式: 3=当前价, 4=昨日收盘
+                # 港股格式: 3=当前价, 4=昨日收盘, 5=开盘, 33=最高, 34=最低
                 price = float(parts[3]) if parts[3] else 0.0
+                open_price = float(parts[5]) if len(parts) > 5 and parts[5] else 0.0
                 prev_close = float(parts[4]) if parts[4] else 0.0
-                change = price - prev_close  # 直接计算涨跌
+                high = float(parts[33]) if len(parts) > 33 and parts[33] else 0.0
+                low = float(parts[34]) if len(parts) > 34 and parts[34] else 0.0
+                change = float(parts[31]) if len(parts) > 31 and parts[31] else 0.0
                 if price > 0 and prev_close > 0:
                     change_percent = (change / prev_close) * 100
                 else:
@@ -404,10 +411,14 @@ class TencentIndexSource(IndexDataSource):
                 currency = "HKD"
                 exchange = "HKEX"
             else:
-                # A股格式
+                # A股格式: 3=当前价, 4=昨日收盘, 5=开盘, 33=最高, 34=最低, 31=涨跌, 32=涨跌幅
                 price = float(parts[3]) if parts[3] else 0.0
-                change = float(parts[4]) if parts[4] else 0.0
-                change_percent = float(parts[5]) if parts[5] else 0.0
+                open_price = float(parts[5]) if parts[5] else 0.0
+                prev_close = float(parts[4]) if parts[4] else 0.0
+                high = float(parts[33]) if parts[33] else 0.0
+                low = float(parts[34]) if parts[34] else 0.0
+                change = float(parts[31]) if parts[31] else 0.0
+                change_percent = float(parts[32]) if parts[32] else 0.0
                 currency = "CNY"
                 exchange = "SSE" if tencent_code.startswith("s_sh") else "SZSE"
 
@@ -424,10 +435,10 @@ class TencentIndexSource(IndexDataSource):
                 "currency": currency,
                 "exchange": exchange,
                 "time": time_str,
-                "high": None,  # 腾讯财经不提供这些字段
-                "low": None,
-                "open": None,
-                "prev_close": None,
+                "high": high,
+                "low": low,
+                "open": open_price,
+                "prev_close": prev_close,
                 "region": INDEX_REGIONS.get(index_type, "unknown"),
                 "market_hours": MARKET_HOURS.get(index_type, {}),
             }
