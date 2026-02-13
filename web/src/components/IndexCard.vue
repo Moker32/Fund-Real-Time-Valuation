@@ -152,13 +152,21 @@ const statusText = computed(() => {
     'open': '交易中',
     'closed': '已收盘',
     'pre': '未开盘',
+    'stalled': '数据停滞',  // 数据超过15分钟未更新
     'unknown': '未知',
   };
   return labels[props.index.tradingStatus || 'unknown'] || '未知';
 });
 
 // 判断是否为延时数据源
-const isDelayed = computed(() => props.index.source === 'yfinance_index');
+const isDelayed = computed(() => {
+  // 优先使用后端返回的 isDelayed 字段
+  if (props.index.isDelayed !== undefined) {
+    return props.index.isDelayed;
+  }
+  // 兼容旧逻辑
+  return props.index.source === 'yfinance_index' || props.index.tradingStatus === 'stalled';
+});
 
 function formatPrice(value: number | undefined): string {
   if (value == null) return '--';

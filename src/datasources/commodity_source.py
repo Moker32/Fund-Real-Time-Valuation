@@ -175,7 +175,7 @@ class YFinanceCommoditySource(CommodityDataSource):
             data = {
                 "commodity": commodity_type,
                 "symbol": ticker,
-                "name": self._get_name(commodity_type),
+                "name": self.get_name(commodity_type),
                 "price": float(price),
                 "change": float(change) if change else 0.0,
                 "change_percent": float(change_percent) if change_percent else 0.0,
@@ -374,25 +374,31 @@ class AKShareCommoditySource(CommodityDataSource):
             return self._handle_error(e, self.name)
 
     async def _fetch_gold_cny(self) -> dict[str, Any] | None:
-        """获取上海黄金交易所 Au99.99 实时数据"""
+        """获取上海黄金交易所 Au99.99 基准价数据"""
         import akshare as ak
 
-        # 使用实时行情接口
-        df = ak.spot_golden_sge()
+        # 使用基准价接口（虽然不是实时，但可用）
+        df = ak.spot_golden_benchmark_sge()
         if df is not None and not df.empty:
-            latest = df.iloc[0]
+            # 取最新一天的数据
+            latest = df.iloc[-1]
+            trade_date = latest.get("交易时间", "")
+            night_price = float(latest.get("晚盘价", 0) or 0)
+            day_price = float(latest.get("早盘价", 0) or 0)
+            # 使用晚盘价作为当前价格（更接近实时）
+            price = night_price if night_price > 0 else day_price
             return {
                 "commodity": "gold_cny",
                 "symbol": "Au99.99",
                 "name": "Au99.99 (上海黄金)",
-                "price": float(latest.get("价格", 0)),
-                "change": float(latest.get("涨跌", 0)),
-                "change_percent": float(latest.get("涨跌幅", 0)),
-                "time": str(latest.get("时间", "")),
-                "high": float(latest.get("最高", 0)),
-                "low": float(latest.get("最低", 0)),
-                "open": float(latest.get("开盘", 0)),
-                "prev_close": float(latest.get("昨收", 0)),
+                "price": price,
+                "change": None,
+                "change_percent": None,
+                "time": str(trade_date),
+                "high": None,
+                "low": None,
+                "open": day_price if day_price > 0 else None,
+                "prev_close": night_price if night_price > 0 else None,
                 "currency": "CNY",
                 "exchange": "SGE",
             }

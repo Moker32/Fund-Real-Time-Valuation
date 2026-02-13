@@ -29,6 +29,7 @@ TENCENT_CODES = {
     "csiall": "sh000001",  # 暂用上证指数
     # 港股 (hk 前缀)
     "hang_seng": "hkHSI",
+    "hang_seng_tech": "hkHSTECH",  # 恒生科技
     # 美股 (us 前缀)
     "dow_jones": "usDJI",
     "nasdaq": "usIXIC",
@@ -67,6 +68,7 @@ INDEX_REGIONS = {
     "hs300": "china",
     "csiall": "china",
     "hang_seng": "hk",
+    "hang_seng_tech": "hk",
     "nikkei225": "asia",
     "dow_jones": "america",
     "nasdaq": "america",
@@ -89,6 +91,7 @@ INDEX_NAMES = {
     "hs300": "沪深 300",
     "csiall": "中证全指",
     "hang_seng": "恒生指数",
+    "hang_seng_tech": "恒生科技",
     "nikkei225": "日经 225",
     "dow_jones": "道琼斯",
     "nasdaq": "纳斯达克",
@@ -113,6 +116,7 @@ MARKET_HOURS = {
     "csiall": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
     # 港股 (9:30-16:00 UTC+8)
     "hang_seng": {"open": "01:30", "close": "09:00", "tz": "Asia/Hong_Kong"},
+    "hang_seng_tech": {"open": "01:30", "close": "09:00", "tz": "Asia/Hong_Kong"},
     # 日经 (9:00-15:00 UTC+9)
     "nikkei225": {"open": "00:00", "close": "06:00", "tz": "Asia/Tokyo"},
     # 欧洲 (9:00-17:30 CET)
@@ -143,7 +147,7 @@ class IndexDataSource(DataSource):
             timeout=timeout
         )
         self._cache: dict[str, dict[str, Any]] = {}
-        self._cache_timeout = 60.0  # 缓存60秒
+        self._cache_timeout = 0  # 禁用缓存
 
     def _is_cache_valid(self, cache_key: str) -> bool:
         """检查缓存是否有效"""
@@ -422,8 +426,22 @@ class TencentIndexSource(IndexDataSource):
                 currency = "CNY"
                 exchange = "SSE" if tencent_code.startswith("s_sh") else "SZSE"
 
-            # 获取当前时间作为数据时间
-            time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            # 从腾讯数据中提取时间戳（格式：YYYYMMDDHHmmss）
+            # 例如：20210105154040 表示 2021-01-05 15:40:40
+            data_timestamp = None
+            for i in range(len(parts) - 1, -1, -1):
+                if parts[i] and len(parts[i]) == 14 and parts[i].isdigit():
+                    try:
+                        data_timestamp = datetime.strptime(parts[i], '%Y%m%d%H%M%S')
+                        break
+                    except ValueError:
+                        continue
+
+            # 如果找到时间戳则使用，否则使用当前时间
+            if data_timestamp:
+                time_str = data_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             data = {
                 "index": index_type,
@@ -435,6 +453,7 @@ class TencentIndexSource(IndexDataSource):
                 "currency": currency,
                 "exchange": exchange,
                 "time": time_str,
+                "data_timestamp": data_timestamp.isoformat() if data_timestamp else None,
                 "high": high,
                 "low": low,
                 "open": open_price,

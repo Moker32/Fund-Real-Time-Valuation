@@ -44,7 +44,7 @@ class CommodityCategoryItem(TypedDict):
     price: float
     currency: str
     change: float | None
-    changePercent: float
+    changePercent: float | None
     high: float | None
     low: float | None
     open: float | None

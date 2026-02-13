@@ -3,7 +3,7 @@
 提供全球主要市场指数相关的 REST API 端点
 """
 
-from datetime import datetime
+from datetime import datetime, time
 from typing import Any, TypedDict
 
 import pytz
@@ -29,13 +29,23 @@ router = APIRouter(prefix="/api/indices", tags=["全球指数"])
 # 支持的指数列表
 SUPPORTED_INDICES = list(INDEX_NAMES.keys())
 
+# 腾讯财经的延时指数
+# 美股数据延时15分钟，港股数据也有延时（几分钟）
+TENCENT_DELAYED_INDICES = {"dow_jones", "nasdaq", "sp500", "hang_seng", "hang_seng_tech"}
 
-def get_trading_status(index_type: str) -> dict:
+
+def get_trading_status(index_type: str, data_timestamp: str | None = None) -> dict:
     """
     获取指数的交易状态
 
+    使用启发式逻辑判断：
+    1. 如果数据源返回了时间戳，检查数据是否及时更新
+    2. 如果没有时间戳，使用当前时间作为数据获取时间
+    3. 根据市场交易时间段判断状态
+
     Args:
         index_type: 指数类型
+        data_timestamp: 数据源返回的数据时间戳 (ISO格式)
 
     Returns:
         dict: 包含交易状态和市场时间信息的字典
@@ -47,38 +57,82 @@ def get_trading_status(index_type: str) -> dict:
     tz_str = market_info.get("tz", "UTC")
     tz = pytz.timezone(tz_str)
 
-    # 获取当前 UTC 时间
+    # 获取当前时间
     utc_now = datetime.now(pytz.UTC)
-    # 转换为目标时区
     local_now = utc_now.astimezone(tz)
-
-    # 解析开盘和收盘时间 (存储的是 UTC 时间，需要转换为目标时区)
-    open_utc = datetime.strptime(market_info["open"], "%H:%M")
-    close_utc = datetime.strptime(market_info["close"], "%H:%M")
-
-    # 构造 UTC 时间并转换为目标时区
-    today = local_now.date()
-    open_utc_dt = datetime.combine(today, open_utc.time(), tzinfo=pytz.UTC)
-    close_utc_dt = datetime.combine(today, close_utc.time(), tzinfo=pytz.UTC)
-    open_time = open_utc_dt.astimezone(tz).time()
-    close_time = close_utc_dt.astimezone(tz).time()
-
-    # 判断交易状态
     current_time = local_now.time()
 
-    # 开盘前
-    if current_time < open_time:
-        status = "pre"  # 盘前
-    # 交易时间
-    elif open_time <= current_time <= close_time:
-        status = "open"  # 交易中
-    # 收盘后
+    # 检查数据是否及时更新（启发式判断）
+    # 如果没有数据时间戳，使用当前时间作为参考
+    is_data_stale = False
+
+    if data_timestamp:
+        try:
+            # 解析数据时间戳
+            data_dt = datetime.fromisoformat(data_timestamp.replace('Z', '+00:00'))
+            # 计算数据时间与当前时间的差距（分钟）
+            data_age_minutes = (local_now.replace(tzinfo=None) - data_dt.replace(tzinfo=None)).total_seconds() / 60
+
+            # 如果数据超过 15 分钟未更新，认为数据不新鲜
+            if data_age_minutes > 15:
+                is_data_stale = True
+        except (ValueError, TypeError):
+            pass
+
+    # 特殊处理 A 股市场（有午间休市）
+    if index_type in ["shanghai", "shenzhen", "shanghai50", "chi_next", "star50",
+                       "csi500", "csi1000", "hs300", "csiall"]:
+        # A 股交易时间：上午 9:30-11:30，下午 13:00-15:00
+        morning_open = time(9, 30)
+        morning_close = time(11, 30)
+        afternoon_open = time(13, 0)
+        afternoon_close = time(15, 0)
+
+        # 周一到周五的交易时间
+        if local_now.weekday() < 5:  # 0=Monday, 4=Friday
+            if morning_open <= current_time <= morning_close:
+                status = "open"
+            elif afternoon_open <= current_time <= afternoon_close:
+                status = "open"
+            elif current_time < morning_open:
+                status = "pre"
+            else:
+                status = "closed"
+        else:
+            status = "closed"  # 周末
     else:
-        status = "closed"  # 已收盘
+        # 其他市场：使用原来的时间段逻辑
+        open_utc = datetime.strptime(market_info["open"], "%H:%M")
+        close_utc = datetime.strptime(market_info["close"], "%H:%M")
+
+        today = local_now.date()
+        open_utc_dt = datetime.combine(today, open_utc.time(), tzinfo=pytz.UTC)
+        close_utc_dt = datetime.combine(today, close_utc.time(), tzinfo=pytz.UTC)
+        open_time = open_utc_dt.astimezone(tz).time()
+        close_time = close_utc_dt.astimezone(tz).time()
+
+        if current_time < open_time:
+            status = "pre"
+        elif open_time <= current_time <= close_time:
+            # 如果在交易时段内，但数据不新鲜，可能是午间休市或其他原因
+            if is_data_stale:
+                status = "stalled"  # 数据停滞
+            else:
+                status = "open"
+        else:
+            status = "closed"
+
+    # 如果数据不新鲜且不是 closed 状态，添加提示
+    reason = None
+    if is_data_stale and status not in ["closed", "pre"]:
+        reason = "数据超过15分钟未更新"
 
     return {
         "status": status,
         "market_time": local_now.strftime("%Y-%m-%d %H:%M:%S"),
+        "data_timestamp": data_timestamp,
+        "is_stale": is_data_stale,
+        "reason": reason,
     }
 
 
@@ -131,7 +185,11 @@ async def get_indices(
 
         data = result.data
         index_type = data.get("index", "")
-        trading_status = get_trading_status(index_type)
+        data_timestamp = data.get("data_timestamp")
+        trading_status = get_trading_status(index_type, data_timestamp)
+
+        # 判断是否为延时数据（腾讯的美股数据延时15分钟）
+        is_delayed = result.source == "tencent_index" and index_type in TENCENT_DELAYED_INDICES
 
         all_indices.append({
             "index": index_type,
@@ -151,6 +209,7 @@ async def get_indices(
             "region": INDEX_REGIONS.get(index_type),
             "tradingStatus": trading_status.get("status"),
             "marketTime": trading_status.get("market_time"),
+            "isDelayed": is_delayed,
         })
 
     return {"indices": all_indices, "timestamp": current_time}
@@ -193,7 +252,12 @@ async def get_index(
         raise ValueError(error_msg)
 
     data = result.data
-    trading_status = get_trading_status(index_type)
+    index_type = data.get("index", "")
+    data_timestamp = data.get("data_timestamp")
+    trading_status = get_trading_status(index_type, data_timestamp)
+
+    # 判断是否为延时数据（腾讯的美股数据延时15分钟）
+    is_delayed = result.source == "tencent_index" and index_type in TENCENT_DELAYED_INDICES
 
     return {
         "index": data.get("index", ""),
@@ -213,6 +277,7 @@ async def get_index(
         "region": INDEX_REGIONS.get(index_type),
         "tradingStatus": trading_status.get("status"),
         "marketTime": trading_status.get("market_time"),
+        "isDelayed": is_delayed,
     }
 
 
