@@ -38,6 +38,7 @@ export const useSectorStore = defineStore('sectors', () => {
   const selectedSector = ref<string | null>(null);
   const sectorDetail = ref<SectorStock[]>([]);
   const detailLoading = ref(false);
+  const detailError = ref<string | null>(null);
 
   // Getters
   const currentSectors = computed(() => {
@@ -179,6 +180,7 @@ export const useSectorStore = defineStore('sectors', () => {
       sectorDetail.value = response.stocks;
     } catch (err) {
       console.error('获取板块详情失败:', err);
+      detailError.value = getFriendlyErrorMessage(err);
     } finally {
       detailLoading.value = false;
     }
@@ -207,6 +209,7 @@ export const useSectorStore = defineStore('sectors', () => {
     selectedSector,
     sectorDetail,
     detailLoading,
+    detailError,
 
     // Getters
     currentSectors,

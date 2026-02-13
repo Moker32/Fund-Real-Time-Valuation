@@ -6,7 +6,7 @@
 from datetime import datetime, timezone
 from typing import TypedDict
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from src.datasources.manager import DataSourceManager
 
@@ -65,7 +65,12 @@ async def get_industry_sectors(
         result = await manager.fetch_with_source("sector_eastmoney_akshare", "industry")
 
     if not result.success or not result.data:
-        return {"sectors": [], "timestamp": current_time, "type": sector_type}
+        # 抛出错误而不是返回空数据
+        error_msg = result.error or "数据源暂时不可用"
+        raise HTTPException(
+            status_code=503,
+            detail=f"暂时无法获取行业板块数据: {error_msg}"
+        )
 
     data = result.data
 
@@ -145,20 +150,18 @@ async def get_concept_sectors(
     """
     current_time = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-    # 使用 SinaSectorSource 获取概念板块数据（行业板块 Sina 支持较好）
-    # 概念板块暂无 Sina 数据源，返回空列表
-    result = await manager.fetch_with_source("sina_sector")
+    # 使用 EastMoney 数据源获取概念板块数据
+    result = await manager.fetch_with_source("sector_eastmoney_akshare", "concept")
 
     if not result.success or not result.data:
-        return {"sectors": [], "timestamp": current_time, "type": "concept"}
+        # 抛出错误而不是返回空数据
+        error_msg = result.error or "数据源暂时不可用"
+        raise HTTPException(
+            status_code=503,
+            detail=f"暂时无法获取概念板块数据: {error_msg}"
+        )
 
     data = result.data
-
-    # Sina 只支持行业板块，概念板块返回空
-    # 如果需要概念板块，需要等待 EastMoney 网络恢复
-    if isinstance(data, list):
-        # Sina 返回的是行业板块，概念板块暂无数据
-        return {"sectors": [], "timestamp": current_time, "type": "concept"}
 
     # EastMoney 格式处理
     if isinstance(data, dict):
@@ -218,12 +221,12 @@ async def get_industry_detail(
     result = await manager.fetch_with_source("sector_industry_detail_akshare", sector_name)
 
     if not result.success or not result.data:
-        return {
-            "sector_name": sector_name,
-            "stocks": [],
-            "count": 0,
-            "timestamp": current_time
-        }
+        # 抛出错误而不是返回空数据
+        error_msg = result.error or "数据源暂时不可用"
+        raise HTTPException(
+            status_code=503,
+            detail=f"暂时无法获取行业板块 [{sector_name}] 详情: {error_msg}"
+        )
 
     data = result.data
 
@@ -286,12 +289,12 @@ async def get_concept_detail(
     result = await manager.fetch_with_source("sector_concept_detail_akshare", sector_name)
 
     if not result.success or not result.data:
-        return {
-            "sector_name": sector_name,
-            "stocks": [],
-            "count": 0,
-            "timestamp": current_time
-        }
+        # 抛出错误而不是返回空数据
+        error_msg = result.error or "数据源暂时不可用"
+        raise HTTPException(
+            status_code=503,
+            detail=f"暂时无法获取概念板块 [{sector_name}] 详情: {error_msg}"
+        )
 
     data = result.data
 

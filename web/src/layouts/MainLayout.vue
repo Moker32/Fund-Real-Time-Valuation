@@ -456,11 +456,11 @@ onUnmounted(() => {
 }
 
 .status-indicator.degraded .status-dot {
-  background: var(--color-rise);
+  background: #FBBF24;
 }
 
 .status-indicator.unhealthy .status-dot {
-  background: var(--color-neutral);
+  background: var(--color-rise);
   animation: pulse 1s infinite;
 }
 
