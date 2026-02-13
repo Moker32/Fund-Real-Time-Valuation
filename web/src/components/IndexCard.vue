@@ -70,12 +70,12 @@
             <span class="label">昨收</span>
             <span class="value font-mono">{{ formatPrice(indexData.prevClose) }}</span>
           </div>
-          <div class="market-time" v-if="indexData.timestamp">
+          <div class="market-time" v-if="indexData.dataTimestamp">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="12" cy="12" r="10"/>
               <path d="M12 6V12L16 14"/>
             </svg>
-            <span>{{ formatMarketTime(indexData.timestamp) }}</span>
+            <span>{{ formatToUserTimezone(indexData.dataTimestamp) }}</span>
           </div>
         </div>
       </div>
@@ -188,13 +188,12 @@ function formatPercent(value: number | undefined): string {
   return `${sign}${value.toFixed(2)}%`;
 }
 
-function formatMarketTime(dateStr: string | undefined): string {
-  if (!dateStr) return '--';
+function formatToUserTimezone(isoTimestamp: string | undefined): string {
+  if (!isoTimestamp) return '--';
   try {
-    const date = new Date(dateStr);
-    // 统一使用上海时区
+    const date = new Date(isoTimestamp);
+    // 使用用户浏览器时区自动转换
     return date.toLocaleTimeString('zh-CN', {
-      timeZone: 'Asia/Shanghai',
       hour12: false,
       hour: '2-digit',
       minute: '2-digit',
