@@ -14,6 +14,11 @@ const router = createRouter({
           component: () => import('@/views/FundsView.vue'),
         },
         {
+          path: 'funds',
+          name: 'funds-alt',
+          redirect: '/',
+        },
+        {
           path: 'commodities',
           name: 'commodities',
           component: () => import('@/views/CommoditiesView.vue'),
