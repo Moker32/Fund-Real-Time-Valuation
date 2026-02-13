@@ -14,16 +14,18 @@
           <span class="index-name">{{ indexData.name }}</span>
           <span class="index-region" :class="`region-${indexData.region}`">{{ regionLabel }}</span>
         </div>
-        <div class="trading-status" :class="`status-${indexData.tradingStatus}`">
-          <span class="status-dot"></span>
-          <span class="status-text">{{ statusText }}</span>
-        </div>
-        <div v-if="isDelayed" class="delay-tag">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 6V12L16 14"/>
-          </svg>
-          <span>延时</span>
+        <div class="header-tags">
+          <div v-if="isDelayed" class="delay-tag">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6V12L16 14"/>
+            </svg>
+            <span>延时</span>
+          </div>
+          <div class="trading-status" :class="`status-${indexData.tradingStatus}`">
+            <span class="status-dot"></span>
+            <span class="status-text">{{ statusText }}</span>
+          </div>
         </div>
       </div>
 
@@ -249,6 +251,12 @@ function formatMarketTime(dateStr: string | undefined): string {
   margin-bottom: var(--spacing-md);
 }
 
+.header-tags {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
 .index-info {
   display: flex;
   flex-direction: column;
@@ -353,7 +361,6 @@ function formatMarketTime(dateStr: string | undefined): string {
   font-size: var(--font-size-xs);
   background: rgba(255, 159, 10, 0.15);
   color: #ff9f0a;
-  margin-left: var(--spacing-xs);
 
   svg {
     width: 12px;
