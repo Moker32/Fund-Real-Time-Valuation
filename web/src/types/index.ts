@@ -161,6 +161,8 @@ export interface MarketIndex {
   currency: string;
   exchange?: string;
   timestamp: string;
+  dataTimestamp?: string;   // 数据更新时间（ISO 格式）
+  timezone?: string;        // 市场时区
   source: string;
   high?: number;
   low?: number;
