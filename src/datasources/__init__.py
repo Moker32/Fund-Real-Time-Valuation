@@ -7,13 +7,15 @@
 - 债券数据源 (bond_source)
 - 新闻数据源 (news_source)
 - 数据源管理器 (manager)
+- 数据网关 (gateway)
 
 使用示例:
     from src.datasources import (
         FundDataSource,
         AKShareCommoditySource,
         SinaNewsDataSource,
-        DataSourceManager
+        DataSourceManager,
+        DataGateway,
     )
 
     # 创建单个数据源
@@ -23,6 +25,10 @@
     # 使用管理器
     manager = create_default_manager()
     result = await manager.fetch(DataSourceType.FUND, "161039")
+
+    # 使用网关
+    gateway = DataGateway(manager)
+    result = await gateway.get_fund("161039")
 """
 
 from .aggregator import (
@@ -49,6 +55,16 @@ from .commodity_source import (
     YFinanceCommoditySource,
 )
 from .fund_source import Fund123DataSource, FundDataSource, SinaFundDataSource
+from .gateway import (
+    BatchDataRequest,
+    BatchDataResponse,
+    DataGateway,
+    DataRequest,
+    DataResponse,
+    GatewayStats,
+    RequestPriority,
+    ResponseStatus,
+)
 from .manager import DataSourceConfig, DataSourceManager, create_default_manager
 from .news_source import NewsAggregatorDataSource, SinaNewsDataSource
 from .portfolio import (
@@ -68,49 +84,51 @@ __all__ = [
     "NetworkError",
     "DataParseError",
     "DataSourceUnavailableError",
-
+    # 统一请求/响应模型
+    "DataRequest",
+    "DataResponse",
+    "BatchDataRequest",
+    "BatchDataResponse",
+    "RequestPriority",
+    "ResponseStatus",
+    # 数据网关
+    "DataGateway",
+    "GatewayStats",
     # 基金数据源
     "FundDataSource",
     "SinaFundDataSource",
     "Fund123DataSource",
-
     # 商品数据源
     "CommodityDataSource",
     "YFinanceCommoditySource",
     "AKShareCommoditySource",
     "CommodityDataAggregator",
-
     # 新闻数据源
     "SinaNewsDataSource",
     "NewsAggregatorDataSource",
-
     # 债券数据源
     "SinaBondDataSource",
     "AKShareBondSource",
     "EastMoneyBondSource",
-
     # 数据聚合器
     "DataAggregator",
     "SameSourceAggregator",
     "LoadBalancedAggregator",
     "AggregatorSourceInfo",
-
     # 组合分析器
     "AssetType",
     "PortfolioPosition",
     "PortfolioAllocation",
     "PortfolioResult",
     "PortfolioAnalyzer",
-
     # 管理器
     "DataSourceManager",
     "DataSourceConfig",
     "create_default_manager",
-
     # 缓存清理器
     "CacheCleaner",
     "get_cache_cleaner",
-    "startup_cleanup"
+    "startup_cleanup",
 ]
 
 
