@@ -680,12 +680,59 @@ class EastMoneyDirectSource(DataSource):
         if not board_type:
             return None
 
+        # 获取两类数据：净流入（降序）和净流出（升序）
+        all_sectors = []
+
+        # 1. 获取净流入数据（按主力净流入降序）
+        inflow_data = await self._fetch_sectors_by_order(board_type, "1", 50)
+        if inflow_data:
+            all_sectors.extend(inflow_data)
+
+        # 2. 获取净流出数据（按主力净流入升序，获取负值）
+        outflow_data = await self._fetch_sectors_by_order(board_type, "0", 50)
+        if outflow_data:
+            all_sectors.extend(outflow_data)
+
+        if not all_sectors:
+            return None
+
+        # 按涨跌幅降序排序
+        all_sectors = sorted(all_sectors, key=lambda x: x.get("change_percent", 0), reverse=True)
+
+        # 去除重复数据
+        seen = set()
+        unique_sectors = []
+        for s in all_sectors:
+            key = (s.get("code"), s.get("name"))
+            if key not in seen:
+                seen.add(key)
+                unique_sectors.append(s)
+        all_sectors = unique_sectors
+
+        # 添加排名
+        for i, sector in enumerate(all_sectors):
+            sector["rank"] = i + 1
+
+        # 使用最近交易日作为时间戳
+        trading_day = get_last_trading_day()
+
+        return {
+            "type": sector_type,
+            "sectors": all_sectors,
+            "count": len(all_sectors),
+            "timestamp": trading_day.timestamp(),
+        }
+
+    async def _fetch_sectors_by_order(
+        self, board_type: str, order: str, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """从 EastMoney API 获取板块数据（指定排序顺序）"""
         url = "https://push2.eastmoney.com/api/qt/clist/get"
         params = {
             "cb": "",
             "fid": "f62",  # 按主力净流入排序
-            "po": "1",  # 降序
-            "pz": "100",  # 获取100条
+            "po": order,  # 1=降序（净流入）, 0=升序（净流出）
+            "pz": str(limit),  # 获取条数
             "pn": "1",
             "np": "1",
             "fltt": "2",
@@ -695,15 +742,15 @@ class EastMoneyDirectSource(DataSource):
             "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13",
         }
 
+        sectors = []
         try:
             response = await self.client.get(url, params=params)
             response.raise_for_status()
             json_data = response.json()
 
             if not json_data.get("data"):
-                return None
+                return sectors
 
-            sectors = []
             for bk in json_data["data"]["diff"]:
                 # 解析资金流向数据（元转换为亿元）
                 main_inflow = bk.get("f62", 0) or 0
@@ -743,37 +790,10 @@ class EastMoneyDirectSource(DataSource):
                     }
                 )
 
-            # 按涨跌幅降序排序
-            sectors = sorted(sectors, key=lambda x: x.get("change_percent", 0), reverse=True)
-
-            # 去除重复数据（Ⅲ和Ⅱ版本数据相同，只保留一个）
-            seen = set()
-            unique_sectors = []
-            for s in sectors:
-                # 用价格+涨跌幅+主力净流入作为唯一标识
-                key = (s.get("price"), s.get("change_percent"), s.get("main_inflow"))
-                if key not in seen:
-                    seen.add(key)
-                    unique_sectors.append(s)
-            sectors = unique_sectors
-
-            # 添加排名
-            for i, sector in enumerate(sectors):
-                sector["rank"] = i + 1
-
-            # 使用最近交易日作为时间戳
-            trading_day = get_last_trading_day()
-
-            return {
-                "type": sector_type,
-                "sectors": sectors,
-                "count": len(sectors),
-                "timestamp": trading_day.timestamp(),
-            }
-
         except Exception as e:
             self.log(f"获取板块数据失败: {e}")
-            return None
+
+        return sectors
 
     def _calc_change(self, price: float, change_pct: float) -> float:
         """计算涨跌额"""
