@@ -67,7 +67,10 @@
             <span class="value font-mono">{{ formatPrice(commodity.low) }}</span>
           </span>
         </div>
-        <span class="timestamp">{{ formatTime(commodity.timestamp) }}</span>
+        <div class="card-footer-row2">
+          <span class="timestamp">{{ formatTime(commodity.timestamp) }}</span>
+          <span class="commodity-source" v-if="sourceName">{{ sourceName }}</span>
+        </div>
       </div>
     </template>
   </div>
@@ -90,6 +93,16 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const store = useCommodityStore();
+
+// 简化数据源名称显示
+const sourceName = computed(() => {
+  const source = props.commodity.source;
+  if (!source) return '';
+  if (source.includes('akshare')) return 'AKShare';
+  if (source.includes('yfinance')) return 'yFinance';
+  if (source.includes('binance')) return 'Binance';
+  return source;
+});
 
 // 缓存各市场交易日结果
 const tradingDayCache = ref<Record<string, boolean>>({});
@@ -126,29 +139,88 @@ const changeClass = computed(() => {
   return 'neutral';
 });
 
-// 判断是否为交易日
-function isTradingDay(): boolean {
-  const now = new Date();
-  const shanghaiTime = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
-  const shanghaiDate = new Date(shanghaiTime);
-  const day = shanghaiDate.getDay();
-  const hour = shanghaiDate.getHours();
-  const minute = shanghaiDate.getMinutes();
-  const timeValue = hour * 60 + minute;
+// 判断是否为交易时段 (基于市场)
+function isInTradingHours(market: string, timeValue: number): boolean {
+  const isWeekend = () => {
+    const now = new Date();
+    const shanghaiTime = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+    const shanghaiDate = new Date(shanghaiTime);
+    return shanghaiDate.getDay() === 0 || shanghaiDate.getDay() === 6;
+  };
 
-  // 沪金交易时间: 日盘 9:00-15:30, 夜盘 19:50-02:30
-  // 日盘交易时段
-  const daySessionStart = 9 * 60;      // 9:00
-  const daySessionEnd = 15 * 60 + 30;   // 15:30
-  // 夜盘交易时段
-  const nightSessionStart = 19 * 60 + 50; // 19:50
-  const nightSessionEnd = 24 * 60;       // 24:00 (次日)
+  // 加密货币 24/7 交易
+  if (market === 'crypto') {
+    return true;
+  }
 
-  const isWeekend = day === 0 || day === 6;
-  const isDaySession = timeValue >= daySessionStart && timeValue < daySessionEnd;
-  const isNightSession = timeValue >= nightSessionStart || timeValue < 2 * 60 + 30;
+  // 伦敦金银市场 (LBMA) - 24小时交易，周末休市
+  if (market === 'lbma') {
+    return !isWeekend();
+  }
 
-  return !isWeekend && (isDaySession || isNightSession);
+  // 上海黄金交易所 (SGE) - 日盘 9:00-15:30, 夜盘 19:50-次日02:30
+  if (market === 'sge') {
+    if (isWeekend()) return false;
+    const daySessionStart = 9 * 60;       // 9:00
+    const daySessionEnd = 15 * 60 + 30;    // 15:30
+    const nightSessionStart = 19 * 60 + 50; // 19:50
+    const nightSessionEnd = 24 * 60 + 150;  // 次日 02:30 = 24*60 + 150
+
+    // 夜盘跨日处理
+    if (timeValue >= nightSessionStart) {
+      // 当天夜盘时段
+      return timeValue < nightSessionEnd;
+    } else if (timeValue < 2 * 60 + 30) {
+      // 次日凌晨时段（夜盘延续）
+      return true;
+    }
+    // 日盘时段
+    return timeValue >= daySessionStart && timeValue < daySessionEnd;
+  }
+
+  // COMEX (纽约商品交易所) - 8:00-13:30 纽约时间 = 21:00-02:30 北京时间
+  if (market === 'comex') {
+    if (isWeekend()) return false;
+    const openHour = 21;  // 北京时间 21:00
+    const closeHour = 2;   // 次日 02:30
+    const closeMinute = 30;
+    const closeTimeValue = closeHour * 60 + closeMinute; // 150
+
+    if (timeValue >= openHour * 60) {
+      // 当天晚盘时段 (21:00-23:59)
+      return true;
+    } else if (timeValue < closeTimeValue) {
+      // 次日凌晨时段
+      return true;
+    }
+    return false;
+  }
+
+  // CME (芝加哥商品交易所) - 大部分品种 8:00-13:30 芝加哥时间 = 22:00-03:30 北京时间
+  if (market === 'cme') {
+    if (isWeekend()) return false;
+    const openHour = 22;  // 北京时间 22:00
+    const closeHour = 3;   // 次日 03:30
+    const closeMinute = 30;
+    const closeTimeValue = closeHour * 60 + closeMinute; // 210
+
+    if (timeValue >= openHour * 60) {
+      return true;
+    } else if (timeValue < closeTimeValue) {
+      return true;
+    }
+    return false;
+  }
+
+  // 默认 A 股交易时间 (仅作备用)
+  if (market === 'china' || market === 'sse' || market === 'szse') {
+    if (isWeekend()) return false;
+    const daySessionStart = 9 * 60;    // 9:30
+    const daySessionEnd = 15 * 60;     // 15:00
+    return timeValue >= daySessionStart && timeValue < daySessionEnd;
+  }
+
+  return false;
 }
 
 // 交易状态判断
@@ -161,7 +233,7 @@ const tradingStatus = computed(() => {
   const timestamp = props.commodity.timestamp;
   const symbol = props.commodity.symbol;
   const market = getCommodityMarket(symbol);
-  
+
   // 检查缓存的交易日状态
   const cachedTradingDay = tradingDayCache.value[market];
 
@@ -170,7 +242,12 @@ const tradingStatus = computed(() => {
     return 'closed';
   }
 
-  // 如果是交易日，检查交易时段
+  // 加密货币 24/7 交易
+  if (market === 'crypto') {
+    return 'open';
+  }
+
+  // 如果有数据时间戳，根据时间判断
   if (timestamp) {
     try {
       // 处理纯时间格式 "15:30:00" (沪金实时数据)
@@ -180,27 +257,12 @@ const tradingStatus = computed(() => {
         const now = new Date();
         const shanghaiTime = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
         const shanghaiDate = new Date(shanghaiTime);
-        const day = shanghaiDate.getDay();
         const hour = shanghaiDate.getHours();
         const minute = shanghaiDate.getMinutes();
         const timeValue = hour * 60 + minute;
 
-        // 沪金交易时间: 日盘 9:00-15:30, 夜盘 19:50-02:30
-        const daySessionStart = 9 * 60;
-        const daySessionEnd = 15 * 60 + 30;
-        const nightSessionStart = 19 * 60 + 50;
-
-        // 周末非交易
-        if (day === 0 || day === 6) {
-          return 'closed';
-        }
-
-        // 日盘交易时段
-        if (timeValue >= daySessionStart && timeValue < daySessionEnd) {
-          return 'open';
-        }
-        // 夜盘交易时段
-        if (timeValue >= nightSessionStart || timeValue < 2 * 60 + 30) {
+        // 根据市场判断是否在交易时段
+        if (isInTradingHours(market, timeValue)) {
           return 'open';
         }
         return 'closed';
@@ -222,9 +284,22 @@ const tradingStatus = computed(() => {
     }
   }
 
-  // 加密货币 24/7 交易
-  if (market === 'crypto') {
+  // 如果没有时间戳，根据当前市场时间判断
+  const now = new Date();
+  const shanghaiTime = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+  const shanghaiDate = new Date(shanghaiTime);
+  const hour = shanghaiDate.getHours();
+  const minute = shanghaiDate.getMinutes();
+  const timeValue = hour * 60 + minute;
+
+  if (isInTradingHours(market, timeValue)) {
     return 'open';
+  }
+
+  // 周末检查 - 对所有市场生效
+  const day = shanghaiDate.getDay();
+  if (day === 0 || day === 6) {
+    return 'closed';
   }
 
   return 'unknown';
@@ -299,9 +374,20 @@ function formatPercent(value: number): string {
   return `${sign}${value.toFixed(2)}%`;
 }
 
-function formatTime(dateStr: string): string {
+function formatTime(dateStr: string | undefined | null): string {
   if (!dateStr) return '--';
   try {
+    // 处理 ISO 格式 "2026-02-13T00:00:00Z"
+    if (dateStr.includes('T') && dateStr.endsWith('Z')) {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '--';
+      return date.toLocaleTimeString('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
     // 处理纯日期格式 "2026-02-13"
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
       return dateStr;
@@ -313,6 +399,7 @@ function formatTime(dateStr: string): string {
     // 处理 "2026-02-13 21:59:50 UTC" 格式
     const utcStr = dateStr.replace(' UTC', '').trim();
     const date = new Date(utcStr + 'Z');
+    if (isNaN(date.getTime())) return '--';
     return date.toLocaleTimeString('zh-CN', {
       timeZone: 'Asia/Shanghai',
       hour12: false,
@@ -625,10 +712,16 @@ function formatTime(dateStr: string): string {
 
 .card-footer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: var(--spacing-xs);
   padding-top: var(--spacing-sm);
   border-top: 1px solid var(--color-divider);
+}
+
+.card-footer-row2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .price-range {
@@ -655,5 +748,18 @@ function formatTime(dateStr: string): string {
 .timestamp {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.commodity-source {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  padding: 1px 4px;
+  background: var(--color-bg-tertiary);
+  border-radius: 3px;
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

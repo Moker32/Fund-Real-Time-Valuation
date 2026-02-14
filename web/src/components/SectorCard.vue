@@ -65,6 +65,7 @@
         </div>
         <div class="data-time" v-if="sector.timestamp">
           {{ formatDataDate(sector.timestamp) }}
+          <span class="sector-source" v-if="sector.source">{{ sector.source }}</span>
         </div>
       </div>
     </template>
@@ -327,5 +328,15 @@ function formatPercent(value: number | undefined): string {
   color: var(--color-text-tertiary);
   text-align: right;
   margin-top: var(--spacing-xs);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sector-source {
+  padding: 2px 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: 4px;
 }
 </style>

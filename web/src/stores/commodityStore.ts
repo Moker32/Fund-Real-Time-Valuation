@@ -476,20 +476,26 @@ export const useCommodityStore = defineStore('commodities', () => {
       const watchedData: Commodity[] = [];
       for (const watched of watchedCommodities.value) {
         try {
-          const data = await commodityApi.getCommodityByTicker(watched.symbol);
+          let data: any;
+          // 根据 symbol 类型调用不同的 API
+          if (watched.symbol === 'Au99.99' || watched.symbol.toLowerCase() === 'sg=f') {
+            data = await commodityApi.getGoldCNY();
+          } else {
+            data = await commodityApi.getCommodityByTicker(watched.symbol);
+          }
           const commodityData: Commodity = {
             symbol: data.symbol,
-            name: getCommodityName(data.symbol, data.name),  // 转换为中文
+            name: getCommodityName(data.symbol, data.name),
             price: data.price,
             currency: data.currency,
-            change: data.change ?? 0,
+            change: data.change ?? data.change_percent ? (data.price * data.change_percent / 100) : 0,
             changePercent: data.change_percent ?? 0,
-            high: 0,
-            low: 0,
-            open: 0,
-            prevClose: data.change ? data.price - data.change : 0,
+            high: data.high ?? 0,
+            low: data.low ?? 0,
+            open: data.open ?? 0,
+            prevClose: data.prev_close ?? 0,
             source: data.source,
-            timestamp: data.timestamp,
+            timestamp: data.time ?? data.timestamp,
           };
           watchedData.push(commodityData);
         } catch (e) {

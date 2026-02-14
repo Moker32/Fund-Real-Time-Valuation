@@ -76,6 +76,7 @@
               <path d="M12 6V12L16 14"/>
             </svg>
             <span>{{ formatToUserTimezone(indexData.dataTimestamp) }}</span>
+            <span class="index-source" v-if="sourceName">{{ sourceName }}</span>
           </div>
         </div>
       </div>
@@ -145,6 +146,16 @@ const regionLabel = computed(() => {
     'europe': '欧洲',
   };
   return labels[props.index.region || ''] || props.index.region || '';
+});
+
+const sourceName = computed(() => {
+  const source = props.index.source;
+  if (!source) return '';
+  if (source.includes('akshare')) return 'AKShare';
+  if (source.includes('yfinance')) return 'yFinance';
+  if (source.includes('tencent')) return 'Tencent';
+  if (source.includes('eastmoney')) return 'EastMoney';
+  return source;
 });
 
 const statusText = computed(() => {
@@ -545,5 +556,13 @@ function formatToUserTimezone(isoTimestamp: string | undefined): string {
     width: 12px;
     height: 12px;
   }
+}
+
+.index-source {
+  font-size: 10px;
+  color: var(--color-text-tertiary);
+  padding: 1px 4px;
+  background: var(--color-bg-tertiary);
+  border-radius: 3px;
 }
 </style>

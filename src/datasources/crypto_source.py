@@ -5,6 +5,7 @@
 
 import asyncio
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -26,16 +27,12 @@ class BinanceCryptoSource(DataSource):
         Args:
             timeout: 请求超时时间(秒)
         """
-        super().__init__(
-            name="binance_crypto",
-            source_type=DataSourceType.CRYPTO,
-            timeout=timeout
-        )
+        super().__init__(name="binance_crypto", source_type=DataSourceType.CRYPTO, timeout=timeout)
         self.client = httpx.AsyncClient(
             timeout=timeout,
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            }
+            },
         )
         # 常用交易对
         self.common_symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"]
@@ -66,6 +63,7 @@ class BinanceCryptoSource(DataSource):
                 "low": float(data.get("lowPrice", 0)),
                 "volume": float(data.get("volume", 0)),
                 "quote_volume": float(data.get("quoteVolume", 0)),
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
 
             self._record_success()
@@ -74,7 +72,7 @@ class BinanceCryptoSource(DataSource):
                 data=result_data,
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"symbol": symbol}
+                metadata={"symbol": symbol},
             )
         except httpx.ConnectTimeout:
             return DataSourceResult(
@@ -82,7 +80,7 @@ class BinanceCryptoSource(DataSource):
                 error="连接超时，请检查网络连接或代理设置",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"symbol": symbol, "error_type": "ConnectTimeout"}
+                metadata={"symbol": symbol, "error_type": "ConnectTimeout"},
             )
         except httpx.HTTPStatusError as e:
             return DataSourceResult(
@@ -90,7 +88,7 @@ class BinanceCryptoSource(DataSource):
                 error=f"HTTP 错误: {e.response.status_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"symbol": symbol, "error_type": "HTTPStatusError"}
+                metadata={"symbol": symbol, "error_type": "HTTPStatusError"},
             )
         except Exception as e:
             error_msg = str(e)
@@ -100,7 +98,7 @@ class BinanceCryptoSource(DataSource):
                     error="网络连接失败，请检查网络连接",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"symbol": symbol, "error_type": "ConnectionError"}
+                    metadata={"symbol": symbol, "error_type": "ConnectionError"},
                 )
             return self._handle_error(e, self.name)
 
@@ -113,6 +111,7 @@ class BinanceCryptoSource(DataSource):
         Returns:
             List[DataSourceResult]: 数据源结果列表
         """
+
         async def fetch_one(sym: str) -> DataSourceResult:
             return await self.fetch(sym)
 
@@ -128,7 +127,7 @@ class BinanceCryptoSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"symbol": symbols[i]}
+                        metadata={"symbol": symbols[i]},
                     )
                 )
             else:
@@ -187,15 +186,13 @@ class CoinGeckoCryptoSource(DataSource):
             timeout: 请求超时时间(秒)
         """
         super().__init__(
-            name="coingecko_crypto",
-            source_type=DataSourceType.CRYPTO,
-            timeout=timeout
+            name="coingecko_crypto", source_type=DataSourceType.CRYPTO, timeout=timeout
         )
         self.client = httpx.AsyncClient(
             timeout=timeout,
             headers={
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            }
+            },
         )
         self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0  # 缓存60秒
@@ -217,7 +214,7 @@ class CoinGeckoCryptoSource(DataSource):
                 data=self._cache[cache_key],
                 timestamp=self._cache[cache_key].get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"coin_id": coin_id, "from_cache": True}
+                metadata={"coin_id": coin_id, "from_cache": True},
             )
 
         try:
@@ -227,7 +224,7 @@ class CoinGeckoCryptoSource(DataSource):
                 "vs_currencies": "usd",
                 "include_24hr_change": "true",
                 "include_market_cap": "true",
-                "include_24hr_vol": "true"
+                "include_24hr_vol": "true",
             }
 
             response = await self.client.get(url, params=params)
@@ -241,7 +238,7 @@ class CoinGeckoCryptoSource(DataSource):
                     error=f"未找到币种: {coin_id}",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"coin_id": coin_id}
+                    metadata={"coin_id": coin_id},
                 )
 
             symbol = self.COIN_IDS.get(coin_id.lower(), coin_id.upper())
@@ -265,7 +262,7 @@ class CoinGeckoCryptoSource(DataSource):
                 data=result_data,
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"coin_id": coin_id}
+                metadata={"coin_id": coin_id},
             )
         except httpx.ConnectTimeout:
             return DataSourceResult(
@@ -273,7 +270,7 @@ class CoinGeckoCryptoSource(DataSource):
                 error="连接超时，请检查网络连接或代理设置",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"coin_id": coin_id, "error_type": "ConnectTimeout"}
+                metadata={"coin_id": coin_id, "error_type": "ConnectTimeout"},
             )
         except httpx.HTTPStatusError as e:
             return DataSourceResult(
@@ -281,7 +278,7 @@ class CoinGeckoCryptoSource(DataSource):
                 error=f"HTTP 错误: {e.response.status_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"coin_id": coin_id, "error_type": "HTTPStatusError"}
+                metadata={"coin_id": coin_id, "error_type": "HTTPStatusError"},
             )
         except Exception as e:
             error_msg = str(e)
@@ -291,7 +288,7 @@ class CoinGeckoCryptoSource(DataSource):
                     error="网络连接失败，请检查网络连接",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"coin_id": coin_id, "error_type": "ConnectionError"}
+                    metadata={"coin_id": coin_id, "error_type": "ConnectionError"},
                 )
             return self._handle_error(e, self.name)
 
@@ -304,6 +301,7 @@ class CoinGeckoCryptoSource(DataSource):
         Returns:
             List[DataSourceResult]: 数据源结果列表
         """
+
         async def fetch_one(coin_id: str) -> DataSourceResult:
             return await self.fetch(coin_id)
 
@@ -319,7 +317,7 @@ class CoinGeckoCryptoSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"coin_id": coin_ids[i]}
+                        metadata={"coin_id": coin_ids[i]},
                     )
                 )
             else:
@@ -394,9 +392,7 @@ class CryptoAggregator(DataSource):
             timeout: 请求超时时间(秒)
         """
         super().__init__(
-            name="crypto_aggregator",
-            source_type=DataSourceType.CRYPTO,
-            timeout=timeout
+            name="crypto_aggregator", source_type=DataSourceType.CRYPTO, timeout=timeout
         )
         self._sources: list[DataSource] = []
         self._primary_source: DataSource | None = None
@@ -447,7 +443,7 @@ class CryptoAggregator(DataSource):
             error=f"所有数据源均失败: {'; '.join(errors)}",
             timestamp=time.time(),
             source=self.name,
-            metadata={"symbol": symbol, "errors": errors}
+            metadata={"symbol": symbol, "errors": errors},
         )
 
     async def fetch_batch(self, symbols: list[str]) -> list[DataSourceResult]:
@@ -464,7 +460,7 @@ class CryptoAggregator(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"symbol": symbols[i]}
+                        metadata={"symbol": symbols[i]},
                     )
                 )
             else:
@@ -483,7 +479,7 @@ class CryptoAggregator(DataSource):
     async def close(self):
         """关闭所有数据源"""
         for source in self._sources:
-            if hasattr(source, 'close'):
+            if hasattr(source, "close"):
                 try:
                     await source.close()
                 except Exception:

@@ -23,15 +23,15 @@ pnpm run dev:api         # 后端 (FastAPI, 端口 8000)
 # Python 测试
 uv run pytest tests/ -v                              # 所有测试
 uv run pytest tests/test_file.py -v                  # 单个文件
-uv run pytest tests/test_file.py::test_function -v   # 单个测试
+uv run pytest tests/test_file.py::test_function -v   # 单个测试函数
 uv run pytest tests/ -k "pattern" -v                # 按模式运行
 
 # Python lint 和类型检查
 uv run ruff check .              # Lint
 uv run ruff check --fix .       # 自动修复
 uv run mypy .                   # 类型检查
-pnpm run lint                   # 后端 lint
-pnpm run check                  # Lint + 类型检查
+cd web && pnpm run lint         # 前端 lint (ESLint)
+pnpm run check                  # Lint + 类型检查 (后端)
 ```
 
 ## 代码风格指南
@@ -68,6 +68,7 @@ from api.routes import funds
 - TypeScript 严格模式
 - Props/Events: camelCase
 - 组件: PascalCase
+- 禁止使用 `as any`, `@ts-ignore`, `@ts-expect-error`
 
 ## 架构
 
@@ -109,8 +110,33 @@ class MyDataSource(DataSource):
 - 异步测试: `@pytest.mark.asyncio`
 - 命名: `test_<方法名>`
 
+## 交易日历 API
+
+支持多市场交易状态查询：
+```bash
+# A股
+curl "http://localhost:8000/trading-calendar/is-trading-day/china"
+# 上海黄金交易所
+curl "http://localhost:8000/trading-calendar/is-trading-day/sge"
+# COMEX
+curl "http://localhost:8000/trading-calendar/is-trading-day/comex"
+```
+
+支持的交易所: china, hk, usa, japan, uk, germany, france, sge, comex, cme, lbma
+
 ## 备注
 
 - 配置: `~/.fund-tui/config.yaml`, `~/.fund-tui/funds.yaml`
 - 数据库: `~/.fund-tui/fund_data.db`
 - mypy 中禁用的第三方类型: akshare, yfinance, matplotlib, pandas, numpy
+
+## 常用 API 端点
+
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/api/funds` | GET | 基金列表 |
+| `/api/commodities` | GET | 商品行情 |
+| `/api/commodities/watchlist` | GET/POST | 关注列表 |
+| `/api/indices` | GET | 全球市场指数 |
+| `/api/health` | GET | 健康检查 |
+| `/trading-calendar/is-trading-day/{market}` | GET | 交易状态 |

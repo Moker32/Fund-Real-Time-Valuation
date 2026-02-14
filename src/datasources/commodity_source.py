@@ -13,7 +13,7 @@
 import asyncio
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, TypedDict
 
 from src.db.commodity_repo import CommodityCacheDAO, CommodityCategory
@@ -94,6 +94,11 @@ class YFinanceCommoditySource(CommodityDataSource):
 
     def __init__(self, timeout: float = 15.0):
         super().__init__(name="yfinance_commodity", timeout=timeout)
+        # 加密货币 ticker 映射 (使用 Binance)
+        self._crypto_tickers = {
+            "btc": "BTCUSDT",
+            "eth": "ETHUSDT",
+        }
 
     async def fetch(self, commodity_type: str = "gold") -> DataSourceResult:
         """
@@ -105,6 +110,9 @@ class YFinanceCommoditySource(CommodityDataSource):
         Returns:
             DataSourceResult: 商品数据结果
         """
+        # 加密货币使用 Binance (实时 ~100ms)
+        if commodity_type in self._crypto_tickers:
+            return await self._fetch_from_binance(commodity_type)
         # 检查数据库缓存
         if self._db_dao:
             try:
@@ -169,15 +177,16 @@ class YFinanceCommoditySource(CommodityDataSource):
                     metadata={"commodity_type": commodity_type},
                 )
 
-            # 转换时间戳为可读格式
+            # 转换时间戳为 UTC ISO 格式
             market_time = info.get("regularMarketTime")
             if market_time:
                 try:
-                    time_str = datetime.fromtimestamp(market_time).strftime("%Y-%m-%d %H:%M:%S")
+                    utc_dt = datetime.fromtimestamp(market_time, timezone.utc)
+                    timestamp_str = utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
                 except (ValueError, TypeError, OSError):
-                    time_str = str(market_time)
+                    timestamp_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             else:
-                time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                timestamp_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
             data = {
                 "commodity": commodity_type,
@@ -188,7 +197,7 @@ class YFinanceCommoditySource(CommodityDataSource):
                 "change_percent": float(change_percent) if change_percent else 0.0,
                 "currency": info.get("currency", "USD"),
                 "exchange": info.get("exchange", ""),
-                "time": time_str,
+                "timestamp": timestamp_str,
             }
 
             # 更新缓存
@@ -297,6 +306,65 @@ class YFinanceCommoditySource(CommodityDataSource):
     async def close(self):
         """关闭数据源（yfinance 不需要显式关闭）"""
         pass
+
+    async def _fetch_from_binance(self, commodity_type: str) -> DataSourceResult:
+        """从 Binance 获取加密货币数据"""
+        import httpx
+
+        symbol = self._crypto_tickers.get(commodity_type)
+        if not symbol:
+            return DataSourceResult(
+                success=False,
+                error=f"不支持的加密货币: {commodity_type}",
+                timestamp=time.time(),
+                source=self.name,
+            )
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                url = "https://api.binance.com/api/v3/ticker/24hr"
+                response = await client.get(url, params={"symbol": symbol})
+                response.raise_for_status()
+                data = response.json()
+
+                crypto_names = {
+                    "btc": "比特币",
+                    "eth": "以太坊",
+                }
+
+                result_data = {
+                    "commodity": commodity_type,
+                    "symbol": symbol,
+                    "name": crypto_names.get(commodity_type, commodity_type),
+                    "price": float(data.get("lastPrice", 0)),
+                    "change": float(data.get("priceChange", 0)),
+                    "change_percent": float(data.get("priceChangePercent", 0)),
+                    "currency": "USDT",
+                    "exchange": "Binance",
+                    "high": float(data.get("highPrice", 0)),
+                    "low": float(data.get("lowPrice", 0)),
+                    "open": float(data.get("openPrice", 0)),
+                    "prev_close": float(data.get("prevClosePrice", 0)),
+                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                }
+
+                cache_key = commodity_type
+                result_data["_cache_time"] = time.time()
+                self._cache[cache_key] = result_data
+
+                await self._save_to_database(commodity_type, result_data, self.name)
+
+                self._record_success()
+                return DataSourceResult(
+                    success=True,
+                    data=result_data,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"commodity_type": commodity_type, "source": "binance"},
+                )
+
+        except Exception as e:
+            return self._handle_error(e, self.name)
 
 
 class AKShareCommoditySource(CommodityDataSource):
@@ -433,7 +501,7 @@ class AKShareCommoditySource(CommodityDataSource):
                         "price": price,
                         "change": change,
                         "change_percent": change_percent,
-                        "time": f"{trade_time}" if trade_time else str(update_time),
+                        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                         "high": high_price if high_price > 0 else None,
                         "low": low_price if low_price > 0 else None,
                         "open": open_price if open_price and open_price > 0 else None,
@@ -471,7 +539,7 @@ class AKShareCommoditySource(CommodityDataSource):
                     "price": price,
                     "change": change,
                     "change_percent": change_percent,
-                    "time": str(trade_date),
+                    "timestamp": f"{trade_date}T00:00:00Z",
                     "high": high if high > 0 else None,
                     "low": low if low > 0 else None,
                     "open": open_price if open_price > 0 else None,
@@ -658,6 +726,12 @@ SEARCHABLE_COMMODITIES: dict[str, dict[str, str]] = {
         "category": "precious_metal",
         "exchange": "CME",
         "currency": "USD",
+    },
+    "Au99.99": {
+        "name": "上海黄金 (Au99.99)",
+        "category": "precious_metal",
+        "exchange": "SGE",
+        "currency": "CNY",
     },
     "SI=F": {"name": "白银", "category": "precious_metal", "exchange": "CME", "currency": "USD"},
     "PT=F": {"name": "铂金", "category": "precious_metal", "exchange": "NYMEX", "currency": "USD"},
