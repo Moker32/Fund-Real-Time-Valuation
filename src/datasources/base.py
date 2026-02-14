@@ -12,12 +12,13 @@ from typing import Any
 
 class DataSourceType(Enum):
     """数据源类型枚举"""
+
     FUND = "fund"
     COMMODITY = "commodity"
     NEWS = "news"
     SECTOR = "sector"
-    STOCK = "stock"    # 股票行情
-    BOND = "bond"      # 债券数据
+    STOCK = "stock"  # 股票行情
+    BOND = "bond"  # 债券数据
     CRYPTO = "crypto"  # 加密货币
 
 
@@ -33,27 +34,32 @@ class DataSourceError(Exception):
 
 class NetworkError(DataSourceError):
     """网络异常"""
+
     pass
 
 
 class DataParseError(DataSourceError):
     """数据解析异常"""
+
     pass
 
 
 class DataSourceUnavailableError(DataSourceError):
     """数据源不可用"""
+
     pass
 
 
 class TimeoutError(DataSourceError):
     """请求超时异常"""
+
     pass
 
 
 @dataclass
 class DataSourceResult:
     """数据源返回结果封装"""
+
     success: bool
     data: Any | None = None
     error: str | None = None
@@ -102,6 +108,10 @@ class DataSource(ABC):
         """
         pass
 
+    async def close(self) -> None:
+        """关闭数据源连接（子类可选实现）"""
+        pass
+
     @abstractmethod
     async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
         """
@@ -133,13 +143,13 @@ class DataSource(ABC):
                 error=error.message,
                 timestamp=time.time(),
                 source=source,
-                metadata={"source_type": error.source_type, "details": error.details}
+                metadata={"source_type": error.source_type, "details": error.details},
             )
 
         self._last_error = DataSourceError(
             message=str(error),
             source_type=self.source_type,
-            details={"original_error": type(error).__name__}
+            details={"original_error": type(error).__name__},
         )
 
         return DataSourceResult(
@@ -147,7 +157,7 @@ class DataSource(ABC):
             error=str(error),
             timestamp=time.time(),
             source=source,
-            metadata={"error_type": type(error).__name__}
+            metadata={"error_type": type(error).__name__},
         )
 
     def _record_success(self) -> DataSourceResult:
@@ -169,7 +179,7 @@ class DataSource(ABC):
             "request_count": self._request_count,
             "error_count": self._error_count,
             "error_rate": self.error_rate,
-            "last_error": str(self._last_error) if self._last_error else None
+            "last_error": str(self._last_error) if self._last_error else None,
         }
 
     async def health_check(self) -> bool:

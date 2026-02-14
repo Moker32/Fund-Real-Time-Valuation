@@ -15,6 +15,7 @@ from .base import DataSource
 
 class HealthStatus(Enum):
     """健康状态枚举"""
+
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
@@ -24,6 +25,7 @@ class HealthStatus(Enum):
 @dataclass
 class HealthCheckResult:
     """健康检查结果"""
+
     source_name: str
     status: HealthStatus
     response_time_ms: float
@@ -41,7 +43,7 @@ class HealthCheckResult:
             "error_count": self.error_count,
             "last_check": self.last_check.isoformat(),
             "message": self.message,
-            "details": self.details
+            "details": self.details,
         }
 
 
@@ -61,7 +63,7 @@ class DataSourceHealthChecker:
         check_interval: int = 60,
         timeout: float = 10.0,
         max_response_time_ms: float = 5000.0,
-        consecutive_failure_threshold: int = 3
+        consecutive_failure_threshold: int = 3,
     ):
         """
         初始化健康检查器
@@ -82,7 +84,9 @@ class DataSourceHealthChecker:
         self._running = False
         self._consecutive_failures: dict[str, int] = {}
 
-    async def check_source(self, source: DataSource, save_history: bool = True) -> HealthCheckResult:
+    async def check_source(
+        self, source: DataSource, save_history: bool = True
+    ) -> HealthCheckResult:
         """
         检查单个数据源健康状态
 
@@ -98,10 +102,7 @@ class DataSourceHealthChecker:
 
         try:
             # 执行健康检查
-            is_healthy = await asyncio.wait_for(
-                source.health_check(),
-                timeout=self.timeout
-            )
+            is_healthy = await asyncio.wait_for(source.health_check(), timeout=self.timeout)
 
             response_time_ms = (time.perf_counter() - start_time) * 1000
 
@@ -124,11 +125,12 @@ class DataSourceHealthChecker:
                     error_count=0,
                     last_check=datetime.now(),
                     message=message,
-                    details={"response_time_threshold": self.max_response_time_ms}
+                    details={"response_time_threshold": self.max_response_time_ms},
                 )
             else:
-                self._consecutive_failures[source_name] = \
+                self._consecutive_failures[source_name] = (
                     self._consecutive_failures.get(source_name, 0) + 1
+                )
 
                 error_count = self._consecutive_failures[source_name]
 
@@ -145,7 +147,7 @@ class DataSourceHealthChecker:
                     response_time_ms=response_time_ms,
                     error_count=error_count,
                     last_check=datetime.now(),
-                    message=message
+                    message=message,
                 )
 
             # 保存到历史记录
@@ -157,14 +159,17 @@ class DataSourceHealthChecker:
                 # 限制历史记录数量
                 max_history = 100
                 if len(self.health_history[source_name]) > max_history:
-                    self.health_history[source_name] = self.health_history[source_name][-max_history:]
+                    self.health_history[source_name] = self.health_history[source_name][
+                        -max_history:
+                    ]
 
             return result
 
         except asyncio.TimeoutError:
             response_time_ms = (time.perf_counter() - start_time) * 1000
-            self._consecutive_failures[source_name] = \
+            self._consecutive_failures[source_name] = (
                 self._consecutive_failures.get(source_name, 0) + 1
+            )
 
             result = HealthCheckResult(
                 source_name=source_name,
@@ -172,7 +177,7 @@ class DataSourceHealthChecker:
                 response_time_ms=response_time_ms,
                 error_count=self._consecutive_failures[source_name],
                 last_check=datetime.now(),
-                message=f"健康检查超时（>{self.timeout}s）"
+                message=f"健康检查超时（>{self.timeout}s）",
             )
 
             # 保存到历史记录
@@ -185,8 +190,9 @@ class DataSourceHealthChecker:
 
         except Exception as e:
             response_time_ms = (time.perf_counter() - start_time) * 1000
-            self._consecutive_failures[source_name] = \
+            self._consecutive_failures[source_name] = (
                 self._consecutive_failures.get(source_name, 0) + 1
+            )
 
             result = HealthCheckResult(
                 source_name=source_name,
@@ -195,7 +201,7 @@ class DataSourceHealthChecker:
                 error_count=self._consecutive_failures[source_name],
                 last_check=datetime.now(),
                 message=f"健康检查异常: {str(e)}",
-                details={"error_type": type(e).__name__}
+                details={"error_type": type(e).__name__},
             )
 
             # 保存到历史记录
@@ -206,10 +212,7 @@ class DataSourceHealthChecker:
 
             return result
 
-    async def check_all_sources(
-        self,
-        sources: list[DataSource]
-    ) -> dict[str, HealthCheckResult]:
+    async def check_all_sources(self, sources: list[DataSource]) -> dict[str, HealthCheckResult]:
         """
         并行检查所有数据源
 
@@ -230,7 +233,7 @@ class DataSourceHealthChecker:
         checked_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for item in checked_results:
-            if isinstance(item, Exception):
+            if isinstance(item, BaseException):
                 # 如果出现异常，记录错误
                 continue
 
@@ -239,10 +242,7 @@ class DataSourceHealthChecker:
 
         return results
 
-    def get_source_health(
-        self,
-        source_name: str
-    ) -> HealthCheckResult | None:
+    def get_source_health(self, source_name: str) -> HealthCheckResult | None:
         """
         获取数据源最近健康状态
 
@@ -257,11 +257,7 @@ class DataSourceHealthChecker:
             return history[-1]
         return None
 
-    def get_health_history(
-        self,
-        source_name: str,
-        limit: int = 10
-    ) -> list[HealthCheckResult]:
+    def get_health_history(self, source_name: str, limit: int = 10) -> list[HealthCheckResult]:
         """
         获取数据源健康历史
 
@@ -282,10 +278,7 @@ class DataSourceHealthChecker:
         Returns:
             Dict: 统计数据字典
         """
-        stats = {
-            "total_sources_checked": len(self.health_history),
-            "sources": {}
-        }
+        stats = {"total_sources_checked": len(self.health_history), "sources": {}}
 
         for source_name, history in self.health_history.items():
             if not history:
@@ -300,7 +293,7 @@ class DataSourceHealthChecker:
                 "unhealthy_count": len(history) - len(recent_results),
                 "avg_response_time_ms": avg_response_time,
                 "current_status": history[-1].status.value,
-                "last_check": history[-1].last_check.isoformat()
+                "last_check": history[-1].last_check.isoformat(),
             }
 
         return stats
@@ -314,10 +307,7 @@ class DataSourceHealthChecker:
         """
         unhealthy = []
         for source_name, history in self.health_history.items():
-            if history and history[-1].status in (
-                HealthStatus.UNHEALTHY,
-                HealthStatus.DEGRADED
-            ):
+            if history and history[-1].status in (HealthStatus.UNHEALTHY, HealthStatus.DEGRADED):
                 unhealthy.append(source_name)
         return unhealthy
 
@@ -334,10 +324,7 @@ class DataSourceHealthChecker:
                 healthy.append(source_name)
         return healthy
 
-    async def start_background_check(
-        self,
-        sources: list[DataSource]
-    ):
+    async def start_background_check(self, sources: list[DataSource]):
         """
         启动后台健康检查任务
 
@@ -359,7 +346,7 @@ class DataSourceHealthChecker:
     def stop_background_check(self):
         """停止后台健康检查任务"""
         self._running = False
-        if hasattr(self, '_check_task'):
+        if hasattr(self, "_check_task"):
             self._check_task.cancel()
 
     def reset(self):
@@ -386,9 +373,7 @@ class HealthCheckInterceptor:
         self.checker = checker
 
     async def get_healthy_source(
-        self,
-        sources: list[DataSource],
-        prefer_healthy: bool = True
+        self, sources: list[DataSource], prefer_healthy: bool = True
     ) -> DataSource | None:
         """
         获取最健康的数据源
@@ -411,39 +396,54 @@ class HealthCheckInterceptor:
 
         # 优先选择健康的数据源
         healthy_sources = [
-            s for s in sources
-            if results.get(s.name, HealthCheckResult(
-                source_name=s.name,
-                status=HealthStatus.UNKNOWN,
-                response_time_ms=0,
-                error_count=0,
-                last_check=datetime.now()
-            )).status == HealthStatus.HEALTHY
+            s
+            for s in sources
+            if results.get(
+                s.name,
+                HealthCheckResult(
+                    source_name=s.name,
+                    status=HealthStatus.UNKNOWN,
+                    response_time_ms=0,
+                    error_count=0,
+                    last_check=datetime.now(),
+                ),
+            ).status
+            == HealthStatus.HEALTHY
         ]
 
         if healthy_sources:
             # 返回响应时间最短的健康数据源
             return min(
                 healthy_sources,
-                key=lambda s: results.get(s.name, HealthCheckResult(
-                    source_name=s.name,
-                    status=HealthStatus.HEALTHY,
-                    response_time_ms=float('inf'),
-                    error_count=0,
-                    last_check=datetime.now()
-                )).response_time_ms
+                key=lambda s: (
+                    results.get(
+                        s.name,
+                        HealthCheckResult(
+                            source_name=s.name,
+                            status=HealthStatus.HEALTHY,
+                            response_time_ms=float("inf"),
+                            error_count=0,
+                            last_check=datetime.now(),
+                        ),
+                    ).response_time_ms
+                ),
             )
 
         # 没有健康数据源，检查是否有降级的
         degraded_sources = [
-            s for s in sources
-            if results.get(s.name, HealthCheckResult(
-                source_name=s.name,
-                status=HealthStatus.UNKNOWN,
-                response_time_ms=0,
-                error_count=0,
-                last_check=datetime.now()
-            )).status == HealthStatus.DEGRADED
+            s
+            for s in sources
+            if results.get(
+                s.name,
+                HealthCheckResult(
+                    source_name=s.name,
+                    status=HealthStatus.UNKNOWN,
+                    response_time_ms=0,
+                    error_count=0,
+                    last_check=datetime.now(),
+                ),
+            ).status
+            == HealthStatus.DEGRADED
         ]
 
         if degraded_sources:
@@ -468,9 +468,4 @@ class HealthCheckInterceptor:
 
 
 # 导出
-__all__ = [
-    "HealthStatus",
-    "HealthCheckResult",
-    "DataSourceHealthChecker",
-    "HealthCheckInterceptor"
-]
+__all__ = ["HealthStatus", "HealthCheckResult", "DataSourceHealthChecker", "HealthCheckInterceptor"]

@@ -15,6 +15,7 @@ async def test_hot_backup_single_success():
     result = await manager.fetch_with_backup(primary, [])
 
     assert result.success is True
+    assert result.primary_response is not None
     assert result.primary_response.data == {"price": 100.0}
 
 
@@ -30,6 +31,7 @@ async def test_hot_backup_primary_fallback():
     result = await manager.fetch_with_backup(primary, [backup])
 
     assert result.success is True
+    assert result.primary_response is not None
     assert result.primary_response.data == {"price": 50.0}
 
 
@@ -67,5 +69,7 @@ def test_hot_backup_result_success():
     assert result.success is True
 
     result2 = HotBackupResult()
-    result2.backup_responses = [DataResponse(request_id="test", success=True, data={"data": "test"})]
+    result2.backup_responses = [
+        DataResponse(request_id="test", success=True, data={"data": "test"})
+    ]
     assert result2.success is True

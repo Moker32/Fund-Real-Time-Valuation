@@ -596,7 +596,7 @@ class DataSourceManager:
                 for name, s in self._sources.items()
             },
             "max_concurrent": self._semaphore._value
-            if hasattr(self._semaphore, "_value")
+            if self._semaphore and hasattr(self._semaphore, "_value")
             else None,
         }
 
@@ -615,11 +615,10 @@ class DataSourceManager:
     async def close_all(self):
         """关闭所有数据源的连接"""
         for source in self._sources.values():
-            if hasattr(source, "close"):
-                try:
-                    await source.close()
-                except Exception:
-                    pass
+            try:
+                await source.close()
+            except Exception:
+                pass
 
 
 # 工厂函数
