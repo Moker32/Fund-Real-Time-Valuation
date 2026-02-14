@@ -103,27 +103,82 @@ INDEX_NAMES = {
 
 
 # 各市场开盘时间段 (UTC 时间)
+# lunch_start/lunch_end 为午休时间段（本地时间），可选
 MARKET_HOURS = {
-    # A股 (9:30-15:00 UTC+8)
-    "shanghai": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
-    "shenzhen": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
-    "shanghai50": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
-    "chi_next": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
-    "star50": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
-    "csi500": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
-    "csi1000": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
-    "hs300": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
-    "csiall": {"open": "01:30", "close": "08:00", "tz": "Asia/Shanghai"},
-    # 港股 (9:30-16:00 UTC+8)
+    # A股 (9:30-11:30, 13:00-15:00 UTC+8)
+    "shanghai": {
+        "open": "01:30",
+        "close": "08:00",
+        "tz": "Asia/Shanghai",
+        "lunch_start": "03:30",
+        "lunch_end": "05:00",
+    },
+    "shenzhen": {
+        "open": "01:30",
+        "close": "08:00",
+        "tz": "Asia/Shanghai",
+        "lunch_start": "03:30",
+        "lunch_end": "05:00",
+    },
+    "shanghai50": {
+        "open": "01:30",
+        "close": "08:00",
+        "tz": "Asia/Shanghai",
+        "lunch_start": "03:30",
+        "lunch_end": "05:00",
+    },
+    "chi_next": {
+        "open": "01:30",
+        "close": "08:00",
+        "tz": "Asia/Shanghai",
+        "lunch_start": "03:30",
+        "lunch_end": "05:00",
+    },
+    "star50": {
+        "open": "01:30",
+        "close": "08:00",
+        "tz": "Asia/Shanghai",
+        "lunch_start": "03:30",
+        "lunch_end": "05:00",
+    },
+    "csi500": {
+        "open": "01:30",
+        "close": "08:00",
+        "tz": "Asia/Shanghai",
+        "lunch_start": "03:30",
+        "lunch_end": "05:00",
+    },
+    "csi1000": {
+        "open": "01:30",
+        "close": "08:00",
+        "tz": "Asia/Shanghai",
+        "lunch_start": "03:30",
+        "lunch_end": "05:00",
+    },
+    "hs300": {
+        "open": "01:30",
+        "close": "08:00",
+        "tz": "Asia/Shanghai",
+        "lunch_start": "03:30",
+        "lunch_end": "05:00",
+    },
+    "csiall": {
+        "open": "01:30",
+        "close": "08:00",
+        "tz": "Asia/Shanghai",
+        "lunch_start": "03:30",
+        "lunch_end": "05:00",
+    },
+    # 港股 (9:30-16:00 UTC+8, 无午休)
     "hang_seng": {"open": "01:30", "close": "08:00", "tz": "Asia/Hong_Kong"},
     "hang_seng_tech": {"open": "01:30", "close": "08:00", "tz": "Asia/Hong_Kong"},
-    # 日经 (9:00-15:00 UTC+9)
+    # 日经 (9:00-15:00 UTC+9, 无午休)
     "nikkei225": {"open": "00:00", "close": "06:00", "tz": "Asia/Tokyo"},
-    # 欧洲 (9:00-17:30 CET)
+    # 欧洲 (9:00-17:30 CET, 无午休)
     "dax": {"open": "08:00", "close": "16:30", "tz": "Europe/Berlin"},
     "ftse": {"open": "08:00", "close": "16:30", "tz": "Europe/London"},
     "cac40": {"open": "08:00", "close": "16:30", "tz": "Europe/Paris"},
-    # 美股 (9:30-16:00 EST)
+    # 美股 (9:30-16:00 EST, 无午休)
     "dow_jones": {"open": "14:30", "close": "21:00", "tz": "America/New_York"},
     "nasdaq": {"open": "14:30", "close": "21:00", "tz": "America/New_York"},
     "sp500": {"open": "14:30", "close": "21:00", "tz": "America/New_York"},
@@ -144,7 +199,7 @@ class IndexDataSource(DataSource):
         super().__init__(
             name=name,
             source_type=DataSourceType.STOCK,  # 复用 STOCK 类型
-            timeout=timeout
+            timeout=timeout,
         )
         self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 0  # 禁用缓存
@@ -169,10 +224,7 @@ class YahooIndexSource(IndexDataSource):
     """Yahoo Finance 全球指数数据源"""
 
     def __init__(self, timeout: float = 30.0):
-        super().__init__(
-            name="yfinance_index",
-            timeout=timeout
-        )
+        super().__init__(name="yfinance_index", timeout=timeout)
 
     async def fetch(self, index_type: str) -> DataSourceResult:
         """
@@ -191,7 +243,7 @@ class YahooIndexSource(IndexDataSource):
                 data=self._cache[cache_key],
                 timestamp=self._cache[cache_key].get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"index_type": index_type, "from_cache": True}
+                metadata={"index_type": index_type, "from_cache": True},
             )
 
         try:
@@ -204,16 +256,16 @@ class YahooIndexSource(IndexDataSource):
                     error=f"不支持的指数类型: {index_type}",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"index_type": index_type}
+                    metadata={"index_type": index_type},
                 )
 
             # 获取数据
             ticker_obj = yf.Ticker(ticker)
             info = ticker_obj.info
 
-            price = info.get('currentPrice', info.get('regularMarketPrice'))
-            change = info.get('regularMarketChange', info.get('change', 0))
-            change_percent = info.get('regularMarketChangePercent', info.get('changePercent', 0))
+            price = info.get("currentPrice", info.get("regularMarketPrice"))
+            change = info.get("regularMarketChange", info.get("change", 0))
+            change_percent = info.get("regularMarketChangePercent", info.get("changePercent", 0))
 
             if price is None:
                 return DataSourceResult(
@@ -221,18 +273,22 @@ class YahooIndexSource(IndexDataSource):
                     error="无法获取价格数据",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"index_type": index_type}
+                    metadata={"index_type": index_type},
                 )
 
             # 转换时间戳为可读格式
-            market_time = info.get('regularMarketTime')
+            market_time = info.get("regularMarketTime")
+            data_timestamp = None
             if market_time:
                 try:
-                    time_str = datetime.fromtimestamp(market_time).strftime('%Y-%m-%d %H:%M:%S')
+                    time_str = datetime.fromtimestamp(market_time).strftime("%Y-%m-%d %H:%M:%S")
+                    data_timestamp = datetime.utcfromtimestamp(market_time).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"
+                    )
                 except (ValueError, TypeError, OSError):
                     time_str = str(market_time)
             else:
-                time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             data = {
                 "index": index_type,
@@ -241,14 +297,15 @@ class YahooIndexSource(IndexDataSource):
                 "price": float(price),
                 "change": float(change) if change else 0.0,
                 "change_percent": float(change_percent) if change_percent else 0.0,
-                "currency": info.get('currency', 'USD'),
-                "exchange": info.get('exchange', ''),
+                "currency": info.get("currency", "USD"),
+                "exchange": info.get("exchange", ""),
                 "time": time_str,
-                "high": info.get('regularMarketDayHigh'),
-                "low": info.get('regularMarketDayLow'),
-                "open": info.get('regularMarketOpen'),
-                "prev_close": info.get('regularMarketPreviousClose'),
-                "region": INDEX_REGIONS.get(index_type, 'unknown'),
+                "data_timestamp": data_timestamp,
+                "high": info.get("regularMarketDayHigh"),
+                "low": info.get("regularMarketDayLow"),
+                "open": info.get("regularMarketOpen"),
+                "prev_close": info.get("regularMarketPreviousClose"),
+                "region": INDEX_REGIONS.get(index_type, "unknown"),
                 "market_hours": MARKET_HOURS.get(index_type, {}),
             }
 
@@ -262,7 +319,7 @@ class YahooIndexSource(IndexDataSource):
                 data=data,
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"index_type": index_type}
+                metadata={"index_type": index_type},
             )
 
         except ImportError:
@@ -271,13 +328,14 @@ class YahooIndexSource(IndexDataSource):
                 error="yfinance 未安装，请运行: pip install yfinance",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"index_type": index_type, "error_type": "ImportError"}
+                metadata={"index_type": index_type, "error_type": "ImportError"},
             )
         except Exception as e:
             return self._handle_error(e, self.name)
 
     async def fetch_batch(self, index_types: list[str]) -> list[DataSourceResult]:
         """批量获取指数数据"""
+
         async def fetch_one(itype: str) -> DataSourceResult:
             return await self.fetch(itype)
 
@@ -293,7 +351,7 @@ class YahooIndexSource(IndexDataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"index_type": index_types[i]}
+                        metadata={"index_type": index_types[i]},
                     )
                 )
             else:
@@ -314,10 +372,7 @@ class TencentIndexSource(IndexDataSource):
     """腾讯财经指数数据源 (A股、港股、美股 - 实时)"""
 
     def __init__(self, timeout: float = 10.0):
-        super().__init__(
-            name="tencent_index",
-            timeout=timeout
-        )
+        super().__init__(name="tencent_index", timeout=timeout)
         self.base_url = "https://qt.gtimg.cn/q"
 
     async def fetch(self, index_type: str) -> DataSourceResult:
@@ -337,7 +392,7 @@ class TencentIndexSource(IndexDataSource):
                 data=self._cache[cache_key],
                 timestamp=self._cache[cache_key].get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"index_type": index_type, "from_cache": True}
+                metadata={"index_type": index_type, "from_cache": True},
             )
 
         try:
@@ -348,7 +403,7 @@ class TencentIndexSource(IndexDataSource):
                     error=f"腾讯财经不支持的指数类型: {index_type}",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"index_type": index_type}
+                    metadata={"index_type": index_type},
                 )
 
             url = f"{self.base_url}={tencent_code}"
@@ -364,7 +419,7 @@ class TencentIndexSource(IndexDataSource):
                     error=f"未找到指数数据: {index_type}",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"index_type": index_type}
+                    metadata={"index_type": index_type},
                 )
 
             # 解析数据
@@ -376,7 +431,7 @@ class TencentIndexSource(IndexDataSource):
                     error="解析腾讯财经数据失败",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"index_type": index_type}
+                    metadata={"index_type": index_type},
                 )
 
             parts = match.group(1).split("~")
@@ -432,16 +487,16 @@ class TencentIndexSource(IndexDataSource):
             for i in range(len(parts) - 1, -1, -1):
                 if parts[i] and len(parts[i]) == 14 and parts[i].isdigit():
                     try:
-                        data_timestamp = datetime.strptime(parts[i], '%Y%m%d%H%M%S')
+                        data_timestamp = datetime.strptime(parts[i], "%Y%m%d%H%M%S")
                         break
                     except ValueError:
                         continue
 
             # 如果找到时间戳则使用，否则使用当前时间
             if data_timestamp:
-                time_str = data_timestamp.strftime('%Y-%m-%d %H:%M:%S')
+                time_str = data_timestamp.strftime("%Y-%m-%d %H:%M:%S")
             else:
-                time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             data = {
                 "index": index_type,
@@ -472,7 +527,7 @@ class TencentIndexSource(IndexDataSource):
                 data=data,
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"index_type": index_type}
+                metadata={"index_type": index_type},
             )
 
         except httpx.HTTPError as e:
@@ -482,6 +537,7 @@ class TencentIndexSource(IndexDataSource):
 
     async def fetch_batch(self, index_types: list[str]) -> list[DataSourceResult]:
         """批量获取指数数据"""
+
         async def fetch_one(itype: str) -> DataSourceResult:
             return await self.fetch(itype)
 
@@ -497,7 +553,7 @@ class TencentIndexSource(IndexDataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"index_type": index_types[i]}
+                        metadata={"index_type": index_types[i]},
                     )
                 )
             else:
@@ -510,10 +566,7 @@ class TencentIndexSource(IndexDataSource):
         status = super().get_status()
         status["cache_size"] = len(self._cache)
         status["cache_timeout"] = self._cache_timeout
-        status["data_sources"] = {
-            "tencent": "A股/港股/美股 (实时)",
-            "yahoo": "日经/欧洲 (延迟)"
-        }
+        status["data_sources"] = {"tencent": "A股/港股/美股 (实时)", "yahoo": "日经/欧洲 (延迟)"}
         return status
 
 
@@ -525,10 +578,7 @@ class HybridIndexSource(IndexDataSource):
     """
 
     def __init__(self, timeout: float = 30.0):
-        super().__init__(
-            name="hybrid_index",
-            timeout=timeout
-        )
+        super().__init__(name="hybrid_index", timeout=timeout)
         self._tencent = TencentIndexSource(timeout=10.0)
         self._yahoo = YahooIndexSource(timeout=timeout)
 
@@ -542,6 +592,7 @@ class HybridIndexSource(IndexDataSource):
 
     async def fetch_batch(self, index_types: list[str]) -> list[DataSourceResult]:
         """批量获取指数数据"""
+
         async def fetch_one(itype: str) -> DataSourceResult:
             return await self.fetch(itype)
 
@@ -557,7 +608,7 @@ class HybridIndexSource(IndexDataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"index_type": index_types[i]}
+                        metadata={"index_type": index_types[i]},
                     )
                 )
             else:

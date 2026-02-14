@@ -19,6 +19,7 @@ from ..models import ErrorResponse
 
 class IndexListData(TypedDict):
     """指数列表响应数据结构"""
+
     indices: list[dict]
     timestamp: str
 
@@ -69,9 +70,11 @@ def get_trading_status(index_type: str, data_timestamp: str | None = None) -> di
     if data_timestamp:
         try:
             # 解析数据时间戳
-            data_dt = datetime.fromisoformat(data_timestamp.replace('Z', '+00:00'))
+            data_dt = datetime.fromisoformat(data_timestamp.replace("Z", "+00:00"))
             # 计算数据时间与当前时间的差距（分钟）
-            data_age_minutes = (local_now.replace(tzinfo=None) - data_dt.replace(tzinfo=None)).total_seconds() / 60
+            data_age_minutes = (
+                local_now.replace(tzinfo=None) - data_dt.replace(tzinfo=None)
+            ).total_seconds() / 60
 
             # 如果数据超过 15 分钟未更新，认为数据不新鲜
             if data_age_minutes > 15:
@@ -79,50 +82,42 @@ def get_trading_status(index_type: str, data_timestamp: str | None = None) -> di
         except (ValueError, TypeError):
             pass
 
-    # 特殊处理 A 股市场（有午间休市）
-    if index_type in ["shanghai", "shenzhen", "shanghai50", "chi_next", "star50",
-                       "csi500", "csi1000", "hs300", "csiall"]:
-        # A 股交易时间：上午 9:30-11:30，下午 13:00-15:00
-        morning_open = time(9, 30)
-        morning_close = time(11, 30)
-        afternoon_open = time(13, 0)
-        afternoon_close = time(15, 0)
+    if local_now.weekday() >= 5:
+        return {
+            "status": "closed",
+            "market_time": local_now.strftime("%Y-%m-%d %H:%M:%S"),
+            "data_timestamp": data_timestamp,
+            "is_stale": is_data_stale,
+        }
 
-        # 周一到周五的交易时间
-        if local_now.weekday() < 5:  # 0=Monday, 4=Friday
-            if morning_open <= current_time <= morning_close:
-                status = "open"
-            elif afternoon_open <= current_time <= afternoon_close:
-                status = "open"
-            elif current_time < morning_open:
-                status = "pre"
-            else:
-                status = "closed"
+    open_utc = datetime.strptime(market_info["open"], "%H:%M")
+    close_utc = datetime.strptime(market_info["close"], "%H:%M")
+
+    today = local_now.date()
+    open_utc_dt = datetime.combine(today, open_utc.time(), tzinfo=pytz.UTC)
+    close_utc_dt = datetime.combine(today, close_utc.time(), tzinfo=pytz.UTC)
+    open_time = open_utc_dt.astimezone(tz).time()
+    close_time = close_utc_dt.astimezone(tz).time()
+
+    if current_time < open_time:
+        status = "pre"
+    elif open_time <= current_time <= close_time:
+        if is_data_stale:
+            status = "stalled"
         else:
-            status = "closed"  # 周末
+            status = "open"
     else:
-        # 其他市场：使用原来的时间段逻辑
-        open_utc = datetime.strptime(market_info["open"], "%H:%M")
-        close_utc = datetime.strptime(market_info["close"], "%H:%M")
+        status = "closed"
 
-        today = local_now.date()
-        open_utc_dt = datetime.combine(today, open_utc.time(), tzinfo=pytz.UTC)
-        close_utc_dt = datetime.combine(today, close_utc.time(), tzinfo=pytz.UTC)
-        open_time = open_utc_dt.astimezone(tz).time()
-        close_time = close_utc_dt.astimezone(tz).time()
-
-        if current_time < open_time:
-            status = "pre"
-        elif open_time <= current_time <= close_time:
-            # 如果在交易时段内，但数据不新鲜，可能是午间休市或其他原因
-            if is_data_stale:
-                status = "stalled"  # 数据停滞
-            else:
-                status = "open"
-        else:
+    # 检查午休（如果有）
+    lunch_start_str = market_info.get("lunch_start")
+    lunch_end_str = market_info.get("lunch_end")
+    if lunch_start_str and lunch_end_str:
+        lunch_start = datetime.strptime(lunch_start_str, "%H:%M").time()
+        lunch_end = datetime.strptime(lunch_end_str, "%H:%M").time()
+        if lunch_start < current_time < lunch_end:
             status = "closed"
 
-    # 如果数据不新鲜且不是 closed 状态，添加提示
     reason = None
     if is_data_stale and status not in ["closed", "pre"]:
         reason = "数据超过15分钟未更新"
@@ -154,7 +149,7 @@ def get_display_timestamp(index_type: str, data_timestamp: str | None) -> str | 
     # 解析数据时间
     try:
         # 处理 Z 后缀和 +00:00 格式
-        ts_str = data_timestamp.replace('Z', '+00:00')
+        ts_str = data_timestamp.replace("Z", "+00:00")
         data_dt = datetime.fromisoformat(ts_str)
     except (ValueError, TypeError):
         return data_timestamp
@@ -181,8 +176,17 @@ def get_display_timestamp(index_type: str, data_timestamp: str | None) -> str | 
         return data_timestamp
 
     # 特殊处理A股午间休市
-    if index_type in ["shanghai", "shenzhen", "shanghai50", "chi_next", "star50",
-                      "csi500", "csi1000", "hs300", "csiall"]:
+    if index_type in [
+        "shanghai",
+        "shenzhen",
+        "shanghai50",
+        "chi_next",
+        "star50",
+        "csi500",
+        "csi1000",
+        "hs300",
+        "csiall",
+    ]:
         # A股午间休市时间是 11:30-13:00
         # 如果数据时间在休市时段，使用上午收盘时间 11:30
         morning_close = time(11, 30)
@@ -236,7 +240,9 @@ async def get_indices(
         index_types = SUPPORTED_INDICES
 
     # 获取指数数据
-    results = await manager.fetch_batch(DataSourceType.STOCK, [{"kwargs": {"index_type": it}} for it in index_types])
+    results = await manager.fetch_batch(
+        DataSourceType.STOCK, [{"kwargs": {"index_type": it}} for it in index_types]
+    )
 
     if not results or len(results) == 0:
         return {"indices": [], "timestamp": current_time}
@@ -260,28 +266,30 @@ async def get_indices(
         # 判断是否为延时数据（腾讯的美股数据延时15分钟）
         is_delayed = result.source == "tencent_index" and index_type in TENCENT_DELAYED_INDICES
 
-        all_indices.append({
-            "index": index_type,
-            "symbol": data.get("symbol", ""),
-            "name": data.get("name", ""),
-            "price": data.get("price", 0.0),
-            "change": data.get("change"),
-            "changePercent": data.get("change_percent"),
-            "currency": data.get("currency", ""),
-            "exchange": data.get("exchange"),
-            "timestamp": data.get("time"),
-            "source": result.source,
-            "high": data.get("high"),
-            "low": data.get("low"),
-            "open": data.get("open"),
-            "prevClose": data.get("prev_close"),
-            "region": INDEX_REGIONS.get(index_type),
-            "tradingStatus": trading_status.get("status"),
-            "marketTime": trading_status.get("market_time"),
-            "isDelayed": is_delayed,
-            "dataTimestamp": display_timestamp,  # 新增
-            "timezone": market_info.get("tz"),  # 新增
-        })
+        all_indices.append(
+            {
+                "index": index_type,
+                "symbol": data.get("symbol", ""),
+                "name": data.get("name", ""),
+                "price": data.get("price", 0.0),
+                "change": data.get("change"),
+                "changePercent": data.get("change_percent"),
+                "currency": data.get("currency", ""),
+                "exchange": data.get("exchange"),
+                "timestamp": data.get("time"),
+                "source": result.source,
+                "high": data.get("high"),
+                "low": data.get("low"),
+                "open": data.get("open"),
+                "prevClose": data.get("prev_close"),
+                "region": INDEX_REGIONS.get(index_type),
+                "tradingStatus": trading_status.get("status"),
+                "marketTime": trading_status.get("market_time"),
+                "isDelayed": is_delayed,
+                "dataTimestamp": display_timestamp,  # 新增
+                "timezone": market_info.get("tz"),  # 新增
+            }
+        )
 
     return {"indices": all_indices, "timestamp": current_time}
 
@@ -373,14 +381,13 @@ async def get_regions() -> dict:
     regions: dict[str, dict[str, Any]] = {}
     for index_type, region in INDEX_REGIONS.items():
         if region not in regions:
-            regions[region] = {
-                "name": region,
-                "indices": []
+            regions[region] = {"name": region, "indices": []}
+        regions[region]["indices"].append(
+            {
+                "index": index_type,
+                "name": INDEX_NAMES.get(index_type, index_type),
             }
-        regions[region]["indices"].append({
-            "index": index_type,
-            "name": INDEX_NAMES.get(index_type, index_type),
-        })
+        )
 
     return {
         "regions": list(regions.values()),
