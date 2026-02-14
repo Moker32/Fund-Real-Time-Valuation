@@ -3,7 +3,6 @@ import { ref, computed } from 'vue';
 import { sectorApi } from '@/api';
 import type { Sector, SectorStock, SectorListResponse, SectorDetailResponse } from '@/types';
 import { ApiError } from '@/api';
-import { formatTime } from '@/utils/time';
 
 export interface FetchOptions {
   retries?: number;

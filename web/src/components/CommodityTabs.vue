@@ -40,7 +40,7 @@ interface Props {
   activeCategory: string | null;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   categories: () => [],
   activeCategory: null,
 });

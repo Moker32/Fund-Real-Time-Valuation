@@ -464,51 +464,48 @@ class AKShareCommoditySource(CommodityDataSource):
             # 优先使用实时行情接口
             df = ak.spot_quotations_sge()
             if df is not None and not df.empty:
-                # 找到 Au99.99 的最新数据
                 au_df = df[df["品种"] == "Au99.99"]
                 if not au_df.empty:
                     latest = au_df.iloc[-1]
-                    price = float(latest.get("现价", 0) or 0)
-                    update_time = latest.get("更新时间", "")
-                    trade_time = latest.get("时间", "")
+                price = float(latest.get("现价", 0) or 0)
 
-                    # 获取当日开盘价（第一条数据）
-                    open_price = float(au_df.iloc[0].get("现价", 0)) if len(au_df) > 0 else None
-                    # 获取当日最高最低
-                    high_price = au_df["现价"].astype(float).max()
-                    low_price = au_df["现价"].astype(float).min()
+                # 获取当日开盘价（第一条数据）
+                open_price = float(au_df.iloc[0].get("现价", 0)) if len(au_df) > 0 else None
+                # 获取当日最高最低
+                high_price = au_df["现价"].astype(float).max()
+                low_price = au_df["现价"].astype(float).min()
 
-                    # 获取昨日收盘价（从历史接口）
-                    prev_close = None
-                    try:
-                        hist_df = ak.spot_hist_sge(symbol="Au99.99")
-                        if hist_df is not None and len(hist_df) >= 2:
-                            prev_close = float(hist_df.iloc[-2].get("close", 0) or 0)
-                    except Exception:
-                        pass
+                # 获取昨日收盘价（从历史接口）
+                prev_close = None
+                try:
+                    hist_df = ak.spot_hist_sge(symbol="Au99.99")
+                    if hist_df is not None and len(hist_df) >= 2:
+                        prev_close = float(hist_df.iloc[-2].get("close", 0) or 0)
+                except Exception:
+                    pass
 
-                    # 计算涨跌幅
-                    change = None
-                    change_percent = None
-                    if prev_close and prev_close > 0:
-                        change = round(price - prev_close, 2)
-                        change_percent = round((change / prev_close) * 100, 2)
+                # 计算涨跌幅
+                change = None
+                change_percent = None
+                if prev_close and prev_close > 0:
+                    change = round(price - prev_close, 2)
+                    change_percent = round((change / prev_close) * 100, 2)
 
-                    return {
-                        "commodity": "gold_cny",
-                        "symbol": "Au99.99",
-                        "name": "Au99.99 (上海黄金)",
-                        "price": price,
-                        "change": change,
-                        "change_percent": change_percent,
-                        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                        "high": high_price if high_price > 0 else None,
-                        "low": low_price if low_price > 0 else None,
-                        "open": open_price if open_price and open_price > 0 else None,
-                        "prev_close": prev_close,
-                        "currency": "CNY",
-                        "exchange": "SGE",
-                    }
+                return {
+                    "commodity": "gold_cny",
+                    "symbol": "Au99.99",
+                    "name": "Au99.99 (上海黄金)",
+                    "price": price,
+                    "change": change,
+                    "change_percent": change_percent,
+                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "high": high_price if high_price > 0 else None,
+                    "low": low_price if low_price > 0 else None,
+                    "open": open_price if open_price and open_price > 0 else None,
+                    "prev_close": prev_close,
+                    "currency": "CNY",
+                    "exchange": "SGE",
+                }
         except Exception as e:
             logger.warning(f"获取沪金实时数据失败，尝试备用接口: {e}")
 

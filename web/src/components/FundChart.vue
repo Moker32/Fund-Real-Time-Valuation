@@ -175,7 +175,7 @@ const updateColor = () => {
   try {
     // uPlot 通过 series[1].stroke 设置颜色
     uplotInstance.setSeries(1, { stroke: newColor });
-  } catch (e) {
+  } catch {
     // 忽略颜色更新错误
   }
 };

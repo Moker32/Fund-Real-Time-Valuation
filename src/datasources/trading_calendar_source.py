@@ -3,7 +3,6 @@ from datetime import date, datetime, time
 from enum import Enum
 
 import httpx
-
 from holidays import CountryHoliday
 
 from src.datasources.base import DataSource, DataSourceResult, DataSourceType

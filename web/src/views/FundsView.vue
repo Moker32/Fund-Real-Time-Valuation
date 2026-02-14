@@ -86,7 +86,7 @@ import { useFundStore } from '@/stores/fundStore';
 import FundCard from '@/components/FundCard.vue';
 import MarketOverview from '@/components/MarketOverview.vue';
 import AddFundDialog from '@/components/AddFundDialog.vue';
-import type { Overview, Fund } from '@/types';
+import type { Overview } from '@/types';
 
 // 加载骨架屏数量常量
 const LOADING_SKELETON_COUNT = 6;
@@ -104,7 +104,7 @@ interface EmptyFundState {
 
 const fundStore = useFundStore();
 const showAddDialog = ref(false);
-let isMounted = true;
+const isMounted = ref(true);
 
 // 空基金数据用于加载骨架屏
 const emptyFund: EmptyFundState = {
@@ -156,7 +156,7 @@ function handleFundAdded() {
 }
 
 onMounted(async () => {
-  isMounted = true;
+  isMounted.value = true;
   // 只在数据为空时加载
   if (fundStore.funds.length === 0) {
     await fundStore.fetchFunds();
@@ -169,7 +169,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  isMounted = false;
+  isMounted.value = false;
 });
 </script>
 

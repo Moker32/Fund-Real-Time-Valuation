@@ -158,7 +158,7 @@ export const useFundStore = defineStore('funds', () => {
     loadingProgress.value = 0;
   }
 
-  async function fetchFundEstimate(code: string, _options: FetchOptions = {}) {
+  async function fetchFundEstimate(code: string) {
     try {
       const estimate = await fundApi.getFundEstimate(code);
       const index = funds.value.findIndex((f) => f.code === code);

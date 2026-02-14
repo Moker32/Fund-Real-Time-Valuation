@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
     try:
         from src.datasources.cache_cleaner import startup_cleanup
 
-        startup_task = asyncio.create_task(startup_cleanup())
+        asyncio.create_task(startup_cleanup())
         logger.info("启动时缓存清理任务已提交")
     except Exception as e:
         logger.warning(f"启动清理任务失败: {e}")

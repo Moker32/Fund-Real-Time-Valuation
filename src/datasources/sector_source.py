@@ -14,7 +14,6 @@ import httpx
 
 from .base import DataSource, DataSourceResult, DataSourceType
 
-
 # 中国A股主要节假日（简化版，提前维护）
 CHINA_HOLIDAYS_2026 = [
     "2026-01-01",  # 元旦
@@ -68,7 +67,6 @@ def get_last_trading_day() -> datetime:
     基于时间和节假日判断
     """
     now = datetime.now()
-    current_date = now.date()
 
     # 情况1: 现在是交易日（周一到周五，且不是节假日）
     if is_trading_day(now):
