@@ -4,6 +4,7 @@ import { commodityApi } from '@/api';
 import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHistoryItem, WatchedCommodity, CommoditySearchResult } from '@/types';
 import { ApiError } from '@/api';
 import { formatTime } from '@/utils/time';
+import { getCommodityName } from '@/utils/commodityNames';
 
 // 防抖函数（支持异步函数返回 Promise）
 function debounce<T extends (...args: Parameters<T>) => ReturnType<T>>(
@@ -49,6 +50,7 @@ const friendlyErrorMessages: Record<string, string> = {
 export const useCommodityStore = defineStore('commodities', () => {
   // State
   const commodities = ref<Commodity[]>([]);
+  const watchedCommodityData = ref<Commodity[]>([]);  // 关注商品的实际行情数据
   const categories = ref<CommodityCategory[]>([]);
   const activeCategory = ref<string | null>(null);
   const loading = ref(false);
@@ -92,33 +94,28 @@ export const useCommodityStore = defineStore('commodities', () => {
 
   // 获取当前选中分类的商品列表（包含关注列表 + 行情数据）
   const activeCommodities = computed(() => {
-    // 创建 symbol 到行情数据的映射
-    const commodityMap = new Map(commodities.value.map(c => [c.symbol, c]));
+    // 如果是"我的关注"分类，返回关注商品的实际数据
+    if (activeCategory.value === 'watched') {
+      return watchedCommodities.value
+        .map(watched => {
+          const marketData = watchedCommodityData.value.find(c => c.symbol === watched.symbol);
+          return marketData || {
+            symbol: watched.symbol,
+            name: watched.name,
+            category: watched.category,
+            price: undefined,
+            change: undefined,
+            changePercent: undefined,
+            prevClose: undefined,
+            time: undefined,
+          };
+        });
+    }
 
-    // 如果有选中分类，返回该分类的商品
+    // 其他分类：从 categories 获取
     if (activeCategory.value) {
       const category = categories.value.find(c => c.id === activeCategory.value);
-      const categoryCommodities = category?.commodities || [];
-
-      // 如果是"我的关注"分类，显示用户添加的关注列表（带实时数据）
-      if (activeCategory.value === 'watched') {
-        return watchedCommodities.value
-          .map(watched => {
-            const marketData = commodityMap.get(watched.symbol);
-            return marketData || {
-              symbol: watched.symbol,
-              name: watched.name,
-              category: watched.category,
-              price: undefined,
-              change: undefined,
-              changePercent: undefined,
-              prevClose: undefined,
-              time: undefined,
-            };
-          });
-      }
-
-      return categoryCommodities;
+      return category?.commodities || [];
     }
 
     // 没有选中分类时，返回所有行情数据
@@ -474,6 +471,34 @@ export const useCommodityStore = defineStore('commodities', () => {
     try {
       const response = await commodityApi.getWatchlist();
       watchedCommodities.value = response.watchlist || [];
+
+      // 收集关注商品的实际行情数据
+      const watchedData: Commodity[] = [];
+      for (const watched of watchedCommodities.value) {
+        try {
+          const data = await commodityApi.getCommodityByTicker(watched.symbol);
+          const commodityData: Commodity = {
+            symbol: data.symbol,
+            name: getCommodityName(data.symbol, data.name),  // 转换为中文
+            price: data.price,
+            currency: data.currency,
+            change: data.change ?? 0,
+            changePercent: data.change_percent ?? 0,
+            high: 0,
+            low: 0,
+            open: 0,
+            prevClose: data.change ? data.price - data.change : 0,
+            source: data.source,
+            timestamp: data.timestamp,
+          };
+          watchedData.push(commodityData);
+        } catch (e) {
+          console.warn(`[CommodityStore] Failed to fetch ${watched.symbol}:`, e);
+        }
+      }
+
+      // 一次性更新 watchedCommodityData
+      watchedCommodityData.value = watchedData;
 
       // 如果有关注的商品且当前没有选中分类，默认选中"我的关注"
       if (watchedCommodities.value.length > 0 && !activeCategory.value) {

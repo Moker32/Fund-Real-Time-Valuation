@@ -48,13 +48,13 @@ import CommoditySearchDialog from '@/components/CommoditySearchDialog.vue';
 const commodityStore = useCommodityStore();
 const searchDialogVisible = ref(false);
 
-onMounted(() => {
-  // 只在数据为空时强制加载
+onMounted(async () => {
+  // 先加载分类数据
   if (commodityStore.categories.length === 0) {
-    commodityStore.fetchCategories({ force: true });
+    await commodityStore.fetchCategories({ force: true });
   }
-  // 同时加载关注列表
-  commodityStore.fetchWatchedCommodities({ showError: false });
+  // 然后加载关注列表（会在 commodities 中添加关注商品的数据）
+  await commodityStore.fetchWatchedCommodities({ showError: false });
 });
 
 function openSearchDialog() {

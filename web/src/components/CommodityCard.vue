@@ -124,7 +124,10 @@ function formatPercent(value: number): string {
 function formatTime(dateStr: string): string {
   if (!dateStr) return '--';
   try {
-    const date = new Date(dateStr);
+    // 后端返回 UTC 时间字符串，如 "2026-02-13 21:59:50 UTC"
+    const utcStr = dateStr.replace(' UTC', '').trim();
+    // 解析 "2026-02-13 21:59:50" 为 UTC 时间
+    const date = new Date(utcStr + 'Z');
     return date.toLocaleTimeString('zh-CN', {
       timeZone: 'Asia/Shanghai',
       hour12: false,

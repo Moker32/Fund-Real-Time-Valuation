@@ -13,14 +13,16 @@ import yaml
 
 class WatchedCommodityDict(TypedDict):
     """关注商品数据结构（YAML 格式）"""
-    symbol: str       # 商品代码 (GC=F, ZS=F...)
-    name: str         # 显示名称
-    category: str     # 分类 (precious_metal/energy/base_metal/agriculture/other)
-    added_at: str    # 添加时间 (ISO 8601)
+
+    symbol: str  # 商品代码 (GC=F, ZS=F...)
+    name: str  # 显示名称
+    category: str  # 分类 (precious_metal/energy/base_metal/agriculture/other)
+    added_at: str  # 添加时间 (ISO 8601)
 
 
 class CommoditiesConfigDict(TypedDict):
     """配置文件根结构"""
+
     watched_commodities: list[WatchedCommodityDict]
 
 
@@ -68,8 +70,8 @@ class CommoditiesConfig:
         Args:
             config_dir: 配置目录，默认为 ~/.fund-tui/
         """
-        self._config_dir = config_dir or str(Path.home() / '.fund-tui')
-        self._config_path = Path(self._config_dir) / 'commodities.yaml'
+        self._config_dir = config_dir or str(Path.home() / ".fund-tui")
+        self._config_path = Path(self._config_dir) / "commodities.yaml"
         self._ensure_config_dir()
 
     def _ensure_config_dir(self) -> None:
@@ -81,7 +83,7 @@ class CommoditiesConfig:
     def _load(self) -> CommoditiesConfigDict:
         """加载配置文件"""
         try:
-            with open(self._config_path, encoding='utf-8') as f:
+            with open(self._config_path, encoding="utf-8") as f:
                 data = yaml.safe_load(f)
                 if data is None:
                     return {"watched_commodities": []}
@@ -93,7 +95,7 @@ class CommoditiesConfig:
 
     def _save(self, data: CommoditiesConfigDict) -> None:
         """保存配置文件"""
-        with open(self._config_path, 'w', encoding='utf-8') as f:
+        with open(self._config_path, "w", encoding="utf-8") as f:
             yaml.dump(data, f, allow_unicode=True, sort_keys=False)
 
     @staticmethod
@@ -109,7 +111,7 @@ class CommoditiesConfig:
         """
         # 清理 symbol
         clean_symbol = symbol.upper().strip()
-        if not clean_symbol.endswith('=F'):
+        if not clean_symbol.endswith("=F"):
             clean_symbol = clean_symbol.upper()
 
         return CATEGORY_MAPPING.get(clean_symbol, "other")
@@ -136,15 +138,12 @@ class CommoditiesConfig:
         """
         watched = self.get_watched_commodities()
         clean_symbol = symbol.upper().strip()
-        if not clean_symbol.endswith('=F'):
+        if not clean_symbol.endswith("=F"):
             clean_symbol = f"{clean_symbol}=F"
         return any(w["symbol"].upper() == clean_symbol for w in watched)
 
     def add_watched_commodity(
-        self,
-        symbol: str,
-        name: str,
-        category: str | None = None
+        self, symbol: str, name: str, category: str | None = None
     ) -> tuple[bool, str]:
         """
         添加关注商品
@@ -157,10 +156,8 @@ class CommoditiesConfig:
         Returns:
             tuple[bool, str]: (是否成功, 消息)
         """
-        # 清理 symbol
+        # 清理 symbol - 保持原样，不自动添加 =F
         clean_symbol = symbol.upper().strip()
-        if not clean_symbol.endswith('=F'):
-            clean_symbol = f"{clean_symbol}=F"
 
         # 检查是否已存在
         if self.is_watching(clean_symbol):
@@ -201,10 +198,8 @@ class CommoditiesConfig:
         Returns:
             tuple[bool, str]: (是否成功, 消息)
         """
-        # 清理 symbol
+        # 清理 symbol - 保持原样
         clean_symbol = symbol.upper().strip()
-        if not clean_symbol.endswith('=F'):
-            clean_symbol = f"{clean_symbol}=F"
 
         # 加载配置
         data = self._load()
@@ -212,9 +207,7 @@ class CommoditiesConfig:
 
         # 查找并移除
         original_len = len(watched)
-        data["watched_commodities"] = [
-            w for w in watched if w["symbol"].upper() != clean_symbol
-        ]
+        data["watched_commodities"] = [w for w in watched if w["symbol"].upper() != clean_symbol]
 
         if len(data["watched_commodities"]) < original_len:
             self._save(data)
@@ -234,7 +227,7 @@ class CommoditiesConfig:
         """
         # 清理 symbol
         clean_symbol = symbol.upper().strip()
-        if not clean_symbol.endswith('=F'):
+        if not clean_symbol.endswith("=F"):
             clean_symbol = f"{clean_symbol}=F"
 
         # 加载配置
@@ -250,9 +243,7 @@ class CommoditiesConfig:
                 return True, f"已将 {old_name} 更新为 {name}"
         return False, f"商品 {clean_symbol} 不在关注列表中"
 
-    def update_watched_commodity_category(
-        self, symbol: str, category: str
-    ) -> tuple[bool, str]:
+    def update_watched_commodity_category(self, symbol: str, category: str) -> tuple[bool, str]:
         """
         更新关注商品分类
 
@@ -265,7 +256,7 @@ class CommoditiesConfig:
         """
         # 清理 symbol
         clean_symbol = symbol.upper().strip()
-        if not clean_symbol.endswith('=F'):
+        if not clean_symbol.endswith("=F"):
             clean_symbol = f"{clean_symbol}=F"
 
         # 加载配置

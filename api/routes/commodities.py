@@ -3,8 +3,8 @@
 提供商品相关的 REST API 端点
 """
 
-from datetime import datetime
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 from typing import Any, TypedDict
@@ -15,7 +15,6 @@ from src.config.commodities_config import CommoditiesConfig
 from src.datasources.base import DataSourceType
 from src.datasources.commodity_source import (
     AKShareCommoditySource,
-    CommoditySearchResult,
     YFinanceCommoditySource,
     get_all_available_commodities,
     get_all_commodity_types,
@@ -33,12 +32,14 @@ from ..models import CommodityResponse, ErrorResponse
 
 class CommodityListData(TypedDict):
     """商品列表响应数据结构"""
+
     commodities: list[dict]
     timestamp: str
 
 
 class CommodityCategoryItem(TypedDict):
     """单个商品项"""
+
     symbol: str
     name: str
     price: float
@@ -55,6 +56,7 @@ class CommodityCategoryItem(TypedDict):
 
 class CommodityCategoryData(TypedDict):
     """分类响应数据结构"""
+
     id: str
     name: str
     icon: str
@@ -63,12 +65,14 @@ class CommodityCategoryData(TypedDict):
 
 class CommodityCategoriesResponse(TypedDict):
     """分类列表响应数据结构"""
+
     categories: list[CommodityCategoryData]
     timestamp: str
 
 
 class CommodityHistoryResponse(TypedDict):
     """历史数据响应"""
+
     commodity_type: str
     name: str
     history: list[dict]
@@ -159,22 +163,24 @@ async def get_commodities(
                 # 避免重复
                 if commodity_key not in seen_commodities:
                     seen_commodities.add(commodity_key)
-                    all_results.append(CommodityResponse(
-                        commodity=data.get("commodity", ""),
-                        symbol=data.get("symbol", ""),
-                        name=data.get("name", ""),
-                        price=data.get("price", 0.0),
-                        change=data.get("change"),
-                        change_percent=data.get("change_percent"),
-                        currency=data.get("currency"),
-                        exchange=data.get("exchange"),
-                        time=data.get("time"),
-                        source=result.source,
-                        high=data.get("high"),
-                        low=data.get("low"),
-                        open=data.get("open"),
-                        prev_close=data.get("prev_close"),
-                    ).model_dump())
+                    all_results.append(
+                        CommodityResponse(
+                            commodity=data.get("commodity", ""),
+                            symbol=data.get("symbol", ""),
+                            name=data.get("name", ""),
+                            price=data.get("price", 0.0),
+                            change=data.get("change"),
+                            change_percent=data.get("change_percent"),
+                            currency=data.get("currency"),
+                            exchange=data.get("exchange"),
+                            time=data.get("time"),
+                            source=result.source,
+                            high=data.get("high"),
+                            low=data.get("low"),
+                            open=data.get("open"),
+                            prev_close=data.get("prev_close"),
+                        ).model_dump()
+                    )
 
     return {"commodities": all_results, "timestamp": current_time}
 
@@ -214,12 +220,14 @@ async def get_categories(
     for category, commodity_types in category_map.items():
         if not commodity_types:
             # 空分类只包含基本信息
-            categories.append({
-                "id": category.value,
-                "name": category.value.replace("_", " ").title(),
-                "icon": CATEGORY_ICONS.get(category.value, "box"),
-                "commodities": [],
-            })
+            categories.append(
+                {
+                    "id": category.value,
+                    "name": category.value.replace("_", " ").title(),
+                    "icon": CATEGORY_ICONS.get(category.value, "box"),
+                    "commodities": [],
+                }
+            )
             continue
 
         # 获取该分类下所有商品的数据
@@ -236,12 +244,14 @@ async def get_categories(
                         item = _commodity_to_item(data, result.source)
                         category_commodities.append(item)
 
-        categories.append({
-            "id": category.value,
-            "name": category.value.replace("_", " ").title(),
-            "icon": CATEGORY_ICONS.get(category.value, "box"),
-            "commodities": category_commodities,
-        })
+        categories.append(
+            {
+                "id": category.value,
+                "name": category.value.replace("_", " ").title(),
+                "icon": CATEGORY_ICONS.get(category.value, "box"),
+                "commodities": category_commodities,
+            }
+        )
 
     return {"categories": categories, "timestamp": current_time}
 
@@ -302,6 +312,7 @@ async def get_history(
 
         # 获取商品名称
         from src.datasources.commodity_source import YFinanceCommoditySource
+
         name_source = YFinanceCommoditySource()
         name = name_source.get_name(commodity_type)
 
@@ -321,6 +332,7 @@ async def get_history(
 
 
 # === 特定商品类型路由（在通用路由之前定义） ===
+
 
 @router.get(
     "/gold/cny",
@@ -457,11 +469,107 @@ async def get_wti_oil() -> dict:
     ).model_dump()
 
 
+# === 通用商品数据获取 API ===
+# 注意：这个路由必须在 /{commodity_type} 之前定义，以避免路由冲突
+
+
+class CommodityByTickerResponse(TypedDict):
+    """按 ticker 获取商品响应"""
+
+    commodity: str
+    symbol: str
+    name: str
+    price: float
+    currency: str
+    change: float | None
+    change_percent: float | None
+    source: str
+    timestamp: str
+
+
+@router.get(
+    "/by-ticker/{symbol}",
+    response_model=CommodityByTickerResponse,
+    summary="按 ticker 获取商品行情",
+    description="根据 yfinance ticker 符号获取商品实时行情（支持用户关注的任意商品）",
+    responses={
+        200: {"description": "成功获取商品行情"},
+        500: {"model": ErrorResponse, "description": "获取数据失败"},
+    },
+)
+async def get_commodity_by_ticker(symbol: str) -> CommodityByTickerResponse:
+    """
+    按 ticker 获取商品行情
+
+    支持获取任意 yfinance 支持的商品期货 ticker 数据，
+    例如: BTC=F, ETH=F, ZC=F, PT=F, PA=F 等
+
+    Args:
+        symbol: yfinance ticker 符号
+
+    Returns:
+        CommodityByTickerResponse: 商品行情数据
+    """
+    try:
+        import yfinance as yf
+
+        ticker_obj = yf.Ticker(symbol)
+        info = ticker_obj.info
+
+        price = info.get("currentPrice", info.get("regularMarketPrice"))
+        change = info.get("regularMarketChange", info.get("change", 0))
+        change_percent = info.get("regularMarketChangePercent", info.get("changePercent", 0))
+
+        if price is None:
+            raise HTTPException(
+                status_code=500,
+                detail=f"无法获取 {symbol} 的价格数据",
+            )
+
+        # 转换时间戳为 UTC 时间字符串
+        market_time = info.get("regularMarketTime")
+        if market_time:
+            try:
+                time_str = (
+                    datetime.utcfromtimestamp(market_time).strftime("%Y-%m-%d %H:%M:%S") + " UTC"
+                )
+            except (ValueError, TypeError, OSError):
+                time_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") + " UTC"
+        else:
+            time_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") + " UTC"
+
+        return {
+            "commodity": symbol.lower(),
+            "symbol": symbol,
+            "name": info.get("shortName", info.get("longName", symbol)),
+            "price": float(price),
+            "currency": info.get("currency", "USD"),
+            "change": float(change) if change else None,
+            "change_percent": float(change_percent) if change_percent else None,
+            "source": "yfinance",
+            "timestamp": time_str,
+        }
+
+    except ImportError:
+        raise HTTPException(
+            status_code=500,
+            detail="yfinance 未安装",
+        )
+    except Exception as e:
+        logger.error(f"获取商品 {symbol} 数据失败: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取数据失败: {str(e)}",
+        )
+
+
 # === 关注列表 API ===
 # 注意：这些路由必须在 /{commodity_type} 之前定义，以避免路由冲突
 
+
 class WatchedCommodityResponse(TypedDict):
     """关注商品响应"""
+
     symbol: str
     name: str
     category: str
@@ -470,6 +578,7 @@ class WatchedCommodityResponse(TypedDict):
 
 class WatchedCommodityAddRequest(TypedDict):
     """添加关注商品请求"""
+
     symbol: str
     name: str
     category: str | None
@@ -477,11 +586,13 @@ class WatchedCommodityAddRequest(TypedDict):
 
 class WatchedCommodityUpdateRequest(TypedDict):
     """更新关注商品请求"""
+
     name: str
 
 
 class WatchlistResponse(TypedDict):
     """关注列表响应"""
+
     watchlist: list[WatchedCommodityResponse]
     count: int
     timestamp: str
@@ -489,6 +600,7 @@ class WatchlistResponse(TypedDict):
 
 class SearchResultItem(TypedDict):
     """搜索结果项"""
+
     symbol: str
     name: str
     exchange: str
@@ -498,6 +610,7 @@ class SearchResultItem(TypedDict):
 
 class SearchResultResponse(TypedDict):
     """搜索结果响应"""
+
     query: str
     results: list[SearchResultItem]
     count: int
@@ -506,6 +619,7 @@ class SearchResultResponse(TypedDict):
 
 class AddWatchlistResponse(TypedDict):
     """添加关注响应"""
+
     success: bool
     message: str
 
@@ -757,6 +871,7 @@ async def get_watchlist_by_category(
 
 
 # === 通用商品类型路由（必须在所有特定路由之后定义） ===
+
 
 @router.get(
     "/{commodity_type}",

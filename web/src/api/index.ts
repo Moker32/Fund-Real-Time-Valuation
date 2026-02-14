@@ -309,6 +309,20 @@ export const commodityApi = {
   async getWatchlistByCategory(category: string): Promise<WatchlistResponse> {
     return api.get(`/api/commodities/watchlist/category/${category}`);
   },
+
+  async getCommodityByTicker(ticker: string): Promise<{
+    commodity: string;
+    symbol: string;
+    name: string;
+    price: number;
+    currency: string;
+    change: number | null;
+    change_percent: number | null;
+    source: string;
+    timestamp: string;
+  }> {
+    return api.get(`/api/commodities/by-ticker/${encodeURIComponent(ticker)}`);
+  },
 };
 
 export const overviewApi = {
