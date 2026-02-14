@@ -810,6 +810,16 @@ def create_default_manager(
 
     manager.register(HybridIndexSource())
 
+    # === 新增 Baostock 股票数据源 ===
+    from .stock_source import BaostockStockSource
+
+    manager.register(BaostockStockSource())
+
+    # === 新增 Tushare 基金数据源 ===
+    from .fund_source import TushareFundSource
+
+    manager.register(TushareFundSource())
+
     return manager
 
 

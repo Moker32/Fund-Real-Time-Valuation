@@ -46,19 +46,19 @@ class SinaStockDataSource(DataSource):
 
     # 新浪股票 API 响应字段索引
     FIELD_NAMES = [
-        "name",           # 0: 股票名称
-        "pre_close",      # 1: 昨收价
-        "open",           # 2: 开盘价
-        "price",          # 3: 当前价
-        "high",           # 4: 最高价
-        "low",            # 5: 最低价
-        "bid",            # 6: 买入价
-        "ask",            # 7: 卖出价
-        "volume",         # 8: 成交量(手)
-        "amount",         # 9: 成交额(元)
-        "bid_volume",     # 10: 买一量
-        "ask_volume",     # 11: 卖一量
-        "time",           # 12: 时间
+        "name",  # 0: 股票名称
+        "pre_close",  # 1: 昨收价
+        "open",  # 2: 开盘价
+        "price",  # 3: 当前价
+        "high",  # 4: 最高价
+        "low",  # 5: 最低价
+        "bid",  # 6: 买入价
+        "ask",  # 7: 卖出价
+        "volume",  # 8: 成交量(手)
+        "amount",  # 9: 成交额(元)
+        "bid_volume",  # 10: 买一量
+        "ask_volume",  # 11: 卖一量
+        "time",  # 12: 时间
     ]
 
     def __init__(self, timeout: float = 10.0):
@@ -67,17 +67,13 @@ class SinaStockDataSource(DataSource):
         Args:
             timeout: 请求超时时间(秒), 默认 10 秒
         """
-        super().__init__(
-            name="sina_stock",
-            source_type=DataSourceType.STOCK,
-            timeout=timeout
-        )
+        super().__init__(name="sina_stock", source_type=DataSourceType.STOCK, timeout=timeout)
         self.client = httpx.AsyncClient(
             timeout=timeout,
             headers={
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
                 "Referer": "https://finance.sina.com.cn/",
-            }
+            },
         )
 
     async def fetch(self, stock_code: str) -> DataSourceResult:
@@ -105,7 +101,7 @@ class SinaStockDataSource(DataSource):
                     data=data,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"stock_code": stock_code, "market": market}
+                    metadata={"stock_code": stock_code, "market": market},
                 )
 
             return DataSourceResult(
@@ -113,7 +109,7 @@ class SinaStockDataSource(DataSource):
                 error="解析股票数据失败: 响应格式异常",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"stock_code": stock_code, "market": market}
+                metadata={"stock_code": stock_code, "market": market},
             )
 
         except httpx.HTTPStatusError as e:
@@ -132,14 +128,16 @@ class SinaStockDataSource(DataSource):
         Returns:
             'sh' 或 'sz'
         """
-        if stock_code.startswith('6'):
-            return 'sh'
-        elif stock_code.startswith('0') or stock_code.startswith('3'):
-            return 'sz'
+        if stock_code.startswith("6"):
+            return "sh"
+        elif stock_code.startswith("0") or stock_code.startswith("3"):
+            return "sz"
         else:
-            return 'sh'  # 默认上海
+            return "sh"  # 默认上海
 
-    def _parse_response(self, response_text: str, stock_code: str, market: str) -> dict[str, Any] | None:
+    def _parse_response(
+        self, response_text: str, stock_code: str, market: str
+    ) -> dict[str, Any] | None:
         """解析新浪股票响应
 
         响应格式示例:
@@ -163,7 +161,7 @@ class SinaStockDataSource(DataSource):
             return None
 
         code = match.group(1)
-        values = match.group(2).split(',')
+        values = match.group(2).split(",")
 
         if len(values) < 13:
             return None
@@ -186,7 +184,7 @@ class SinaStockDataSource(DataSource):
             "low": float(values[5]),
             "bid": float(values[6]),
             "ask": float(values[7]),
-            "volume": int(values[8]),      # 成交量(手)
+            "volume": int(values[8]),  # 成交量(手)
             "amount": round(float(values[9]) / 10000, 2),  # 成交额(万元)
             "bid_volume": int(values[10]) if len(values) > 10 else 0,
             "ask_volume": int(values[11]) if len(values) > 11 else 0,
@@ -216,6 +214,7 @@ class SinaStockDataSource(DataSource):
         Returns:
             DataSourceResult 列表
         """
+
         async def fetch_one(code: str) -> DataSourceResult:
             return await self.fetch(code)
 
@@ -231,7 +230,7 @@ class SinaStockDataSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"stock_code": stock_codes[i]}
+                        metadata={"stock_code": stock_codes[i]},
                     )
                 )
             else:
@@ -293,11 +292,7 @@ class YahooStockSource(DataSource):
         Args:
             timeout: 请求超时时间(秒), 默认 15 秒
         """
-        super().__init__(
-            name="yahoo_stock",
-            source_type=DataSourceType.STOCK,
-            timeout=timeout
-        )
+        super().__init__(name="yahoo_stock", source_type=DataSourceType.STOCK, timeout=timeout)
         self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 30.0  # 缓存 30 秒
 
@@ -322,7 +317,7 @@ class YahooStockSource(DataSource):
                 data=cached_data,
                 timestamp=cached_data.get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"symbol": symbol, "from_cache": True}
+                metadata={"symbol": symbol, "from_cache": True},
             )
 
         try:
@@ -332,14 +327,14 @@ class YahooStockSource(DataSource):
             info = ticker.info
 
             # 提取关键数据
-            price = info.get('currentPrice', info.get('regularMarketPrice'))
+            price = info.get("currentPrice", info.get("regularMarketPrice"))
             if price is None:
                 return DataSourceResult(
                     success=False,
                     error=f"无法获取 {symbol} 的价格数据",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"symbol": symbol}
+                    metadata={"symbol": symbol},
                 )
 
             # 构建返回数据
@@ -347,30 +342,30 @@ class YahooStockSource(DataSource):
                 "symbol": symbol,
                 "name": self._get_name(info, symbol),
                 "price": float(price),
-                "open": float(info.get('regularMarketOpen', 0)),
-                "high": float(info.get('regularMarketDayHigh', 0)),
-                "low": float(info.get('regularMarketDayLow', 0)),
-                "change": float(info.get('regularMarketChange', 0)),
-                "change_pct": float(info.get('regularMarketChangePercent', 0)),
-                "volume": int(info.get('regularMarketVolume', 0)),
-                "market_cap": info.get('marketCap'),
-                "pe": info.get('trailingPE'),
-                "pb": info.get('priceToBook'),
-                "eps": info.get('trailingEps'),
-                "dividend_yield": info.get('dividendYield'),
-                "exchange": info.get('exchange'),
-                "currency": info.get('currency', 'USD'),
+                "open": float(info.get("regularMarketOpen", 0)),
+                "high": float(info.get("regularMarketDayHigh", 0)),
+                "low": float(info.get("regularMarketDayLow", 0)),
+                "change": float(info.get("regularMarketChange", 0)),
+                "change_pct": float(info.get("regularMarketChangePercent", 0)),
+                "volume": int(info.get("regularMarketVolume", 0)),
+                "market_cap": info.get("marketCap"),
+                "pe": info.get("trailingPE"),
+                "pb": info.get("priceToBook"),
+                "eps": info.get("trailingEps"),
+                "dividend_yield": info.get("dividendYield"),
+                "exchange": info.get("exchange"),
+                "currency": info.get("currency", "USD"),
             }
 
             # 获取交易时间
-            market_time = info.get('regularMarketTime')
+            market_time = info.get("regularMarketTime")
             if market_time:
                 try:
-                    data["time"] = datetime.fromtimestamp(market_time).strftime('%Y-%m-%d %H:%M:%S')
+                    data["time"] = datetime.fromtimestamp(market_time).strftime("%Y-%m-%d %H:%M:%S")
                 except (ValueError, TypeError, OSError):
                     data["time"] = str(market_time)
             else:
-                data["time"] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                data["time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             # 添加市场类型
             data["market_type"] = self._get_market_type(symbol)
@@ -385,7 +380,7 @@ class YahooStockSource(DataSource):
                 data=data,
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"symbol": symbol, "market_type": data["market_type"]}
+                metadata={"symbol": symbol, "market_type": data["market_type"]},
             )
 
         except ImportError:
@@ -394,7 +389,7 @@ class YahooStockSource(DataSource):
                 error="yfinance 未安装，请运行: pip install yfinance",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"symbol": symbol, "error_type": "ImportError"}
+                metadata={"symbol": symbol, "error_type": "ImportError"},
             )
         except Exception as e:
             return self._handle_error(e, self.name)
@@ -410,7 +405,7 @@ class YahooStockSource(DataSource):
             股票名称
         """
         # 优先使用 shortName，其次 longName，最后返回 symbol
-        return info.get('shortName', info.get('longName', symbol))
+        return info.get("shortName", info.get("longName", symbol))
 
     def _get_market_type(self, symbol: str) -> str:
         """判断市场类型
@@ -423,14 +418,14 @@ class YahooStockSource(DataSource):
         """
         symbol_upper = symbol.upper()
 
-        if symbol_upper.endswith('.SH') or symbol_upper.endswith('.SZ'):
-            return 'cn'  # A股
-        elif symbol_upper.endswith('.HK'):
-            return 'hk'  # 港股
-        elif '.' not in symbol_upper:  # 美股通常不带后缀
-            return 'us'
+        if symbol_upper.endswith(".SH") or symbol_upper.endswith(".SZ"):
+            return "cn"  # A股
+        elif symbol_upper.endswith(".HK"):
+            return "hk"  # 港股
+        elif "." not in symbol_upper:  # 美股通常不带后缀
+            return "us"
         else:
-            return 'other'
+            return "other"
 
     def _is_cache_valid(self, cache_key: str) -> bool:
         """检查缓存是否有效
@@ -455,6 +450,7 @@ class YahooStockSource(DataSource):
         Returns:
             DataSourceResult 列表
         """
+
         async def fetch_one(sym: str) -> DataSourceResult:
             return await self.fetch(sym)
 
@@ -470,7 +466,7 @@ class YahooStockSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"symbol": symbols[i]}
+                        metadata={"symbol": symbols[i]},
                     )
                 )
             else:
@@ -553,11 +549,7 @@ class StockDataAggregator(DataSource):
     """股票数据聚合器 - 支持多数据源自动切换"""
 
     def __init__(self, timeout: float = 15.0):
-        super().__init__(
-            name="stock_aggregator",
-            source_type=DataSourceType.STOCK,
-            timeout=timeout
-        )
+        super().__init__(name="stock_aggregator", source_type=DataSourceType.STOCK, timeout=timeout)
         self._sources: list[DataSource] = []
         self._primary_source: DataSource | None = None
 
@@ -603,11 +595,12 @@ class StockDataAggregator(DataSource):
             error=f"所有数据源均失败: {'; '.join(errors)}",
             timestamp=time.time(),
             source=self.name,
-            metadata={"symbol": symbol, "errors": errors}
+            metadata={"symbol": symbol, "errors": errors},
         )
 
     async def fetch_batch(self, symbols: list[str]) -> list[DataSourceResult]:
         """批量获取股票数据"""
+
         async def fetch_one(sym: str) -> DataSourceResult:
             return await self.fetch(sym)
 
@@ -623,7 +616,7 @@ class StockDataAggregator(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"symbol": symbols[i]}
+                        metadata={"symbol": symbols[i]},
                     )
                 )
             else:
@@ -642,15 +635,140 @@ class StockDataAggregator(DataSource):
     async def close(self):
         """关闭所有数据源"""
         for source in self._sources:
-            if hasattr(source, 'close') and callable(getattr(source, 'close')):
+            if hasattr(source, "close") and callable(getattr(source, "close")):
                 try:
                     await source.close()
                 except Exception:
                     pass
 
 
+class BaostockStockSource(DataSource):
+    """Baostock A股历史数据源
+
+    提供A股历史K线数据，支持上海和深圳股票。
+    API: https://www.baostock.com/
+
+    返回字段:
+        - date: 交易日期
+        - open: 开盘价
+        - high: 最高价
+        - low: 最低价
+        - close: 收盘价
+        - volume: 成交量
+        - amount: 成交额
+    """
+
+    def __init__(self, timeout: float = 10.0):
+        super().__init__(name="baostock_stock", source_type=DataSourceType.STOCK, timeout=timeout)
+        self._logged_in = False
+
+    def _ensure_login(self):
+        if not self._logged_in:
+            try:
+                import baostock as bs
+
+                bs.login()
+                self._logged_in = True
+            except ImportError:
+                raise ImportError("请安装 baostock 库: pip install baostock")
+
+    async def fetch(
+        self, stock_code: str, start_date: str = "", end_date: str = ""
+    ) -> DataSourceResult:
+        self._request_count += 1
+        try:
+            self._ensure_login()
+            import baostock as bs
+
+            rs = bs.query_history_k_data_plus(
+                stock_code,
+                "date,open,high,low,close,volume,amount",
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+            if rs.error_code != "0":
+                self._error_count += 1
+                return DataSourceResult(
+                    success=False,
+                    error=f"Baostock API错误: {rs.error_msg}",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"stock_code": stock_code},
+                )
+
+            data_list = []
+            while rs.next():
+                data_list.append(rs.get_row_data())
+
+            if not data_list:
+                self._error_count += 1
+                return DataSourceResult(
+                    success=False,
+                    error="未获取到数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"stock_code": stock_code},
+                )
+
+            result_data = {"stock_code": stock_code, "records": data_list, "count": len(data_list)}
+
+            return DataSourceResult(
+                success=True,
+                data=result_data,
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"stock_code": stock_code},
+            )
+
+        except ImportError:
+            self._error_count += 1
+            return DataSourceResult(
+                success=False,
+                error="baostock库未安装，请运行: pip install baostock",
+                timestamp=time.time(),
+                source=self.name,
+            )
+        except Exception as e:
+            self._error_count += 1
+            return DataSourceResult(
+                success=False,
+                error=str(e),
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"stock_code": stock_code},
+            )
+
+    async def fetch_batch(
+        self, stock_codes: list[str], start_date: str = "", end_date: str = ""
+    ) -> list[DataSourceResult]:
+        async def fetch_one(code: str) -> DataSourceResult:
+            return await self.fetch(code, start_date, end_date)
+
+        tasks = [fetch_one(code) for code in stock_codes]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append(
+                    DataSourceResult(
+                        success=False,
+                        error=str(result),
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"stock_code": stock_codes[i]},
+                    )
+                )
+            else:
+                processed_results.append(result)
+
+        return processed_results
+
+
 __all__ = [
     "SinaStockDataSource",
     "YahooStockSource",
     "StockDataAggregator",
+    "BaostockStockSource",
 ]

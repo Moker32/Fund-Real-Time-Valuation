@@ -47,6 +47,12 @@ from .base import (
     NetworkError,
 )
 from .bond_source import AKShareBondSource, EastMoneyBondSource, SinaBondDataSource
+from .stock_source import (
+    BaostockStockSource,
+    SinaStockDataSource,
+    StockDataAggregator,
+    YahooStockSource,
+)
 from .cache_cleaner import CacheCleaner, get_cache_cleaner, startup_cleanup
 from .commodity_source import (
     AKShareCommoditySource,
@@ -54,7 +60,7 @@ from .commodity_source import (
     CommodityDataSource,
     YFinanceCommoditySource,
 )
-from .fund_source import Fund123DataSource, FundDataSource, SinaFundDataSource
+from .fund_source import Fund123DataSource, FundDataSource, SinaFundDataSource, TushareFundSource
 from .gateway import (
     BatchDataRequest,
     BatchDataResponse,
@@ -114,6 +120,12 @@ __all__ = [
     "FundDataSource",
     "SinaFundDataSource",
     "Fund123DataSource",
+    "TushareFundSource",
+    # 股票数据源
+    "SinaStockDataSource",
+    "YahooStockSource",
+    "BaostockStockSource",
+    "StockDataAggregator",
     # 商品数据源
     "CommodityDataSource",
     "YFinanceCommoditySource",

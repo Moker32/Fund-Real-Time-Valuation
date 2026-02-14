@@ -6,6 +6,7 @@
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 from pathlib import Path
@@ -55,9 +56,9 @@ def get_fund_cache() -> DualLayerCache:
         cache_dir = Path.home() / ".fund-tui" / "cache" / "funds"
         _fund_cache = DualLayerCache(
             cache_dir=cache_dir,
-            memory_ttl=0,       # 禁用内存缓存
-            file_ttl=0,         # 禁用文件缓存
-            max_memory_items=100
+            memory_ttl=0,  # 禁用内存缓存
+            file_ttl=0,  # 禁用文件缓存
+            max_memory_items=100,
         )
     return _fund_cache
 
@@ -332,11 +333,14 @@ def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
 
         # 保存到数据库
         if fund_name or fund_type:
-            save_basic_info_to_db(fund_code, {
-                "short_name": fund_name,
-                "name": fund_name,
-                "type": fund_type,
-            })
+            save_basic_info_to_db(
+                fund_code,
+                {
+                    "short_name": fund_name,
+                    "name": fund_name,
+                    "type": fund_type,
+                },
+            )
 
         return result
 
@@ -348,12 +352,7 @@ def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
 class FundDataSource(DataSource):
     """基金数据源 - 从天天基金接口获取数据"""
 
-    def __init__(
-        self,
-        timeout: float = 30.0,
-        max_retries: int = 2,
-        retry_delay: float = 1.0
-    ):
+    def __init__(self, timeout: float = 30.0, max_retries: int = 2, retry_delay: float = 1.0):
         """
         初始化基金数据源
 
@@ -362,11 +361,7 @@ class FundDataSource(DataSource):
             max_retries: 最大重试次数
             retry_delay: 重试间隔(秒)
         """
-        super().__init__(
-            name="fund_tiantian",
-            source_type=DataSourceType.FUND,
-            timeout=timeout
-        )
+        super().__init__(name="fund_tiantian", source_type=DataSourceType.FUND, timeout=timeout)
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.client = httpx.AsyncClient(
@@ -375,8 +370,8 @@ class FundDataSource(DataSource):
             headers={
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
                 "Accept": "application/javascript, */*;q=0.8",
-                "Referer": "http://fundgz.1234567.com.cn/"
-            }
+                "Referer": "http://fundgz.1234567.com.cn/",
+            },
         )
 
     async def fetch(self, fund_code: str, use_cache: bool = True) -> DataSourceResult:
@@ -401,7 +396,7 @@ class FundDataSource(DataSource):
                 error=f"无效的基金代码: {fund_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         cache_key = f"fund:{self.name}:{fund_code}"
@@ -435,7 +430,7 @@ class FundDataSource(DataSource):
                         data=result_data,
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code, "cache": "database"}
+                        metadata={"fund_code": fund_code, "cache": "database"},
                     )
 
         # 2. 检查内存/文件缓存
@@ -449,7 +444,7 @@ class FundDataSource(DataSource):
                     data=cached_value,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code, "cache": cache_type}
+                    metadata={"fund_code": fund_code, "cache": cache_type},
                 )
 
         # 3. 从 API 获取数据
@@ -476,7 +471,7 @@ class FundDataSource(DataSource):
                         error=f"{fund_code} 是 LOF 基金，数据获取失败: {result.error}",
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code}
+                        metadata={"fund_code": fund_code},
                     )
 
                 # ETF 使用东方财富 ETF 接口
@@ -496,7 +491,7 @@ class FundDataSource(DataSource):
                         error=f"{fund_code} 是 ETF 基金，数据获取失败: {result.error}",
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code}
+                        metadata={"fund_code": fund_code},
                     )
 
                 # 普通基金使用天天基金接口
@@ -513,7 +508,7 @@ class FundDataSource(DataSource):
                             error=f"{fund_code} 是 ETF 基金，请使用场内基金交易接口",
                             timestamp=time.time(),
                             source=self.name,
-                            metadata={"fund_code": fund_code}
+                            metadata={"fund_code": fund_code},
                         )
                     if fund_code.startswith("16"):
                         return DataSourceResult(
@@ -521,7 +516,7 @@ class FundDataSource(DataSource):
                             error=f"{fund_code} 是 LOF 基金，请使用场内基金交易接口",
                             timestamp=time.time(),
                             source=self.name,
-                            metadata={"fund_code": fund_code}
+                            metadata={"fund_code": fund_code},
                         )
 
                 # 检查是否是空响应
@@ -540,7 +535,7 @@ class FundDataSource(DataSource):
                             error=f"{fund_code} 是 ETF 基金，请使用场内基金交易接口",
                             timestamp=time.time(),
                             source=self.name,
-                            metadata={"fund_code": fund_code}
+                            metadata={"fund_code": fund_code},
                         )
                     if fund_code.startswith("16"):
                         return DataSourceResult(
@@ -548,14 +543,14 @@ class FundDataSource(DataSource):
                             error=f"{fund_code} 是 LOF 基金，请使用场内基金交易接口",
                             timestamp=time.time(),
                             source=self.name,
-                            metadata={"fund_code": fund_code}
+                            metadata={"fund_code": fund_code},
                         )
                     return DataSourceResult(
                         success=False,
                         error=f"基金 {fund_code} 数据获取失败: {result.error}",
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code}
+                        metadata={"fund_code": fund_code},
                     )
 
                 # 解析返回的 JS 数据
@@ -600,13 +595,16 @@ class FundDataSource(DataSource):
                     self._record_success()
 
                     # 保存基金基本信息到数据库
-                    save_basic_info_to_db(fund_code, {
-                        "short_name": data.get("name", ""),
-                        "name": data.get("name", ""),
-                        "type": data.get("type", ""),
-                        "net_value": data.get("unit_net_value"),
-                        "net_value_date": data.get("net_value_date", ""),
-                    })
+                    save_basic_info_to_db(
+                        fund_code,
+                        {
+                            "short_name": data.get("name", ""),
+                            "name": data.get("name", ""),
+                            "type": data.get("type", ""),
+                            "net_value": data.get("unit_net_value"),
+                            "net_value_date": data.get("net_value_date", ""),
+                        },
+                    )
 
                     # 写入数据库缓存
                     daily_dao = get_daily_cache_dao()
@@ -620,7 +618,7 @@ class FundDataSource(DataSource):
                         data=data,
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code}
+                        metadata={"fund_code": fund_code},
                     )
 
             except httpx.HTTPStatusError as e:
@@ -630,7 +628,7 @@ class FundDataSource(DataSource):
                         error=f"基金不存在: {fund_code}",
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code, "status_code": 404}
+                        metadata={"fund_code": fund_code, "status_code": 404},
                     )
                 await self._handle_retry_delay(attempt)
 
@@ -645,7 +643,7 @@ class FundDataSource(DataSource):
                     error=f"数据解析失败: {str(e)}",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code}
+                    metadata={"fund_code": fund_code},
                 )
 
         # 如果是 LOF，返回更明确的错误信息
@@ -655,7 +653,7 @@ class FundDataSource(DataSource):
                 error=f"{fund_code} 是 QDII/LOF 基金，akshare 东方财富接口返回数据为空",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         # 如果是 ETF，返回更明确的错误信息
@@ -665,7 +663,7 @@ class FundDataSource(DataSource):
                 error=f"{fund_code} 是 ETF 基金，当前数据源暂不支持",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         return DataSourceResult(
@@ -673,7 +671,7 @@ class FundDataSource(DataSource):
             error=f"获取基金数据失败，已重试 {self.max_retries} 次",
             timestamp=time.time(),
             source=self.name,
-            metadata={"fund_code": fund_code}
+            metadata={"fund_code": fund_code},
         )
 
     async def _fetch_etf(self, fund_code: str) -> DataSourceResult:
@@ -689,14 +687,12 @@ class FundDataSource(DataSource):
         try:
             # 使用 akshare 获取 ETF 数据
             import asyncio
+
             loop = asyncio.get_event_loop()
             import akshare as ak
 
             # 获取 ETF 最新数据
-            df = await loop.run_in_executor(
-                None,
-                lambda: ak.fund_etf_fund_info_em(fund=fund_code)
-            )
+            df = await loop.run_in_executor(None, lambda: ak.fund_etf_fund_info_em(fund=fund_code))
 
             if df is None or df.empty:
                 return DataSourceResult(
@@ -704,7 +700,7 @@ class FundDataSource(DataSource):
                     error=f"ETF {fund_code} 无数据",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code}
+                    metadata={"fund_code": fund_code},
                 )
 
             # 获取最新一条数据
@@ -727,9 +723,15 @@ class FundDataSource(DataSource):
                 "name": fund_name,
                 "type": fund_type,
                 "net_value_date": str(latest.get("净值日期", "")),
-                "unit_net_value": float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None,
-                "estimated_net_value": float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None,
-                "estimated_growth_rate": float(latest.get("日增长率", 0)) if pd.notna(latest.get("日增长率")) else None,
+                "unit_net_value": float(latest.get("单位净值", 0))
+                if pd.notna(latest.get("单位净值"))
+                else None,
+                "estimated_net_value": float(latest.get("单位净值", 0))
+                if pd.notna(latest.get("单位净值"))
+                else None,
+                "estimated_growth_rate": float(latest.get("日增长率", 0))
+                if pd.notna(latest.get("日增长率"))
+                else None,
                 "estimate_time": str(latest.get("净值日期", "")),
                 "has_real_time_estimate": True,  # ETF 有实时估值
             }
@@ -737,20 +739,23 @@ class FundDataSource(DataSource):
             self._record_success()
 
             # 保存基金基本信息到数据库
-            save_basic_info_to_db(fund_code, {
-                "short_name": fund_name,
-                "name": fund_name,
-                "type": fund_type,
-                "net_value": data.get("unit_net_value"),
-                "net_value_date": data.get("net_value_date", ""),
-            })
+            save_basic_info_to_db(
+                fund_code,
+                {
+                    "short_name": fund_name,
+                    "name": fund_name,
+                    "type": fund_type,
+                    "net_value": data.get("unit_net_value"),
+                    "net_value_date": data.get("net_value_date", ""),
+                },
+            )
 
             return DataSourceResult(
                 success=True,
                 data=data,
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         except ImportError:
@@ -759,7 +764,7 @@ class FundDataSource(DataSource):
                 error="akshare 库未安装",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
         except Exception as e:
             return DataSourceResult(
@@ -767,10 +772,12 @@ class FundDataSource(DataSource):
                 error=f"ETF 数据获取失败: {str(e)}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
-    async def _fetch_lof(self, fund_code: str, has_real_time_estimate: bool = True) -> DataSourceResult:
+    async def _fetch_lof(
+        self, fund_code: str, has_real_time_estimate: bool = True
+    ) -> DataSourceResult:
         """
         获取 LOF/QDII/FOF 基金数据 - 使用东方财富开放式基金接口
 
@@ -785,6 +792,7 @@ class FundDataSource(DataSource):
         """
         try:
             import asyncio
+
             loop = asyncio.get_event_loop()
             import akshare as ak
 
@@ -792,10 +800,8 @@ class FundDataSource(DataSource):
             df = await loop.run_in_executor(
                 None,
                 lambda: ak.fund_open_fund_info_em(
-                    symbol=fund_code,
-                    indicator="单位净值走势",
-                    period="近一年"
-                )
+                    symbol=fund_code, indicator="单位净值走势", period="近一年"
+                ),
             )
 
             if df is None or df.empty:
@@ -804,7 +810,7 @@ class FundDataSource(DataSource):
                     error=f"基金 {fund_code} 无净值数据",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code}
+                    metadata={"fund_code": fund_code},
                 )
 
             # 获取最新一条数据（最后一行是最新的，因为数据是按日期升序排列的）
@@ -832,9 +838,15 @@ class FundDataSource(DataSource):
 
             net_date = str(latest.get("净值日期", ""))
             prev_net_date = str(prev_row.get("净值日期", ""))
-            unit_net = float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None
-            prev_unit_net = float(prev_row.get("单位净值", 0)) if pd.notna(prev_row.get("单位净值")) else None
-            daily_change = float(latest.get("日增长率", 0)) if pd.notna(latest.get("日增长率")) else None
+            unit_net = (
+                float(latest.get("单位净值", 0)) if pd.notna(latest.get("单位净值")) else None
+            )
+            prev_unit_net = (
+                float(prev_row.get("单位净值", 0)) if pd.notna(prev_row.get("单位净值")) else None
+            )
+            daily_change = (
+                float(latest.get("日增长率", 0)) if pd.notna(latest.get("日增长率")) else None
+            )
 
             data = {
                 "fund_code": fund_code,
@@ -853,20 +865,23 @@ class FundDataSource(DataSource):
             self._record_success()
 
             # 保存基金基本信息到数据库
-            save_basic_info_to_db(fund_code, {
-                "short_name": fund_name,
-                "name": fund_name,
-                "type": fund_type,
-                "net_value": unit_net,
-                "net_value_date": net_date,
-            })
+            save_basic_info_to_db(
+                fund_code,
+                {
+                    "short_name": fund_name,
+                    "name": fund_name,
+                    "type": fund_type,
+                    "net_value": unit_net,
+                    "net_value_date": net_date,
+                },
+            )
 
             return DataSourceResult(
                 success=True,
                 data=data,
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         except ImportError:
@@ -875,7 +890,7 @@ class FundDataSource(DataSource):
                 error="akshare 库未安装",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
         except Exception as e:
             return DataSourceResult(
@@ -883,7 +898,7 @@ class FundDataSource(DataSource):
                 error=f"基金数据获取失败: {str(e)}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
     async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
@@ -896,6 +911,7 @@ class FundDataSource(DataSource):
         Returns:
             List[DataSourceResult]: 每个基金的结果列表
         """
+
         async def fetch_one(code: str) -> DataSourceResult:
             return await self.fetch(code)
 
@@ -912,7 +928,7 @@ class FundDataSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_codes[i]}
+                        metadata={"fund_code": fund_codes[i]},
                     )
                 )
             else:
@@ -970,7 +986,7 @@ class FundDataSource(DataSource):
                 raise DataParseError(
                     message="无法解析基金数据响应",
                     source_type=self.source_type,
-                    details={"response_preview": response_text[:100]}
+                    details={"response_preview": response_text[:100]},
                 )
 
             json_str = match.group(1)
@@ -985,14 +1001,14 @@ class FundDataSource(DataSource):
                 "estimated_net_value": self._safe_float(data.get("gsz")),
                 "estimated_growth_rate": self._safe_float(data.get("gszzl")),
                 "estimate_time": data.get("gztime", ""),
-                "raw_data": data
+                "raw_data": data,
             }
 
         except (json.JSONDecodeError, KeyError, AttributeError) as e:
             raise DataParseError(
                 message=f"基金数据解析错误: {str(e)}",
                 source_type=self.source_type,
-                details={"fund_code": fund_code}
+                details={"fund_code": fund_code},
             )
 
     def _safe_float(self, value: Any) -> float | None:
@@ -1024,7 +1040,7 @@ class FundDataSource(DataSource):
     def __del__(self):
         """析构时确保关闭客户端（异步客户端需要在异步上下文中关闭）"""
         try:
-            if hasattr(self, 'client') and self.client.is_closed is False:
+            if hasattr(self, "client") and self.client.is_closed is False:
                 # Note: 异步客户端无法在 __del__ 中安全关闭
                 # 应使用 async with 或显式调用 close() 方法
                 pass
@@ -1097,8 +1113,8 @@ def get_fund_cache_stats() -> dict:
             "hit_rate": round(info_hit_rate, 4),
             "total_requests": info_total,
             "cached_items": len(_fund_info_cache),
-            "ttl_seconds": _fund_info_cache_ttl
-        }
+            "ttl_seconds": _fund_info_cache_ttl,
+        },
     }
 
 
@@ -1113,9 +1129,7 @@ class FundHistorySource(DataSource):
             timeout: 请求超时时间
         """
         super().__init__(
-            name="fund_history_akshare",
-            source_type=DataSourceType.FUND,
-            timeout=timeout
+            name="fund_history_akshare", source_type=DataSourceType.FUND, timeout=timeout
         )
 
     async def fetch(self, fund_code: str, period: str = "近一年") -> DataSourceResult:
@@ -1135,7 +1149,7 @@ class FundHistorySource(DataSource):
                 error=f"无效的基金代码: {fund_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         try:
@@ -1151,7 +1165,7 @@ class FundHistorySource(DataSource):
                     error="未获取到基金历史数据",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code}
+                    metadata={"fund_code": fund_code},
                 )
 
             # 解析数据并转换为 OHLCV 格式（K 线图需要）
@@ -1164,14 +1178,16 @@ class FundHistorySource(DataSource):
                     try:
                         nav = float(net_value)
                         # 基金净值是单点数据，open/high/low/close 相同
-                        ohlcv_data.append({
-                            "time": str(date),
-                            "open": round(nav, 4),
-                            "high": round(nav, 4),
-                            "low": round(nav, 4),
-                            "close": round(nav, 4),
-                            "volume": 0,  # 基金没有成交量
-                        })
+                        ohlcv_data.append(
+                            {
+                                "time": str(date),
+                                "open": round(nav, 4),
+                                "high": round(nav, 4),
+                                "low": round(nav, 4),
+                                "close": round(nav, 4),
+                                "volume": 0,  # 基金没有成交量
+                            }
+                        )
                     except (ValueError, TypeError):
                         continue
 
@@ -1181,14 +1197,10 @@ class FundHistorySource(DataSource):
             self._record_success()
             return DataSourceResult(
                 success=True,
-                data={
-                    "fund_code": fund_code,
-                    "data": ohlcv_data,
-                    "count": len(ohlcv_data)
-                },
+                data={"fund_code": fund_code, "data": ohlcv_data, "count": len(ohlcv_data)},
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code, "period": period}
+                metadata={"fund_code": fund_code, "period": period},
             )
 
         except ImportError:
@@ -1197,7 +1209,7 @@ class FundHistorySource(DataSource):
                 error="akshare 库未安装，请运行: pip install akshare",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
         except Exception as e:
             self._request_count += 1
@@ -1207,7 +1219,7 @@ class FundHistorySource(DataSource):
                 error=f"获取基金历史数据失败: {str(e)}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
     async def fetch_async(self, fund_code: str, period: str = "近一年") -> DataSourceResult:
@@ -1237,18 +1249,20 @@ class FundHistorySource(DataSource):
             List[DataSourceResult]: 返回结果列表
         """
         # 从 kwargs 中提取参数
-        fund_code = kwargs.get('fund_code')
-        period = kwargs.get('period', '近一年')
+        fund_code = kwargs.get("fund_code")
+        period = kwargs.get("period", "近一年")
 
         if fund_code:
             result = await self.fetch(fund_code, period)
             return [result]
-        return [DataSourceResult(
-            success=False,
-            error="缺少 fund_code 参数",
-            timestamp=time.time(),
-            source=self.name,
-        )]
+        return [
+            DataSourceResult(
+                success=False,
+                error="缺少 fund_code 参数",
+                timestamp=time.time(),
+                source=self.name,
+            )
+        ]
 
 
 class FundHistoryYFinanceSource(DataSource):
@@ -1256,9 +1270,7 @@ class FundHistoryYFinanceSource(DataSource):
 
     def __init__(self, timeout: float = 30.0):
         super().__init__(
-            name="fund_history_yfinance",
-            source_type=DataSourceType.FUND,
-            timeout=timeout
+            name="fund_history_yfinance", source_type=DataSourceType.FUND, timeout=timeout
         )
 
     async def fetch(self, fund_code: str, period: str = "1y") -> DataSourceResult:
@@ -1287,21 +1299,23 @@ class FundHistoryYFinanceSource(DataSource):
                     error="未获取到基金历史数据",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code}
+                    metadata={"fund_code": fund_code},
                 )
 
             history_data = []
             for index, row in hist.iterrows():
-                history_data.append({
-                    "date": index.strftime("%Y-%m-%d"),
-                    "open": row.get("Open"),
-                    "high": row.get("High"),
-                    "low": row.get("Low"),
-                    "close": row.get("Close"),
-                    "volume": row.get("Volume"),
-                    "dividends": row.get("Dividends"),
-                    "stock_splits": row.get("Stock Splits")
-                })
+                history_data.append(
+                    {
+                        "date": index.strftime("%Y-%m-%d"),
+                        "open": row.get("Open"),
+                        "high": row.get("High"),
+                        "low": row.get("Low"),
+                        "close": row.get("Close"),
+                        "volume": row.get("Volume"),
+                        "dividends": row.get("Dividends"),
+                        "stock_splits": row.get("Stock Splits"),
+                    }
+                )
 
             self._record_success()
             return DataSourceResult(
@@ -1310,11 +1324,11 @@ class FundHistoryYFinanceSource(DataSource):
                     "fund_code": fund_code,
                     "ticker": ticker_symbol,
                     "history": history_data,
-                    "count": len(history_data)
+                    "count": len(history_data),
                 },
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code, "period": period}
+                metadata={"fund_code": fund_code, "period": period},
             )
 
         except ImportError:
@@ -1323,7 +1337,7 @@ class FundHistoryYFinanceSource(DataSource):
                 error="yfinance 库未安装，请运行: pip install yfinance",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
         except Exception as e:
             self._request_count += 1
@@ -1333,7 +1347,7 @@ class FundHistoryYFinanceSource(DataSource):
                 error=f"获取历史数据失败: {str(e)}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
     async def fetch_async(self, fund_code: str, period: str = "1y") -> DataSourceResult:
@@ -1348,29 +1362,26 @@ class FundHistoryYFinanceSource(DataSource):
         Returns:
             List[DataSourceResult]: 返回结果列表
         """
-        fund_code = kwargs.get('fund_code')
-        period = kwargs.get('period', '1y')
+        fund_code = kwargs.get("fund_code")
+        period = kwargs.get("period", "1y")
 
         if fund_code:
             result = await self.fetch(fund_code, period)
             return [result]
-        return [DataSourceResult(
-            success=False,
-            error="缺少 fund_code 参数",
-            timestamp=time.time(),
-            source=self.name,
-        )]
+        return [
+            DataSourceResult(
+                success=False,
+                error="缺少 fund_code 参数",
+                timestamp=time.time(),
+                source=self.name,
+            )
+        ]
 
 
 class SinaFundDataSource(DataSource):
     """新浪基金数据源 - 备用基金数据源"""
 
-    def __init__(
-        self,
-        timeout: float = 30.0,
-        max_retries: int = 2,
-        retry_delay: float = 1.0
-    ):
+    def __init__(self, timeout: float = 30.0, max_retries: int = 2, retry_delay: float = 1.0):
         """
         初始化新浪基金数据源
 
@@ -1379,11 +1390,7 @@ class SinaFundDataSource(DataSource):
             max_retries: 最大重试次数
             retry_delay: 重试间隔(秒)
         """
-        super().__init__(
-            name="fund_sina",
-            source_type=DataSourceType.FUND,
-            timeout=timeout
-        )
+        super().__init__(name="fund_sina", source_type=DataSourceType.FUND, timeout=timeout)
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.client = httpx.AsyncClient(
@@ -1392,7 +1399,7 @@ class SinaFundDataSource(DataSource):
             headers={
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
                 "Accept": "application/json, text/javascript, */*;q=0.8",
-            }
+            },
         )
 
     async def fetch(self, fund_code: str) -> DataSourceResult:
@@ -1411,7 +1418,7 @@ class SinaFundDataSource(DataSource):
                 error=f"无效的基金代码: {fund_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         for attempt in range(self.max_retries):
@@ -1429,26 +1436,30 @@ class SinaFundDataSource(DataSource):
                         error=f"基金 {fund_code} 无数据",
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code}
+                        metadata={"fund_code": fund_code},
                     )
 
                 # 新浪返回格式: var LF_xx={...}
-                json_match = re.search(r'\{.+\}', text)
+                json_match = re.search(r"\{.+\}", text)
                 if not json_match:
                     return DataSourceResult(
                         success=False,
                         error=f"基金 {fund_code} 数据解析失败",
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code}
+                        metadata={"fund_code": fund_code},
                     )
 
                 data = json.loads(json_match.group())
 
                 # 提取数据
                 net_value = self._safe_float(data.get("NAV", data.get("unit_nav")))
-                estimate_value = self._safe_float(data.get("ACC_NAV", data.get("acc_nav"))) or net_value
-                change_percent = self._safe_float(data.get("NAV_CHG_PCT", data.get("change_percent")))
+                estimate_value = (
+                    self._safe_float(data.get("ACC_NAV", data.get("acc_nav"))) or net_value
+                )
+                change_percent = self._safe_float(
+                    data.get("NAV_CHG_PCT", data.get("change_percent"))
+                )
 
                 # 解析日期
                 net_date = str(data.get("UPDATE_DATE", data.get("nav_date", "")))
@@ -1469,7 +1480,7 @@ class SinaFundDataSource(DataSource):
                     data=result_data,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code}
+                    metadata={"fund_code": fund_code},
                 )
 
             except asyncio.TimeoutError:
@@ -1484,7 +1495,7 @@ class SinaFundDataSource(DataSource):
             error=f"基金 {fund_code} 获取失败，已重试 {self.max_retries} 次",
             timestamp=time.time(),
             source=self.name,
-            metadata={"fund_code": fund_code}
+            metadata={"fund_code": fund_code},
         )
 
     def _validate_fund_code(self, fund_code: str) -> bool:
@@ -1502,6 +1513,7 @@ class SinaFundDataSource(DataSource):
 
     async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
         """批量获取基金数据"""
+
         async def fetch_one(code: str) -> DataSourceResult:
             return await self.fetch(code)
 
@@ -1517,7 +1529,7 @@ class SinaFundDataSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_codes[i]}
+                        metadata={"fund_code": fund_codes[i]},
                     )
                 )
             else:
@@ -1529,12 +1541,7 @@ class SinaFundDataSource(DataSource):
 class EastMoneyFundDataSource(DataSource):
     """东方财富基金数据源 - 备用基金数据源"""
 
-    def __init__(
-        self,
-        timeout: float = 30.0,
-        max_retries: int = 2,
-        retry_delay: float = 1.0
-    ):
+    def __init__(self, timeout: float = 30.0, max_retries: int = 2, retry_delay: float = 1.0):
         """
         初始化东方财富基金数据源
 
@@ -1543,11 +1550,7 @@ class EastMoneyFundDataSource(DataSource):
             max_retries: 最大重试次数
             retry_delay: 重试间隔(秒)
         """
-        super().__init__(
-            name="fund_eastmoney",
-            source_type=DataSourceType.FUND,
-            timeout=timeout
-        )
+        super().__init__(name="fund_eastmoney", source_type=DataSourceType.FUND, timeout=timeout)
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.client = httpx.AsyncClient(
@@ -1556,7 +1559,7 @@ class EastMoneyFundDataSource(DataSource):
             headers={
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
                 "Accept": "application/json, text/plain, */*",
-            }
+            },
         )
 
     async def fetch(self, fund_code: str) -> DataSourceResult:
@@ -1575,7 +1578,7 @@ class EastMoneyFundDataSource(DataSource):
                 error=f"无效的基金代码: {fund_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         for attempt in range(self.max_retries):
@@ -1592,15 +1595,15 @@ class EastMoneyFundDataSource(DataSource):
                         error=f"基金 {fund_code} 无数据",
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code}
+                        metadata={"fund_code": fund_code},
                     )
 
                 # 解析 JS 格式数据
                 # 格式: var API_FUND_xxxx={...}
-                json_match = re.search(r'=\{[\s\S]*\};?$', text)
+                json_match = re.search(r"=\{[\s\S]*\};?$", text)
                 if not json_match:
                     # 尝试另一种格式
-                    json_match = re.search(r'\{.+\}', text)
+                    json_match = re.search(r"\{.+\}", text)
 
                 if not json_match:
                     return DataSourceResult(
@@ -1608,15 +1611,17 @@ class EastMoneyFundDataSource(DataSource):
                         error=f"基金 {fund_code} 数据解析失败",
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code}
+                        metadata={"fund_code": fund_code},
                     )
 
-                data_str = json_match.group().rstrip(';')
+                data_str = json_match.group().rstrip(";")
                 data = json.loads(data_str)
 
                 # 提取数据
                 net_value = self._safe_float(data.get("NET", data.get("unit_nav")))
-                estimate_value = self._safe_float(data.get("ACC_NET", data.get("acc_nav"))) or net_value
+                estimate_value = (
+                    self._safe_float(data.get("ACC_NET", data.get("acc_nav"))) or net_value
+                )
                 change_percent = self._safe_float(data.get("CHANGEPCT", data.get("change_percent")))
 
                 # 解析日期
@@ -1643,7 +1648,7 @@ class EastMoneyFundDataSource(DataSource):
                     data=result_data,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code}
+                    metadata={"fund_code": fund_code},
                 )
 
             except asyncio.TimeoutError:
@@ -1658,7 +1663,7 @@ class EastMoneyFundDataSource(DataSource):
             error=f"基金 {fund_code} 获取失败，已重试 {self.max_retries} 次",
             timestamp=time.time(),
             source=self.name,
-            metadata={"fund_code": fund_code}
+            metadata={"fund_code": fund_code},
         )
 
     def _validate_fund_code(self, fund_code: str) -> bool:
@@ -1676,6 +1681,7 @@ class EastMoneyFundDataSource(DataSource):
 
     async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
         """批量获取基金数据"""
+
         async def fetch_one(code: str) -> DataSourceResult:
             return await self.fetch(code)
 
@@ -1691,7 +1697,7 @@ class EastMoneyFundDataSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_codes[i]}
+                        metadata={"fund_code": fund_codes[i]},
                     )
                 )
             else:
@@ -1718,12 +1724,7 @@ class Fund123DataSource(DataSource):
     _csrf_token_time: float = 0.0
     _csrf_token_ttl = 1800  # 30 分钟过期
 
-    def __init__(
-        self,
-        timeout: float = 15.0,
-        max_retries: int = 3,
-        retry_delay: float = 0.5
-    ):
+    def __init__(self, timeout: float = 15.0, max_retries: int = 3, retry_delay: float = 0.5):
         """
         初始化 fund123 基金数据源
 
@@ -1732,11 +1733,7 @@ class Fund123DataSource(DataSource):
             max_retries: 最大重试次数
             retry_delay: 重试间隔(秒)
         """
-        super().__init__(
-            name="fund123",
-            source_type=DataSourceType.FUND,
-            timeout=timeout
-        )
+        super().__init__(name="fund123", source_type=DataSourceType.FUND, timeout=timeout)
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self._ensure_session()
@@ -1746,14 +1743,16 @@ class Fund123DataSource(DataSource):
         """确保存在全局 Session"""
         if cls._session is None:
             cls._session = requests.Session()
-            cls._session.headers.update({
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "zh-CN,zh;q=0.9",
-                "Referer": "https://www.fund123.cn/fund",
-                "Origin": "https://www.fund123.cn",
-                "X-API-Key": "foobar",
-            })
+            cls._session.headers.update(
+                {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+                    "Accept": "application/json, text/plain, */*",
+                    "Accept-Language": "zh-CN,zh;q=0.9",
+                    "Referer": "https://www.fund123.cn/fund",
+                    "Origin": "https://www.fund123.cn",
+                    "X-API-Key": "foobar",
+                }
+            )
 
     @classmethod
     def _get_csrf_token(cls) -> str | None:
@@ -1771,11 +1770,7 @@ class Fund123DataSource(DataSource):
 
         try:
             # 访问首页获取 token
-            response = cls._session.get(
-                f"{cls.BASE_URL}/fund",
-                timeout=15,
-                verify=False
-            )
+            response = cls._session.get(f"{cls.BASE_URL}/fund", timeout=15, verify=False)
             response.raise_for_status()
 
             # 从响应文本中提取 CSRF
@@ -1823,7 +1818,7 @@ class Fund123DataSource(DataSource):
                 error=f"无效的基金代码: {fund_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         today = time.strftime("%Y-%m-%d")
@@ -1852,14 +1847,14 @@ class Fund123DataSource(DataSource):
                         "estimated_growth_rate": cached_daily.change_rate,
                         "estimate_time": cached_daily.fetched_at or cached_daily.date,
                         "has_real_time_estimate": cached_daily.estimated_value is not None,
-                        "from_cache": "database"
+                        "from_cache": "database",
                     }
                     return DataSourceResult(
                         success=True,
                         data=result_data,
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code, "cache": "database"}
+                        metadata={"fund_code": fund_code, "cache": "database"},
                     )
 
         # 2. 检查内存/文件缓存
@@ -1873,7 +1868,7 @@ class Fund123DataSource(DataSource):
                     data=cached_value,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code, "cache": cache_type}
+                    metadata={"fund_code": fund_code, "cache": cache_type},
                 )
 
         # 3. 从 API 获取数据
@@ -1881,10 +1876,7 @@ class Fund123DataSource(DataSource):
             try:
                 # 在线程池中执行同步请求
                 loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(
-                    None,
-                    lambda: self._fetch_fund_data(fund_code)
-                )
+                result = await loop.run_in_executor(None, lambda: self._fetch_fund_data(fund_code))
 
                 if result.success:
                     self._record_success()
@@ -1894,13 +1886,16 @@ class Fund123DataSource(DataSource):
                     daily_dao.save_daily_from_fund_data(fund_code, result.data)
 
                     # 保存基金基本信息到数据库
-                    save_basic_info_to_db(fund_code, {
-                        "short_name": result.data.get("name", ""),
-                        "name": result.data.get("name", ""),
-                        "type": "",
-                        "net_value": result.data.get("unit_net_value"),
-                        "net_value_date": result.data.get("net_value_date", ""),
-                    })
+                    save_basic_info_to_db(
+                        fund_code,
+                        {
+                            "short_name": result.data.get("name", ""),
+                            "name": result.data.get("name", ""),
+                            "type": "",
+                            "net_value": result.data.get("unit_net_value"),
+                            "net_value_date": result.data.get("net_value_date", ""),
+                        },
+                    )
 
                     # 写入内存/文件缓存
                     cache = get_fund_cache()
@@ -1933,7 +1928,7 @@ class Fund123DataSource(DataSource):
             error=f"获取基金数据失败，已重试 {self.max_retries} 次",
             timestamp=time.time(),
             source=self.name,
-            metadata={"fund_code": fund_code}
+            metadata={"fund_code": fund_code},
         )
 
     def _fetch_fund_data(self, fund_code: str) -> DataSourceResult:
@@ -1941,10 +1936,7 @@ class Fund123DataSource(DataSource):
         # 1. 获取基金基本信息（fund_key 和 fund_name）
         search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={self._csrf_token}"
         search_response = self._session.post(
-            search_url,
-            json={"fundCode": fund_code},
-            timeout=self.timeout,
-            verify=False
+            search_url, json={"fundCode": fund_code}, timeout=self.timeout, verify=False
         )
 
         if not search_response.ok:
@@ -1953,7 +1945,7 @@ class Fund123DataSource(DataSource):
                 error=f"搜索基金失败: {search_response.status_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         search_data = search_response.json()
@@ -1963,7 +1955,7 @@ class Fund123DataSource(DataSource):
                 error=f"基金不存在: {fund_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         fund_info = search_data.get("fundInfo", {})
@@ -1972,7 +1964,9 @@ class Fund123DataSource(DataSource):
 
         # 2. 获取日内估值数据
         today = time.strftime("%Y-%m-%d")
-        intraday_url = f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={self._csrf_token}"
+        intraday_url = (
+            f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={self._csrf_token}"
+        )
         intraday_response = self._session.post(
             intraday_url,
             json={
@@ -1981,10 +1975,10 @@ class Fund123DataSource(DataSource):
                 "limit": 200,
                 "productId": fund_key,
                 "format": True,
-                "source": "WEALTHBFFWEB"
+                "source": "WEALTHBFFWEB",
             },
             timeout=self.timeout,
-            verify=False
+            verify=False,
         )
 
         if not intraday_response.ok:
@@ -1993,7 +1987,7 @@ class Fund123DataSource(DataSource):
                 error=f"获取日内数据失败: {intraday_response.status_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         intraday_data = intraday_response.json()
@@ -2004,8 +1998,9 @@ class Fund123DataSource(DataSource):
             latest = intraday_list[-1]
             estimate_value = float(latest.get("forecastNetValue", 0))
             growth_rate = float(latest.get("forecastGrowth", 0)) * 100
-            estimate_time = time.strftime("%Y-%m-%d %H:%M:%S",
-                                        time.localtime(latest.get("time", 0) / 1000))
+            estimate_time = time.strftime(
+                "%Y-%m-%d %H:%M:%S", time.localtime(latest.get("time", 0) / 1000)
+            )
         else:
             estimate_value = None
             growth_rate = 0.0
@@ -2038,10 +2033,10 @@ class Fund123DataSource(DataSource):
                 {
                     "time": time.strftime("%H:%M", time.localtime(item.get("time", 0) / 1000)),
                     "price": float(item.get("forecastNetValue", 0)),
-                    "change": round(float(item.get("forecastGrowth", 0)) * 100, 4)
+                    "change": round(float(item.get("forecastGrowth", 0)) * 100, 4),
                 }
                 for item in intraday_list
-            ]
+            ],
         }
 
         return DataSourceResult(
@@ -2049,7 +2044,7 @@ class Fund123DataSource(DataSource):
             data=result_data,
             timestamp=time.time(),
             source=self.name,
-            metadata={"fund_code": fund_code}
+            metadata={"fund_code": fund_code},
         )
 
     async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
@@ -2062,6 +2057,7 @@ class Fund123DataSource(DataSource):
         Returns:
             List[DataSourceResult]: 每个基金的结果列表
         """
+
         async def fetch_one(code: str) -> DataSourceResult:
             return await self.fetch(code)
 
@@ -2077,7 +2073,7 @@ class Fund123DataSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_codes[i]}
+                        metadata={"fund_code": fund_codes[i]},
                     )
                 )
             else:
@@ -2111,7 +2107,7 @@ class Fund123DataSource(DataSource):
                 error=f"无效的基金代码: {fund_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         cache_key = f"fund:{self.name}:{fund_code}:intraday"
@@ -2125,11 +2121,7 @@ class Fund123DataSource(DataSource):
                 if cached_records:
                     # 从数据库记录构建返回数据
                     intraday_points = [
-                        {
-                            "time": record.time,
-                            "price": record.price,
-                            "change": record.change_rate
-                        }
+                        {"time": record.time, "price": record.price, "change": record.change_rate}
                         for record in cached_records
                     ]
                     result_data = {
@@ -2139,14 +2131,18 @@ class Fund123DataSource(DataSource):
                         "data": intraday_points,
                         "count": len(intraday_points),
                         "from_cache": "database",
-                        "cache_expired": False
+                        "cache_expired": False,
                     }
                     return DataSourceResult(
                         success=True,
                         data=result_data,
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"fund_code": fund_code, "cache": "database", "cache_expired": False}
+                        metadata={
+                            "fund_code": fund_code,
+                            "cache": "database",
+                            "cache_expired": False,
+                        },
                     )
 
         # 2. 检查内存/文件缓存
@@ -2161,7 +2157,7 @@ class Fund123DataSource(DataSource):
                     data=cached_value,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"fund_code": fund_code, "cache": cache_type, "cache_expired": True}
+                    metadata={"fund_code": fund_code, "cache": cache_type, "cache_expired": True},
                 )
 
         for attempt in range(self.max_retries):
@@ -2169,8 +2165,7 @@ class Fund123DataSource(DataSource):
                 # 在线程池中执行同步请求
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
-                    None,
-                    lambda: self._fetch_intraday_data(fund_code)
+                    None, lambda: self._fetch_intraday_data(fund_code)
                 )
 
                 if result.success:
@@ -2205,7 +2200,7 @@ class Fund123DataSource(DataSource):
             error=f"获取日内数据失败，已重试 {self.max_retries} 次",
             timestamp=time.time(),
             source=self.name,
-            metadata={"fund_code": fund_code}
+            metadata={"fund_code": fund_code},
         )
 
     def _fetch_intraday_data(self, fund_code: str) -> DataSourceResult:
@@ -2213,10 +2208,7 @@ class Fund123DataSource(DataSource):
         # 1. 获取基金基本信息（fund_key 和 fund_name）
         search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={self._csrf_token}"
         search_response = self._session.post(
-            search_url,
-            json={"fundCode": fund_code},
-            timeout=self.timeout,
-            verify=False
+            search_url, json={"fundCode": fund_code}, timeout=self.timeout, verify=False
         )
 
         if not search_response.ok:
@@ -2225,7 +2217,7 @@ class Fund123DataSource(DataSource):
                 error=f"搜索基金失败: {search_response.status_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         search_data = search_response.json()
@@ -2235,7 +2227,7 @@ class Fund123DataSource(DataSource):
                 error=f"基金不存在: {fund_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         fund_info = search_data.get("fundInfo", {})
@@ -2244,7 +2236,9 @@ class Fund123DataSource(DataSource):
 
         # 2. 获取日内估值数据
         today = time.strftime("%Y-%m-%d")
-        intraday_url = f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={self._csrf_token}"
+        intraday_url = (
+            f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={self._csrf_token}"
+        )
         intraday_response = self._session.post(
             intraday_url,
             json={
@@ -2253,10 +2247,10 @@ class Fund123DataSource(DataSource):
                 "limit": 200,
                 "productId": fund_key,
                 "format": True,
-                "source": "WEALTHBFFWEB"
+                "source": "WEALTHBFFWEB",
             },
             timeout=self.timeout,
-            verify=False
+            verify=False,
         )
 
         if not intraday_response.ok:
@@ -2265,7 +2259,7 @@ class Fund123DataSource(DataSource):
                 error=f"获取日内数据失败: {intraday_response.status_code}",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"fund_code": fund_code}
+                metadata={"fund_code": fund_code},
             )
 
         intraday_data = intraday_response.json()
@@ -2278,18 +2272,20 @@ class Fund123DataSource(DataSource):
                 time_ms = item.get("time", 0)
                 # 将毫秒时间戳转换为 HH:mm 格式
                 time_str = time.strftime("%H:%M", time.localtime(time_ms / 1000))
-                intraday_points.append({
-                    "time": time_str,
-                    "price": float(item.get("forecastNetValue", 0)),
-                    "change": round(float(item.get("forecastGrowth", 0)) * 100, 4)
-                })
+                intraday_points.append(
+                    {
+                        "time": time_str,
+                        "price": float(item.get("forecastNetValue", 0)),
+                        "change": round(float(item.get("forecastGrowth", 0)) * 100, 4),
+                    }
+                )
 
         result_data = {
             "fund_code": fund_code,
             "name": fund_name,
             "date": today,
             "data": intraday_points,
-            "count": len(intraday_points)
+            "count": len(intraday_points),
         }
 
         return DataSourceResult(
@@ -2297,7 +2293,7 @@ class Fund123DataSource(DataSource):
             data=result_data,
             timestamp=time.time(),
             source=self.name,
-            metadata={"fund_code": fund_code}
+            metadata={"fund_code": fund_code},
         )
 
     async def health_check(self) -> bool:
@@ -2319,3 +2315,135 @@ class Fund123DataSource(DataSource):
             self._session.close()
             self._session = None
             self._csrf_token = None
+
+
+class TushareFundSource(DataSource):
+    """Tushare 基金数据源
+
+    提供国内基金净值数据，需要 Tushare Token。
+    API: https://tushare.pro/
+
+    Token 获取: https://tushare.pro/register
+    免费版有一定调用限制
+    """
+
+    def __init__(self, token: str | None = None, timeout: float = 10.0):
+        super().__init__(name="tushare_fund", source_type=DataSourceType.FUND, timeout=timeout)
+        self._token = token or os.environ.get("TUSHARE_TOKEN")
+        self._pro = None
+        if self._token:
+            self._init_pro()
+
+    def _init_pro(self):
+        if not self._token:
+            return
+        try:
+            import tushare as ts
+
+            ts.set_token(self._token)
+            self._pro = ts.pro_api()
+        except ImportError:
+            raise ImportError("请安装 tushare 库: pip install tushare")
+
+    async def fetch(self, fund_code: str) -> DataSourceResult:
+        self._request_count += 1
+        if not self._token or not self._pro:
+            self._error_count += 1
+            return DataSourceResult(
+                success=False,
+                error="Tushare Token 未配置。请设置 TUSHARE_TOKEN 环境变量或传入 token 参数。访问 https://tushare.pro/register 注册获取 Token。",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code},
+            )
+
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, lambda: self._fetch_fund_nav(fund_code))
+            return result
+        except Exception as e:
+            self._error_count += 1
+            return DataSourceResult(
+                success=False,
+                error=str(e),
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code},
+            )
+
+    def _fetch_fund_nav(self, fund_code: str) -> DataSourceResult:
+        try:
+            df = self._pro.fund_nav(fund_code=fund_code)
+            if df is None or df.empty:
+                return DataSourceResult(
+                    success=False,
+                    error=f"未找到基金数据: {fund_code}",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code},
+                )
+
+            latest = df.iloc[-1]
+            result_data = {
+                "fund_code": fund_code,
+                "nav": float(latest.get("nav", 0)),
+                "acc_nav": float(latest.get("acc_nav", 0)),
+                "date": latest.get("nav_date", ""),
+            }
+
+            return DataSourceResult(
+                success=True,
+                data=result_data,
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code},
+            )
+        except Exception as e:
+            return DataSourceResult(
+                success=False,
+                error=str(e),
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code},
+            )
+
+    async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
+        async def fetch_one(code: str) -> DataSourceResult:
+            return await self.fetch(code)
+
+        tasks = [fetch_one(code) for code in fund_codes]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append(
+                    DataSourceResult(
+                        success=False,
+                        error=str(result),
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"fund_code": fund_codes[i]},
+                    )
+                )
+            else:
+                processed_results.append(result)
+
+        return processed_results
+
+
+__all__ = [
+    "FundDataSource",
+    "SinaFundDataSource",
+    "FundHistorySource",
+    "FundHistoryYFinanceSource",
+    "Fund123DataSource",
+    "TushareFundSource",
+    "get_fund_cache",
+    "get_fund_cache_stats",
+    "get_intraday_cache_dao",
+    "get_daily_cache_dao",
+    "get_basic_info_dao",
+    "get_basic_info_db",
+    "save_basic_info_to_db",
+]
