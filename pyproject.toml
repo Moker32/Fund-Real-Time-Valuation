@@ -31,6 +31,7 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
     "python-dateutil>=2.8.2",
     "matplotlib>=3.7.0",
+    "holidays>=0.40",
     # FastAPI 后端依赖
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",

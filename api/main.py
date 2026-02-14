@@ -25,7 +25,7 @@ from .dependencies import (
     set_data_source_manager,
 )
 from .models import DataSourceHealthItem, HealthDetailResponse, HealthResponse
-from .routes import cache, commodities, funds, indices, overview, sectors
+from .routes import cache, commodities, funds, indices, overview, sectors, trading_calendar
 
 # 全局预热器实例
 _cache_warmer: CacheWarmer | None = None
@@ -141,6 +141,7 @@ app.add_middleware(
 
 # ==================== 全局异常处理器 ====================
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     """
@@ -160,7 +161,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "error": exc.detail if isinstance(exc.detail, str) else "HTTP Error",
             "detail": str(exc.detail) if not isinstance(exc.detail, str) else None,
             "timestamp": datetime.now().isoformat() + "Z",
-        }
+        },
     )
 
 
@@ -187,7 +188,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "error": "请求参数验证失败",
             "detail": "; ".join(errors),
             "timestamp": datetime.now().isoformat() + "Z",
-        }
+        },
     )
 
 
@@ -210,7 +211,7 @@ async def general_exception_handler(request: Request, exc: Exception):
             "error": "Internal Server Error",
             "detail": str(exc) if app.debug else "服务器内部错误，请稍后重试",
             "timestamp": datetime.now().isoformat() + "Z",
-        }
+        },
     )
 
 
@@ -223,6 +224,7 @@ app.include_router(indices.router)
 app.include_router(sectors.router)
 app.include_router(overview.router)
 app.include_router(cache.router)
+app.include_router(trading_calendar.router)
 
 
 @app.get(
@@ -271,11 +273,13 @@ async def health_check() -> HealthDetailResponse:
     # 构建数据源状态列表
     data_sources: list[DataSourceHealthItem] = []
     for source_name, result in health_result.get("sources", {}).items():
-        data_sources.append(DataSourceHealthItem(
-            source=source_name,
-            status=result.get("status", "unknown"),
-            response_time_ms=result.get("response_time_ms"),
-        ))
+        data_sources.append(
+            DataSourceHealthItem(
+                source=source_name,
+                status=result.get("status", "unknown"),
+                response_time_ms=result.get("response_time_ms"),
+            )
+        )
 
     return HealthDetailResponse(
         status="healthy" if health_result.get("healthy_count", 0) > 0 else "degraded",
