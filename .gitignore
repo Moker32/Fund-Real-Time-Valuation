@@ -43,3 +43,19 @@ web/dist/
 
 # Vite dev server
 web/.vite/
+
+# 测试覆盖率
+.coverage
+coverage.json
+htmlcov/
+coverage_html/
+
+# AI工具工作目录
+.sisyphus/
+.claude/
+
+# uv锁定文件
+uv.lock
+
+# Playwright缓存
+.playwright-mcp/
