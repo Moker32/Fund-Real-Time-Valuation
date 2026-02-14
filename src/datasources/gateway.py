@@ -11,6 +11,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from src.datasources.base import DataSourceType
+from src.datasources.hot_backup import (
+    CircuitBreaker,
+    CircuitBreakerManager,
+    CircuitConfig,
+    HotBackupManager,
+)
 from src.datasources.manager import DataSourceManager
 from src.datasources.unified_models import (
     BatchDataRequest,
@@ -99,18 +105,45 @@ class DataGateway:
     - 批量请求支持
     - 便捷方法
     - 统计监控
+    - 熔断保护
+    - 热备份
     """
 
-    def __init__(self, manager: DataSourceManager):
+    def __init__(
+        self,
+        manager: DataSourceManager,
+        circuit_config: CircuitConfig | None = None,
+        enable_circuit_breaker: bool = True,
+        enable_hot_backup: bool = False,
+        hot_backup_timeout: float = 10.0,
+    ):
         """
         初始化数据网关
 
         Args:
             manager: DataSourceManager 实例
+            circuit_config: 熔断器配置
+            enable_circuit_breaker: 是否启用熔断器
+            enable_hot_backup: 是否启用热备份
+            hot_backup_timeout: 热备份超时时间
         """
         self._manager = manager
         self._stats = GatewayStats()
         self._semaphore = asyncio.Semaphore(50)
+
+        self._circuit_breaker_manager = CircuitBreakerManager() if enable_circuit_breaker else None
+        self._circuit_config = circuit_config or CircuitConfig()
+        self._enable_hot_backup = enable_hot_backup
+        self._hot_backup_manager = (
+            HotBackupManager(timeout=hot_backup_timeout) if enable_hot_backup else None
+        )
+
+        self._circuit_breaker_stats: dict[str, int] = {}
+
+    def _get_breaker(self, source_type: DataSourceType) -> CircuitBreaker | None:
+        if not self._circuit_breaker_manager:
+            return None
+        return self._circuit_breaker_manager.get_breaker(source_type.value, self._circuit_config)
 
     async def request(self, req: DataRequest) -> DataResponse:
         """
@@ -124,6 +157,21 @@ class DataGateway:
         """
         start_time = time.perf_counter()
 
+        breaker = self._get_breaker(req.source_type)
+
+        if breaker and not breaker.can_execute():
+            latency_ms = (time.perf_counter() - start_time) * 1000
+            response = DataResponse(
+                request_id=req.request_id,
+                success=False,
+                error="Circuit breaker is open",
+                status=ResponseStatus.FAILED,
+                latency_ms=latency_ms,
+                metadata={"circuit_breaker_open": True},
+            )
+            self._stats.record_request(latency_ms=latency_ms, success=False)
+            return response
+
         try:
             result = await self._manager.fetch(
                 req.source_type,
@@ -133,6 +181,12 @@ class DataGateway:
 
             latency_ms = (time.perf_counter() - start_time) * 1000
             response = DataResponse.from_result(req, result, latency_ms)
+
+            if breaker:
+                if result.success:
+                    await breaker.record_success()
+                else:
+                    await breaker.record_failure()
 
             self._stats.record_request(
                 latency_ms=latency_ms,
@@ -151,6 +205,9 @@ class DataGateway:
                 status=ResponseStatus.FAILED,
                 latency_ms=latency_ms,
             )
+
+            if breaker:
+                await breaker.record_failure()
 
             self._stats.record_request(
                 latency_ms=latency_ms,
@@ -355,7 +412,10 @@ class DataGateway:
         Returns:
             Dict: 统计信息字典
         """
-        return self._stats.to_dict()
+        stats = self._stats.to_dict()
+        if self._circuit_breaker_manager:
+            stats["circuit_breakers"] = self._circuit_breaker_manager.get_all_stats()
+        return stats
 
     def reset_stats(self):
         """重置统计信息"""
@@ -371,4 +431,5 @@ __all__ = [
     "BatchDataResponse",
     "RequestPriority",
     "ResponseStatus",
+    "CircuitConfig",
 ]

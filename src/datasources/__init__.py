@@ -65,6 +65,14 @@ from .gateway import (
     RequestPriority,
     ResponseStatus,
 )
+from .hot_backup import (
+    CircuitBreaker,
+    CircuitBreakerManager,
+    CircuitConfig,
+    CircuitState,
+    HotBackupManager,
+    HotBackupResult,
+)
 from .manager import DataSourceConfig, DataSourceManager, create_default_manager
 from .news_source import NewsAggregatorDataSource, SinaNewsDataSource
 from .portfolio import (
@@ -94,6 +102,14 @@ __all__ = [
     # 数据网关
     "DataGateway",
     "GatewayStats",
+    "CircuitConfig",
+    # 熔断器
+    "CircuitBreaker",
+    "CircuitBreakerManager",
+    "CircuitState",
+    # 热备份
+    "HotBackupManager",
+    "HotBackupResult",
     # 基金数据源
     "FundDataSource",
     "SinaFundDataSource",
