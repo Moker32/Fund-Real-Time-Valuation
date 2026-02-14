@@ -133,7 +133,9 @@ class HotBackupResult:
 
     @property
     def success(self) -> bool:
-        return self.primary_response is not None or any(r.success for r in self.backup_responses)
+        if self.primary_response is not None and self.primary_response.success:
+            return True
+        return any(r.success for r in self.backup_responses)
 
 
 class HotBackupManager:
@@ -186,8 +188,18 @@ class HotBackupManager:
                         result.fastest_response_ms = latency
 
         if responses:
-            result.primary_response = responses[0][0]
-            result.backup_responses = [r[0] for r in responses[1:]]
+            successful_responses = [
+                (resp, lat)
+                for resp, lat in responses
+                if isinstance(resp, DataResponse) and resp.success
+            ]
+            if successful_responses:
+                result.primary_response = successful_responses[0][0]
+                result.backup_responses = [r[0] for r in successful_responses[1:]]
+                result.successful_calls = len(successful_responses)
+            else:
+                result.primary_response = responses[0][0]
+                result.backup_responses = [r[0] for r in responses[1:]]
 
         return result
 

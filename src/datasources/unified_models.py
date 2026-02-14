@@ -65,12 +65,18 @@ class DataResponse:
     success: bool
     data: Any = None
     error: str | None = None
-    source: str = ""  # 返回数据的数据源名称
+    source: str = ""
     status: ResponseStatus = ResponseStatus.SUCCESS
     fallback_used: bool = False
     latency_ms: float = 0.0
     timestamp: float = field(default_factory=time.time)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if self.success and self.status == ResponseStatus.SUCCESS:
+            self.status = ResponseStatus.SUCCESS
+        elif not self.success and self.status == ResponseStatus.SUCCESS:
+            self.status = ResponseStatus.FAILED
 
     def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
