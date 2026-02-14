@@ -3,7 +3,6 @@
 测试 YFinance 和 AKShare 商品数据源
 """
 
-
 import pytest
 
 from src.datasources.commodity_source import (
@@ -45,12 +44,17 @@ class TestYFinanceCommoditySource:
     @pytest.mark.asyncio
     async def test_commodity_names(self, source):
         """测试商品名称映射"""
-        assert source._get_name("gold") == "黄金 (COMEX)"
-        assert source._get_name("wti") == "WTI原油"
-        assert source._get_name("platinum") == "铂金"
-        assert source._get_name("palladium") == "钯金"
-        assert source._get_name("copper") == "铜"
-        assert source._get_name("aluminum") == "铝"
+        assert source.get_name("gold") == "黄金 (COMEX)"
+        assert source.get_name("wti") == "WTI原油"
+        assert source.get_name("platinum") == "铂金"
+        assert source.get_name("palladium") == "钯金"
+        assert source.get_name("copper") == "铜"
+        assert source.get_name("aluminum") == "铝"
+        # 测试新增商品
+        assert source.get_name("soybean") == "大豆"
+        assert source.get_name("corn") == "玉米"
+        assert source.get_name("btc") == "比特币"
+        assert source.get_name("eth") == "以太坊"
 
     @pytest.mark.asyncio
     async def test_get_status(self, source):
@@ -110,7 +114,12 @@ class TestAKShareCommoditySource:
             assert result.data.get("commodity") == "gold_cny"
         else:
             # 如果失败，可能是 akshare 未安装、网络问题或 SSL 错误
-            assert "akshare" in result.error.lower() or "失败" in result.error or "SSL" in result.error or "Connection" in result.error
+            assert (
+                "akshare" in result.error.lower()
+                or "失败" in result.error
+                or "SSL" in result.error
+                or "Connection" in result.error
+            )
 
     @pytest.mark.asyncio
     async def test_invalid_commodity_type(self, source):

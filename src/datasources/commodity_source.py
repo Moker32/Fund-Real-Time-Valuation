@@ -34,11 +34,7 @@ class CommodityDataSource(DataSource):
             name: 数据源名称
             timeout: 请求超时时间(秒)
         """
-        super().__init__(
-            name=name,
-            source_type=DataSourceType.COMMODITY,
-            timeout=timeout
-        )
+        super().__init__(name=name, source_type=DataSourceType.COMMODITY, timeout=timeout)
         self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0  # 内存缓存60秒
         self._db_dao: CommodityCacheDAO | None = None
@@ -67,28 +63,36 @@ class YFinanceCommoditySource(CommodityDataSource):
 
     # 商品 ticker 映射
     COMMODITY_TICKERS = {
-        # 国际期货
-        "gold": "GC=F",       # COMEX 黄金
-        "gold_cny": "SG=f",   # 上海黄金
-        "wti": "CL=F",        # WTI 原油
-        "brent": "BZ=F",      # 布伦特原油
-        "silver": "SI=F",     # 白银
-        "natural_gas": "NG=F",  # 天然气
-        # 贵金属 (预留)
-        "platinum": "PT=F",   # 铂金
+        # 贵金属
+        "gold": "GC=F",  # COMEX 黄金
+        "gold_cny": "SG=f",  # 上海黄金
+        "silver": "SI=F",  # 白银
+        "platinum": "PT=F",  # 铂金
         "palladium": "PA=F",  # 钯金
-        # 基本金属 (预留)
-        "copper": "HG=F",     # 铜
-        "aluminum": "AL=f",   # 铝
-        "zinc": "ZN=f",       # 锌
-        "nickel": "NI=f",     # 镍
+        # 能源
+        "wti": "CL=F",  # WTI 原油
+        "brent": "BZ=F",  # 布伦特原油
+        "natural_gas": "NG=F",  # 天然气
+        # 基本金属
+        "copper": "HG=F",  # 铜
+        "aluminum": "AL=f",  # 铝
+        "zinc": "ZN=f",  # 锌
+        "nickel": "NI=f",  # 镍
+        # 农产品
+        "soybean": "ZS=F",  # 大豆
+        "corn": "ZC=F",  # 玉米
+        "wheat": "ZW=F",  # 小麦
+        "coffee": "KC=F",  # 咖啡
+        "sugar": "SB=F",  # 白糖
+        # 加密货币
+        "btc": "BTC-USD",  # 比特币现货
+        "btc_futures": "BTC=F",  # 比特币期货
+        "eth": "ETH-USD",  # 以太坊现货
+        "eth_futures": "ETH=F",  # 以太坊期货
     }
 
     def __init__(self, timeout: float = 15.0):
-        super().__init__(
-            name="yfinance_commodity",
-            timeout=timeout
-        )
+        super().__init__(name="yfinance_commodity", timeout=timeout)
 
     async def fetch(self, commodity_type: str = "gold") -> DataSourceResult:
         """
@@ -114,9 +118,11 @@ class YFinanceCommoditySource(CommodityDataSource):
                         data=data,
                         timestamp=datetime.fromisoformat(
                             data.get("timestamp", "").replace("Z", "+00:00")
-                        ).timestamp() if data.get("timestamp") else time.time(),
+                        ).timestamp()
+                        if data.get("timestamp")
+                        else time.time(),
                         source=self.name,
-                        metadata={"commodity_type": commodity_type, "from_cache": "database"}
+                        metadata={"commodity_type": commodity_type, "from_cache": "database"},
                     )
             except Exception as e:
                 logger.warning(f"查询数据库缓存失败: {e}")
@@ -129,7 +135,7 @@ class YFinanceCommoditySource(CommodityDataSource):
                 data=self._cache[cache_key],
                 timestamp=self._cache[cache_key].get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"commodity_type": commodity_type, "from_cache": "memory"}
+                metadata={"commodity_type": commodity_type, "from_cache": "memory"},
             )
 
         try:
@@ -142,16 +148,16 @@ class YFinanceCommoditySource(CommodityDataSource):
                     error=f"不支持的商品类型: {commodity_type}",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"commodity_type": commodity_type}
+                    metadata={"commodity_type": commodity_type},
                 )
 
             # 获取数据
             ticker_obj = yf.Ticker(ticker)
             info = ticker_obj.info
 
-            price = info.get('currentPrice', info.get('regularMarketPrice'))
-            change = info.get('regularMarketChange', info.get('change', 0))
-            change_percent = info.get('regularMarketChangePercent', info.get('changePercent', 0))
+            price = info.get("currentPrice", info.get("regularMarketPrice"))
+            change = info.get("regularMarketChange", info.get("change", 0))
+            change_percent = info.get("regularMarketChangePercent", info.get("changePercent", 0))
 
             if price is None:
                 return DataSourceResult(
@@ -159,18 +165,18 @@ class YFinanceCommoditySource(CommodityDataSource):
                     error="无法获取价格数据",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"commodity_type": commodity_type}
+                    metadata={"commodity_type": commodity_type},
                 )
 
             # 转换时间戳为可读格式
-            market_time = info.get('regularMarketTime')
+            market_time = info.get("regularMarketTime")
             if market_time:
                 try:
-                    time_str = datetime.fromtimestamp(market_time).strftime('%Y-%m-%d %H:%M:%S')
+                    time_str = datetime.fromtimestamp(market_time).strftime("%Y-%m-%d %H:%M:%S")
                 except (ValueError, TypeError, OSError):
                     time_str = str(market_time)
             else:
-                time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             data = {
                 "commodity": commodity_type,
@@ -179,8 +185,8 @@ class YFinanceCommoditySource(CommodityDataSource):
                 "price": float(price),
                 "change": float(change) if change else 0.0,
                 "change_percent": float(change_percent) if change_percent else 0.0,
-                "currency": info.get('currency', 'USD'),
-                "exchange": info.get('exchange', ''),
+                "currency": info.get("currency", "USD"),
+                "exchange": info.get("exchange", ""),
                 "time": time_str,
             }
 
@@ -197,7 +203,7 @@ class YFinanceCommoditySource(CommodityDataSource):
                 data=data,
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"commodity_type": commodity_type}
+                metadata={"commodity_type": commodity_type},
             )
 
         except ImportError:
@@ -206,13 +212,14 @@ class YFinanceCommoditySource(CommodityDataSource):
                 error="yfinance 未安装，请运行: pip install yfinance",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"commodity_type": commodity_type, "error_type": "ImportError"}
+                metadata={"commodity_type": commodity_type, "error_type": "ImportError"},
             )
         except Exception as e:
             return self._handle_error(e, self.name)
 
     async def fetch_batch(self, commodity_types: list[str]) -> list[DataSourceResult]:
         """批量获取商品数据"""
+
         async def fetch_one(ctype: str) -> DataSourceResult:
             return await self.fetch(ctype)
 
@@ -228,7 +235,7 @@ class YFinanceCommoditySource(CommodityDataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"commodity_type": commodity_types[i]}
+                        metadata={"commodity_type": commodity_types[i]},
                     )
                 )
             else:
@@ -245,14 +252,21 @@ class YFinanceCommoditySource(CommodityDataSource):
             "brent": "布伦特原油",
             "silver": "白银",
             "natural_gas": "天然气",
-            # 贵金属 (预留)
             "platinum": "铂金",
             "palladium": "钯金",
-            # 基本金属 (预留)
             "copper": "铜",
             "aluminum": "铝",
             "zinc": "锌",
             "nickel": "镍",
+            "soybean": "大豆",
+            "corn": "玉米",
+            "wheat": "小麦",
+            "coffee": "咖啡",
+            "sugar": "白糖",
+            "btc": "比特币",
+            "btc_futures": "比特币期货",
+            "eth": "以太坊",
+            "eth_futures": "以太坊期货",
         }
         return names.get(commodity_type, commodity_type)
 
@@ -287,10 +301,7 @@ class AKShareCommoditySource(CommodityDataSource):
     """AKShare 商品数据源 - 用于国内黄金"""
 
     def __init__(self, timeout: float = 15.0):
-        super().__init__(
-            name="akshare_commodity",
-            timeout=timeout
-        )
+        super().__init__(name="akshare_commodity", timeout=timeout)
         self._cache_timeout = 10.0  # 缓存10秒，商品价格实时性要求高
 
     async def fetch(self, commodity_type: str = "gold_cny") -> DataSourceResult:
@@ -308,9 +319,11 @@ class AKShareCommoditySource(CommodityDataSource):
                         data=data,
                         timestamp=datetime.fromisoformat(
                             data.get("timestamp", "").replace("Z", "+00:00")
-                        ).timestamp() if data.get("timestamp") else time.time(),
+                        ).timestamp()
+                        if data.get("timestamp")
+                        else time.time(),
                         source=self.name,
-                        metadata={"commodity_type": commodity_type, "from_cache": "database"}
+                        metadata={"commodity_type": commodity_type, "from_cache": "database"},
                     )
             except Exception as e:
                 logger.warning(f"查询数据库缓存失败: {e}")
@@ -323,7 +336,7 @@ class AKShareCommoditySource(CommodityDataSource):
                 data=self._cache[cache_key],
                 timestamp=self._cache[cache_key].get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"commodity_type": commodity_type, "from_cache": "memory"}
+                metadata={"commodity_type": commodity_type, "from_cache": "memory"},
             )
 
         try:
@@ -337,7 +350,7 @@ class AKShareCommoditySource(CommodityDataSource):
                     error=f"不支持的商品类型: {commodity_type}",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"commodity_type": commodity_type}
+                    metadata={"commodity_type": commodity_type},
                 )
 
             if data:
@@ -351,7 +364,7 @@ class AKShareCommoditySource(CommodityDataSource):
                     data=data,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"commodity_type": commodity_type}
+                    metadata={"commodity_type": commodity_type},
                 )
 
             return DataSourceResult(
@@ -359,7 +372,7 @@ class AKShareCommoditySource(CommodityDataSource):
                 error="获取商品数据为空",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"commodity_type": commodity_type}
+                metadata={"commodity_type": commodity_type},
             )
 
         except ImportError:
@@ -368,7 +381,7 @@ class AKShareCommoditySource(CommodityDataSource):
                 error="AKShare 未安装",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"commodity_type": commodity_type}
+                metadata={"commodity_type": commodity_type},
             )
         except Exception as e:
             return self._handle_error(e, self.name)
@@ -418,7 +431,7 @@ class AKShareCommoditySource(CommodityDataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"commodity_type": commodity_types[i]}
+                        metadata={"commodity_type": commodity_types[i]},
                     )
                 )
             else:
@@ -444,10 +457,7 @@ class CommodityDataAggregator(CommodityDataSource):
     """商品数据聚合器 - 支持多数据源自动切换"""
 
     def __init__(self, timeout: float = 15.0):
-        super().__init__(
-            name="commodity_aggregator",
-            timeout=timeout
-        )
+        super().__init__(name="commodity_aggregator", timeout=timeout)
         self._sources: list[DataSource] = []
         self._primary_source: DataSource | None = None
 
@@ -488,7 +498,7 @@ class CommodityDataAggregator(CommodityDataSource):
             error=f"所有数据源均失败: {'; '.join(errors)}",
             timestamp=time.time(),
             source=self.name,
-            metadata={"commodity_type": commodity_type, "errors": errors}
+            metadata={"commodity_type": commodity_type, "errors": errors},
         )
 
     async def fetch_batch(self, commodity_types: list[str]) -> list[DataSourceResult]:
@@ -505,7 +515,7 @@ class CommodityDataAggregator(CommodityDataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"commodity_type": commodity_types[i]}
+                        metadata={"commodity_type": commodity_types[i]},
                     )
                 )
             else:
@@ -524,7 +534,7 @@ class CommodityDataAggregator(CommodityDataSource):
     async def close(self):
         """关闭所有数据源"""
         for source in self._sources:
-            if hasattr(source, 'close'):
+            if hasattr(source, "close"):
                 try:
                     await source.close()
                 except Exception:
@@ -542,11 +552,22 @@ def get_all_commodity_types() -> list[str]:
         "wti",
         "brent",
         "natural_gas",
-        # 基本金属（预留）
-        # "copper",
-        # "aluminum",
-        # "zinc",
-        # "nickel",
+        # 基本金属
+        "copper",
+        "aluminum",
+        "zinc",
+        "nickel",
+        # 农产品
+        "soybean",
+        "corn",
+        "wheat",
+        "coffee",
+        "sugar",
+        # 加密货币
+        "btc",
+        "btc_futures",
+        "eth",
+        "eth_futures",
     ]
 
 
@@ -555,15 +576,22 @@ def get_commodities_by_category() -> dict[CommodityCategory, list[str]]:
     return {
         CommodityCategory.PRECIOUS_METAL: ["gold", "gold_cny", "silver"],
         CommodityCategory.ENERGY: ["wti", "brent", "natural_gas"],
-        CommodityCategory.BASE_METAL: [],
+        CommodityCategory.BASE_METAL: ["copper", "aluminum", "zinc", "nickel"],
+        CommodityCategory.AGRICULTURE: ["soybean", "corn", "wheat", "coffee", "sugar"],
+        CommodityCategory.CRYPTO: ["btc", "btc_futures", "eth", "eth_futures"],
     }
 
 
 # 搜索商品配置映射（用于自定义关注商品搜索）
 SEARCHABLE_COMMODITIES: dict[str, dict[str, str]] = {
     # 贵金属
-    "GC=F": {"name": "黄金 (COMEX)", "category": "precious_metal", "exchange": "COMEX", "currency": "USD"},
-    "SI=F": {"name": "白银", "category": "precious_metal", "exchange": "COMEX", "currency": "USD"},
+    "GC=F": {
+        "name": "黄金 (COMEX)",
+        "category": "precious_metal",
+        "exchange": "CME",
+        "currency": "USD",
+    },
+    "SI=F": {"name": "白银", "category": "precious_metal", "exchange": "CME", "currency": "USD"},
     "PT=F": {"name": "铂金", "category": "precious_metal", "exchange": "NYMEX", "currency": "USD"},
     "PA=F": {"name": "钯金", "category": "precious_metal", "exchange": "NYMEX", "currency": "USD"},
     # 能源
@@ -573,8 +601,8 @@ SEARCHABLE_COMMODITIES: dict[str, dict[str, str]] = {
     "HO=F": {"name": "燃油", "category": "energy", "exchange": "NYMEX", "currency": "USD"},
     "RB=F": {"name": "汽油", "category": "energy", "exchange": "NYMEX", "currency": "USD"},
     # 基本金属
-    "HG=F": {"name": "铜", "category": "base_metal", "exchange": "COMEX", "currency": "USD"},
-    "AL=F": {"name": "铝", "category": "base_metal", "exchange": "LME", "currency": "USD"},
+    "HG=F": {"name": "铜", "category": "base_metal", "exchange": "CME", "currency": "USD"},
+    "ALU": {"name": "铝", "category": "base_metal", "exchange": "LME", "currency": "USD"},
     "ZN=F": {"name": "锌", "category": "base_metal", "exchange": "LME", "currency": "USD"},
     "NI=F": {"name": "镍", "category": "base_metal", "exchange": "LME", "currency": "USD"},
     "PB=F": {"name": "铅", "category": "base_metal", "exchange": "LME", "currency": "USD"},
@@ -590,14 +618,19 @@ SEARCHABLE_COMMODITIES: dict[str, dict[str, str]] = {
     "LE=F": {"name": "活牛", "category": "agriculture", "exchange": "CME", "currency": "USD"},
     "HE=F": {"name": "瘦肉猪", "category": "agriculture", "exchange": "CME", "currency": "USD"},
     "ZR=F": {"name": "糙米", "category": "agriculture", "exchange": "CBOT", "currency": "USD"},
+    "OJ=F": {"name": "橙汁", "category": "agriculture", "exchange": "ICE", "currency": "USD"},
+    # 加密货币现货
+    "BTC-USD": {"name": "比特币", "category": "crypto", "exchange": "Spot", "currency": "USD"},
+    "ETH-USD": {"name": "以太坊", "category": "crypto", "exchange": "Spot", "currency": "USD"},
     # 加密货币期货
-    "BTC=F": {"name": "比特币", "category": "crypto", "exchange": "CME", "currency": "USD"},
-    "ETH=F": {"name": "以太坊", "category": "crypto", "exchange": "CME", "currency": "USD"},
+    "BTC=F": {"name": "比特币期货", "category": "crypto", "exchange": "CME", "currency": "USD"},
+    "ETH=F": {"name": "以太坊期货", "category": "crypto", "exchange": "CME", "currency": "USD"},
 }
 
 
 class CommoditySearchResult(TypedDict):
     """商品搜索结果"""
+
     symbol: str
     name: str
     exchange: str
@@ -607,6 +640,7 @@ class CommoditySearchResult(TypedDict):
 
 class CommoditySearchResponse(TypedDict):
     """商品搜索响应"""
+
     query: str
     results: list[CommoditySearchResult]
     timestamp: str
@@ -649,24 +683,28 @@ def search_commodities(query: str) -> list[CommoditySearchResult]:
     for symbol, info in SEARCHABLE_COMMODITIES.items():
         # 检查代码是否匹配
         if query_lower in symbol.lower():
-            results.append({
-                "symbol": symbol,
-                "name": info["name"],
-                "exchange": info["exchange"],
-                "currency": info["currency"],
-                "category": info["category"],
-            })
+            results.append(
+                {
+                    "symbol": symbol,
+                    "name": info["name"],
+                    "exchange": info["exchange"],
+                    "currency": info["currency"],
+                    "category": info["category"],
+                }
+            )
             continue
 
         # 检查名称是否匹配
         if query_lower in info["name"].lower():
-            results.append({
-                "symbol": symbol,
-                "name": info["name"],
-                "exchange": info["exchange"],
-                "currency": info["currency"],
-                "category": info["category"],
-            })
+            results.append(
+                {
+                    "symbol": symbol,
+                    "name": info["name"],
+                    "exchange": info["exchange"],
+                    "currency": info["currency"],
+                    "category": info["category"],
+                }
+            )
 
     return results
 
@@ -680,12 +718,13 @@ def get_all_available_commodities() -> list[CommoditySearchResult]:
     """
     results: list[CommoditySearchResult] = []
     for symbol, info in SEARCHABLE_COMMODITIES.items():
-        results.append({
-            "symbol": symbol,
-            "name": info["name"],
-            "exchange": info["exchange"],
-            "currency": info["currency"],
-            "category": info["category"],
-        })
+        results.append(
+            {
+                "symbol": symbol,
+                "name": info["name"],
+                "exchange": info["exchange"],
+                "currency": info["currency"],
+                "category": info["category"],
+            }
+        )
     return results
-

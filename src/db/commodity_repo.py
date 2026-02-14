@@ -23,6 +23,8 @@ class CommodityCategory(Enum):
     PRECIOUS_METAL = "precious_metal"  # 贵金属
     ENERGY = "energy"  # 能源化工
     BASE_METAL = "base_metal"  # 基本金属
+    AGRICULTURE = "agriculture"  # 农产品
+    CRYPTO = "crypto"  # 加密货币
 
 
 # 商品到分类的映射
@@ -42,6 +44,17 @@ COMMODITY_CATEGORY_MAP: dict[str, CommodityCategory] = {
     "aluminum": CommodityCategory.BASE_METAL,
     "zinc": CommodityCategory.BASE_METAL,
     "nickel": CommodityCategory.BASE_METAL,
+    # 农产品
+    "soybean": CommodityCategory.AGRICULTURE,
+    "corn": CommodityCategory.AGRICULTURE,
+    "wheat": CommodityCategory.AGRICULTURE,
+    "coffee": CommodityCategory.AGRICULTURE,
+    "sugar": CommodityCategory.AGRICULTURE,
+    # 加密货币
+    "btc": CommodityCategory.CRYPTO,
+    "btc_futures": CommodityCategory.CRYPTO,
+    "eth": CommodityCategory.CRYPTO,
+    "eth_futures": CommodityCategory.CRYPTO,
 }
 
 # 分类名称映射
@@ -49,6 +62,8 @@ CATEGORY_NAMES: dict[CommodityCategory, str] = {
     CommodityCategory.PRECIOUS_METAL: "贵金属",
     CommodityCategory.ENERGY: "能源化工",
     CommodityCategory.BASE_METAL: "基本金属",
+    CommodityCategory.AGRICULTURE: "农产品",
+    CommodityCategory.CRYPTO: "加密货币",
 }
 
 # 商品显示名称
@@ -65,6 +80,15 @@ COMMODITY_NAMES: dict[str, str] = {
     "aluminum": "铝",
     "zinc": "锌",
     "nickel": "镍",
+    "soybean": "大豆",
+    "corn": "玉米",
+    "wheat": "小麦",
+    "coffee": "咖啡",
+    "sugar": "白糖",
+    "btc": "比特币",
+    "btc_futures": "比特币期货",
+    "eth": "以太坊",
+    "eth_futures": "以太坊期货",
 }
 
 
@@ -238,9 +262,7 @@ class CommodityCacheDAO:
             except sqlite3.IntegrityError:
                 return False
 
-    def save_from_api(
-        self, commodity_type: str, data: dict[str, Any], source: str
-    ) -> bool:
+    def save_from_api(self, commodity_type: str, data: dict[str, Any], source: str) -> bool:
         """
         从 API 响应保存商品数据
 
@@ -300,9 +322,7 @@ class CommodityCacheDAO:
             )
             return [CommodityCacheRecord(**row) for row in cursor.fetchall()]
 
-    def get_by_category(
-        self, category: CommodityCategory
-    ) -> list[CommodityCacheRecord]:
+    def get_by_category(self, category: CommodityCategory) -> list[CommodityCacheRecord]:
         """
         获取指定分类的商品最新行情
 
@@ -312,9 +332,7 @@ class CommodityCacheDAO:
         Returns:
             list[CommodityCacheRecord]: 该分类商品的最新行情列表
         """
-        commodity_types = [
-            ct for ct, cat in COMMODITY_CATEGORY_MAP.items() if cat == category
-        ]
+        commodity_types = [ct for ct, cat in COMMODITY_CATEGORY_MAP.items() if cat == category]
         if not commodity_types:
             return []
 
@@ -335,9 +353,7 @@ class CommodityCacheDAO:
             )
             return [CommodityCacheRecord(**row) for row in cursor.fetchall()]
 
-    def get_history(
-        self, commodity_type: str, limit: int = 30
-    ) -> list[CommodityCacheRecord]:
+    def get_history(self, commodity_type: str, limit: int = 30) -> list[CommodityCacheRecord]:
         """
         获取商品历史行情
 
@@ -376,9 +392,7 @@ class CommodityCacheDAO:
             return True
 
         try:
-            created_time = datetime.fromisoformat(
-                record.created_at.replace("Z", "+00:00")
-            )
+            created_time = datetime.fromisoformat(record.created_at.replace("Z", "+00:00"))
             now = datetime.now()
             elapsed_hours = (now - created_time).total_seconds() / 3600
             return elapsed_hours > self.cache_ttl_hours
@@ -510,9 +524,7 @@ class CommodityCategoryDAO:
         """
         return [{"id": cat.value, "name": CATEGORY_NAMES[cat]} for cat in CommodityCategory]
 
-    def get_commodity_types_by_category(
-        self, category: CommodityCategory
-    ) -> list[str]:
+    def get_commodity_types_by_category(self, category: CommodityCategory) -> list[str]:
         """
         获取指定分类的所有商品类型
 
@@ -523,9 +535,7 @@ class CommodityCategoryDAO:
             list[str]: 商品类型列表
         ]
         """
-        return [
-            ct for ct, cat in COMMODITY_CATEGORY_MAP.items() if cat == category
-        ]
+        return [ct for ct, cat in COMMODITY_CATEGORY_MAP.items() if cat == category]
 
     def get_category_by_commodity(self, commodity_type: str) -> CommodityCategory | None:
         """
