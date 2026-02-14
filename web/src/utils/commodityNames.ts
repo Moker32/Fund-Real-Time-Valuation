@@ -25,13 +25,14 @@ export const commodityNameMap: Record<string, string> = {
   'HG=F': '铜期货',
   'ALU': '铝现货',
   'ZN=F': '锌期货',
+  'ZN=f': '锌',
 
   // 农产品
   'ZS=F': '大豆',
   'ZC=F': '玉米',
   'ZW=F': '小麦',
   'KC=F': '咖啡',
-  'SB=F': '糖',
+  'SB=F': '白糖',
   'LE=F': '活牛',
   'HE=F': '瘦肉猪',
   'ZR=F': '大米',
@@ -39,7 +40,9 @@ export const commodityNameMap: Record<string, string> = {
 
   // 加密货币
   'BTC-USD': '比特币',
+  'BTCUSDT': '比特币',
   'ETH-USD': '以太坊',
+  'ETHUSDT': '以太坊',
   'BTC=F': '比特币期货',
   'ETH=F': '以太坊期货',
   'Bitcoin USD': '比特币',
@@ -91,6 +94,7 @@ export const commodityCategoryMap: Record<string, string> = {
   'SI=F': 'precious_metal',
   'PT=F': 'precious_metal',
   'PA=F': 'precious_metal',
+  'PAXG-USD': 'precious_metal',
   // 能源
   'CL=F': 'energy',
   'BZ=F': 'energy',
@@ -108,7 +112,9 @@ export const commodityCategoryMap: Record<string, string> = {
   'SB=F': 'agriculture',
   // 加密货币
   'BTC-USD': 'crypto',
+  'BTCUSDT': 'crypto',
   'ETH-USD': 'crypto',
+  'ETHUSDT': 'crypto',
   'BTC=F': 'crypto',
   'ETH=F': 'crypto',
 };
@@ -123,19 +129,29 @@ export const commodityExchangeMap: Record<string, string> = {
   // 上海黄金交易所
   'SG=f': 'sge',
   'Au99.99': 'sge',
-  // COMEX 纽约商品交易所
+  // COMEX 纽约商品交易所 (贵金属 + 能源 + 基本金属)
   'GC=F': 'comex',
   'SI=F': 'comex',
   'CL=F': 'comex',
   'BZ=F': 'comex',
   'HG=F': 'comex',
+  'ZN=f': 'comex',
   // CME 芝加哥商品交易所
   'NG=F': 'cme',
+  // CBOT 芝加哥期货交易所 (农产品) - 映射到 USA 市场
+  'ZS=F': 'usa',
+  'ZC=F': 'usa',
+  'ZW=F': 'usa',
+  // ICE 洲际交易所 (农产品) - 映射到 USA 市场
+  'KC=F': 'usa',
+  'SB=F': 'usa',
   // LBMA 伦敦金银市场协会
   'PAXG-USD': 'lbma',
   // 加密货币 (24/7)
   'BTC-USD': 'crypto',
+  'BTCUSDT': 'crypto',
   'ETH-USD': 'crypto',
+  'ETHUSDT': 'crypto',
   'BTC=F': 'crypto',
   'ETH=F': 'crypto',
 };
