@@ -15,6 +15,7 @@ from .health import DataSourceHealthChecker, HealthCheckInterceptor, HealthCheck
 @dataclass
 class DataSourceConfig:
     """数据源配置"""
+
     source_class: type[DataSource]
     name: str
     source_type: DataSourceType
@@ -39,7 +40,7 @@ class DataSourceManager:
         self,
         max_concurrent: int = 10,
         enable_load_balancing: bool = False,
-        health_check_interval: int = 60
+        health_check_interval: int = 60,
     ):
         """
         初始化数据源管理器
@@ -58,7 +59,7 @@ class DataSourceManager:
             DataSourceType.SECTOR: [],
             DataSourceType.STOCK: [],
             DataSourceType.BOND: [],
-            DataSourceType.CRYPTO: []
+            DataSourceType.CRYPTO: [],
         }
         self._max_concurrent = max_concurrent  # 延迟创建 semaphore
         self._semaphore: asyncio.Semaphore | None = None  # 延迟初始化
@@ -70,7 +71,7 @@ class DataSourceManager:
             DataSourceType.SECTOR: 0,
             DataSourceType.STOCK: 0,
             DataSourceType.BOND: 0,
-            DataSourceType.CRYPTO: 0
+            DataSourceType.CRYPTO: 0,
         }
         self._request_history: list[dict[str, Any]] = []
         self._max_history = 1000
@@ -109,7 +110,7 @@ class DataSourceManager:
                 name=source.name,
                 source_type=source.source_type,
                 enabled=True,
-                priority=len(self._type_sources[source.source_type])
+                priority=len(self._type_sources[source.source_type]),
             )
 
     def unregister(self, source_name: str):
@@ -156,7 +157,7 @@ class DataSourceManager:
         *args,
         failover: bool = True,
         health_aware: bool = True,
-        **kwargs
+        **kwargs,
     ) -> DataSourceResult:
         """
         获取数据（自动选择数据源）
@@ -185,11 +186,12 @@ class DataSourceManager:
                     sources = [healthy_source] + [s for s in sources if s != healthy_source]
 
             for source in sources:
-                if not self._source_configs.get(source.name, DataSourceConfig(
-                    source_class=type(source),
-                    name=source.name,
-                    source_type=source.source_type
-                )).enabled:
+                if not self._source_configs.get(
+                    source.name,
+                    DataSourceConfig(
+                        source_class=type(source), name=source.name, source_type=source.source_type
+                    ),
+                ).enabled:
                     continue
 
                 # 如果启用健康感知，跳过不健康的数据源
@@ -222,7 +224,7 @@ class DataSourceManager:
                     error=f"所有数据源均失败: {'; '.join(errors)}",
                     timestamp=time.time(),
                     source="manager",
-                    metadata={"source_type": source_type.value, "errors": errors}
+                    metadata={"source_type": source_type.value, "errors": errors},
                 )
 
             return DataSourceResult(
@@ -230,15 +232,10 @@ class DataSourceManager:
                 error="没有可用的数据源",
                 timestamp=time.time(),
                 source="manager",
-                metadata={"source_type": source_type.value}
+                metadata={"source_type": source_type.value},
             )
 
-    async def fetch_with_source(
-        self,
-        source_name: str,
-        *args,
-        **kwargs
-    ) -> DataSourceResult:
+    async def fetch_with_source(self, source_name: str, *args, **kwargs) -> DataSourceResult:
         """
         使用指定数据源获取数据
 
@@ -256,7 +253,7 @@ class DataSourceManager:
                 success=False,
                 error=f"数据源不存在: {source_name}",
                 timestamp=time.time(),
-                source="manager"
+                source="manager",
             )
 
         async with await self._get_semaphore():
@@ -275,7 +272,7 @@ class DataSourceManager:
         *args,
         parallel: bool = True,
         failover: bool = True,
-        **kwargs
+        **kwargs,
     ) -> list[DataSourceResult]:
         """
         批量获取数据
@@ -295,10 +292,7 @@ class DataSourceManager:
         if not sources:
             return [
                 DataSourceResult(
-                    success=False,
-                    error="没有可用的数据源",
-                    timestamp=time.time(),
-                    source="manager"
+                    success=False, error="没有可用的数据源", timestamp=time.time(), source="manager"
                 )
             ] * len(params_list)
 
@@ -333,7 +327,7 @@ class DataSourceManager:
                     error=f"所有数据源均失败: {'; '.join(errors)}",
                     timestamp=time.time(),
                     source="manager",
-                    metadata={"errors": errors}
+                    metadata={"errors": errors},
                 )
 
         # 使用 gather 并行执行所有请求
@@ -346,10 +340,7 @@ class DataSourceManager:
             if isinstance(result, Exception):
                 processed_results.append(
                     DataSourceResult(
-                        success=False,
-                        error=str(result),
-                        timestamp=time.time(),
-                        source="manager"
+                        success=False, error=str(result), timestamp=time.time(), source="manager"
                     )
                 )
             else:
@@ -373,10 +364,8 @@ class DataSourceManager:
                 if config:
                     return config.priority
                 return 0
-            return [
-                self._sources[sid]
-                for sid in sorted(source_ids, key=get_priority)
-            ]
+
+            return [self._sources[sid] for sid in sorted(source_ids, key=get_priority)]
 
         # 负载均衡模式
         idx = self._round_robin_index[source_type] % len(source_ids)
@@ -409,7 +398,7 @@ class DataSourceManager:
                 "error_count": result.error_count,
                 "last_check": result.last_check.isoformat(),
                 "message": result.message,
-                "details": result.details
+                "details": result.details,
             }
 
         # 检查所有数据源
@@ -425,10 +414,7 @@ class DataSourceManager:
             "healthy_count": healthy_count,
             "degraded_count": degraded_count,
             "unhealthy_count": unhealthy_count,
-            "sources": {
-                name: result.to_dict()
-                for name, result in results.items()
-            }
+            "sources": {name: result.to_dict() for name, result in results.items()},
         }
 
     async def health_check_all_sources(self) -> dict[str, HealthCheckResult]:
@@ -534,7 +520,7 @@ class DataSourceManager:
         source_name: str,
         source_type: DataSourceType,
         result: DataSourceResult | None,
-        error: str | None = None
+        error: str | None = None,
     ):
         """
         记录请求历史
@@ -545,17 +531,19 @@ class DataSourceManager:
             result: 结果
             error: 错误信息
         """
-        self._request_history.append({
-            "timestamp": time.time(),
-            "source": source_name,
-            "type": source_type.value,
-            "success": result.success if result else False,
-            "error": error or (result.error if result else None)
-        })
+        self._request_history.append(
+            {
+                "timestamp": time.time(),
+                "source": source_name,
+                "type": source_type.value,
+                "success": result.success if result else False,
+                "error": error or (result.error if result else None),
+            }
+        )
 
         # 限制历史记录数量
         if len(self._request_history) > self._max_history:
-            self._request_history = self._request_history[-self._max_history:]
+            self._request_history = self._request_history[-self._max_history :]
 
     def get_statistics(self) -> dict[str, Any]:
         """
@@ -577,32 +565,39 @@ class DataSourceManager:
                     "total": len(source_requests),
                     "success": sum(1 for r in source_requests if r["success"]),
                     "failed": sum(1 for r in source_requests if not r["success"]),
-                    "success_rate": sum(1 for r in source_requests if r["success"]) / len(source_requests)
+                    "success_rate": sum(1 for r in source_requests if r["success"])
+                    / len(source_requests),
                 }
 
         return {
             "total_requests": total_requests,
             "successful_requests": successful_requests,
             "failed_requests": failed_requests,
-            "overall_success_rate": successful_requests / total_requests if total_requests > 0 else 0,
+            "overall_success_rate": successful_requests / total_requests
+            if total_requests > 0
+            else 0,
             "source_statistics": source_stats,
             "registered_sources": {
                 name: {
                     "type": s.source_type.value,
-                    "enabled": self._source_configs.get(name, DataSourceConfig(
-                        source_class=type(s),
-                        name=name,
-                        source_type=s.source_type
-                    )).enabled,
-                    "priority": self._source_configs.get(name, DataSourceConfig(
-                        source_class=type(s),
-                        name=name,
-                        source_type=s.source_type
-                    )).priority
+                    "enabled": self._source_configs.get(
+                        name,
+                        DataSourceConfig(
+                            source_class=type(s), name=name, source_type=s.source_type
+                        ),
+                    ).enabled,
+                    "priority": self._source_configs.get(
+                        name,
+                        DataSourceConfig(
+                            source_class=type(s), name=name, source_type=s.source_type
+                        ),
+                    ).priority,
                 }
                 for name, s in self._sources.items()
             },
-            "max_concurrent": self._semaphore._value if hasattr(self._semaphore, '_value') else None
+            "max_concurrent": self._semaphore._value
+            if hasattr(self._semaphore, "_value")
+            else None,
         }
 
     def list_sources(self) -> list[dict[str, Any]]:
@@ -613,18 +608,14 @@ class DataSourceManager:
             List[Dict]: 数据源信息列表
         """
         return [
-            {
-                "name": name,
-                "type": source.source_type.value,
-                "status": source.get_status()
-            }
+            {"name": name, "type": source.source_type.value, "status": source.get_status()}
             for name, source in self._sources.items()
         ]
 
     async def close_all(self):
         """关闭所有数据源的连接"""
         for source in self._sources.values():
-            if hasattr(source, 'close'):
+            if hasattr(source, "close"):
                 try:
                     await source.close()
                 except Exception:
@@ -633,8 +624,7 @@ class DataSourceManager:
 
 # 工厂函数
 def create_default_manager(
-    enable_load_balancing: bool = False,
-    health_check_interval: int = 60
+    enable_load_balancing: bool = False, health_check_interval: int = 60
 ) -> DataSourceManager:
     """
     创建默认配置的数据源管理器
@@ -655,15 +645,15 @@ def create_default_manager(
     )
     from .news_source import SinaNewsDataSource
     from .sector_source import (
-        EastMoneySectorSource,
-        EastMoneyIndustryDetailSource,
         EastMoneyConceptDetailSource,
+        EastMoneyDirectSource,
+        EastMoneyIndustryDetailSource,
+        EastMoneySectorSource,
         SinaSectorDataSource,
     )
 
     manager = DataSourceManager(
-        enable_load_balancing=enable_load_balancing,
-        health_check_interval=health_check_interval
+        enable_load_balancing=enable_load_balancing, health_check_interval=health_check_interval
     )
 
     # 注册基金数据源（按优先级排序）
@@ -671,43 +661,55 @@ def create_default_manager(
 
     # fund123.cn 接口（主数据源 - 最快 ~0.1秒/请求）
     fund123 = Fund123DataSource()
-    manager.register(fund123, DataSourceConfig(
-        source_class=type(fund123),
-        name=fund123.name,
-        source_type=DataSourceType.FUND,
-        enabled=True,
-        priority=1  # 最高优先级
-    ))
+    manager.register(
+        fund123,
+        DataSourceConfig(
+            source_class=type(fund123),
+            name=fund123.name,
+            source_type=DataSourceType.FUND,
+            enabled=True,
+            priority=1,  # 最高优先级
+        ),
+    )
 
     # 天天基金接口（备用数据源）
     fund_tiantian = FundDataSource()
-    manager.register(fund_tiantian, DataSourceConfig(
-        source_class=type(fund_tiantian),
-        name=fund_tiantian.name,
-        source_type=DataSourceType.FUND,
-        enabled=False,  # 默认禁用，fund123 足够快
-        priority=2
-    ))
+    manager.register(
+        fund_tiantian,
+        DataSourceConfig(
+            source_class=type(fund_tiantian),
+            name=fund_tiantian.name,
+            source_type=DataSourceType.FUND,
+            enabled=False,  # 默认禁用，fund123 足够快
+            priority=2,
+        ),
+    )
 
     # 暂时禁用备用数据源，因为它们响应慢且容易超时
     # 如需启用，请将 enabled 改为 True
     fund_sina = SinaFundDataSource()
-    manager.register(fund_sina, DataSourceConfig(
-        source_class=type(fund_sina),
-        name=fund_sina.name,
-        source_type=DataSourceType.FUND,
-        enabled=False,  # 禁用：响应慢(~2s)且经常失败
-        priority=2
-    ))
+    manager.register(
+        fund_sina,
+        DataSourceConfig(
+            source_class=type(fund_sina),
+            name=fund_sina.name,
+            source_type=DataSourceType.FUND,
+            enabled=False,  # 禁用：响应慢(~2s)且经常失败
+            priority=2,
+        ),
+    )
 
     fund_eastmoney = EastMoneyFundDataSource()
-    manager.register(fund_eastmoney, DataSourceConfig(
-        source_class=type(fund_eastmoney),
-        name=fund_eastmoney.name,
-        source_type=DataSourceType.FUND,
-        enabled=False,  # 禁用：响应慢(~2s)且经常失败
-        priority=3
-    ))
+    manager.register(
+        fund_eastmoney,
+        DataSourceConfig(
+            source_class=type(fund_eastmoney),
+            name=fund_eastmoney.name,
+            source_type=DataSourceType.FUND,
+            enabled=False,  # 禁用：响应慢(~2s)且经常失败
+            priority=3,
+        ),
+    )
 
     # 注册商品数据源
     commodity_source = AKShareCommoditySource()
@@ -722,57 +724,95 @@ def create_default_manager(
     manager.register(news_source)
 
     # 注册行业板块数据源
-    sector_source = SinaSectorDataSource()
-    manager.register(sector_source)
+    # 优先使用 EastMoney 直连 API（包含资金流向）
+    eastmoney_direct_source = EastMoneyDirectSource()
+    manager.register(
+        eastmoney_direct_source,
+        DataSourceConfig(
+            source_class=type(eastmoney_direct_source),
+            name=eastmoney_direct_source.name,
+            source_type=DataSourceType.SECTOR,
+            enabled=True,
+            priority=1,  # 最高优先级（包含资金流向）
+        ),
+    )
 
-    # 注册东方财富板块数据源 (预留接口)
+    # Sina 板块数据源（作为备用）
+    sector_source = SinaSectorDataSource()
+    manager.register(
+        sector_source,
+        DataSourceConfig(
+            source_class=type(sector_source),
+            name=sector_source.name,
+            source_type=DataSourceType.SECTOR,
+            enabled=True,
+            priority=5,
+        ),
+    )
+
+    # 东方财富 AKShare 板块数据源（作为备用）
     eastmoney_sector_source = EastMoneySectorSource()
-    manager.register(eastmoney_sector_source)
+    manager.register(
+        eastmoney_sector_source,
+        DataSourceConfig(
+            source_class=type(eastmoney_sector_source),
+            name=eastmoney_sector_source.name,
+            source_type=DataSourceType.SECTOR,
+            enabled=True,
+            priority=5,
+        ),
+    )
 
     # 注册东方财富板块详情数据源
     industry_detail_source = EastMoneyIndustryDetailSource()
-    manager.register(industry_detail_source, DataSourceConfig(
-        source_class=type(industry_detail_source),
-        name=industry_detail_source.name,
-        source_type=DataSourceType.SECTOR,
-        enabled=True,
-        priority=10
-    ))
+    manager.register(
+        industry_detail_source,
+        DataSourceConfig(
+            source_class=type(industry_detail_source),
+            name=industry_detail_source.name,
+            source_type=DataSourceType.SECTOR,
+            enabled=True,
+            priority=10,
+        ),
+    )
 
     concept_detail_source = EastMoneyConceptDetailSource()
-    manager.register(concept_detail_source, DataSourceConfig(
-        source_class=type(concept_detail_source),
-        name=concept_detail_source.name,
-        source_type=DataSourceType.SECTOR,
-        enabled=True,
-        priority=10
-    ))
+    manager.register(
+        concept_detail_source,
+        DataSourceConfig(
+            source_class=type(concept_detail_source),
+            name=concept_detail_source.name,
+            source_type=DataSourceType.SECTOR,
+            enabled=True,
+            priority=10,
+        ),
+    )
 
     # === 新增股票数据源 ===
     from .stock_source import SinaStockDataSource, YahooStockSource
+
     manager.register(SinaStockDataSource())
     manager.register(YahooStockSource())
 
     # === 新增债券数据源 ===
     from .bond_source import AKShareBondSource, SinaBondDataSource
+
     manager.register(SinaBondDataSource())
     manager.register(AKShareBondSource())
 
     # === 新增加密货币数据源 ===
     from .crypto_source import BinanceCryptoSource, CoinGeckoCryptoSource
+
     manager.register(BinanceCryptoSource())
     manager.register(CoinGeckoCryptoSource())
 
     # === 新增全球指数数据源 ===
     from .index_source import HybridIndexSource
+
     manager.register(HybridIndexSource())
 
     return manager
 
 
 # 导出
-__all__ = [
-    "DataSourceManager",
-    "DataSourceConfig",
-    "create_default_manager"
-]
+__all__ = ["DataSourceManager", "DataSourceConfig", "create_default_manager"]

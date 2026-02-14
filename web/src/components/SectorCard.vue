@@ -30,13 +30,26 @@
 
       <div class="card-footer">
         <div class="stock-counts">
-          <span class="up-count">
+          <span class="up-count" v-if="sector.mainInflow !== undefined">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 19V5M5 12L12 5L19 12" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {{ formatInflow(sector.mainInflow) }}
+          </span>
+          <span class="down-count" v-if="sector.smallInflow !== undefined">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 5V19M19 12L12 19L5 12" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {{ formatInflow(sector.smallInflow) }}
+          </span>
+          <!-- Fallback to upCount/downCount if mainInflow not available -->
+          <span class="up-count" v-else-if="sector.upCount">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 19V5M5 12L12 5L19 12" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             {{ sector.upCount }}
           </span>
-          <span class="down-count">
+          <span class="down-count" v-else-if="sector.downCount">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 5V19M19 12L12 19L5 12" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -50,6 +63,9 @@
             {{ formatPercent(sector.leadChange) }}
           </span>
         </div>
+        <div class="data-time" v-if="sector.timestamp">
+          {{ formatDataDate(sector.timestamp) }}
+        </div>
       </div>
     </template>
   </div>
@@ -58,6 +74,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { Sector } from '@/types';
+import { formatDataDate } from '@/utils/time';
 
 interface Props {
   sector: Sector;
@@ -89,6 +106,12 @@ function formatChange(value: number | undefined): string {
   if (value == null || isNaN(value)) return '--';
   const sign = value >= 0 ? '+' : '';
   return `${sign}${value.toFixed(2)}`;
+}
+
+function formatInflow(value: number | undefined): string {
+  if (value == null || isNaN(value)) return '--';
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}${value.toFixed(2)}亿`;
 }
 
 function formatPercent(value: number | undefined): string {
@@ -297,5 +320,12 @@ function formatPercent(value: number | undefined): string {
       color: var(--color-text-tertiary);
     }
   }
+}
+
+.data-time {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  text-align: right;
+  margin-top: var(--spacing-xs);
 }
 </style>

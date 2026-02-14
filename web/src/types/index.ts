@@ -193,6 +193,13 @@ export interface Sector {
   downCount: number;
   leadStock?: string;
   leadChange: number;
+  // 资金流向字段
+  mainInflow?: number;
+  mainInflowPct?: number;
+  smallInflow?: number;
+  smallInflowPct?: number;
+  // 数据时间
+  timestamp?: string;
 }
 
 export interface SectorListResponse {

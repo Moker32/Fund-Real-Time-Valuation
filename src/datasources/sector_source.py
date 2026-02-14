@@ -1,18 +1,103 @@
 """
 行业板块数据源模块
 实现从新浪财经获取行业板块数据
-- 白酒、新能源、消费、医药、科技等主要行业
+- 白酒、新能源，消费、医药，科技等主要行业
 """
 
 import asyncio
 import re
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
 
 from .base import DataSource, DataSourceResult, DataSourceType
+
+
+# 中国A股主要节假日（简化版，提前维护）
+CHINA_HOLIDAYS_2026 = [
+    "2026-01-01",  # 元旦
+    "2026-01-26",  # 春节假期开始
+    "2026-01-27",
+    "2026-01-28",
+    "2026-01-29",
+    "2026-01-30",
+    "2026-01-31",
+    "2026-02-01",
+    "2026-02-02",
+    "2026-02-03",
+    "2026-02-04",
+    "2026-02-05",
+    "2026-02-06",
+    "2026-02-07",  # 春节假期结束
+    # 国庆节（假设）
+    "2026-10-01",
+    "2026-10-02",
+    "2026-10-03",
+    "2026-10-04",
+    "2026-10-05",
+    "2026-10-06",
+    "2026-10-07",
+    # 清明节（假设）
+    "2026-04-04",
+    "2026-04-05",
+    "2026-04-06",
+    # 劳动节（假设）
+    "2026-05-01",
+    "2026-05-02",
+    "2026-05-03",
+]
+
+
+def is_trading_day(date: datetime) -> bool:
+    """判断是否是交易日"""
+    # 周末不是交易日
+    if date.weekday() >= 5:
+        return False
+    # 节假日不是交易日
+    date_str = date.strftime("%Y-%m-%d")
+    if date_str in CHINA_HOLIDAYS_2026:
+        return False
+    return True
+
+
+def get_last_trading_day() -> datetime:
+    """
+    获取最近的一个交易日
+    基于时间和节假日判断
+    """
+    now = datetime.now()
+    current_date = now.date()
+
+    # 情况1: 现在是交易日（周一到周五，且不是节假日）
+    if is_trading_day(now):
+        # 判断当前时间
+        # A股交易时间: 9:30-11:30, 13:00-15:00
+        if now.hour >= 15:
+            # 15:00 后，当天交易结束
+            # 但如果刚收盘，数据还是当天的
+            return now
+        elif now.hour >= 9:
+            # 9:00-15:00 之间，交易时间
+            return now
+        else:
+            # 9:00 之前，可能是盘前，数据可能是昨日的
+            # 查找上一个交易日
+            for days in range(1, 10):
+                check_date = now - timedelta(days=days)
+                if is_trading_day(check_date):
+                    return check_date
+
+    # 情况2: 现在不是交易日（周末或节假日）
+    # 查找上一个交易日
+    for days in range(1, 10):
+        check_date = now - timedelta(days=days)
+        if is_trading_day(check_date):
+            return check_date
+
+    # 如果都找不到，返回今天（兜底）
+    return now
 
 
 class SinaSectorDataSource(DataSource):
@@ -49,18 +134,14 @@ class SinaSectorDataSource(DataSource):
         Args:
             timeout: 请求超时时间(秒)
         """
-        super().__init__(
-            name="sina_sector",
-            source_type=DataSourceType.SECTOR,
-            timeout=timeout
-        )
+        super().__init__(name="sina_sector", source_type=DataSourceType.SECTOR, timeout=timeout)
         self.client = httpx.AsyncClient(
             timeout=timeout,
             headers={
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"
-            }
+                "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            },
         )
         self._cache: list[dict[str, Any]] = []
         self._cache_time: float = 0.0
@@ -78,13 +159,17 @@ class SinaSectorDataSource(DataSource):
         """
         # 检查缓存
         if self._is_cache_valid() and sector_code is None:
-            data = [s for s in self._cache if s.get("code") == sector_code] if sector_code else self._cache
+            data = (
+                [s for s in self._cache if s.get("code") == sector_code]
+                if sector_code
+                else self._cache
+            )
             return DataSourceResult(
                 success=True,
                 data=data if sector_code else self._cache,
                 timestamp=self._cache_time,
                 source=self.name,
-                metadata={"from_cache": True, "sector_code": sector_code}
+                metadata={"from_cache": True, "sector_code": sector_code},
             )
 
         try:
@@ -94,7 +179,8 @@ class SinaSectorDataSource(DataSource):
 
             # 过滤需要获取的板块
             configs_to_fetch = [
-                config for config in self.SECTOR_CONFIG
+                config
+                for config in self.SECTOR_CONFIG
                 if sector_code is None or config["code"] == sector_code
             ]
 
@@ -120,7 +206,7 @@ class SinaSectorDataSource(DataSource):
                     data=sectors,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"count": len(sectors), "sector_code": sector_code}
+                    metadata={"count": len(sectors), "sector_code": sector_code},
                 )
 
             return DataSourceResult(
@@ -128,7 +214,7 @@ class SinaSectorDataSource(DataSource):
                 error="未获取到板块数据",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"sector_code": sector_code}
+                metadata={"sector_code": sector_code},
             )
 
         except Exception as e:
@@ -142,7 +228,7 @@ class SinaSectorDataSource(DataSource):
             List[DataSourceResult]: 返回结果列表
         """
         # 支持从 kwargs 中提取参数列表
-        params_list = kwargs.get('params_list', [])
+        params_list = kwargs.get("params_list", [])
 
         if not params_list:
             # 如果没有指定参数，获取所有板块
@@ -151,7 +237,11 @@ class SinaSectorDataSource(DataSource):
 
         results = []
         for params in params_list:
-            sector_code = params.get('kwargs', {}).get('sector_code') if params.get('kwargs') else params.get('sector_code')
+            sector_code = (
+                params.get("kwargs", {}).get("sector_code")
+                if params.get("kwargs")
+                else params.get("sector_code")
+            )
             result = await self.fetch(sector_code)
             results.append(result)
 
@@ -183,8 +273,7 @@ class SinaSectorDataSource(DataSource):
 
             # 过滤指定类别的板块
             configs_to_fetch = [
-                config for config in self.SECTOR_CONFIG
-                if config["category"] == category
+                config for config in self.SECTOR_CONFIG if config["category"] == category
             ]
 
             # 并行执行所有请求
@@ -202,7 +291,7 @@ class SinaSectorDataSource(DataSource):
                 data=sectors,
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"category": category, "count": len(sectors)}
+                metadata={"category": category, "count": len(sectors)},
             )
 
         except Exception as e:
@@ -231,11 +320,12 @@ class SinaSectorDataSource(DataSource):
 
             # 解析返回数据
             # 格式: var _bk04151 = {...}
-            json_match = re.search(r'var\s+\w+\s*=\s*(\{.*?\});', data)
+            json_match = re.search(r"var\s+\w+\s*=\s*(\{.*?\});", data)
 
             if json_match:
                 try:
                     import json
+
                     sector_info = json.loads(json_match.group(1))
 
                     return {
@@ -267,12 +357,15 @@ class SinaSectorDataSource(DataSource):
             self.log(f"获取板块 {name} 数据异常: {e}")
             return self._get_mock_sector(code, name, category)
 
-    def _parse_backup(self, data: str, code: str, name: str, category: str) -> dict[str, Any] | None:
+    def _parse_backup(
+        self, data: str, code: str, name: str, category: str
+    ) -> dict[str, Any] | None:
         """备用解析方法"""
         try:
             # 尝试解析JSON数组格式
             if data.startswith("[") and data.endswith("]"):
                 import json
+
                 items = json.loads(data)
                 if items:
                     item = items[0]
@@ -309,7 +402,10 @@ class SinaSectorDataSource(DataSource):
             afternoon_start = 1300
             afternoon_end = 1500
 
-            if morning_start <= current_time <= morning_end or afternoon_start <= current_time <= afternoon_end:
+            if (
+                morning_start <= current_time <= morning_end
+                or afternoon_start <= current_time <= afternoon_end
+            ):
                 return "交易"
             elif current_time < morning_start:
                 return "竞价"
@@ -321,6 +417,7 @@ class SinaSectorDataSource(DataSource):
     def _get_mock_sector(self, code: str, name: str, category: str) -> dict[str, Any]:
         """生成模拟数据（备用）"""
         import random
+
         change_pct = random.uniform(-3, 3)
 
         return {
@@ -393,9 +490,7 @@ class SectorDataAggregator(DataSource):
 
     def __init__(self, timeout: float = 15.0):
         super().__init__(
-            name="sector_aggregator",
-            source_type=DataSourceType.SECTOR,
-            timeout=timeout
+            name="sector_aggregator", source_type=DataSourceType.SECTOR, timeout=timeout
         )
         self._sources: list[DataSource] = []
         self._primary_source: DataSource | None = None
@@ -437,7 +532,7 @@ class SectorDataAggregator(DataSource):
             error=f"所有数据源均失败: {'; '.join(errors)}",
             timestamp=time.time(),
             source=self.name,
-            metadata={"sector_code": sector_code, "errors": errors}
+            metadata={"sector_code": sector_code, "errors": errors},
         )
 
     async def fetch_all(self) -> DataSourceResult:
@@ -447,7 +542,7 @@ class SectorDataAggregator(DataSource):
     async def fetch_by_category(self, category: str) -> DataSourceResult:
         """按类别获取板块数据"""
         for source in self._sources:
-            if hasattr(source, 'fetch_by_category'):
+            if hasattr(source, "fetch_by_category"):
                 try:
                     result = await source.fetch_by_category(category)
                     if result.success:
@@ -459,7 +554,7 @@ class SectorDataAggregator(DataSource):
             success=False,
             error=f"无法获取类别 {category} 的数据",
             timestamp=time.time(),
-            source=self.name
+            source=self.name,
         )
 
     def get_status(self) -> dict[str, Any]:
@@ -481,7 +576,7 @@ class SectorDataAggregator(DataSource):
     async def close(self):
         """关闭所有数据源"""
         for source in self._sources:
-            if hasattr(source, 'close'):
+            if hasattr(source, "close"):
                 try:
                     await source.close()
                 except Exception:
@@ -492,15 +587,280 @@ class SectorDataAggregator(DataSource):
 __all__ = [
     "SinaSectorDataSource",
     "SectorDataAggregator",
-    "EastMoneySectorSource",           # AKShare 东方财富板块
-    "EastMoneyIndustryDetailSource",   # 行业板块详情
-    "EastMoneyConceptDetailSource",    # 概念板块详情
+    "EastMoneySectorSource",  # AKShare 东方财富板块
+    "EastMoneyIndustryDetailSource",  # 行业板块详情
+    "EastMoneyConceptDetailSource",  # 概念板块详情
+    "EastMoneyDirectSource",  # EastMoney 直连 API (资金流向)
 ]
+
+
+# ============================================================
+# EastMoney 直连 API 数据源 (资金流向完整版)
+# 类似 lanZzV/fund 项目的实现
+# ============================================================
+
+
+class EastMoneyDirectSource(DataSource):
+    """
+    东方财富直连 API 数据源
+
+    功能:
+    - 获取行业板块/概念板块列表及涨跌幅
+    - 获取主力资金流入数据 (主力净流入、小单净流入)
+    - 数据更稳定，不依赖 AKShare
+
+    接口:
+    - https://push2.eastmoney.com/api/qt/clist/get
+    """
+
+    # 板块类型映射
+    BOARD_TYPES = {
+        "industry": "m:90+t:2",  # 行业板块
+        "concept": "m:90+t:3",  # 概念板块
+    }
+
+    def __init__(self, timeout: float = 15.0):
+        super().__init__(
+            name="sector_eastmoney_direct", source_type=DataSourceType.SECTOR, timeout=timeout
+        )
+        self.client = httpx.AsyncClient(timeout=timeout)
+        self._cache: dict[str, dict[str, Any]] = {}
+        self._cache_timeout = 60.0
+
+    def log(self, message: str) -> None:
+        print(f"[EastMoneyDirectSource] {message}")
+
+    async def fetch(self, sector_type: str = "industry") -> DataSourceResult:
+        """
+        获取板块数据
+
+        Args:
+            sector_type: 板块类型 ("industry" 行业板块, "concept" 概念板块)
+
+        Returns:
+            DataSourceResult: 板块数据结果
+        """
+        cache_key = sector_type
+        if self._is_cache_valid(cache_key):
+            return DataSourceResult(
+                success=True,
+                data=self._cache[cache_key],
+                timestamp=self._cache[cache_key].get("_cache_time", time.time()),
+                source=self.name,
+                metadata={"sector_type": sector_type, "from_cache": True},
+            )
+
+        try:
+            data = await self._fetch_sectors(sector_type)
+
+            if data:
+                data["_cache_time"] = time.time()
+                self._cache[cache_key] = data
+                self._record_success()
+                return DataSourceResult(
+                    success=True,
+                    data=data,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"sector_type": sector_type},
+                )
+
+            return DataSourceResult(
+                success=False,
+                error="获取板块数据为空",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_type": sector_type},
+            )
+
+        except Exception as e:
+            return self._handle_error(e, self.name)
+
+    async def _fetch_sectors(self, sector_type: str) -> dict[str, Any] | None:
+        """从 EastMoney API 获取板块数据"""
+        board_type = self.BOARD_TYPES.get(sector_type)
+        if not board_type:
+            return None
+
+        url = "https://push2.eastmoney.com/api/qt/clist/get"
+        params = {
+            "cb": "",
+            "fid": "f62",  # 按主力净流入排序
+            "po": "1",  # 降序
+            "pz": "100",  # 获取100条
+            "pn": "1",
+            "np": "1",
+            "fltt": "2",
+            "invt": "2",
+            "ut": "8dec03ba335b81bf4ebdf7b29ec27d15",
+            "fs": board_type,
+            "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13",
+        }
+
+        try:
+            response = await self.client.get(url, params=params)
+            response.raise_for_status()
+            json_data = response.json()
+
+            if not json_data.get("data"):
+                return None
+
+            sectors = []
+            for bk in json_data["data"]["diff"]:
+                # 解析资金流向数据（元转换为亿元）
+                main_inflow = bk.get("f62", 0) or 0
+                main_inflow_pct = bk.get("f184", 0) or 0
+                small_inflow = bk.get("f84", 0) or 0
+                small_inflow_pct = bk.get("f87", 0) or 0
+                medium_inflow = bk.get("f72", 0) or 0
+                large_inflow = bk.get("f75", 0) or 0
+                huge_inflow = bk.get("f78", 0) or 0
+
+                # 转换为亿元单位
+                main_inflow_yi = round(main_inflow / 100000000, 2) if main_inflow else 0
+                small_inflow_yi = round(small_inflow / 100000000, 2) if small_inflow else 0
+
+                sectors.append(
+                    {
+                        "code": bk.get("f12", ""),
+                        "name": bk.get("f14", ""),
+                        "price": bk.get("f2", 0),
+                        "change_percent": bk.get("f3", 0),
+                        "change": self._calc_change(bk.get("f2", 0), bk.get("f3", 0)),
+                        # 资金流向数据（已转换为亿元）
+                        "main_inflow": main_inflow_yi,
+                        "main_inflow_pct": main_inflow_pct,
+                        "small_inflow": small_inflow_yi,
+                        "small_inflow_pct": small_inflow_pct,
+                        "medium_inflow": round(medium_inflow / 100000000, 2)
+                        if medium_inflow
+                        else 0,
+                        "large_inflow": round(large_inflow / 100000000, 2) if large_inflow else 0,
+                        "huge_inflow": round(huge_inflow / 100000000, 2) if huge_inflow else 0,
+                        # 额外字段（兼容现有代码）
+                        "total_market": bk.get("f124", ""),
+                        "turnover": bk.get("f205", ""),
+                        "up_count": bk.get("f66", 0),
+                        "down_count": bk.get("f69", 0),
+                    }
+                )
+
+            # 按涨跌幅降序排序
+            sectors = sorted(sectors, key=lambda x: x.get("change_percent", 0), reverse=True)
+
+            # 去除重复数据（Ⅲ和Ⅱ版本数据相同，只保留一个）
+            seen = set()
+            unique_sectors = []
+            for s in sectors:
+                # 用价格+涨跌幅+主力净流入作为唯一标识
+                key = (s.get("price"), s.get("change_percent"), s.get("main_inflow"))
+                if key not in seen:
+                    seen.add(key)
+                    unique_sectors.append(s)
+            sectors = unique_sectors
+
+            # 添加排名
+            for i, sector in enumerate(sectors):
+                sector["rank"] = i + 1
+
+            # 使用最近交易日作为时间戳
+            trading_day = get_last_trading_day()
+
+            return {
+                "type": sector_type,
+                "sectors": sectors,
+                "count": len(sectors),
+                "timestamp": trading_day.timestamp(),
+            }
+
+        except Exception as e:
+            self.log(f"获取板块数据失败: {e}")
+            return None
+
+    def _calc_change(self, price: float, change_pct: float) -> float:
+        """计算涨跌额"""
+        if not price or not change_pct:
+            return 0.0
+        return round(price * change_pct / 100, 2)
+
+    def _is_cache_valid(self, cache_key: str) -> bool:
+        """检查缓存是否有效"""
+        if cache_key not in self._cache:
+            return False
+        cache_time = self._cache[cache_key].get("_cache_time", 0)
+        return (time.time() - cache_time) < self._cache_timeout
+
+    def clear_cache(self):
+        """清空缓存"""
+        self._cache.clear()
+
+    async def close(self):
+        """关闭HTTP客户端"""
+        await self.client.aclose()
+
+    def get_status(self) -> dict[str, Any]:
+        """获取数据源状态"""
+        status = super().get_status()
+        status["cache_size"] = len(self._cache)
+        status["cache_timeout"] = self._cache_timeout
+        status["supported_types"] = list(self.BOARD_TYPES.keys())
+        return status
+
+    async def health_check(self) -> bool:
+        """健康检查"""
+        try:
+            response = await self.client.get(
+                "https://push2.eastmoney.com/api/qt/clist/get",
+                params={
+                    "cb": "",
+                    "fid": "f62",
+                    "po": "1",
+                    "pz": "1",
+                    "pn": "1",
+                    "fltt": "2",
+                    "invt": "2",
+                    "ut": "8dec03ba335b81bf4ebdf7b29ec27d15",
+                    "fs": "m:90+t:2",
+                },
+                timeout=self.timeout,
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("data") is not None
+            return False
+        except Exception:
+            return False
+
+    async def fetch_batch(self, sector_types: list[str]) -> list[DataSourceResult]:
+        """批量获取板块数据"""
+
+        async def fetch_one(stype: str) -> DataSourceResult:
+            return await self.fetch(stype)
+
+        tasks = [fetch_one(stype) for stype in sector_types]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                processed_results.append(
+                    DataSourceResult(
+                        success=False,
+                        error=str(result),
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"sector_type": sector_types[i]},
+                    )
+                )
+            else:
+                processed_results.append(result)
+        return processed_results
 
 
 # ============================================================
 # AKShare 东方财富板块数据源
 # ============================================================
+
 
 class EastMoneySectorSource(DataSource):
     """
@@ -517,9 +877,7 @@ class EastMoneySectorSource(DataSource):
 
     def __init__(self, timeout: float = 15.0):
         super().__init__(
-            name="sector_eastmoney_akshare",
-            source_type=DataSourceType.SECTOR,
-            timeout=timeout
+            name="sector_eastmoney_akshare", source_type=DataSourceType.SECTOR, timeout=timeout
         )
         self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0
@@ -541,7 +899,7 @@ class EastMoneySectorSource(DataSource):
                 data=self._cache[cache_key],
                 timestamp=self._cache[cache_key].get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"sector_type": sector_type, "from_cache": True}
+                metadata={"sector_type": sector_type, "from_cache": True},
             )
 
         try:
@@ -557,7 +915,7 @@ class EastMoneySectorSource(DataSource):
                     error=f"不支持的板块类型: {sector_type}",
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"sector_type": sector_type}
+                    metadata={"sector_type": sector_type},
                 )
 
             if data:
@@ -569,7 +927,7 @@ class EastMoneySectorSource(DataSource):
                     data=data,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"sector_type": sector_type}
+                    metadata={"sector_type": sector_type},
                 )
 
             return DataSourceResult(
@@ -577,7 +935,7 @@ class EastMoneySectorSource(DataSource):
                 error="获取板块数据为空",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"sector_type": sector_type}
+                metadata={"sector_type": sector_type},
             )
 
         except ImportError:
@@ -586,7 +944,7 @@ class EastMoneySectorSource(DataSource):
                 error="akshare 未安装，请运行: pip install akshare",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"sector_type": sector_type, "error_type": "ImportError"}
+                metadata={"sector_type": sector_type, "error_type": "ImportError"},
             )
         except Exception as e:
             return self._handle_error(e, self.name)
@@ -598,25 +956,23 @@ class EastMoneySectorSource(DataSource):
             if df is not None and not df.empty:
                 sectors = []
                 for _, row in df.iterrows():
-                    sectors.append({
-                        "rank": row.get("排名", 0),
-                        "name": row.get("板块名称", ""),
-                        "code": row.get("板块代码", ""),
-                        "price": row.get("最新价", 0),
-                        "change": row.get("涨跌额", 0),
-                        "change_percent": row.get("涨跌幅", 0),
-                        "total_market": row.get("总市值", ""),
-                        "turnover": row.get("换手率", ""),
-                        "up_count": row.get("上涨家数", 0),
-                        "down_count": row.get("下跌家数", 0),
-                        "lead_stock": row.get("领涨股票", ""),
-                        "lead_change": row.get("领涨股票-涨跌幅", 0),
-                    })
-                return {
-                    "type": "industry",
-                    "sectors": sectors,
-                    "count": len(sectors)
-                }
+                    sectors.append(
+                        {
+                            "rank": row.get("排名", 0),
+                            "name": row.get("板块名称", ""),
+                            "code": row.get("板块代码", ""),
+                            "price": row.get("最新价", 0),
+                            "change": row.get("涨跌额", 0),
+                            "change_percent": row.get("涨跌幅", 0),
+                            "total_market": row.get("总市值", ""),
+                            "turnover": row.get("换手率", ""),
+                            "up_count": row.get("上涨家数", 0),
+                            "down_count": row.get("下跌家数", 0),
+                            "lead_stock": row.get("领涨股票", ""),
+                            "lead_change": row.get("领涨股票-涨跌幅", 0),
+                        }
+                    )
+                return {"type": "industry", "sectors": sectors, "count": len(sectors)}
         except Exception:
             pass
         return None
@@ -628,31 +984,30 @@ class EastMoneySectorSource(DataSource):
             if df is not None and not df.empty:
                 sectors = []
                 for _, row in df.iterrows():
-                    sectors.append({
-                        "rank": row.get("排名", 0),
-                        "name": row.get("板块名称", ""),
-                        "code": row.get("板块代码", ""),
-                        "price": row.get("最新价", 0),
-                        "change": row.get("涨跌额", 0),
-                        "change_percent": row.get("涨跌幅", 0),
-                        "total_market": row.get("总市值", ""),
-                        "turnover": row.get("换手率", ""),
-                        "up_count": row.get("上涨家数", 0),
-                        "down_count": row.get("下跌家数", 0),
-                        "lead_stock": row.get("领涨股票", ""),
-                        "lead_change": row.get("领涨股票-涨跌幅", 0),
-                    })
-                return {
-                    "type": "concept",
-                    "sectors": sectors,
-                    "count": len(sectors)
-                }
+                    sectors.append(
+                        {
+                            "rank": row.get("排名", 0),
+                            "name": row.get("板块名称", ""),
+                            "code": row.get("板块代码", ""),
+                            "price": row.get("最新价", 0),
+                            "change": row.get("涨跌额", 0),
+                            "change_percent": row.get("涨跌幅", 0),
+                            "total_market": row.get("总市值", ""),
+                            "turnover": row.get("换手率", ""),
+                            "up_count": row.get("上涨家数", 0),
+                            "down_count": row.get("下跌家数", 0),
+                            "lead_stock": row.get("领涨股票", ""),
+                            "lead_change": row.get("领涨股票-涨跌幅", 0),
+                        }
+                    )
+                return {"type": "concept", "sectors": sectors, "count": len(sectors)}
         except Exception:
             pass
         return None
 
     async def fetch_batch(self, sector_types: list[str]) -> list[DataSourceResult]:
         """批量获取板块数据"""
+
         async def fetch_one(stype: str) -> DataSourceResult:
             return await self.fetch(stype)
 
@@ -668,7 +1023,7 @@ class EastMoneySectorSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"sector_type": sector_types[i]}
+                        metadata={"sector_type": sector_types[i]},
                     )
                 )
             else:
@@ -703,13 +1058,11 @@ class EastMoneySectorSource(DataSource):
         """
         try:
             import akshare as ak
+
             loop = asyncio.get_event_loop()
 
             # 尝试获取行业板块数据
-            df = await loop.run_in_executor(
-                None,
-                lambda: ak.stock_board_industry_name_em()
-            )
+            df = await loop.run_in_executor(None, lambda: ak.stock_board_industry_name_em())
 
             # 验证返回数据
             if df is not None and not df.empty:
@@ -732,7 +1085,7 @@ class EastMoneyIndustryDetailSource(DataSource):
         super().__init__(
             name="sector_industry_detail_akshare",
             source_type=DataSourceType.SECTOR,
-            timeout=timeout
+            timeout=timeout,
         )
         self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0
@@ -745,7 +1098,7 @@ class EastMoneyIndustryDetailSource(DataSource):
                 error="请指定板块名称",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"sector_name": sector_name}
+                metadata={"sector_name": sector_name},
             )
 
         cache_key = sector_name
@@ -755,7 +1108,7 @@ class EastMoneyIndustryDetailSource(DataSource):
                 data=self._cache[cache_key],
                 timestamp=self._cache[cache_key].get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"sector_name": sector_name, "from_cache": True}
+                metadata={"sector_name": sector_name, "from_cache": True},
             )
 
         try:
@@ -765,19 +1118,17 @@ class EastMoneyIndustryDetailSource(DataSource):
             if df is not None and not df.empty:
                 stocks = []
                 for _, row in df.iterrows():
-                    stocks.append({
-                        "rank": row.get("序号", 0),
-                        "code": row.get("代码", ""),
-                        "name": row.get("名称", ""),
-                        "price": row.get("最新价", 0),
-                        "change_percent": row.get("涨跌幅", 0),
-                    })
+                    stocks.append(
+                        {
+                            "rank": row.get("序号", 0),
+                            "code": row.get("代码", ""),
+                            "name": row.get("名称", ""),
+                            "price": row.get("最新价", 0),
+                            "change_percent": row.get("涨跌幅", 0),
+                        }
+                    )
 
-                data = {
-                    "sector_name": sector_name,
-                    "stocks": stocks,
-                    "count": len(stocks)
-                }
+                data = {"sector_name": sector_name, "stocks": stocks, "count": len(stocks)}
                 data["_cache_time"] = time.time()
                 self._cache[cache_key] = data
                 self._record_success()
@@ -787,7 +1138,7 @@ class EastMoneyIndustryDetailSource(DataSource):
                     data=data,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"sector_name": sector_name}
+                    metadata={"sector_name": sector_name},
                 )
 
             return DataSourceResult(
@@ -795,7 +1146,7 @@ class EastMoneyIndustryDetailSource(DataSource):
                 error=f"未获取到板块 {sector_name} 的成份股",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"sector_name": sector_name}
+                metadata={"sector_name": sector_name},
             )
 
         except ImportError:
@@ -804,7 +1155,7 @@ class EastMoneyIndustryDetailSource(DataSource):
                 error="akshare 未安装",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"sector_name": sector_name}
+                metadata={"sector_name": sector_name},
             )
         except Exception as e:
             return self._handle_error(e, self.name)
@@ -825,7 +1176,7 @@ class EastMoneyIndustryDetailSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"sector_name": sector_names[i]}
+                        metadata={"sector_name": sector_names[i]},
                     )
                 )
             else:
@@ -853,9 +1204,7 @@ class EastMoneyConceptDetailSource(DataSource):
 
     def __init__(self, timeout: float = 15.0):
         super().__init__(
-            name="sector_concept_detail_akshare",
-            source_type=DataSourceType.SECTOR,
-            timeout=timeout
+            name="sector_concept_detail_akshare", source_type=DataSourceType.SECTOR, timeout=timeout
         )
         self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0
@@ -868,7 +1217,7 @@ class EastMoneyConceptDetailSource(DataSource):
                 error="请指定板块名称",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"sector_name": sector_name}
+                metadata={"sector_name": sector_name},
             )
 
         cache_key = sector_name
@@ -878,7 +1227,7 @@ class EastMoneyConceptDetailSource(DataSource):
                 data=self._cache[cache_key],
                 timestamp=self._cache[cache_key].get("_cache_time", time.time()),
                 source=self.name,
-                metadata={"sector_name": sector_name, "from_cache": True}
+                metadata={"sector_name": sector_name, "from_cache": True},
             )
 
         try:
@@ -888,19 +1237,17 @@ class EastMoneyConceptDetailSource(DataSource):
             if df is not None and not df.empty:
                 stocks = []
                 for _, row in df.iterrows():
-                    stocks.append({
-                        "rank": row.get("序号", 0),
-                        "code": row.get("代码", ""),
-                        "name": row.get("名称", ""),
-                        "price": row.get("最新价", 0),
-                        "change_percent": row.get("涨跌幅", 0),
-                    })
+                    stocks.append(
+                        {
+                            "rank": row.get("序号", 0),
+                            "code": row.get("代码", ""),
+                            "name": row.get("名称", ""),
+                            "price": row.get("最新价", 0),
+                            "change_percent": row.get("涨跌幅", 0),
+                        }
+                    )
 
-                data = {
-                    "sector_name": sector_name,
-                    "stocks": stocks,
-                    "count": len(stocks)
-                }
+                data = {"sector_name": sector_name, "stocks": stocks, "count": len(stocks)}
                 data["_cache_time"] = time.time()
                 self._cache[cache_key] = data
                 self._record_success()
@@ -910,7 +1257,7 @@ class EastMoneyConceptDetailSource(DataSource):
                     data=data,
                     timestamp=time.time(),
                     source=self.name,
-                    metadata={"sector_name": sector_name}
+                    metadata={"sector_name": sector_name},
                 )
 
             return DataSourceResult(
@@ -918,7 +1265,7 @@ class EastMoneyConceptDetailSource(DataSource):
                 error=f"未获取到板块 {sector_name} 的成份股（接口可能不稳定）",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"sector_name": sector_name}
+                metadata={"sector_name": sector_name},
             )
 
         except ImportError:
@@ -927,7 +1274,7 @@ class EastMoneyConceptDetailSource(DataSource):
                 error="akshare 未安装",
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"sector_name": sector_name}
+                metadata={"sector_name": sector_name},
             )
         except Exception as e:
             return self._handle_error(e, self.name)
@@ -948,7 +1295,7 @@ class EastMoneyConceptDetailSource(DataSource):
                         error=str(result),
                         timestamp=time.time(),
                         source=self.name,
-                        metadata={"sector_name": sector_names[i]}
+                        metadata={"sector_name": sector_names[i]},
                     )
                 )
             else:

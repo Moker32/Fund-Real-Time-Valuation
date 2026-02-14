@@ -106,7 +106,7 @@ export const useSectorStore = defineStore('sectors', () => {
           conceptSectors.value = response.sectors;
         }
 
-        lastUpdated.value = formatTime(response.timestamp);
+        lastUpdated.value = response.timestamp;
         loading.value = false;
         return;
       } catch (err) {

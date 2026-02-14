@@ -20,9 +20,6 @@
             概念板块
           </button>
         </div>
-        <span class="last-updated" v-if="sectorStore.lastUpdated">
-          更新时间: {{ sectorStore.lastUpdated }}
-        </span>
       </div>
     </div>
 
