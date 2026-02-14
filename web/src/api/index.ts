@@ -379,4 +379,16 @@ export const sectorApi = {
   },
 };
 
+export interface TradingDayResponse {
+  market: string;
+  date: string;
+  is_trading_day: boolean;
+}
+
+export const tradingCalendarApi = {
+  async isTradingDay(market: string = 'china'): Promise<TradingDayResponse> {
+    return api.get(`/trading-calendar/is-trading-day/${market}`);
+  },
+};
+
 export { api };

@@ -1,12 +1,14 @@
 // 商品名称中英文映射
 export const commodityNameMap: Record<string, string> = {
   // 贵金属
-  'GC=F': '黄金期货',
-  'SI=F': '白银期货',
-  'PT=F': '铂金期货',
-  'PA=F': '钯金期货',
-  'Gold Apr 26': '黄金期货',
-  'Silver Mar 26': '白银期货',
+  'GC=F': '黄金 (COMEX)',
+  'SG=f': '沪金 Au99.99',
+  'PAXG-USD': 'Pax Gold',
+  'SI=F': '白银 (COMEX)',
+  'PT=F': '铂金',
+  'PA=F': '钯金',
+  'Gold Apr 26': '国际黄金',
+  'Silver Mar 26': '国际白银',
   'Palladium Mar 26': '钯金期货',
   'Bitcoin Futures,Feb-2026': '比特币期货',
   'Ethereum Feb 26': '以太坊期货',
@@ -79,4 +81,66 @@ export function getCommodityName(symbol: string, englishName: string): string {
   }
   // 返回原始名称
   return englishName;
+}
+
+// 商品分类映射
+export const commodityCategoryMap: Record<string, string> = {
+  // 贵金属
+  'GC=F': 'precious_metal',
+  'SG=f': 'precious_metal',
+  'SI=F': 'precious_metal',
+  'PT=F': 'precious_metal',
+  'PA=F': 'precious_metal',
+  // 能源
+  'CL=F': 'energy',
+  'BZ=F': 'energy',
+  'NG=F': 'energy',
+  // 基本金属
+  'HG=F': 'base_metal',
+  'ALU': 'base_metal',
+  'ZN=f': 'base_metal',
+  'NI=f': 'base_metal',
+  // 农产品
+  'ZS=F': 'agriculture',
+  'ZC=F': 'agriculture',
+  'ZW=F': 'agriculture',
+  'KC=F': 'agriculture',
+  'SB=F': 'agriculture',
+  // 加密货币
+  'BTC-USD': 'crypto',
+  'ETH-USD': 'crypto',
+  'BTC=F': 'crypto',
+  'ETH=F': 'crypto',
+};
+
+// 根据 symbol 获取商品分类
+export function getCommodityCategory(symbol: string): string {
+  return commodityCategoryMap[symbol.toUpperCase()] || 'other';
+}
+
+// 商品对应的交易所映射
+export const commodityExchangeMap: Record<string, string> = {
+  // 上海黄金交易所
+  'SG=f': 'sge',
+  'Au99.99': 'sge',
+  // COMEX 纽约商品交易所
+  'GC=F': 'comex',
+  'SI=F': 'comex',
+  'CL=F': 'comex',
+  'BZ=F': 'comex',
+  'HG=F': 'comex',
+  // CME 芝加哥商品交易所
+  'NG=F': 'cme',
+  // LBMA 伦敦金银市场协会
+  'PAXG-USD': 'lbma',
+  // 加密货币 (24/7)
+  'BTC-USD': 'crypto',
+  'ETH-USD': 'crypto',
+  'BTC=F': 'crypto',
+  'ETH=F': 'crypto',
+};
+
+// 根据 symbol 获取对应的市场
+export function getCommodityMarket(symbol: string): string {
+  return commodityExchangeMap[symbol.toUpperCase()] || 'china';
 }

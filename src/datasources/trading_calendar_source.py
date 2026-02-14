@@ -20,6 +20,11 @@ class Market(Enum):
     UK = "uk"
     GERMANY = "germany"
     FRANCE = "france"
+    # 贵金属/大宗商品
+    SGE = "sge"  # 上海黄金交易所
+    COMEX = "comex"  # 纽约商品交易所
+    CME = "cme"  # 芝加哥商品交易所
+    LBMA = "lbma"  # 伦敦金银市场协会
 
 
 MARKET_COUNTRY_MAP = {
@@ -67,6 +72,29 @@ MARKET_TRADING_HOURS = {
     Market.FRANCE: {
         "open": time(9, 0),
         "close": time(17, 30),
+    },
+    # 贵金属交易所 - 日盘 + 夜盘连续交易
+    Market.SGE: {  # 上海黄金交易所
+        "day_open": time(9, 0),
+        "day_close": time(15, 30),
+        "night_open": time(19, 50),
+        "night_close": time(2, 30),  # 次日
+    },
+    Market.COMEX: {  # 纽约商品交易所 (黄金、白银)
+        "day_open": time(8, 0),
+        "day_close": time(13, 30),
+        "night_open": time(17, 0),  # 场后交易
+        "night_close": time(8, 0),  # 次日
+    },
+    Market.CME: {  # 芝加哥商品交易所
+        "day_open": time(8, 30),
+        "day_close": time(13, 30),
+        "night_open": time(15, 30),
+        "night_close": time(8, 30),  # 次日
+    },
+    Market.LBMA: {  # 伦敦金银市场协会 - 每日定价两次
+        "am_price": time(10, 30),  # 上午定价
+        "pm_price": time(15, 0),  # 下午定价
     },
 }
 
@@ -239,6 +267,9 @@ class TradingCalendarSource(DataSource):
         holidays = self._get_holidays(market, year)
         special_dates = self._get_special_dates(market, year)
 
+        # 判断是否为贵金属交易所
+        is_precious_metal = market in (Market.SGE, Market.COMEX, Market.CME, Market.LBMA)
+
         # 尝试获取A股真实交易日数据
         china_real_days: set[date] = set()
         if market == Market.CHINA:
@@ -247,26 +278,33 @@ class TradingCalendarSource(DataSource):
         trading_days = []
         current = start_date
         while current <= end_date:
-            # 优先使用真实交易日数据
-            if current in china_real_days:
-                is_trading = True
+            # 贵金属交易所: 只有周末休市，节假日不休市
+            if is_precious_metal:
+                is_wknd = self._is_weekend(current)
+                is_trading = not is_wknd
                 holiday_name = None
                 is_makeup_day = False
             else:
-                is_holiday = current in holidays
-                is_wknd = self._is_weekend(current)
-                special_name = special_dates.get(current)
+                # 优先使用真实交易日数据
+                if current in china_real_days:
+                    is_trading = True
+                    holiday_name = None
+                    is_makeup_day = False
+                else:
+                    is_holiday = current in holidays
+                    is_wknd = self._is_weekend(current)
+                    special_name = special_dates.get(current)
 
-                is_makeup_day = special_name and "补班" in special_name
-                is_trading = not is_holiday and not is_wknd
-                holiday_name = None
-                if is_holiday:
-                    try:
-                        country_code, _ = MARKET_COUNTRY_MAP.get(market, ("US", ["US"]))
-                        ch = CountryHoliday(country_code, years=year)
-                        holiday_name = ch.get(current)
-                    except Exception:
-                        holiday_name = "Holiday"
+                    is_makeup_day = special_name and "补班" in special_name
+                    is_trading = not is_holiday and not is_wknd
+                    holiday_name = None
+                    if is_holiday:
+                        try:
+                            country_code, _ = MARKET_COUNTRY_MAP.get(market, ("US", ["US"]))
+                            ch = CountryHoliday(country_code, years=year)
+                            holiday_name = ch.get(current)
+                        except Exception:
+                            holiday_name = "Holiday"
 
             trading_days.append(
                 TradingDay(

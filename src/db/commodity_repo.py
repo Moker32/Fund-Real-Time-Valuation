@@ -32,6 +32,7 @@ COMMODITY_CATEGORY_MAP: dict[str, CommodityCategory] = {
     # 贵金属
     "gold": CommodityCategory.PRECIOUS_METAL,
     "gold_cny": CommodityCategory.PRECIOUS_METAL,
+    "gold_pax": CommodityCategory.PRECIOUS_METAL,
     "silver": CommodityCategory.PRECIOUS_METAL,
     "platinum": CommodityCategory.PRECIOUS_METAL,
     "palladium": CommodityCategory.PRECIOUS_METAL,
@@ -69,8 +70,9 @@ CATEGORY_NAMES: dict[CommodityCategory, str] = {
 # 商品显示名称
 COMMODITY_NAMES: dict[str, str] = {
     "gold": "黄金 (COMEX)",
-    "gold_cny": "Au99.99 (上海黄金)",
-    "silver": "白银",
+    "gold_cny": "沪金 Au99.99",
+    "gold_pax": "Pax Gold",
+    "silver": "国际白银",
     "platinum": "铂金",
     "palladium": "钯金",
     "wti": "WTI原油",

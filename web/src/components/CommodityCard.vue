@@ -14,7 +14,25 @@
           <span class="commodity-symbol">{{ commodity.symbol }}</span>
           <span class="commodity-name">{{ commodity.name }}</span>
         </div>
-        <span class="commodity-source">{{ commodity.source || 'API' }}</span>
+        <div class="header-tags">
+          <div class="trading-status" :class="`status-${tradingStatus}`">
+            <span class="status-dot"></span>
+            <span class="status-text">{{ statusText }}</span>
+          </div>
+          <button
+            class="action-btn watch-btn"
+            :class="{ active: isWatched }"
+            :title="isWatched ? '取消关注' : '添加关注'"
+            @click.stop="toggleWatch"
+          >
+            <svg v-if="isWatched" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div class="card-body">
@@ -56,7 +74,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted } from 'vue';
+import { useCommodityStore } from '@/stores/commodityStore';
+import { getCommodityCategory, getCommodityMarket } from '@/utils/commodityNames';
+import { tradingCalendarApi } from '@/api';
 import type { Commodity } from '@/types';
 
 interface Props {
@@ -68,10 +89,154 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
 });
 
+const store = useCommodityStore();
+
+// 缓存各市场交易日结果
+const tradingDayCache = ref<Record<string, boolean>>({});
+
+// 获取对应市场的交易日状态
+async function fetchTradingDayStatus(market: string) {
+  if (tradingDayCache.value[market] !== undefined) {
+    return;
+  }
+  try {
+    const result = await tradingCalendarApi.isTradingDay(market);
+    tradingDayCache.value[market] = result.is_trading_day;
+  } catch (e) {
+    console.warn(`获取 ${market} 交易日失败，使用本地判断`, e);
+    tradingDayCache.value[market] = null;
+  }
+}
+
+onMounted(() => {
+  const market = getCommodityMarket(props.commodity.symbol);
+  fetchTradingDayStatus(market);
+});
+
+// 检查该商品是否在关注列表中
+const isWatched = computed(() => {
+  return store.watchedCommodities.some(
+    (item) => item.symbol.toUpperCase() === props.commodity.symbol.toUpperCase()
+  );
+});
+
 const changeClass = computed(() => {
   if (props.commodity.changePercent > 0) return 'rising';
   if (props.commodity.changePercent < 0) return 'falling';
   return 'neutral';
+});
+
+// 判断是否为交易日
+function isTradingDay(): boolean {
+  const now = new Date();
+  const shanghaiTime = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+  const shanghaiDate = new Date(shanghaiTime);
+  const day = shanghaiDate.getDay();
+  const hour = shanghaiDate.getHours();
+  const minute = shanghaiDate.getMinutes();
+  const timeValue = hour * 60 + minute;
+
+  // 沪金交易时间: 日盘 9:00-15:30, 夜盘 19:50-02:30
+  // 日盘交易时段
+  const daySessionStart = 9 * 60;      // 9:00
+  const daySessionEnd = 15 * 60 + 30;   // 15:30
+  // 夜盘交易时段
+  const nightSessionStart = 19 * 60 + 50; // 19:50
+  const nightSessionEnd = 24 * 60;       // 24:00 (次日)
+
+  const isWeekend = day === 0 || day === 6;
+  const isDaySession = timeValue >= daySessionStart && timeValue < daySessionEnd;
+  const isNightSession = timeValue >= nightSessionStart || timeValue < 2 * 60 + 30;
+
+  return !isWeekend && (isDaySession || isNightSession);
+}
+
+// 交易状态判断
+const tradingStatus = computed(() => {
+  // 优先使用后端返回的状态
+  if (props.commodity.tradingStatus) {
+    return props.commodity.tradingStatus;
+  }
+
+  const timestamp = props.commodity.timestamp;
+  const symbol = props.commodity.symbol;
+  const market = getCommodityMarket(symbol);
+  
+  // 检查缓存的交易日状态
+  const cachedTradingDay = tradingDayCache.value[market];
+
+  // 如果不是交易日（周末/节假日），直接返回 closed
+  if (cachedTradingDay === false) {
+    return 'closed';
+  }
+
+  // 如果是交易日，检查交易时段
+  if (timestamp) {
+    try {
+      // 处理纯时间格式 "15:30:00" (沪金实时数据)
+      const timeMatch = timestamp.match(/^(\d{2}):(\d{2}):(\d{2})$/);
+      if (timeMatch) {
+        // 获取当前上海时间
+        const now = new Date();
+        const shanghaiTime = now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+        const shanghaiDate = new Date(shanghaiTime);
+        const day = shanghaiDate.getDay();
+        const hour = shanghaiDate.getHours();
+        const minute = shanghaiDate.getMinutes();
+        const timeValue = hour * 60 + minute;
+
+        // 沪金交易时间: 日盘 9:00-15:30, 夜盘 19:50-02:30
+        const daySessionStart = 9 * 60;
+        const daySessionEnd = 15 * 60 + 30;
+        const nightSessionStart = 19 * 60 + 50;
+
+        // 周末非交易
+        if (day === 0 || day === 6) {
+          return 'closed';
+        }
+
+        // 日盘交易时段
+        if (timeValue >= daySessionStart && timeValue < daySessionEnd) {
+          return 'open';
+        }
+        // 夜盘交易时段
+        if (timeValue >= nightSessionStart || timeValue < 2 * 60 + 30) {
+          return 'open';
+        }
+        return 'closed';
+      }
+
+      // 处理完整时间格式 "2026-02-14 05:59:50 UTC"
+      const dateStr = timestamp.replace(' UTC', '').trim();
+      const dataTime = new Date(dateStr + 'Z');
+      const now = new Date();
+      const diffMinutes = (now.getTime() - dataTime.getTime()) / (1000 * 60);
+
+      // 数据超过15分钟认为已收盘
+      if (diffMinutes > 15) {
+        return 'closed';
+      }
+      return 'open';
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  // 加密货币 24/7 交易
+  if (market === 'crypto') {
+    return 'open';
+  }
+
+  return 'unknown';
+});
+
+const statusText = computed(() => {
+  const labels: Record<string, string> = {
+    'open': '交易中',
+    'closed': '已收盘',
+    'unknown': '未知',
+  };
+  return labels[tradingStatus.value] || '未知';
 });
 
 // 价格动画状态
@@ -101,6 +266,19 @@ function triggerChangeAnimation() {
   setTimeout(() => changeAnimating.value = false, 500);
 }
 
+async function toggleWatch() {
+  const category = getCommodityCategory(props.commodity.symbol);
+  if (isWatched.value) {
+    await store.removeFromWatchlist(props.commodity.symbol);
+  } else {
+    await store.addToWatchlist(
+      props.commodity.symbol,
+      props.commodity.name,
+      category
+    );
+  }
+}
+
 function formatPrice(value: number): string {
   if (value == null) return '--';
   if (value >= 1000) {
@@ -124,9 +302,16 @@ function formatPercent(value: number): string {
 function formatTime(dateStr: string): string {
   if (!dateStr) return '--';
   try {
-    // 后端返回 UTC 时间字符串，如 "2026-02-13 21:59:50 UTC"
+    // 处理纯日期格式 "2026-02-13"
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+    // 处理纯时间格式 "15:30:00" (沪金实时数据)
+    if (/^\d{2}:\d{2}:\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+    // 处理 "2026-02-13 21:59:50 UTC" 格式
     const utcStr = dateStr.replace(' UTC', '').trim();
-    // 解析 "2026-02-13 21:59:50" 为 UTC 时间
     const date = new Date(utcStr + 'Z');
     return date.toLocaleTimeString('zh-CN', {
       timeZone: 'Asia/Shanghai',
@@ -194,6 +379,12 @@ function formatTime(dateStr: string): string {
   margin-bottom: var(--spacing-md);
 }
 
+.header-tags {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
 .commodity-info {
   display: flex;
   flex-direction: column;
@@ -214,6 +405,104 @@ function formatTime(dateStr: string): string {
 }
 
 .commodity-source {
+  font-size: var(--font-size-xs);
+  padding: 2px 8px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+}
+
+.trading-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  .status-text {
+    line-height: 1;
+  }
+
+  &.status-open {
+    background: var(--color-rise-bg);
+    color: var(--color-rise);
+
+    .status-dot {
+      background: var(--color-rise);
+    }
+  }
+
+  &.status-closed {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-tertiary);
+
+    .status-dot {
+      background: var(--color-text-tertiary);
+    }
+  }
+
+  &.status-unknown {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-tertiary);
+
+    .status-dot {
+      background: var(--color-text-tertiary);
+    }
+  }
+}
+
+.action-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  opacity: 0;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    background: var(--color-bg-tertiary);
+  }
+}
+
+.watch-btn {
+  &:hover {
+    color: var(--color-rise);
+  }
+
+  &.active {
+    opacity: 1;
+    color: #fbbf24;
+
+    svg {
+      fill: #fbbf24;
+    }
+  }
+}
+
+.commodity-card:hover .action-btn {
+  opacity: 1;
+}
+
+.card-body {
   font-size: var(--font-size-xs);
   padding: 2px 8px;
   background: var(--color-bg-tertiary);

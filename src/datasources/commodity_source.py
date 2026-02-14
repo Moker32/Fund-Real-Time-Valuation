@@ -64,9 +64,10 @@ class YFinanceCommoditySource(CommodityDataSource):
     # 商品 ticker 映射
     COMMODITY_TICKERS = {
         # 贵金属
-        "gold": "GC=F",  # COMEX 黄金
+        "gold": "GC=F",  # COMEX 黄金期货
         "gold_cny": "SG=f",  # 上海黄金
-        "silver": "SI=F",  # 白银
+        "gold_pax": "PAXG-USD",  # Pax Gold (数字黄金)
+        "silver": "SI=F",  # 国际白银
         "platinum": "PT=F",  # 铂金
         "palladium": "PA=F",  # 钯金
         # 能源
@@ -247,7 +248,8 @@ class YFinanceCommoditySource(CommodityDataSource):
         """获取商品名称"""
         names = {
             "gold": "黄金 (COMEX)",
-            "gold_cny": "黄金 (上海)",
+            "gold_cny": "沪金",
+            "gold_pax": "Pax Gold",
             "wti": "WTI原油",
             "brent": "布伦特原油",
             "silver": "白银",
@@ -387,34 +389,99 @@ class AKShareCommoditySource(CommodityDataSource):
             return self._handle_error(e, self.name)
 
     async def _fetch_gold_cny(self) -> dict[str, Any] | None:
-        """获取上海黄金交易所 Au99.99 基准价数据"""
+        """获取上海黄金交易所 Au99.99 实时行情数据"""
         import akshare as ak
 
-        # 使用基准价接口（虽然不是实时，但可用）
-        df = ak.spot_golden_benchmark_sge()
-        if df is not None and not df.empty:
-            # 取最新一天的数据
-            latest = df.iloc[-1]
-            trade_date = latest.get("交易时间", "")
-            night_price = float(latest.get("晚盘价", 0) or 0)
-            day_price = float(latest.get("早盘价", 0) or 0)
-            # 使用晚盘价作为当前价格（更接近实时）
-            price = night_price if night_price > 0 else day_price
-            return {
-                "commodity": "gold_cny",
-                "symbol": "Au99.99",
-                "name": "Au99.99 (上海黄金)",
-                "price": price,
-                "change": None,
-                "change_percent": None,
-                "time": str(trade_date),
-                "high": None,
-                "low": None,
-                "open": day_price if day_price > 0 else None,
-                "prev_close": night_price if night_price > 0 else None,
-                "currency": "CNY",
-                "exchange": "SGE",
-            }
+        try:
+            # 优先使用实时行情接口
+            df = ak.spot_quotations_sge()
+            if df is not None and not df.empty:
+                # 找到 Au99.99 的最新数据
+                au_df = df[df["品种"] == "Au99.99"]
+                if not au_df.empty:
+                    latest = au_df.iloc[-1]
+                    price = float(latest.get("现价", 0) or 0)
+                    update_time = latest.get("更新时间", "")
+                    trade_time = latest.get("时间", "")
+
+                    # 获取当日开盘价（第一条数据）
+                    open_price = float(au_df.iloc[0].get("现价", 0)) if len(au_df) > 0 else None
+                    # 获取当日最高最低
+                    high_price = au_df["现价"].astype(float).max()
+                    low_price = au_df["现价"].astype(float).min()
+
+                    # 获取昨日收盘价（从历史接口）
+                    prev_close = None
+                    try:
+                        hist_df = ak.spot_hist_sge(symbol="Au99.99")
+                        if hist_df is not None and len(hist_df) >= 2:
+                            prev_close = float(hist_df.iloc[-2].get("close", 0) or 0)
+                    except Exception:
+                        pass
+
+                    # 计算涨跌幅
+                    change = None
+                    change_percent = None
+                    if prev_close and prev_close > 0:
+                        change = round(price - prev_close, 2)
+                        change_percent = round((change / prev_close) * 100, 2)
+
+                    return {
+                        "commodity": "gold_cny",
+                        "symbol": "Au99.99",
+                        "name": "Au99.99 (上海黄金)",
+                        "price": price,
+                        "change": change,
+                        "change_percent": change_percent,
+                        "time": f"{trade_time}" if trade_time else str(update_time),
+                        "high": high_price if high_price > 0 else None,
+                        "low": low_price if low_price > 0 else None,
+                        "open": open_price if open_price and open_price > 0 else None,
+                        "prev_close": prev_close,
+                        "currency": "CNY",
+                        "exchange": "SGE",
+                    }
+        except Exception as e:
+            logger.warning(f"获取沪金实时数据失败，尝试备用接口: {e}")
+
+        # 备用：使用历史数据接口
+        try:
+            df = ak.spot_hist_sge(symbol="Au99.99")
+            if df is not None and not df.empty:
+                latest = df.iloc[-1]
+                trade_date = latest.get("date", "")
+                price = float(latest.get("close", 0) or 0)
+                open_price = float(latest.get("open", 0) or 0)
+                high = float(latest.get("high", 0) or 0)
+                low = float(latest.get("low", 0) or 0)
+                prev_close = None
+                if len(df) >= 2:
+                    prev_close = float(df.iloc[-2].get("close", 0) or 0)
+
+                change = None
+                change_percent = None
+                if prev_close and prev_close > 0:
+                    change = round(price - prev_close, 2)
+                    change_percent = round((change / prev_close) * 100, 2)
+
+                return {
+                    "commodity": "gold_cny",
+                    "symbol": "Au99.99",
+                    "name": "Au99.99 (上海黄金)",
+                    "price": price,
+                    "change": change,
+                    "change_percent": change_percent,
+                    "time": str(trade_date),
+                    "high": high if high > 0 else None,
+                    "low": low if low > 0 else None,
+                    "open": open_price if open_price > 0 else None,
+                    "prev_close": prev_close,
+                    "currency": "CNY",
+                    "exchange": "SGE",
+                }
+        except Exception as e2:
+            logger.warning(f"备用接口也失败: {e2}")
+
         return None
 
     async def fetch_batch(self, commodity_types: list[str]) -> list[DataSourceResult]:
@@ -547,6 +614,7 @@ def get_all_commodity_types() -> list[str]:
         # 贵金属
         "gold",
         "gold_cny",
+        "gold_pax",
         "silver",
         # 能源
         "wti",
@@ -574,7 +642,7 @@ def get_all_commodity_types() -> list[str]:
 def get_commodities_by_category() -> dict[CommodityCategory, list[str]]:
     """获取按分类组织的商品类型"""
     return {
-        CommodityCategory.PRECIOUS_METAL: ["gold", "gold_cny", "silver"],
+        CommodityCategory.PRECIOUS_METAL: ["gold", "gold_cny", "gold_pax", "silver"],
         CommodityCategory.ENERGY: ["wti", "brent", "natural_gas"],
         CommodityCategory.BASE_METAL: ["copper", "aluminum", "zinc", "nickel"],
         CommodityCategory.AGRICULTURE: ["soybean", "corn", "wheat", "coffee", "sugar"],

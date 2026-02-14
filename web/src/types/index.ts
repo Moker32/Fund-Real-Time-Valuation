@@ -56,6 +56,7 @@ export interface Commodity {
   prevClose: number;
   source?: string;
   timestamp: string;
+  tradingStatus?: string; // 交易状态: 'open', 'closed'
 }
 
 export interface CommodityListResponse {
