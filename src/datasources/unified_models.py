@@ -73,9 +73,7 @@ class DataResponse:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
-        if self.success and self.status == ResponseStatus.SUCCESS:
-            self.status = ResponseStatus.SUCCESS
-        elif not self.success and self.status == ResponseStatus.SUCCESS:
+        if not self.success:
             self.status = ResponseStatus.FAILED
 
     def to_dict(self) -> dict[str, Any]:

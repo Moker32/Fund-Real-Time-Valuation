@@ -180,12 +180,10 @@ class HotBackupManager:
         for task in done:
             success, resp, latency = task.result()
             result.total_calls += 1
-            if success:
-                result.successful_calls += 1
-                if isinstance(resp, DataResponse):
-                    responses.append((resp, latency))
-                    if result.fastest_response_ms == 0 or latency < result.fastest_response_ms:
-                        result.fastest_response_ms = latency
+            if isinstance(resp, DataResponse):
+                responses.append((resp, latency))
+                if result.fastest_response_ms == 0 or latency < result.fastest_response_ms:
+                    result.fastest_response_ms = latency
 
         if responses:
             successful_responses = [

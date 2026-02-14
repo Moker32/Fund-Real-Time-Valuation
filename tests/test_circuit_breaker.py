@@ -21,13 +21,13 @@ class TestCircuitBreaker:
         )
         assert breaker.state == CircuitState.CLOSED
 
-        asyncio.get_event_loop().run_until_complete(breaker.record_failure())
+        asyncio.run(breaker.record_failure())
         assert breaker.state == CircuitState.CLOSED
 
-        asyncio.get_event_loop().run_until_complete(breaker.record_failure())
+        asyncio.run(breaker.record_failure())
         assert breaker.state == CircuitState.CLOSED
 
-        asyncio.get_event_loop().run_until_complete(breaker.record_failure())
+        asyncio.run(breaker.record_failure())
         assert breaker.state == CircuitState.OPEN
         assert breaker.can_execute() is False
 
@@ -37,11 +37,11 @@ class TestCircuitBreaker:
             CircuitConfig(failure_threshold=3),
         )
 
-        asyncio.get_event_loop().run_until_complete(breaker.record_failure())
-        asyncio.get_event_loop().run_until_complete(breaker.record_failure())
+        asyncio.run(breaker.record_failure())
+        asyncio.run(breaker.record_failure())
         assert breaker._failure_count == 2
 
-        asyncio.get_event_loop().run_until_complete(breaker.record_success())
+        asyncio.run(breaker.record_success())
         assert breaker._failure_count == 0
 
     def test_half_open_after_timeout(self):
@@ -50,14 +50,14 @@ class TestCircuitBreaker:
             CircuitConfig(failure_threshold=1, timeout_seconds=0.1),
         )
 
-        asyncio.get_event_loop().run_until_complete(breaker.record_failure())
+        asyncio.run(breaker.record_failure())
         assert breaker.state == CircuitState.OPEN
 
         import time
 
         time.sleep(0.2)
 
-        asyncio.get_event_loop().run_until_complete(breaker.record_half_open())
+        asyncio.run(breaker.record_half_open())
         assert breaker.state == CircuitState.HALF_OPEN
 
     def test_half_open_to_closed(self):
@@ -70,18 +70,18 @@ class TestCircuitBreaker:
             ),
         )
 
-        asyncio.get_event_loop().run_until_complete(breaker.record_failure())
+        asyncio.run(breaker.record_failure())
         assert breaker.state == CircuitState.OPEN
 
         import time
 
         time.sleep(0.2)
 
-        asyncio.get_event_loop().run_until_complete(breaker.record_half_open())
+        asyncio.run(breaker.record_half_open())
         assert breaker.state == CircuitState.HALF_OPEN
 
-        asyncio.get_event_loop().run_until_complete(breaker.record_success())
-        asyncio.get_event_loop().run_until_complete(breaker.record_success())
+        asyncio.run(breaker.record_success())
+        asyncio.run(breaker.record_success())
         assert breaker.state == CircuitState.CLOSED
 
     def test_get_stats(self):
