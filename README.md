@@ -9,6 +9,7 @@
 - **财经新闻** - 聚合多来源财经新闻
 - **价格预警** - 设置目标价格，自动触发通知
 - **数据缓存** - 智能缓存减少 API 调用
+- **交易日历** - 全球市场交易/休市日查询
 
 ## 快速开始
 
@@ -36,10 +37,11 @@ pnpm run dev
 │   └── routes/             # API 路由
 │       ├── funds.py        # 基金 API
 │       ├── commodities.py  # 商品 API
-│       └── overview.py     # 市场概览 API
+│       ├── indices.py      # 指数 API
+│       ├── sectors.py      # 板块 API
+│       └── trading_calendar.py # 交易日历 API
 ├── web/                    # Vue 3 前端
-│   ├── src/               # 前端源码
-│   └── package.json       # 前端依赖
+│   └── src/               # 前端源码
 ├── src/                    # Python 源码
 │   ├── datasources/       # 数据源层
 │   ├── config/            # 配置管理
@@ -68,10 +70,27 @@ uv run ruff check .              # Python 代码检查
 uv run ruff check --fix .        # 自动修复
 uv run mypy .                    # 类型检查
 cd web && pnpm run lint          # 前端代码检查
-cd web && pnpm run typecheck    # 前端类型检查
 
 # 构建前端
 pnpm run build:web
+```
+
+## API 示例
+
+### 交易日历
+
+```bash
+# 获取A股2025年交易日历
+curl "http://localhost:8000/trading-calendar/calendar/china?year=2025"
+
+# 判断是否为交易日
+curl "http://localhost:8000/trading-calendar/is-trading-day/china?check_date=2025-01-28"
+
+# 获取下一个交易日
+curl "http://localhost:8000/trading-calendar/next-trading-day/china"
+
+# 获取多市场状态
+curl "http://localhost:8000/trading-calendar/market-status?markets=china,usa"
 ```
 
 ## 许可证

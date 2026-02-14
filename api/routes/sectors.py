@@ -82,7 +82,7 @@ async def get_industry_sectors(
     # 处理三种数据格式
     if isinstance(data, list):
         # Sina 格式转换
-        sectors = []
+        sectors: list[dict] = []
         for item in data:
             sectors.append(
                 {

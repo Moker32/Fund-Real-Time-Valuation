@@ -1,43 +1,116 @@
 # AGENTS.md
 
 > **注意:** 对于 Claude Code，请优先参考 `CLAUDE.md` 获取项目指南。
+> 本文件供在此仓库中工作的 AI 编程代理使用。
 
-本文件记录开发过程中的约定和历史信息。
+## 项目概览
 
-## 项目信息
+- **项目**: Fund Real-Time Valuation
+- **技术栈**: Python 3.10+, FastAPI, Vue 3 + TypeScript, SQLite, akshare, yfinance
+- **pnpm 工作空间**: backend (FastAPI) + frontend (Vue 3)
 
-- **创建日期**: 2026-02-04
-- **项目**: Fund Real-Time Valuation (Flet GUI)
-- **技术栈**: Python 3.10+, Flet 0.80.5, SQLite, YAML, httpx, akshare
+## 构建 / Lint / 测试命令
 
-## 架构概览
+```bash
+# 安装依赖
+pnpm run install:all
+
+# 运行开发服务器
+pnpm run dev              # 前端 + 后端
+pnpm run dev:web         # 前端 (Vite, 端口 3000)
+pnpm run dev:api         # 后端 (FastAPI, 端口 8000)
+
+# Python 测试
+uv run pytest tests/ -v                              # 所有测试
+uv run pytest tests/test_file.py -v                  # 单个文件
+uv run pytest tests/test_file.py::test_function -v   # 单个测试
+uv run pytest tests/ -k "pattern" -v                # 按模式运行
+
+# Python lint 和类型检查
+uv run ruff check .              # Lint
+uv run ruff check --fix .       # 自动修复
+uv run mypy .                   # 类型检查
+pnpm run lint                   # 后端 lint
+pnpm run check                  # Lint + 类型检查
+```
+
+## 代码风格指南
+
+### Python (后端)
+
+**导入顺序**: 标准库 → 第三方 → 本地模块。使用绝对导入：
+```python
+from src.datasources.manager import DataSourceManager
+from api.routes import funds
+```
+
+**格式**: 行长 100 字符，4 空格缩进，尾部逗号。
+
+**类型**: Python 3.10+ 类型提示 (`| None` 而非 `Optional[]`)。除非必要否则避免 `Any`。
+
+**命名**:
+- 文件: snake_case (`fund_source.py`)
+- 类: PascalCase (`DataSourceManager`)
+- 函数: snake_case (`get_fund_data`)
+- 常量: UPPER_SNAKE_CASE
+- 私有: 前缀 `_`
+
+**错误处理**:
+- 外部调用用 try/except 包装
+- 返回 `DataSourceResult(success=False, error=...)` 而非 raise
+- 禁止 bare `except:`
+- 使用 `logger.error()` / `logger.warning()` 记录日志
+
+### TypeScript / Vue (前端)
+
+- 绝对导入: `@/components/...`
+- Composition API + `<script setup>`
+- TypeScript 严格模式
+- Props/Events: camelCase
+- 组件: PascalCase
+
+## 架构
 
 ```
-run_gui.py               # 入口点 (依赖检查 + GUI 启动)
+api/           # FastAPI 路由
+  routes/      # 端点处理器
 src/
-├── gui/                # Flet GUI 层 (卡片、图表、主题)
-├── datasources/        # 数据源层 (akshare, yfinance)
-├── db/                 # SQLite 持久化
-└── config/             # 配置模型
-tests/                  # pytest 测试
-docs/plans/             # 开发计划
+  datasources/ # 数据获取器 (akshare, yfinance 等)
+  db/          # SQLite DAOs
+  config/      # 配置管理
+web/           # Vue 3 前端
+tests/         # pytest 测试文件
 ```
 
-## 代码结构速查
+## 数据源模式
 
-| 组件 | 位置 | 说明 |
-|------|------|------|
-| 主应用 | `src/gui/main.py` | FundGUIApp 类，标签页，事件处理 |
-| 卡片组件 | `src/gui/components.py` | FundCard, FundPortfolioCard 等 |
-| 主题/颜色 | `src/gui/theme.py` | AppColors, ChangeColors |
-| 数据源 | `src/datasources/` | 所有数据源实现 |
-| 源管理器 | `src/datasources/manager.py` | 多源故障切换 |
-| 数据库 | `src/db/database.py` | SQLite 模式 |
-| 配置模型 | `src/config/models.py` | Fund, Holding 等 |
+```python
+class MyDataSource(DataSource):
+    async def fetch(self, *args) -> DataSourceResult:
+        try:
+            data = await self._fetch(...)
+            return DataSourceResult(success=True, data=data, source=self.name)
+        except Exception as e:
+            logger.warning(f"获取失败: {e}")
+            return DataSourceResult(success=False, error=str(e))
+```
 
-## 子目录 AGENTS
+## 反模式
 
-- `src/gui/AGENTS.md` - Flet GUI 组件和模式
-- `src/datasources/AGENTS.md` - 数据源架构
-- `src/db/AGENTS.md` - 数据库模式和 DAO 模式
-- `tests/AGENTS.md` - 测试约定和固件
+- **禁止**: 使用 `as any`, `@ts-ignore`, `@ts-expect-error`
+- **禁止**: bare `except:` 或空 catch 块
+- **禁止**: 不运行 lint 就提交 (`pnpm run lint`)
+- **禁止**: 跳过类型检查
+
+## 测试
+
+- 测试文件: `tests/test_*.py`
+- 使用 `conftest.py` 中的 fixtures
+- 异步测试: `@pytest.mark.asyncio`
+- 命名: `test_<方法名>`
+
+## 备注
+
+- 配置: `~/.fund-tui/config.yaml`, `~/.fund-tui/funds.yaml`
+- 数据库: `~/.fund-tui/fund_data.db`
+- mypy 中禁用的第三方类型: akshare, yfinance, matplotlib, pandas, numpy

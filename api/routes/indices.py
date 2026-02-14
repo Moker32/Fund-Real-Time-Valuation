@@ -166,6 +166,8 @@ def get_display_timestamp(index_type: str, data_timestamp: str | None) -> str | 
     # 计算当天收盘时间
     today = data_dt_tz.date()
     close_time_str = market_info.get("close")  # 如 "08:00" (UTC时间)
+    if close_time_str is None:
+        return data_timestamp
     try:
         # 将 UTC 收盘时间转换为市场时区时间
         close_utc_dt = datetime.strptime(close_time_str, "%H:%M")
