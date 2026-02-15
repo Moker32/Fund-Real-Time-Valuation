@@ -725,8 +725,8 @@ def create_default_manager(
     # === 新增 AKShare 舆情数据源 ===
     from .akshare_sentiment_source import (
         AKShareEconomicNewsDataSource,
-        AKShareWeiboSentimentDataSource,
         AKShareSentimentAggregatorDataSource,
+        AKShareWeiboSentimentDataSource,
     )
 
     manager.register(AKShareEconomicNewsDataSource())

@@ -742,7 +742,7 @@ class EastMoneyDirectSource(DataSource):
             "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13",
         }
 
-        sectors = []
+        sectors: list[dict[str, Any]] = []
         try:
             response = await self.client.get(url, params=params)
             response.raise_for_status()

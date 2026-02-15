@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from src.datasources.cache_cleaner import CacheCleaner, get_cache_cleaner
 from src.datasources.cache_warmer import CacheWarmer
 from src.datasources.manager import create_default_manager
-from src.utils.log_buffer import LogBuffer, get_log_buffer
+from src.utils.log_buffer import get_log_buffer
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +35,8 @@ from .routes import (
     news,
     overview,
     sectors,
-    trading_calendar,
     sentiment,
+    trading_calendar,
 )
 
 # 配置日志：将日志同时输出到缓冲区和标准输出

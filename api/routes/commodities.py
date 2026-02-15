@@ -15,6 +15,7 @@ from src.config.commodities_config import CommoditiesConfig
 from src.datasources.base import DataSourceType
 from src.datasources.commodity_source import (
     AKShareCommoditySource,
+    YFinanceCommoditySource,
     get_all_available_commodities,
     get_all_commodity_types,
     get_commodities_by_category,
