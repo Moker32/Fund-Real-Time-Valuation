@@ -186,6 +186,8 @@ const updateColor = () => {
 
 // 监听数据变化
 watch(() => props.data, (newData) => {
+  if (!uplotInstance) return;
+  
   if (!newData || newData.length === 0) return;
 
   // 更新颜色
@@ -199,6 +201,10 @@ watch(() => props.data, (newData) => {
 
 onMounted(() => {
   initChart();
+  // 如果挂载时数据已存在，立即更新图表
+  if (props.data && props.data.length > 0) {
+    updateData();
+  }
   window.addEventListener('resize', handleResize);
 });
 
