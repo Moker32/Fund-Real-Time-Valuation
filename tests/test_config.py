@@ -2,6 +2,8 @@
 配置模块测试
 """
 
+import pytest
+
 from src.config.models import (
     AlertDirection,
     AppConfig,
@@ -180,3 +182,72 @@ class TestNotificationConfig:
         
         alerts_000002 = config.get_alerts_for_fund("000002")
         assert len(alerts_000002) == 1
+
+
+class TestConfigManager:
+    """配置管理器测试"""
+
+    @pytest.fixture
+    def manager(self, tmp_path):
+        from src.config.manager import ConfigManager
+        return ConfigManager(config_dir=str(tmp_path))
+
+    def test_config_dir_created(self, manager):
+        """测试配置目录已创建"""
+        import os
+        assert os.path.exists(manager.get_config_dir())
+
+    def test_add_watchlist(self, manager):
+        """测试添加自选基金"""
+        fund = Fund(code="000001", name="测试基金")
+        result = manager.add_watchlist(fund)
+        assert result is True
+
+    def test_add_duplicate_watchlist(self, manager):
+        """测试添加重复自选基金"""
+        fund = Fund(code="000001", name="测试基金")
+        manager.add_watchlist(fund)
+        result = manager.add_watchlist(fund)
+        assert result is False
+
+    def test_remove_watchlist(self, manager):
+        """测试移除自选基金"""
+        fund = Fund(code="000001", name="测试基金")
+        manager.add_watchlist(fund)
+        result = manager.remove_watchlist("000001")
+        assert result is True
+
+    def test_add_holding(self, manager):
+        """测试添加持仓"""
+        holding = Holding(code="000001", name="测试基金", shares=100, cost=1.5)
+        result = manager.add_holding(holding)
+        assert result is True
+
+    def test_update_holding(self, manager):
+        """测试更新持仓"""
+        holding = Holding(code="000001", name="测试基金", shares=100, cost=1.5)
+        manager.add_holding(holding)
+        
+        updated = Holding(code="000001", name="测试基金", shares=200, cost=1.8)
+        result = manager.update_holding(updated)
+        assert result is True
+
+    def test_remove_holding(self, manager):
+        """测试移除持仓"""
+        holding = Holding(code="000001", name="测试基金", shares=100, cost=1.5)
+        manager.add_holding(holding)
+        result = manager.remove_holding("000001")
+        assert result is True
+
+    def test_add_commodity(self, manager):
+        """测试添加商品"""
+        commodity = Commodity(symbol="GC=F", name="黄金", source="akshare")
+        result = manager.add_commodity(commodity)
+        assert result is True
+
+    def test_remove_commodity(self, manager):
+        """测试移除商品"""
+        commodity = Commodity(symbol="GC=F", name="黄金", source="akshare")
+        manager.add_commodity(commodity)
+        result = manager.remove_commodity("GC=F")
+        assert result is True
