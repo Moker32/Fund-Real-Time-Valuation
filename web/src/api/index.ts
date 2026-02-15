@@ -401,4 +401,14 @@ export const newsApi = {
   },
 };
 
+export const stockApi = {
+  async getStocks(codes: string): Promise<Stock[]> {
+    return api.get('/api/stocks', { params: { codes } });
+  },
+
+  async getStock(code: string): Promise<Stock> {
+    return api.get(`/api/stocks/${code}`);
+  },
+};
+
 export { api };

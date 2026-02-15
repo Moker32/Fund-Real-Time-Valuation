@@ -76,6 +76,14 @@
           <span v-if="!sidebarCollapsed" class="nav-text">债券行情</span>
         </router-link>
 
+        <router-link to="/stocks" class="nav-item" :class="{ active: currentRoute === 'stocks' }">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 3v18h18"/>
+            <path d="M7 14l4-4 4 4 5-5"/>
+          </svg>
+          <span v-if="!sidebarCollapsed" class="nav-text">股票行情</span>
+        </router-link>
+
         <router-link to="/settings" class="nav-item" :class="{ active: currentRoute === 'settings' }">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="12" cy="12" r="3"/>

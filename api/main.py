@@ -38,6 +38,7 @@ from .routes import (
     overview,
     sectors,
     sentiment,
+    stocks,
     trading_calendar,
 )
 
@@ -247,6 +248,7 @@ app.include_router(trading_calendar.router)
 app.include_router(news.router)
 app.include_router(sentiment.router)
 app.include_router(datasource.router)
+app.include_router(stocks.router)
 app.include_router(bonds.router)
 
 
