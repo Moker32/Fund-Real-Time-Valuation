@@ -66,6 +66,16 @@
           <span v-if="!sidebarCollapsed" class="nav-text">7×24快讯</span>
         </router-link>
 
+        <router-link to="/bonds" class="nav-item" :class="{ active: currentRoute === 'bonds' }">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="4" width="18" height="16" rx="2"/>
+            <path d="M7 8h10"/>
+            <path d="M7 12h6"/>
+            <path d="M7 16h4"/>
+          </svg>
+          <span v-if="!sidebarCollapsed" class="nav-text">债券行情</span>
+        </router-link>
+
         <router-link to="/settings" class="nav-item" :class="{ active: currentRoute === 'settings' }">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="12" cy="12" r="3"/>
