@@ -7,7 +7,6 @@
     "paths": {
       "@/*": ["src/*"]
     },
-    "ignoreDeprecations": "6.0",
 
     /* Linting */
     "strict": true,

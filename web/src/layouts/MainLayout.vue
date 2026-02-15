@@ -13,7 +13,15 @@
       </div>
 
       <nav class="sidebar-nav">
-        <router-link to="/" class="nav-item" :class="{ active: currentRoute === 'funds' }">
+        <router-link to="/" class="nav-item" :class="{ active: currentRoute === 'home' }">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+            <polyline points="9,22 9,12 15,12 15,22"/>
+          </svg>
+          <span v-if="!sidebarCollapsed" class="nav-text">首页</span>
+        </router-link>
+
+        <router-link to="/funds" class="nav-item" :class="{ active: currentRoute === 'funds' }">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M3 3V21H21"/>
             <path d="M7 14L11 10L15 12L21 6"/>
@@ -145,9 +153,10 @@ let commodityTimer: number | null = null;
 let indexTimer: number | null = null;
 let healthTimer: number | null = null;
 
-const currentRoute = computed(() => route.name as string || 'funds');
+const currentRoute = computed(() => route.name as string || 'home');
 const pageTitle = computed(() => {
   const titles: Record<string, string> = {
+    home: '首页',
     funds: '基金自选',
     commodities: '商品行情',
     indices: '全球市场',
