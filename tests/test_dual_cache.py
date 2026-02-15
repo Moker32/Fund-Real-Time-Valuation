@@ -2,9 +2,10 @@
 双层缓存测试
 """
 
-import pytest
 import asyncio
-from pathlib import Path
+
+import pytest
+
 from src.datasources.dual_cache import DualLayerCache, MemoryCache
 
 
