@@ -30,6 +30,7 @@ from .models import DataSourceHealthItem, HealthDetailResponse, HealthResponse
 from .routes import (
     cache,
     commodities,
+    datasource,
     funds,
     indices,
     news,
@@ -244,6 +245,7 @@ app.include_router(cache.router)
 app.include_router(trading_calendar.router)
 app.include_router(news.router)
 app.include_router(sentiment.router)
+app.include_router(datasource.router)
 
 
 @app.get(
