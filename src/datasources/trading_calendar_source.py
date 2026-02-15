@@ -187,6 +187,24 @@ class TradingCalendarSource(DataSource):
             return {k: v for k, v in CHINA_SPECIAL_DATES.items() if k.year == year}
         return {}
 
+    def _get_crypto_calendar(self, year: int) -> CalendarResult:
+        trading_days = []
+        for month in range(1, 13):
+            try:
+                for day in range(1, 32):
+                    d = date(year, month, day)
+                    trading_days.append(TradingDay(date=d, is_trading_day=True, holiday_name=None))
+            except ValueError:
+                continue
+        total_days = 366 if (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)) else 365
+        return CalendarResult(
+            market="crypto",
+            year=year,
+            trading_days=trading_days,
+            total_trading_days=total_days,
+            total_holidays=0,
+        )
+
     def is_within_trading_hours(
         self, market: Market | str, check_datetime: datetime | None = None
     ) -> dict:
@@ -247,7 +265,12 @@ class TradingCalendarSource(DataSource):
         end_date: date | None = None,
     ) -> CalendarResult:
         if isinstance(market, str):
-            market = Market(market)
+            try:
+                market = Market(market)
+            except ValueError:
+                if market.lower() == "crypto":
+                    return self._get_crypto_calendar(year or datetime.now().year)
+                raise ValueError(f"Unknown market: {market}")
 
         if year is None:
             year = datetime.now().year

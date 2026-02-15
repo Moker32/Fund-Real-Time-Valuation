@@ -338,8 +338,8 @@ class DataSourceHealthChecker:
 
         async def periodic_check():
             while self._running:
-                await self.check_all_sources(sources)
                 await asyncio.sleep(self.check_interval)
+                await self.check_all_sources(sources)
 
         self._check_task = asyncio.create_task(periodic_check())
 
