@@ -46,9 +46,9 @@ const chartData = computed((): FlowDataItem[] => {
       name: s.name,
       mainInflow: s.mainInflow || 0,
       smallInflow: s.smallInflow || 0,
-      mediumInflow: (s as any).mediumInflow,
-      largeInflow: (s as any).largeInflow,
-      hugeInflow: (s as any).hugeInflow,
+      mediumInflow: s.mediumInflow,
+      largeInflow: s.largeInflow,
+      hugeInflow: s.hugeInflow,
     }));
 });
 
@@ -207,7 +207,6 @@ const updateChart = () => {
   const data = chartData.value;
   if (data.length === 0) return;
 
-  const names = data.map(d => d.name);
   const mainFlows = data.map(d => d.mainInflow);
   const smallFlows = data.map(d => d.smallInflow);
   const mediumFlows = data.map(d => d.mediumInflow || 0);

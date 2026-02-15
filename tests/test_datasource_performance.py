@@ -81,12 +81,12 @@ class TestDataSourcePerformance:
         binance = BinanceCryptoSource()
         bn_result = await benchmark_source(binance, ["BTCUSDT", "ETHUSDT"], 2)
 
-        print(f"\nCoinGecko (新备份源):")
+        print("\nCoinGecko (新备份源):")
         print(f"  成功率: {cg_result.success_rate:.0f}%")
         print(f"  平均响应: {cg_result.avg_response_time:.2f}s")
         print(f"  P95响应: {cg_result.p95_response_time:.2f}s")
 
-        print(f"\nBinance (现有主源):")
+        print("\nBinance (现有主源):")
         print(f"  成功率: {bn_result.success_rate:.0f}%")
         print(f"  平均响应: {bn_result.avg_response_time:.2f}s")
         print(f"  P95响应: {bn_result.p95_response_time:.2f}s")
@@ -111,18 +111,18 @@ class TestDataSourcePerformance:
         sina = SinaStockDataSource()
         sina_result = await benchmark_source(sina, ["sh600000"], 2)
 
-        print(f"\nBaostock (新数据源):")
+        print("\nBaostock (新数据源):")
         print(f"  成功率: {bs_result.success_rate:.0f}%")
         print(f"  平均响应: {bs_result.avg_response_time:.2f}s")
 
-        print(f"\nSina (现有数据源):")
+        print("\nSina (现有数据源):")
         print(f"  成功率: {sina_result.success_rate:.0f}%")
         print(f"  平均响应: {sina_result.avg_response_time:.2f}s")
 
         if bs_result.avg_response_time < sina_result.avg_response_time:
-            print(f"\n✓ Baostock 更快")
+            print("\n✓ Baostock 更快")
         else:
-            print(f"\n✓ Sina 更快")
+            print("\n✓ Sina 更快")
 
     @pytest.mark.asyncio
     async def test_fund_sources(self):
@@ -133,16 +133,16 @@ class TestDataSourcePerformance:
         fund123 = Fund123DataSource()
         f123_result = await benchmark_source(fund123, ["161039"], 2)
 
-        print(f"\nFund123 (现有主源):")
+        print("\nFund123 (现有主源):")
         print(f"  成功率: {f123_result.success_rate:.0f}%")
         print(f"  平均响应: {f123_result.avg_response_time:.2f}s")
 
         tushare = TushareFundSource()
         ts_result = await benchmark_source(tushare, ["161039"], 2)
 
-        print(f"\nTushare (新数据源 - 无Token):")
+        print("\nTushare (新数据源 - 无Token):")
         print(f"  成功率: {ts_result.success_rate:.0f}%")
         if ts_result.success_rate == 0:
-            print(f"  说明: 需要配置 TUSHARE_TOKEN 环境变量")
+            print("  说明: 需要配置 TUSHARE_TOKEN 环境变量")
 
         assert f123_result.success_rate >= 50

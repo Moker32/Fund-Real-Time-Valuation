@@ -64,9 +64,9 @@ const parseTimeToTimestamp = (timeStr: string): number => {
   // 尝试解析其他格式
   const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:[\sT](\d{2}):(\d{2}):?(\d{2})?)?$/);
   if (match) {
-    const year = parseInt(match[1], 10);
-    const month = parseInt(match[2], 10) - 1;
-    const day = parseInt(match[3], 10);
+    const year = parseInt(match[1] ?? '0', 10);
+    const month = (parseInt(match[2] ?? '0', 10)) - 1;
+    const day = parseInt(match[3] ?? '0', 10);
     const hour = match[4] ? parseInt(match[4], 10) : 0;
     const minute = match[5] ? parseInt(match[5], 10) : 0;
     const second = match[6] ? parseInt(match[6], 10) : 0;
@@ -144,9 +144,11 @@ const updateData = () => {
 
   for (const item of validData) {
     const ts = parseTimeToTimestamp(item.time);
-    const price = 'close' in item ? item.close : item.price;
-    timestamps.push(ts);
-    values.push(price);
+    const price = 'close' in item ? (item.close ?? item.price) : item.price;
+    if (price !== undefined) {
+      timestamps.push(ts);
+      values.push(price);
+    }
   }
 
   // 按时间排序
@@ -155,8 +157,11 @@ const updateData = () => {
   const sortedValues: number[] = [];
 
   for (const { ts, i } of sortedIndices) {
-    sortedTimestamps.push(ts);
-    sortedValues.push(values[i]);
+    const val = values[i];
+    if (val !== undefined) {
+      sortedTimestamps.push(ts);
+      sortedValues.push(val);
+    }
   }
 
   const newData: [number[], number[]] = [sortedTimestamps, sortedValues];
@@ -173,8 +178,7 @@ const updateColor = () => {
 
   const newColor = getTrendColor();
   try {
-    // uPlot 通过 series[1].stroke 设置颜色
-    uplotInstance.setSeries(1, { stroke: newColor });
+    uplotInstance.setSeries(1, { stroke: newColor } as any);
   } catch {
     // 忽略颜色更新错误
   }

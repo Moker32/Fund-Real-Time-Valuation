@@ -47,12 +47,6 @@ from .base import (
     NetworkError,
 )
 from .bond_source import AKShareBondSource, EastMoneyBondSource, SinaBondDataSource
-from .stock_source import (
-    BaostockStockSource,
-    SinaStockDataSource,
-    StockDataAggregator,
-    YahooStockSource,
-)
 from .cache_cleaner import CacheCleaner, get_cache_cleaner, startup_cleanup
 from .commodity_source import (
     AKShareCommoditySource,
@@ -87,6 +81,12 @@ from .portfolio import (
     PortfolioAnalyzer,
     PortfolioPosition,
     PortfolioResult,
+)
+from .stock_source import (
+    BaostockStockSource,
+    SinaStockDataSource,
+    StockDataAggregator,
+    YahooStockSource,
 )
 
 __all__ = [

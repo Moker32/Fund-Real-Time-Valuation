@@ -199,7 +199,13 @@ export interface Sector {
   mainInflowPct?: number;
   smallInflow?: number;
   smallInflowPct?: number;
-  // 数据时间
+  mediumInflow?: number;
+  mediumInflowPct?: number;
+  largeInflow?: number;
+  largeInflowPct?: number;
+  hugeInflow?: number;
+  hugeInflowPct?: number;
+  source?: string;
   timestamp?: string;
 }
 

@@ -95,7 +95,7 @@ export const useIndexStore = defineStore('indices', () => {
         return friendlyErrorMessages[err.detail] || err.detail;
       }
       if (err.code && friendlyErrorMessages[err.code]) {
-        return friendlyErrorMessages[err.code];
+        return friendlyErrorMessages[err.code] ?? err.message ?? '获取指数列表失败';
       }
       return err.message || '获取指数列表失败';
     }

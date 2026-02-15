@@ -116,8 +116,8 @@ export const useFundStore = defineStore('funds', () => {
 
   // Actions
   async function fetchFunds(options: FetchOptions = DEFAULT_OPTIONS) {
-    const retries = options.retries ?? DEFAULT_OPTIONS.retries;
-    const retryDelay = options.retryDelay ?? DEFAULT_OPTIONS.retryDelay;
+    const retries = options.retries ?? DEFAULT_OPTIONS.retries ?? 2;
+    const retryDelay = options.retryDelay ?? DEFAULT_OPTIONS.retryDelay ?? 1000;
     const showError = options.showError ?? DEFAULT_OPTIONS.showError;
     loading.value = true;
     loadingProgress.value = 0;
