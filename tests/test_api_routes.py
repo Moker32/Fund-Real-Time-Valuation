@@ -3,21 +3,22 @@ API 路由测试
 测试 API 端点的基本功能
 """
 
-import pytest
 
 
 def test_routes_module_imports():
     """测试各个路由模块可以正确导入"""
-    from api.routes import cache
-    from api.routes import commodities
-    from api.routes import datasource
-    from api.routes import funds
-    from api.routes import indices
-    from api.routes import news
-    from api.routes import overview
-    from api.routes import sectors
-    from api.routes import sentiment
-    from api.routes import trading_calendar
+    from api.routes import (
+        cache,
+        commodities,
+        datasource,
+        funds,
+        indices,
+        news,
+        overview,
+        sectors,
+        sentiment,
+        trading_calendar,
+    )
 
     # 验证路由存在
     assert hasattr(cache, 'router')
