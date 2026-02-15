@@ -20,8 +20,6 @@ const props = withDefaults(defineProps<Props>(), {
   amount: undefined,
 });
 
-const isPositive = computed(() => (props.changePct ?? 0) >= 0);
-
 const changeClass = computed(() => {
   if (props.changePct === undefined || props.changePct === null) return '';
   return props.changePct >= 0 ? 'positive' : 'negative';
