@@ -48,13 +48,13 @@ export const useFundStore = defineStore('funds', () => {
     } catch (e) {
       console.error('[FundStore] Failed to load settings:', e);
     }
-    return { refreshInterval: 30, autoRefresh: true, showChart: false };
+    return { refreshInterval: 30, autoRefresh: true, showChart: true };
   }
 
   const savedSettings = loadSettings();
   const refreshInterval = ref(savedSettings.refreshInterval); // seconds
   const autoRefresh = ref(savedSettings.autoRefresh);
-  const showChart = ref(savedSettings.showChart); // 是否显示基金卡片图表，默认关闭
+  const showChart = ref(savedSettings.showChart); // 是否显示基金卡片图表，默认开启
   const retryCount = ref(0);
   const maxRetries = 2;
 
