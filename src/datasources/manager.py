@@ -722,6 +722,17 @@ def create_default_manager(
     news_source = SinaNewsDataSource()
     manager.register(news_source)
 
+    # === 新增 AKShare 舆情数据源 ===
+    from .akshare_sentiment_source import (
+        AKShareEconomicNewsDataSource,
+        AKShareWeiboSentimentDataSource,
+        AKShareSentimentAggregatorDataSource,
+    )
+
+    manager.register(AKShareEconomicNewsDataSource())
+    manager.register(AKShareWeiboSentimentDataSource())
+    manager.register(AKShareSentimentAggregatorDataSource())
+
     # 注册行业板块数据源
     # 优先使用 EastMoney 直连 API（包含资金流向）
     eastmoney_direct_source = EastMoneyDirectSource()

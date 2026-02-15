@@ -27,7 +27,17 @@ from .dependencies import (
     set_data_source_manager,
 )
 from .models import DataSourceHealthItem, HealthDetailResponse, HealthResponse
-from .routes import cache, commodities, funds, indices, news, overview, sectors, trading_calendar
+from .routes import (
+    cache,
+    commodities,
+    funds,
+    indices,
+    news,
+    overview,
+    sectors,
+    trading_calendar,
+    sentiment,
+)
 
 # 配置日志：将日志同时输出到缓冲区和标准输出
 _root_logger = logging.getLogger()
@@ -233,6 +243,7 @@ app.include_router(overview.router)
 app.include_router(cache.router)
 app.include_router(trading_calendar.router)
 app.include_router(news.router)
+app.include_router(sentiment.router)
 
 
 @app.get(
