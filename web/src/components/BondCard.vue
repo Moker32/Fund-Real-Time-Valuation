@@ -57,14 +57,16 @@ function formatVolume(value: number | undefined | null): string {
       <span class="bond-code">{{ code }}</span>
       <span class="bond-name" :title="name">{{ name }}</span>
     </div>
-    <div class="bond-price">
-      <span class="price">{{ formatPrice(price) }}</span>
+    <div class="bond-body">
+      <div class="bond-price">
+        <span class="price">{{ formatPrice(price) }}</span>
+      </div>
+      <div class="bond-change">
+        <span class="change">{{ formatChange(change) }}</span>
+        <span class="change-pct">{{ formatChangePct(changePct) }}</span>
+      </div>
     </div>
-    <div class="bond-change">
-      <span class="change">{{ formatChange(change) }}</span>
-      <span class="change-pct">{{ formatChangePct(changePct) }}</span>
-    </div>
-    <div class="bond-volume">
+    <div class="bond-footer">
       <span class="label">成交量:</span>
       <span class="value">{{ formatVolume(volume) }}</span>
     </div>
@@ -73,91 +75,120 @@ function formatVolume(value: number | undefined | null): string {
 
 <style scoped>
 .bond-card {
-  background: var(--card-bg, #fff);
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.2s ease;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  transition: all var(--transition-normal);
+  cursor: pointer;
 }
 
 .bond-card:hover {
+  background: var(--color-bg-card-hover);
+  border-color: var(--color-border-light);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-md);
 }
 
 .bond-card.positive {
-  border-left: 3px solid #52c41a;
+  border-left: 3px solid var(--color-rise);
 }
 
 .bond-card.negative {
-  border-left: 3px solid #ff4d4f;
+  border-left: 3px solid var(--color-fall);
 }
 
 .bond-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
 }
 
 .bond-code {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text-primary, #333);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-md);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
 }
 
 .bond-name {
-  font-size: 12px;
-  color: var(--text-secondary, #666);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 120px;
 }
 
+.bond-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: var(--spacing-md);
+}
+
 .bond-price {
-  margin-bottom: 4px;
+  flex: 1;
 }
 
 .price {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary, #333);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
 }
 
 .bond-change {
   display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 13px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+}
+
+.positive .bond-change {
+  background: var(--color-rise-bg);
+}
+
+.negative .bond-change {
+  background: var(--color-fall-bg);
 }
 
 .positive .change,
 .positive .change-pct {
-  color: #52c41a;
+  color: var(--color-rise);
 }
 
 .negative .change,
 .negative .change-pct {
-  color: #ff4d4f;
+  color: var(--color-fall);
 }
 
 .change {
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  font-family: var(--font-mono);
 }
 
 .change-pct {
-  font-weight: 600;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  font-family: var(--font-mono);
 }
 
-.bond-volume {
+.bond-footer {
   display: flex;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--text-secondary, #666);
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-divider);
 }
 
-.bond-volume .value {
-  color: var(--text-primary, #333);
+.bond-footer .value {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
 }
 </style>
