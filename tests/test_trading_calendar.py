@@ -4,19 +4,18 @@
 测试交易日历数据源
 """
 
+from datetime import date, datetime
+from unittest.mock import patch
+
 import pytest
-from datetime import date, time, datetime
-from unittest.mock import patch, MagicMock
 
 from src.datasources.trading_calendar_source import (
-    TradingCalendarSource,
-    Market,
-    TradingDay,
-    CalendarResult,
     CHINA_SPECIAL_DATES,
+    CalendarResult,
+    Market,
+    TradingCalendarSource,
+    TradingDay,
     update_china_special_dates,
-    SATURDAY,
-    SUNDAY,
 )
 
 

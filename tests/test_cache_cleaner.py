@@ -4,13 +4,13 @@
 测试缓存清理功能
 """
 
-import pytest
-import asyncio
+import os
+import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import patch, MagicMock, AsyncMock, patch
-import tempfile
-import os
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 class TestCacheCleaner:
@@ -172,7 +172,7 @@ class TestCacheCleanerFunctions:
 
     def test_get_cache_cleaner_singleton(self):
         """测试单例获取"""
-        from src.datasources.cache_cleaner import get_cache_cleaner, _cache_cleaner
+        from src.datasources.cache_cleaner import _cache_cleaner, get_cache_cleaner
         
         # 保存原始单例
         original = _cache_cleaner
@@ -192,20 +192,20 @@ class TestCacheCleanerFunctions:
     @pytest.mark.asyncio
     async def test_startup_cleanup(self):
         """测试启动清理函数"""
-        from src.datasources.cache_cleaner import startup_cleanup, get_cache_cleaner
+        from src.datasources.cache_cleaner import startup_cleanup
         
         with patch('src.datasources.cache_cleaner.get_cache_cleaner') as mock_get:
             mock_cleaner = MagicMock()
             mock_cleaner.cleanup_on_startup = AsyncMock(return_value={"deleted": 0})
             mock_get.return_value = mock_cleaner
             
-            result = await startup_cleanup()
+            await startup_cleanup()
             
             mock_cleaner.cleanup_on_startup.assert_called_once()
 
     def test_start_background_cleanup_task(self):
         """测试启动后台清理任务"""
-        from src.datasources.cache_cleaner import start_background_cleanup_task, get_cache_cleaner
+        from src.datasources.cache_cleaner import start_background_cleanup_task
         
         with patch('src.datasources.cache_cleaner.get_cache_cleaner') as mock_get:
             with patch('src.datasources.cache_cleaner.asyncio.create_task'):
