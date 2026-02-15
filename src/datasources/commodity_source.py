@@ -61,11 +61,10 @@ class CommodityDataSource(DataSource):
 class YFinanceCommoditySource(CommodityDataSource):
     """yfinance 商品数据源"""
 
-    # 商品 ticker 映射
+    # 商品 ticker 映射（yfinance 不支持上海黄金交易所 SG=f）
     COMMODITY_TICKERS = {
         # 贵金属
         "gold": "GC=F",  # COMEX 黄金期货
-        "gold_cny": "SG=f",  # 上海黄金
         "gold_pax": "PAXG-USD",  # Pax Gold (数字黄金)
         "silver": "SI=F",  # 国际白银
         "platinum": "PT=F",  # 铂金
@@ -152,6 +151,7 @@ class YFinanceCommoditySource(CommodityDataSource):
 
             ticker = self.COMMODITY_TICKERS.get(commodity_type)
             if not ticker:
+                logger.warning(f"[YFinance] 不支持的商品类型: {commodity_type}")
                 return DataSourceResult(
                     success=False,
                     error=f"不支持的商品类型: {commodity_type}",
@@ -160,9 +160,14 @@ class YFinanceCommoditySource(CommodityDataSource):
                     metadata={"commodity_type": commodity_type},
                 )
 
+            logger.debug(f"[YFinance] fetching {commodity_type} -> ticker={ticker}")
+
             # 获取数据
             ticker_obj = yf.Ticker(ticker)
             info = ticker_obj.info
+
+            if not info or info.get("symbol") is None:
+                logger.warning(f"[YFinance] ticker {ticker} 返回空数据或 404")
 
             price = info.get("currentPrice", info.get("regularMarketPrice"))
             change = info.get("regularMarketChange", info.get("change", 0))

@@ -12,10 +12,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from src.datasources.cache_cleaner import CacheCleaner, get_cache_cleaner
 from src.datasources.cache_warmer import CacheWarmer
 from src.datasources.manager import create_default_manager
+from src.utils.log_buffer import LogBuffer, get_log_buffer
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,13 @@ from .dependencies import (
 )
 from .models import DataSourceHealthItem, HealthDetailResponse, HealthResponse
 from .routes import cache, commodities, funds, indices, news, overview, sectors, trading_calendar
+
+# 配置日志：将日志同时输出到缓冲区和标准输出
+_root_logger = logging.getLogger()
+_buffer_handler = get_log_buffer()
+_buffer_handler.setLevel(logging.DEBUG)
+_root_logger.addHandler(_buffer_handler)
+_root_logger.setLevel(logging.DEBUG)
 
 # 全局预热器实例
 _cache_warmer: CacheWarmer | None = None
@@ -50,18 +59,16 @@ async def lifespan(app: FastAPI):
     # 创建缓存预热器（用于后续操作）
     _cache_warmer = CacheWarmer(manager)
 
-    # 立即预加载所有缓存数据到内存（不阻塞，快速同步读取）
-    # 这样前端首次请求就能拿到缓存数据，而不必等待数据刷新
-    await _cache_warmer.preload_all_cache(timeout=10)
+    # 预加载所有缓存数据到内存（不阻塞服务启动）
+    asyncio.create_task(_cache_warmer.preload_all_cache(timeout=5))
 
     # 预热基金信息缓存（名称、类型等）- 并行获取，不阻塞服务启动
     asyncio.create_task(_cache_warmer.preload_fund_info_cache(timeout=60))
 
-    # 启动后台健康检查（会立即执行一次检查）
-    await manager.start_background_health_check()
+    # 启动后台健康检查（非阻塞）
+    asyncio.create_task(manager.start_background_health_check())
 
-    # 等待一段时间让健康检查完成初始化
-    await asyncio.sleep(2)
+    # 移除启动时的 sleep - 健康检查在后台运行，无需等待
 
     # 启动缓存预热（不阻塞服务启动）
     asyncio.create_task(_cache_warmer.start_background_warmup(interval=300))
@@ -311,6 +318,72 @@ async def simple_health_check() -> HealthResponse:
         version="0.1.0",
         timestamp=datetime.now(),
     )
+
+
+class LogEntryResponse(BaseModel):
+    """日志条目响应"""
+
+    timestamp: datetime
+    level: str
+    logger: str
+    message: str
+
+
+class LogsResponse(BaseModel):
+    """日志列表响应"""
+
+    logs: list[LogEntryResponse]
+    total: int
+
+
+@app.get(
+    "/api/logs",
+    response_model=LogsResponse,
+    summary="获取日志",
+    description="获取最近的日志记录（支持过滤）",
+)
+async def get_logs(
+    level: str | None = None,
+    limit: int = 100,
+    logger: str | None = None,
+) -> LogsResponse:
+    """
+    获取日志
+
+    Args:
+        level: 日志级别 (DEBUG, INFO, WARNING, ERROR)
+        limit: 返回数量 (默认 100)
+        logger: 日志器名称过滤
+
+    Returns:
+        LogsResponse: 日志列表
+    """
+    buffer = get_log_buffer()
+    logs = buffer.get_logs(level=level, limit=limit, logger=logger)
+    return LogsResponse(
+        logs=[
+            LogEntryResponse(
+                timestamp=log.timestamp,
+                level=log.level,
+                logger=log.logger,
+                message=log.message,
+            )
+            for log in logs
+        ],
+        total=len(logs),
+    )
+
+
+@app.delete(
+    "/api/logs",
+    summary="清空日志",
+    description="清空日志缓冲区",
+)
+async def clear_logs():
+    """清空日志缓冲区"""
+    buffer = get_log_buffer()
+    buffer.clear()
+    return {"message": "日志已清空"}
 
 
 # 导出应用实例

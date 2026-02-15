@@ -15,7 +15,6 @@ from src.config.commodities_config import CommoditiesConfig
 from src.datasources.base import DataSourceType
 from src.datasources.commodity_source import (
     AKShareCommoditySource,
-    YFinanceCommoditySource,
     get_all_available_commodities,
     get_all_commodity_types,
     get_commodities_by_category,
@@ -351,8 +350,9 @@ async def get_gold_cny() -> dict:
     Returns:
         CommodityResponse: 国内黄金行情
     """
-    source = AKShareCommoditySource()
-    result = await source.fetch("gold_cny")
+    # 只使用 AKShare（yfinance 不支持上海黄金交易所）
+    akshare_source = AKShareCommoditySource()
+    result = await akshare_source.fetch("gold_cny")
 
     if not result.success or not result.data:
         raise HTTPException(
