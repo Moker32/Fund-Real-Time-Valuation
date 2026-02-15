@@ -270,6 +270,73 @@ async def root():
 
 
 @app.get(
+    "/api/info",
+    summary="API 详细信息",
+    description="返回 API 详细信息，包括所有可用端点",
+)
+async def api_info():
+    """
+    API 详细信息
+
+    Returns:
+        dict: API 详细信息
+    """
+    return {
+        "name": "基金实时估值 API",
+        "version": "0.1.0",
+        "description": "基金实时估值 Web API 服务",
+        "docs": "/docs",
+        "redoc": "/redoc",
+        "endpoints": {
+            "health": {
+                "simple": "/api/health/simple",
+                "detailed": "/api/health",
+            },
+            "funds": {
+                "list": "GET /api/funds",
+                "detail": "GET /api/funds/{fund_code}",
+                "estimate": "GET /api/funds/{fund_code}/estimate",
+                "history": "GET /api/funds/{fund_code}/history",
+                "intraday": "GET /api/funds/{fund_code}/intraday",
+            },
+            "commodities": {
+                "list": "GET /api/commodities",
+                "gold": "GET /api/commodities/gold",
+                "oil": "GET /api/commodities/oil",
+                "search": "GET /api/commodities/search",
+            },
+            "indices": "GET /api/indices",
+            "sectors": "GET /api/sectors",
+            "news": {
+                "list": "GET /api/news",
+                "categories": "GET /api/news/categories",
+            },
+            "sentiment": {
+                "economic": "GET /api/sentiment/economic",
+                "weibo": "GET /api/sentiment/weibo",
+                "all": "GET /api/sentiment/all",
+            },
+            "trading_calendar": {
+                "calendar": "GET /trading-calendar/calendar/{market}",
+                "is_trading_day": "GET /trading-calendar/is-trading-day/{market}",
+                "next_trading_day": "GET /trading-calendar/next-trading-day/{market}",
+                "market_status": "GET /trading-calendar/market-status",
+            },
+            "cache": "GET /api/cache/stats",
+            "datasource": {
+                "statistics": "GET /api/datasource/statistics",
+                "health": "GET /api/datasource/health",
+                "sources": "GET /api/datasource/sources",
+            },
+            "logs": {
+                "get": "GET /api/logs",
+                "clear": "DELETE /api/logs",
+            },
+        },
+    }
+
+
+@app.get(
     "/api/health",
     response_model=HealthDetailResponse,
     summary="健康检查",
