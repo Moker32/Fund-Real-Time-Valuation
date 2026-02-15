@@ -2,12 +2,12 @@
 数据源管理器测试
 """
 
-import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.datasources.manager import DataSourceManager, DataSourceConfig, create_default_manager
+import pytest
+
 from src.datasources.base import DataSource, DataSourceResult, DataSourceType
+from src.datasources.manager import DataSourceConfig, DataSourceManager, create_default_manager
 
 
 class MockDataSource(DataSource):
@@ -325,7 +325,6 @@ class TestDataSourceManager:
         manager.register(mock_source1)
         
         # 执行一些请求
-        import time
         loop = asyncio.new_event_loop()
         loop.run_until_complete(manager.fetch(DataSourceType.FUND))
         
@@ -361,11 +360,11 @@ class TestCreateDefaultManager:
         """测试默认管理器的数据源"""
         manager = create_default_manager()
         
-        sources = manager.list_sources()
+        # 列出所有数据源
+        manager.list_sources()
         
-        # 应该有基金数据源
-        fund_sources = manager.get_sources_by_type(DataSourceType.FUND)
-        # 可能为空或有几个数据源
+        # 获取基金数据源
+        manager.get_sources_by_type(DataSourceType.FUND)
     
     def test_create_with_load_balancing(self):
         """测试创建带负载均衡的管理器"""

@@ -2,19 +2,15 @@
 商品缓存仓库测试
 """
 
-import pytest
-from datetime import datetime
 
 from src.db.commodity_repo import (
-    CommodityCategory,
+    CATEGORY_NAMES,
+    COMMODITY_CATEGORY_MAP,
+    COMMODITY_NAMES,
     CommodityCacheRecord,
-    CommodityCacheDAO,
-    CommodityCategoryDAO,
+    CommodityCategory,
     get_category_info,
     get_commodity_info,
-    COMMODITY_CATEGORY_MAP,
-    CATEGORY_NAMES,
-    COMMODITY_NAMES,
 )
 
 

@@ -2,14 +2,15 @@
 股票数据源测试
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from src.datasources.base import DataSourceType
 from src.datasources.stock_source import (
     SinaStockDataSource,
     YahooStockSource,
 )
-from src.datasources.base import DataSourceType
 
 
 class TestSinaStockDataSource:

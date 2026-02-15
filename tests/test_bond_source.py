@@ -2,15 +2,16 @@
 债券数据源测试
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from src.datasources.base import DataSourceType
 from src.datasources.bond_source import (
-    SinaBondDataSource,
     AKShareBondSource,
     EastMoneyBondSource,
+    SinaBondDataSource,
 )
-from src.datasources.base import DataSourceType
 
 
 class TestSinaBondDataSource:
@@ -108,7 +109,7 @@ class TestSinaBondDataSource:
             
             mock_client.get = AsyncMock(return_value=mock_response)
             
-            result = await source.health_check()
+            await source.health_check()
             # 健康检查可能返回 True 或 False，取决于实际接口
 
 
@@ -145,9 +146,7 @@ class TestAKShareBondSource:
     @pytest.mark.asyncio
     async def test_fetch_unsupported_type(self, source):
         """测试不支持的债券类型"""
-        result = await source.fetch("unknown_type")
-        
-        # 可能会失败，但代码应该能处理
+        await source.fetch("unknown_type")
 
     @pytest.mark.asyncio
     async def test_fetch_batch(self, source):
