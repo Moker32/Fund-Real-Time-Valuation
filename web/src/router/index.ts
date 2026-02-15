@@ -10,13 +10,13 @@ const router = createRouter({
       children: [
         {
           path: '',
-          name: 'funds',
-          component: () => import('@/views/FundsView.vue'),
+          name: 'home',
+          component: () => import('@/views/HomeView.vue'),
         },
         {
           path: 'funds',
-          name: 'funds-alt',
-          redirect: '/',
+          name: 'funds',
+          component: () => import('@/views/FundsView.vue'),
         },
         {
           path: 'commodities',
@@ -32,6 +32,11 @@ const router = createRouter({
           path: 'sectors',
           name: 'sectors',
           component: () => import('@/views/SectorsView.vue'),
+        },
+        {
+          path: 'news',
+          name: 'news',
+          component: () => import('@/views/NewsView.vue'),
         },
         {
           path: 'settings',
