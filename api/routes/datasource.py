@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/datasource", tags=["数据源"])
     description="获取数据源请求统计数据，包括成功率、响应时间等",
 )
 async def get_datasource_statistics(
-    manager: DataSourceManager = Depends(DataSourceDependency),
+    manager: DataSourceManager = Depends(DataSourceDependency()),
 ) -> dict:
     """
     获取数据源统计信息
@@ -46,7 +46,7 @@ async def get_datasource_statistics(
     description="获取所有数据源的详细健康状态",
 )
 async def get_datasource_health(
-    manager: DataSourceManager = Depends(DataSourceDependency),
+    manager: DataSourceManager = Depends(DataSourceDependency()),
 ) -> dict:
     """
     获取数据源健康状态
@@ -68,7 +68,7 @@ async def get_datasource_health(
     description="获取所有已注册的数据源列表",
 )
 async def get_datasource_list(
-    manager: DataSourceManager = Depends(DataSourceDependency),
+    manager: DataSourceManager = Depends(DataSourceDependency()),
 ) -> list[dict]:
     """
     获取数据源列表
