@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse } from '@/types';
+import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse, NewsListResponse, NewsCategoriesResponse } from '@/types';
 
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -388,6 +388,16 @@ export interface TradingDayResponse {
 export const tradingCalendarApi = {
   async isTradingDay(market: string = 'china'): Promise<TradingDayResponse> {
     return api.get(`/trading-calendar/is-trading-day/${market}`);
+  },
+};
+
+export const newsApi = {
+  async getNews(category: string = 'finance'): Promise<NewsListResponse> {
+    return api.get('/api/news', { params: { category } });
+  },
+
+  async getCategories(): Promise<NewsCategoriesResponse> {
+    return api.get('/api/news/categories');
   },
 };
 

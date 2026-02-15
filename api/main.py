@@ -25,7 +25,7 @@ from .dependencies import (
     set_data_source_manager,
 )
 from .models import DataSourceHealthItem, HealthDetailResponse, HealthResponse
-from .routes import cache, commodities, funds, indices, overview, sectors, trading_calendar
+from .routes import cache, commodities, funds, indices, news, overview, sectors, trading_calendar
 
 # 全局预热器实例
 _cache_warmer: CacheWarmer | None = None
@@ -225,6 +225,7 @@ app.include_router(sectors.router)
 app.include_router(overview.router)
 app.include_router(cache.router)
 app.include_router(trading_calendar.router)
+app.include_router(news.router)
 
 
 @app.get(
