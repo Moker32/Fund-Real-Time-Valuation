@@ -130,7 +130,6 @@ class SinaStockDataSource(DataSource):
         """
         # 移除前缀
         code = stock_code.upper()
-        original_code = code
         if code.startswith("SH"):
             code = code[2:]
         elif code.startswith("SZ"):
