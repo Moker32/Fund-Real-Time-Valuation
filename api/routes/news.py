@@ -90,8 +90,13 @@ async def get_news(
         category = "finance"
 
     # 通过数据源管理器获取新闻
+    # 优先使用东方财富新闻（更稳定），失败则使用新浪新闻
     try:
-        result = await manager.fetch_with_source("sina_news", category)
+        result = await manager.fetch_with_source("eastmoney_news", category)
+        
+        # 如果东方财富失败，尝试新浪新闻
+        if not result.success:
+            result = await manager.fetch_with_source("sina_news", category)
 
         if not result.success:
             logger.warning(f"获取新闻失败: {result.error}")

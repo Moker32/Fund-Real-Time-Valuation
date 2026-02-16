@@ -411,4 +411,106 @@ class NewsAggregatorDataSource(DataSource):
 
 
 # 导出类
-__all__ = ["SinaNewsDataSource", "NewsAggregatorDataSource"]
+__all__ = ["SinaNewsDataSource", "EastMoneyNewsDataSource", "NewsAggregatorDataSource"]
+
+
+class EastMoneyNewsDataSource(DataSource):
+    """东方财富财经新闻数据源"""
+
+    def __init__(self, timeout: float = 15.0, max_news: int = 20):
+        """
+        初始化东方财富新闻数据源
+
+        Args:
+            timeout: 请求超时时间
+            max_news: 最大获取新闻数量
+        """
+        super().__init__(
+            name="eastmoney_news",
+            source_type=DataSourceType.NEWS,
+            timeout=timeout
+        )
+        self.max_news = max_news
+
+    async def fetch(self, category: str = "finance") -> DataSourceResult:
+        """
+        获取财经新闻
+
+        Args:
+            category: 新闻类别 (finance, stock, fund, economy, global, commodity)
+                     东方财富使用统一接口，category 影响搜索关键词
+
+        Returns:
+            DataSourceResult: 新闻数据结果
+        """
+        try:
+            import akshare as ak
+            
+            # 根据类别获取不同类型的新闻
+            symbol_map = {
+                "finance": "沪深京",
+                "stock": "股票",
+                "fund": "基金",
+                "economy": "宏观",
+                "global": "国际",
+                "commodity": "商品"
+            }
+            
+            symbol = symbol_map.get(category, "沪深京")
+            
+            # 获取新闻数据
+            df = ak.stock_news_em(symbol=symbol)
+            
+            if df is not None and not df.empty:
+                news_list = []
+                for _, row in df.head(self.max_news).iterrows():
+                    news_list.append({
+                        "title": str(row.get("新闻标题", "")),
+                        "url": str(row.get("新闻链接", "")),
+                        "time": str(row.get("发布时间", "")),
+                        "source": f"eastmoney_{row.get('文章来源', '东方财富')}",
+                        "category": category,
+                        "content": str(row.get("新闻内容", ""))[:200] if row.get("新闻内容") else ""
+                    })
+                
+                self._record_success()
+                return DataSourceResult(
+                    success=True,
+                    data=news_list,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"category": category, "count": len(news_list)}
+                )
+            
+            return DataSourceResult(
+                success=False,
+                error="未获取到新闻数据",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"category": category}
+            )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 库未安装",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"category": category}
+            )
+        except Exception as e:
+            return self._handle_error(e, self.name)
+
+    async def fetch_batch(self, categories: list[str]) -> list[DataSourceResult]:
+        """批量获取多类别新闻"""
+        async def fetch_one(cat: str) -> DataSourceResult:
+            return await self.fetch(cat)
+
+        tasks = [fetch_one(cat) for cat in categories]
+        return await asyncio.gather(*tasks, return_exceptions=True)
+
+    def get_status(self) -> dict[str, Any]:
+        """获取数据源状态"""
+        status = super().get_status()
+        status["max_news"] = self.max_news
+        return status
