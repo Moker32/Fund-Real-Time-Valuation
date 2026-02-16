@@ -448,12 +448,12 @@ class EastMoneyNewsDataSource(DataSource):
             
             # 根据类别获取不同类型的新闻
             symbol_map = {
-                "finance": "沪深京",
-                "stock": "股票",
-                "fund": "基金",
-                "economy": "宏观",
-                "global": "国际",
-                "commodity": "商品"
+                "finance": "最新",      # 最新财经新闻
+                "stock": "股票",         # 股票新闻
+                "fund": "基金",          # 基金新闻
+                "economy": "宏观",       # 宏观经济
+                "global": "国际",        # 国际新闻
+                "commodity": "商品"      # 大宗商品
             }
             
             symbol = symbol_map.get(category, "沪深京")
@@ -468,7 +468,7 @@ class EastMoneyNewsDataSource(DataSource):
                         "title": str(row.get("新闻标题", "")),
                         "url": str(row.get("新闻链接", "")),
                         "time": str(row.get("发布时间", "")),
-                        "source": f"eastmoney_{row.get('文章来源', '东方财富')}",
+                        "source": str(row.get("文章来源", "东方财富")),
                         "category": category,
                         "content": str(row.get("新闻内容", ""))[:200] if row.get("新闻内容") else ""
                     })
