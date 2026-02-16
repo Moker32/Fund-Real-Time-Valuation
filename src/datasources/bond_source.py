@@ -326,15 +326,15 @@ class AKShareBondSource(DataSource):
                 if df is not None and not df.empty:
                     for _, row in df.iterrows():
                         bonds.append({
-                            "code": str(row.get("代码", "")),
-                            "name": str(row.get("名称", "")),
-                            "price": self._safe_float(row.get("最新价")),
-                            "change": self._safe_float(row.get("涨跌额")),
-                            "change_pct": self._safe_float(row.get("涨跌幅")),
-                            "volume": self._safe_int(row.get("成交量")),
-                            "turnover": self._safe_float(row.get("成交额")),
-                            "bid": self._safe_float(row.get("买一")),
-                            "ask": self._safe_float(row.get("卖一")),
+                            "code": str(row.get("code", "")),
+                            "name": str(row.get("name", "")),
+                            "price": self._safe_float(row.get("trade")),
+                            "change": self._safe_float(row.get("pricechange")),
+                            "change_pct": self._safe_float(row.get("changepercent")),
+                            "volume": self._safe_int(row.get("volume")),
+                            "turnover": self._safe_float(row.get("amount")),
+                            "bid": self._safe_float(row.get("buy")),
+                            "ask": self._safe_float(row.get("sell")),
                         })
             elif bond_type == "bond_china":
                 # 中国债券市场数据
