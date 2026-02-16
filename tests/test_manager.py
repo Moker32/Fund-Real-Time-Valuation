@@ -170,8 +170,9 @@ class TestDataSourceManager:
         
         sources = manager._get_ordered_sources(DataSourceType.FUND)
         
-        # source2 优先级为 1，应该排在前面
-        assert sources[0].name == "source2"
+        # source1 优先级为 0（默认），source2 优先级为 1
+        # priority 越小越高，所以 source1 应该在前面
+        assert sources[0].name == "source1"
     
     def test_get_ordered_sources_load_balancing(self, manager, mock_source1, mock_source2):
         """测试负载均衡模式"""
