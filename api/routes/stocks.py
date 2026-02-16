@@ -100,9 +100,9 @@ async def get_stocks(
             ds = get_sina_stock_source()
             batch_results = await ds.fetch_batch(a_stocks)
             for result in batch_results:
-                if result and result.data:
-                    # 从 result 中获取 code
-                    stock_code = result.request
+                if result and result.success and result.data:
+                    # 从 result.metadata 中获取 code
+                    stock_code = result.metadata.get("stock_code") if result.metadata else a_stocks[0]
                     parsed = parse_stock_result(result, stock_code)
                     if parsed:
                         results.append(parsed)
@@ -115,8 +115,8 @@ async def get_stocks(
             ds = get_yahoo_stock_source()
             batch_results = await ds.fetch_batch(other_stocks)
             for result in batch_results:
-                if result and result.data:
-                    stock_code = result.request
+                if result and result.success and result.data:
+                    stock_code = result.metadata.get("symbol") if result.metadata else other_stocks[0]
                     parsed = parse_stock_result(result, stock_code)
                     if parsed:
                         results.append(parsed)
