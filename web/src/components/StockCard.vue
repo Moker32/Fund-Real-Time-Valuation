@@ -156,7 +156,7 @@ function formatVolume(vol: string | number | undefined | null): string {
 .stock-card {
   background: var(--color-bg-secondary, #fff);
   border-radius: var(--radius-lg, 12px);
-  padding: var(--spacing-md, 16px);
+  padding: var(--spacing-sm, 12px);
   border: 1px solid var(--color-border, #e5e7eb);
   transition: all var(--transition-normal, 0.2s);
 }
@@ -164,14 +164,6 @@ function formatVolume(vol: string | number | undefined | null): string {
 .stock-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   transform: translateY(-2px);
-}
-
-.stock-card.rising {
-  border-left: 3px solid var(--color-rise, #ef4444);
-}
-
-.stock-card.falling {
-  border-left: 3px solid var(--color-fall, #22c55e);
 }
 
 .card-header {
@@ -189,12 +181,12 @@ function formatVolume(vol: string | number | undefined | null): string {
 
 .stock-name {
   font-weight: var(--font-weight-semibold, 600);
-  font-size: var(--font-size-base, 16px);
+  font-size: var(--font-size-sm, 14px);
   color: var(--color-text-primary, #1f2937);
 }
 
 .stock-code {
-  font-size: var(--font-size-xs, 12px);
+  font-size: 11px;
   color: var(--color-text-tertiary, #9ca3af);
 }
 
@@ -222,8 +214,8 @@ function formatVolume(vol: string | number | undefined | null): string {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: var(--spacing-md, 16px);
-  margin-bottom: var(--spacing-md, 16px);
+  gap: var(--spacing-sm, 12px);
+  margin-bottom: var(--spacing-xs, 8px);
 }
 
 .price-section {
@@ -233,7 +225,7 @@ function formatVolume(vol: string | number | undefined | null): string {
 }
 
 .price {
-  font-size: var(--font-size-2xl, 24px);
+  font-size: var(--font-size-lg, 18px);
   font-weight: var(--font-weight-bold, 700);
   color: var(--color-text-primary, #1f2937);
   line-height: 1;
@@ -307,7 +299,7 @@ function formatVolume(vol: string | number | undefined | null): string {
 }
 
 .change-percent {
-  font-size: var(--font-size-xl, 20px);
+  font-size: var(--font-size-base, 16px);
   font-weight: var(--font-weight-bold, 700);
 }
 
@@ -344,7 +336,7 @@ function formatVolume(vol: string | number | undefined | null): string {
   display: flex;
   justify-content: space-between;
   flex: 1;
-  font-size: var(--font-size-sm, 14px);
+  font-size: 12px;
 }
 
 .footer-item.volume {
