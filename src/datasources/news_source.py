@@ -165,7 +165,9 @@ class SinaNewsDataSource(DataSource):
 
         # 尝试多种选择器
         selectors = [
-            ("财经要闻", ".news-list li a, .ctl00_ContentPlaceHolder1_MainNews_News1 tr a"),
+            # 顶部热点新闻 (当前新浪财经使用的格式)
+            ("财经要闻", ".cheadTopbar a, .top-news a, .news_important a"),
+            ("财经要闻备用", ".news-list li a, .ctl00_ContentPlaceHolder1_MainNews_News1 tr a"),
             ("基金新闻", ".FundNewsList .news-item a, .list-nav li a"),
             ("股票新闻", ".StockNewsList .news-item a, .list_content a"),
         ]
