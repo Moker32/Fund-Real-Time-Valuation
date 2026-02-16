@@ -73,7 +73,7 @@ def parse_stock_result(result, code: str) -> StockData | None:
     )
 
 
-@router.get("", response_model=list[StockData])
+@router.get("")
 async def get_stocks(
     codes: str = Query(..., description="股票代码，多个用逗号分隔，如: sh600000,sz000001,AAPL"),
 ):

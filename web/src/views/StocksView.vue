@@ -28,45 +28,12 @@
 
     <!-- 股票列表 -->
     <div class="stock-list" v-if="stockStore.stocks.length > 0">
-      <div
+      <StockCard
         v-for="stock in stockStore.stocks"
         :key="stock.code"
-        class="stock-card"
-        :class="{ rising: stock.change_pct > 0, falling: stock.change_pct < 0 }"
-      >
-        <div class="stock-header">
-          <div class="stock-info">
-            <span class="stock-name">{{ stock.name }}</span>
-            <span class="stock-code">{{ stock.code }}</span>
-          </div>
-          <button @click="removeStock(stock.code)" class="btn-remove">×</button>
-        </div>
-        <div class="stock-price">
-          <span class="price">{{ stock.price.toFixed(2) }}</span>
-          <span class="change" :class="{ positive: stock.change > 0, negative: stock.change < 0 }">
-            {{ stock.change > 0 ? '+' : '' }}{{ stock.change.toFixed(2) }}
-            ({{ stock.change_pct > 0 ? '+' : '' }}{{ stock.change_pct.toFixed(2) }}%)
-          </span>
-        </div>
-        <div class="stock-details">
-          <div class="detail-row">
-            <span class="label">开盘</span>
-            <span class="value">{{ stock.open.toFixed(2) }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="label">最高</span>
-            <span class="value">{{ stock.high.toFixed(2) }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="label">最低</span>
-            <span class="value">{{ stock.low.toFixed(2) }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="label">成交量</span>
-            <span class="value">{{ stock.volume }}</span>
-          </div>
-        </div>
-      </div>
+        :stock="stock"
+        @remove="removeStock"
+      />
     </div>
 
     <!-- 空状态 -->
@@ -84,6 +51,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useStockStore } from '@/stores/stockStore';
+import StockCard from '@/components/StockCard.vue';
 
 const stockStore = useStockStore();
 const newStockCode = ref('');
@@ -190,104 +158,8 @@ function removeStock(code: string) {
 
 .stock-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 16px;
-}
-
-.stock-card {
-  background: var(--color-bg-secondary, #f9fafb);
-  border-radius: 8px;
-  padding: 16px;
-  border: 1px solid var(--color-border, #e5e7eb);
-}
-
-.stock-card.rising {
-  border-left: 3px solid #ef4444;
-}
-
-.stock-card.falling {
-  border-left: 3px solid #22c55e;
-}
-
-.stock-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-
-.stock-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.stock-name {
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--color-text, #1f2937);
-}
-
-.stock-code {
-  font-size: 12px;
-  color: var(--color-text-tertiary, #9ca3af);
-}
-
-.btn-remove {
-  background: none;
-  border: none;
-  font-size: 20px;
-  color: var(--color-text-tertiary, #9ca3af);
-  cursor: pointer;
-  padding: 0 4px;
-}
-
-.btn-remove:hover {
-  color: #ef4444;
-}
-
-.stock-price {
-  margin-bottom: 12px;
-}
-
-.price {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-text, #1f2937);
-}
-
-.change {
-  display: block;
-  font-size: 14px;
-  margin-top: 4px;
-}
-
-.change.positive {
-  color: #ef4444;
-}
-
-.change.negative {
-  color: #22c55e;
-}
-
-.stock-details {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-}
-
-.label {
-  color: var(--color-text-tertiary, #9ca3af);
-}
-
-.value {
-  color: var(--color-text, #1f2937);
-  font-weight: 500;
 }
 
 .empty-state,

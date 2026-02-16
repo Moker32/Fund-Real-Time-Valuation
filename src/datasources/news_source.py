@@ -178,7 +178,17 @@ class SinaNewsDataSource(DataSource):
                         title = elem.get_text(strip=True)
                         link = elem.get("href", "")
 
-                        if title and link and len(title) > 5:
+                        # 过滤无效标题
+                        if not title or len(title) < 6:
+                            continue
+                        # 过滤导航项
+                        if title in ["新浪财经", "财经", "基金", "股票", "财经要闻", "基金新闻", "股票新闻", "期货", "外汇", "黄金", "理财", "视频", "博客", "论坛"]:
+                            continue
+                        # 过滤空链接
+                        if not link or link in ["#", "/", "javascript:"]:
+                            continue
+
+                        if link and len(title) > 5:
                             # 提取发布时间
                             time_match = re.search(r"(\d{2}:\d{2}|\d{2}-\d{2})", title)
                             news_time = time_match.group(1) if time_match else ""
