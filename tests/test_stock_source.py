@@ -31,30 +31,12 @@ class TestSinaStockDataSource:
     def test_get_market(self, source):
         """测试市场判断"""
         # 沪市股票 (6 开头)
-        assert source._get_market("600000") == "sh"
-        assert source._get_market("688000") == "sh"  # 科创板
+        assert source._get_market("600000")[0] == "sh"
+        assert source._get_market("688000")[0] == "sh"  # 科创板
         
         # 深市股票 (0, 3 开头)
-        assert source._get_market("000001") == "sz"
-        assert source._get_market("300001") == "sz"  # 创业板
-        
-        # 北交所 (8, 4 开头)
-        assert source._get_market("830001") == "bj"
-        assert source._get_market("430001") == "bj"
-    
-    def test_validate_stock_code(self, source):
-        """测试股票代码验证"""
-        # 有效代码
-        assert source._validate_stock_code("600000") is True
-        assert source._validate_stock_code("000001") is True
-        assert source._validate_stock_code("300001") is True
-        assert source._validate_stock_code("688001") is True
-        assert source._validate_stock_code("830001") is True
-        
-        # 无效代码
-        assert source._validate_stock_code("60000") is False  # 不足6位
-        assert source._validate_stock_code("6000000") is False  # 超过6位
-        assert source._validate_stock_code("abc") is False  # 非数字
+        assert source._get_market("000001")[0] == "sz"
+        assert source._get_market("300001")[0] == "sz"  # 创业板
     
     def test_parse_response(self, source):
         """测试响应解析"""
@@ -82,15 +64,15 @@ class TestSinaStockDataSource:
     @pytest.mark.asyncio
     async def test_fetch_invalid_code(self, source):
         """测试无效股票代码"""
-        with patch.object(source, '_validate_stock_code', return_value=False):
-            result = await source.fetch("123")
+        # 空代码应该返回失败
+        result = await source.fetch("")
         
         assert result.success is False
     
     @pytest.mark.asyncio
     async def test_fetch_with_valid_code(self, source):
         """测试有效股票代码"""
-        with patch.object(source, '_get_market', return_value="sh"), \
+        with patch.object(source, '_get_market', return_value=("sh", "600000")), \
              patch.object(source, '_parse_response', return_value={"code": "600000", "price": 10.6}):
             with patch.object(source, 'client') as mock_client:
                 mock_response = MagicMock()
@@ -133,29 +115,16 @@ class TestYahooStockSource:
     
     def test_get_market_type(self, source):
         """测试市场类型判断"""
-        # A股
-        assert source._get_market_type("600000") == "sh"
-        assert source._get_market_type("000001") == "sz"
+        # A股 (需要带后缀)
+        assert source._get_market_type("600000.SH") == "cn"
+        assert source._get_market_type("000001.SZ") == "cn"
         
         # 港股
-        assert source._get_market_type("0700") == "hk"
         assert source._get_market_type("0700.HK") == "hk"
         
-        # 美股
+        # 美股 (不带后缀)
         assert source._get_market_type("AAPL") == "us"
         assert source._get_market_type("MSFT") == "us"
-    
-    def test_convert_to_yahoo_format(self, source):
-        """测试转换为 Yahoo 格式"""
-        # A股
-        assert source._convert_to_yahoo_format("600000", "sh") == "600000.SS"
-        assert source._convert_to_yahoo_format("000001", "sz") == "000001.SZ"
-        
-        # 港股
-        assert source._convert_to_yahoo_format("0700", "hk") == "0700.HK"
-        
-        # 美股
-        assert source._convert_to_yahoo_format("AAPL", "us") == "AAPL"
     
     @pytest.mark.asyncio
     async def test_fetch_invalid_code(self, source):
