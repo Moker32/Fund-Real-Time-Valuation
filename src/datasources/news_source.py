@@ -182,7 +182,8 @@ class SinaNewsDataSource(DataSource):
                         if not title or len(title) < 6:
                             continue
                         # 过滤导航项
-                        if title in ["新浪财经", "财经", "基金", "股票", "财经要闻", "基金新闻", "股票新闻", "期货", "外汇", "黄金", "理财", "视频", "博客", "论坛"]:
+                        nav_items = ["新浪财经", "财经", "基金", "股票", "财经要闻", "基金新闻", "股票新闻", "期货", "外汇", "黄金", "理财", "视频", "博客", "论坛", "首页", "更多", "APP"]
+                        if title in nav_items or (title.startswith("新浪") and len(title) < 15):
                             continue
                         # 过滤空链接
                         if not link or link in ["#", "/", "javascript:"]:
@@ -214,6 +215,14 @@ class SinaNewsDataSource(DataSource):
                 try:
                     href = link.get("href", "")
                     text = link.get_text(strip=True)
+
+                    # 过滤无效标题
+                    if not text or len(text) < 6:
+                        continue
+                    # 过滤导航项和APP推广
+                    nav_items = ["新浪财经", "财经", "基金", "股票", "财经要闻", "基金新闻", "股票新闻", "期货", "外汇", "黄金", "理财", "视频", "博客", "论坛", "首页", "更多", "APP"]
+                    if text in nav_items or text.startswith("新浪") and len(text) < 15:
+                        continue
 
                     # 筛选财经新闻链接
                     if self._is_finance_link(href, text):
