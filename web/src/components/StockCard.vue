@@ -1,76 +1,145 @@
 <template>
-  <div class="stock-card" :class="{ rising: stock.change_pct > 0, falling: stock.change_pct < 0 }">
-    <div class="card-header">
-      <div class="stock-info">
-        <span class="stock-name">{{ stock.name }}</span>
-        <span class="stock-code">{{ stock.code }}</span>
+  <div class="stock-card" :class="{ loading: loading, rising: stock.change_pct > 0, falling: stock.change_pct < 0 }">
+    <template v-if="loading">
+      <div class="skeleton-content">
+        <div class="skeleton skeleton-title"></div>
+        <div class="skeleton skeleton-price"></div>
+        <div class="skeleton skeleton-change"></div>
       </div>
-      <button class="action-btn delete-btn" title="从自选移除" @click.stop="$emit('remove', stock.code)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-        </svg>
-      </button>
-    </div>
+    </template>
 
-    <div class="card-body">
-      <div class="value-section">
-        <div class="value-row">
-          <span class="label">现价</span>
-          <span class="value font-mono">{{ stock.price.toFixed(2) }}</span>
+    <template v-else>
+      <div class="card-header">
+        <div class="stock-info">
+          <span class="stock-name">{{ stock.name }}</span>
+          <span class="stock-code">{{ stock.code }}</span>
         </div>
-        <div class="value-row">
-          <span class="label">开盘</span>
-          <span class="value font-mono">{{ stock.open.toFixed(2) }}</span>
-        </div>
-        <div class="value-row">
-          <span class="label">最高</span>
-          <span class="value font-mono">{{ stock.high.toFixed(2) }}</span>
-        </div>
-        <div class="value-row">
-          <span class="label">最低</span>
-          <span class="value font-mono">{{ stock.low.toFixed(2) }}</span>
-        </div>
-      </div>
-
-      <div class="change-section" :class="{ positive: stock.change > 0, negative: stock.change < 0 }">
-        <span class="change-percent font-mono">
-          {{ stock.change > 0 ? '+' : '' }}{{ stock.change_pct.toFixed(2) }}%
-        </span>
-        <span class="change-indicator">
-          <svg v-if="stock.change > 0" viewBox="0 0 24 24" fill="none">
-            <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <button class="action-btn delete-btn" title="从自选移除" @click.stop="$emit('remove', stock.code)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
           </svg>
-          <svg v-else-if="stock.change < 0" viewBox="0 0 24 24" fill="none">
-            <path d="M12 5V19M19 12L12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <span v-else>—</span>
-        </span>
-        <span class="change-value font-mono">
-          {{ stock.change > 0 ? '+' : '' }}{{ stock.change.toFixed(2) }}
-        </span>
+        </button>
       </div>
-    </div>
 
-    <div class="card-footer">
-      <span class="update-time">成交量: {{ formatVolume(stock.volume) }}</span>
-    </div>
+      <div class="card-body">
+        <div class="price-section">
+          <span class="price font-mono" :class="{ 'value-updated': priceAnimating }">{{ formatPrice(stock.price) }}</span>
+          <span class="currency">¥</span>
+        </div>
+
+        <div class="change-section" :class="[changeClass, { 'value-updated': changeAnimating }]">
+          <span class="change-percent font-mono">{{ formatPercent(stock.change_pct) }}</span>
+          <span class="change-indicator-value">
+            <svg v-if="stock.change_pct > 0" viewBox="0 0 24 24" fill="none">
+              <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <svg v-else-if="stock.change_pct < 0" viewBox="0 0 24 24" fill="none">
+              <path d="M12 5V19M19 12L12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span v-else>—</span>
+          </span>
+          <span class="change-value font-mono">{{ formatChange(stock.change) }}</span>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <div class="footer-row">
+          <div class="footer-item">
+            <span class="label">高</span>
+            <span class="value font-mono">{{ formatPrice(stock.high) }}</span>
+          </div>
+          <div class="footer-item">
+            <span class="label">低</span>
+            <span class="value font-mono">{{ formatPrice(stock.low) }}</span>
+          </div>
+        </div>
+        <div class="footer-row">
+          <div class="footer-item">
+            <span class="label">今开</span>
+            <span class="value font-mono">{{ formatPrice(stock.open) }}</span>
+          </div>
+          <div class="footer-item">
+            <span class="label">昨收</span>
+            <span class="value font-mono">{{ formatPrice(stock.pre_close) }}</span>
+          </div>
+        </div>
+        <div class="footer-row">
+          <div class="footer-item volume">
+            <span class="label">成交量</span>
+            <span class="value font-mono">{{ formatVolume(stock.volume) }}</span>
+          </div>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue';
 import type { Stock } from '@/types';
 
 interface Props {
   stock: Stock;
+  loading?: boolean;
 }
 
-defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+});
 
 defineEmits<{
   remove: [code: string];
 }>();
 
-function formatVolume(vol: string | number): string {
+// 动画状态
+const priceAnimating = ref(false);
+const changeAnimating = ref(false);
+
+// 监听价格变化触发动画
+watch(() => props.stock.price, (newVal, oldVal) => {
+  if (oldVal !== undefined && newVal !== oldVal) {
+    priceAnimating.value = true;
+    setTimeout(() => priceAnimating.value = false, 500);
+  }
+});
+
+watch(() => props.stock.change_pct, (newVal, oldVal) => {
+  if (oldVal !== undefined && newVal !== oldVal) {
+    changeAnimating.value = true;
+    setTimeout(() => changeAnimating.value = false, 500);
+  }
+});
+
+// 涨跌分类
+const changeClass = computed(() => {
+  if (props.stock.change_pct > 0) return 'rising';
+  if (props.stock.change_pct < 0) return 'falling';
+  return 'neutral';
+});
+
+// 格式化价格
+function formatPrice(price: number | undefined | null): string {
+  if (price === undefined || price === null || isNaN(price)) return '--';
+  return price.toFixed(2);
+}
+
+// 格式化涨跌幅
+function formatPercent(value: number | undefined | null): string {
+  if (value === undefined || value === null || isNaN(value)) return '--';
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value.toFixed(2)}%`;
+}
+
+// 格式化涨跌额
+function formatChange(value: number | undefined | null): string {
+  if (value === undefined || value === null || isNaN(value)) return '--';
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value.toFixed(2)}`;
+}
+
+// 格式化成交量
+function formatVolume(vol: string | number | undefined | null): string {
+  if (vol === undefined || vol === null) return '--';
   if (typeof vol === 'number') {
     if (vol >= 100000000) {
       return (vol / 100000000).toFixed(2) + '亿';
@@ -86,29 +155,30 @@ function formatVolume(vol: string | number): string {
 <style scoped>
 .stock-card {
   background: var(--color-bg-secondary, #fff);
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--spacing-md, 16px);
   border: 1px solid var(--color-border, #e5e7eb);
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal, 0.2s);
 }
 
 .stock-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
 .stock-card.rising {
-  border-left: 3px solid #ef4444;
+  border-left: 3px solid var(--color-rise, #ef4444);
 }
 
 .stock-card.falling {
-  border-left: 3px solid #22c55e;
+  border-left: 3px solid var(--color-fall, #22c55e);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: var(--spacing-sm, 12px);
 }
 
 .stock-info {
@@ -118,13 +188,13 @@ function formatVolume(vol: string | number): string {
 }
 
 .stock-name {
-  font-weight: 600;
-  font-size: 16px;
-  color: var(--color-text, #1f2937);
+  font-weight: var(--font-weight-semibold, 600);
+  font-size: var(--font-size-base, 16px);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .stock-code {
-  font-size: 12px;
+  font-size: var(--font-size-xs, 12px);
   color: var(--color-text-tertiary, #9ca3af);
 }
 
@@ -134,13 +204,13 @@ function formatVolume(vol: string | number): string {
   padding: 4px;
   cursor: pointer;
   color: var(--color-text-tertiary, #9ca3af);
-  border-radius: 4px;
-  transition: all 0.2s;
+  border-radius: var(--radius-sm, 4px);
+  transition: all var(--transition-fast, 0.15s);
 }
 
 .action-btn:hover {
   background: var(--color-bg-tertiary, #f3f4f6);
-  color: var(--color-text, #1f2937);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .action-btn svg {
@@ -151,82 +221,184 @@ function formatVolume(vol: string | number): string {
 .card-body {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  align-items: flex-start;
+  gap: var(--spacing-md, 16px);
+  margin-bottom: var(--spacing-md, 16px);
 }
 
-.value-section {
-  flex: 1;
+.price-section {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: baseline;
+  gap: 4px;
 }
 
-.value-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
+.price {
+  font-size: var(--font-size-2xl, 24px);
+  font-weight: var(--font-weight-bold, 700);
+  color: var(--color-text-primary, #1f2937);
+  line-height: 1;
+  transition: all var(--transition-fast, 0.15s);
 }
 
-.value-row .label {
+.price.value-updated {
+  animation: value-pulse 0.5s ease-out;
+}
+
+.currency {
+  font-size: var(--font-size-sm, 14px);
   color: var(--color-text-tertiary, #9ca3af);
 }
 
-.value-row .value {
-  font-weight: 500;
-  color: var(--color-text, #1f2937);
+@keyframes value-pulse {
+  0% {
+    transform: scale(1);
+    color: var(--color-text-primary);
+  }
+  30% {
+    color: var(--color-rise);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    color: var(--color-text-primary);
+  }
 }
 
 .change-section {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 80px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--color-bg-tertiary, #f9fafb);
+  align-items: flex-end;
+  gap: 2px;
+  padding: var(--spacing-xs, 8px) var(--spacing-sm, 12px);
+  border-radius: var(--radius-md, 8px);
+  transition: all var(--transition-fast, 0.15s);
 }
 
-.change-section.positive {
-  background: #fef2f2;
-  color: #ef4444;
+.change-section.rising {
+  background: var(--color-rise-bg, #fef2f2);
+  color: var(--color-rise, #ef4444);
 }
 
-.change-section.negative {
-  background: #f0fdf4;
-  color: #22c55e;
+.change-section.falling {
+  background: var(--color-fall-bg, #f0fdf4);
+  color: var(--color-fall, #22c55e);
+}
+
+.change-section.neutral {
+  color: var(--color-text-tertiary, #9ca3af);
+}
+
+.change-section.value-updated {
+  animation: change-pulse 0.5s ease-out;
+}
+
+@keyframes change-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .change-percent {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: var(--font-size-xl, 20px);
+  font-weight: var(--font-weight-bold, 700);
 }
 
-.change-indicator {
+.change-indicator-value {
   display: flex;
   align-items: center;
 }
 
-.change-indicator svg {
-  width: 16px;
-  height: 16px;
+.change-indicator-value svg {
+  width: 14px;
+  height: 14px;
 }
 
 .change-value {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--font-size-sm, 14px);
+  font-weight: var(--font-weight-medium, 500);
 }
 
 .card-footer {
-  margin-top: 12px;
-  padding-top: 12px;
+  padding-top: var(--spacing-sm, 12px);
   border-top: 1px solid var(--color-border, #e5e7eb);
-  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs, 8px);
+}
+
+.footer-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-sm, 8px);
+}
+
+.footer-item {
+  display: flex;
+  justify-content: space-between;
+  flex: 1;
+  font-size: var(--font-size-sm, 14px);
+}
+
+.footer-item.volume {
+  justify-content: flex-start;
+}
+
+.footer-item .label {
   color: var(--color-text-tertiary, #9ca3af);
+}
+
+.footer-item .value {
+  font-weight: var(--font-weight-medium, 500);
+  color: var(--color-text-primary, #1f2937);
 }
 
 .font-mono {
   font-family: 'SF Mono', 'Monaco', 'Menlo', monospace;
+}
+
+/* Skeleton loading */
+.skeleton-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-bg-tertiary, #f3f4f6) 25%, var(--color-bg-secondary, #e5e7eb) 50%, var(--color-bg-tertiary, #f3f4f6) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.skeleton-title {
+  width: 60%;
+  height: 20px;
+}
+
+.skeleton-price {
+  width: 40%;
+  height: 28px;
+}
+
+.skeleton-change {
+  width: 50%;
+  height: 18px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 </style>
