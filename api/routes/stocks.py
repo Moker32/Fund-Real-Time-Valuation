@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from typing import TypedDict
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from src.datasources.stock_source import SinaStockDataSource, YahooStockSource
 
