@@ -39,7 +39,12 @@ def get_calendar_source() -> TradingCalendarSource:
     return _calendar_source
 
 
-@router.get("/calendar/{market}", response_model=CalendarResponse)
+@router.get(
+    "/calendar/{market}",
+    response_model=CalendarResponse,
+    summary="获取市场日历",
+    description="获取指定市场在指定年份的交易日期历，包括交易日和节假日",
+)
 async def get_calendar(
     market: str,
     year: int | None = Query(None, description="Year (default: current year)"),
@@ -74,7 +79,11 @@ async def get_calendar(
     )
 
 
-@router.get("/is-trading-day/{market}")
+@router.get(
+    "/is-trading-day/{market}",
+    summary="判断是否为交易日",
+    description="判断指定市场在指定日期是否为交易日",
+)
 async def is_trading_day(
     market: str,
     check_date: str | None = Query(None, description="Date to check (YYYY-MM-DD, default: today)"),
@@ -91,7 +100,11 @@ async def is_trading_day(
     }
 
 
-@router.get("/next-trading-day/{market}")
+@router.get(
+    "/next-trading-day/{market}",
+    summary="获取下一个交易日",
+    description="获取指定日期之后的下一个交易日",
+)
 async def get_next_trading_day(
     market: str,
     from_date: str | None = Query(None, description="Start from date (YYYY-MM-DD, default: today)"),
@@ -108,7 +121,12 @@ async def get_next_trading_day(
     }
 
 
-@router.get("/market-status", response_model=dict[str, MarketStatusResponse])
+@router.get(
+    "/market-status",
+    response_model=dict[str, MarketStatusResponse],
+    summary="获取多市场状态",
+    description="批量获取多个市场的当前交易状态",
+)
 async def get_market_status(
     markets: str | None = Query(None, description="Comma-separated markets (default: all)"),
 ) -> dict[str, MarketStatusResponse]:
@@ -123,7 +141,11 @@ async def get_market_status(
     return {k: MarketStatusResponse(**v) for k, v in status.items()}
 
 
-@router.get("/markets")
+@router.get(
+    "/markets",
+    summary="获取支持的市场列表",
+    description="获取所有支持的交易市场及其描述",
+)
 async def list_markets() -> dict:
     return {
         "markets": [m.value for m in Market],

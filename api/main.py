@@ -128,17 +128,33 @@ app = FastAPI(
 提供以下功能:
 - **基金数据**: 获取基金实时估值、历史净值等
 - **商品行情**: 获取黄金、原油等大宗商品实时行情
+- **全球指数**: 获取全球主要市场指数行情
+- **行业板块**: 获取A股行业板块和概念板块行情
+- **交易日历**: 查询全球市场交易/休市日期
+- **财经新闻**: 获取最新财经新闻
+- **舆情数据**: 获取市场舆情和情绪指标
 - **健康检查**: 服务状态监控
 
 ### 数据源
 
 - **基金**: 天天基金、新浪财经
 - **商品**: yfinance、AKShare
+- **指数**: yfinance、AKShare
+- **板块**: 东方财富
     """,
     version="0.1.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
+    terms_of_service="https://github.com",
+    contact={
+        "name": "API Support",
+        "url": "https://github.com",
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    },
 )
 
 import os
