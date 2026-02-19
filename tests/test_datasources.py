@@ -480,14 +480,14 @@ class TestSinaStockDataSource:
     def test_get_market_sh(self):
         """测试上海市场判断"""
         source = SinaStockDataSource()
-        assert source._get_market("600000") == "sh"
-        assert source._get_market("688888") == "sh"
+        assert source._get_market("600000")[0] == "sh"
+        assert source._get_market("688888")[0] == "sh"
 
     def test_get_market_sz(self):
         """测试深圳市场判断"""
         source = SinaStockDataSource()
-        assert source._get_market("000001") == "sz"
-        assert source._get_market("300001") == "sz"
+        assert source._get_market("000001")[0] == "sz"
+        assert source._get_market("300001")[0] == "sz"
 
     @pytest.mark.asyncio
     async def test_parse_response(self, source):

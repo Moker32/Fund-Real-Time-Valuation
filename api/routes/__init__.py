@@ -2,6 +2,30 @@
 API 路由模块
 """
 
-from . import cache, commodities, funds, indices
+from . import (
+    bonds,
+    cache,
+    commodities,
+    datasource,
+    funds,
+    indices,
+    news,
+    overview,
+    sectors,
+    sentiment,
+    trading_calendar,
+)
 
-__all__ = ["cache", "commodities", "funds", "indices"]
+__all__ = [
+    "bonds",
+    "cache",
+    "commodities",
+    "datasource",
+    "funds",
+    "indices",
+    "news",
+    "overview",
+    "sectors",
+    "sentiment",
+    "trading_calendar",
+]

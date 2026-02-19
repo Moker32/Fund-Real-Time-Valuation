@@ -165,7 +165,9 @@ class SinaNewsDataSource(DataSource):
 
         # 尝试多种选择器
         selectors = [
-            ("财经要闻", ".news-list li a, .ctl00_ContentPlaceHolder1_MainNews_News1 tr a"),
+            # 顶部热点新闻 (当前新浪财经使用的格式)
+            ("财经要闻", ".cheadTopbar a, .top-news a, .news_important a"),
+            ("财经要闻备用", ".news-list li a, .ctl00_ContentPlaceHolder1_MainNews_News1 tr a"),
             ("基金新闻", ".FundNewsList .news-item a, .list-nav li a"),
             ("股票新闻", ".StockNewsList .news-item a, .list_content a"),
         ]
@@ -178,7 +180,18 @@ class SinaNewsDataSource(DataSource):
                         title = elem.get_text(strip=True)
                         link = elem.get("href", "")
 
-                        if title and link and len(title) > 5:
+                        # 过滤无效标题
+                        if not title or len(title) < 6:
+                            continue
+                        # 过滤导航项
+                        nav_items = ["新浪财经", "财经", "基金", "股票", "财经要闻", "基金新闻", "股票新闻", "期货", "外汇", "黄金", "理财", "视频", "博客", "论坛", "首页", "更多", "APP"]
+                        if title in nav_items or (title.startswith("新浪") and len(title) < 15):
+                            continue
+                        # 过滤空链接
+                        if not link or link in ["#", "/", "javascript:"]:
+                            continue
+
+                        if link and len(title) > 5:
                             # 提取发布时间
                             time_match = re.search(r"(\d{2}:\d{2}|\d{2}-\d{2})", title)
                             news_time = time_match.group(1) if time_match else ""
@@ -204,6 +217,14 @@ class SinaNewsDataSource(DataSource):
                 try:
                     href = link.get("href", "")
                     text = link.get_text(strip=True)
+
+                    # 过滤无效标题
+                    if not text or len(text) < 6:
+                        continue
+                    # 过滤导航项和APP推广
+                    nav_items = ["新浪财经", "财经", "基金", "股票", "财经要闻", "基金新闻", "股票新闻", "期货", "外汇", "黄金", "理财", "视频", "博客", "论坛", "首页", "更多", "APP"]
+                    if text in nav_items or text.startswith("新浪") and len(text) < 15:
+                        continue
 
                     # 筛选财经新闻链接
                     if self._is_finance_link(href, text):
@@ -390,4 +411,106 @@ class NewsAggregatorDataSource(DataSource):
 
 
 # 导出类
-__all__ = ["SinaNewsDataSource", "NewsAggregatorDataSource"]
+__all__ = ["SinaNewsDataSource", "EastMoneyNewsDataSource", "NewsAggregatorDataSource"]
+
+
+class EastMoneyNewsDataSource(DataSource):
+    """东方财富财经新闻数据源"""
+
+    def __init__(self, timeout: float = 15.0, max_news: int = 20):
+        """
+        初始化东方财富新闻数据源
+
+        Args:
+            timeout: 请求超时时间
+            max_news: 最大获取新闻数量
+        """
+        super().__init__(
+            name="eastmoney_news",
+            source_type=DataSourceType.NEWS,
+            timeout=timeout
+        )
+        self.max_news = max_news
+
+    async def fetch(self, category: str = "finance") -> DataSourceResult:
+        """
+        获取财经新闻
+
+        Args:
+            category: 新闻类别 (finance, stock, fund, economy, global, commodity)
+                     东方财富使用统一接口，category 影响搜索关键词
+
+        Returns:
+            DataSourceResult: 新闻数据结果
+        """
+        try:
+            import akshare as ak
+            
+            # 根据类别获取不同类型的新闻
+            symbol_map = {
+                "finance": "最新",      # 最新财经新闻
+                "stock": "股票",         # 股票新闻
+                "fund": "基金",          # 基金新闻
+                "economy": "宏观",       # 宏观经济
+                "global": "国际",        # 国际新闻
+                "commodity": "商品"      # 大宗商品
+            }
+            
+            symbol = symbol_map.get(category, "沪深京")
+            
+            # 获取新闻数据
+            df = ak.stock_news_em(symbol=symbol)
+            
+            if df is not None and not df.empty:
+                news_list = []
+                for _, row in df.head(self.max_news).iterrows():
+                    news_list.append({
+                        "title": str(row.get("新闻标题", "")),
+                        "url": str(row.get("新闻链接", "")),
+                        "time": str(row.get("发布时间", "")),
+                        "source": str(row.get("文章来源", "东方财富")),
+                        "category": category,
+                        "content": str(row.get("新闻内容", ""))[:200] if row.get("新闻内容") else ""
+                    })
+                
+                self._record_success()
+                return DataSourceResult(
+                    success=True,
+                    data=news_list,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"category": category, "count": len(news_list)}
+                )
+            
+            return DataSourceResult(
+                success=False,
+                error="未获取到新闻数据",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"category": category}
+            )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 库未安装",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"category": category}
+            )
+        except Exception as e:
+            return self._handle_error(e, self.name)
+
+    async def fetch_batch(self, categories: list[str]) -> list[DataSourceResult]:
+        """批量获取多类别新闻"""
+        async def fetch_one(cat: str) -> DataSourceResult:
+            return await self.fetch(cat)
+
+        tasks = [fetch_one(cat) for cat in categories]
+        return await asyncio.gather(*tasks, return_exceptions=True)
+
+    def get_status(self) -> dict[str, Any]:
+        """获取数据源状态"""
+        status = super().get_status()
+        status["max_news"] = self.max_news
+        return status

@@ -6,6 +6,7 @@
 - sample_funds: 测试基金列表
 - sample_holdings: 测试持仓列表
 - notification_config: 通知配置实例
+- client: FastAPI 测试客户端
 """
 
 import os
@@ -30,6 +31,7 @@ if CONFIG_ROOT not in sys.path:
 
 
 import pytest
+from fastapi.testclient import TestClient
 
 from src.config.models import (
     AlertDirection,
@@ -41,6 +43,13 @@ from src.config.models import (
     NotificationConfig,
     PriceAlert,
 )
+
+
+@pytest.fixture
+def client():
+    """返回 FastAPI 测试客户端"""
+    from api.main import app
+    return TestClient(app)
 
 
 @pytest.fixture

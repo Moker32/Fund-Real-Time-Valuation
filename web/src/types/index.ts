@@ -312,3 +312,19 @@ export interface NewsCategoriesResponse {
   categories: NewsCategory[];
   timestamp: string;
 }
+
+// Stock Types
+export interface Stock {
+  code: string;
+  name: string;
+  price: number;
+  change: number;
+  change_pct: number;
+  open: number;
+  high: number;
+  low: number;
+  volume: string;
+  amount: string;
+  pre_close: number;
+  timestamp: string;
+}

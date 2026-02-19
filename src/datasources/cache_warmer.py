@@ -213,7 +213,7 @@ class CacheWarmer:
             self._refresh_task.cancel()
             try:
                 self._refresh_task.result()
-            except asyncio.CancelledError:
+            except (asyncio.CancelledError, asyncio.InvalidStateError):
                 pass
 
         logger.info("后台缓存预热任务已停止")

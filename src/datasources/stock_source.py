@@ -80,14 +80,14 @@ class SinaStockDataSource(DataSource):
         """获取 A 股实时行情
 
         Args:
-            stock_code: 股票代码 (如: 600000, 000001)
+            stock_code: 股票代码 (如: 600000, 000001, sh600000, sz000001)
 
         Returns:
             DataSourceResult: 包含股票行情数据的结果对象
         """
-        # 确定交易所前缀
-        market = self._get_market(stock_code)
-        url = f"https://hq.sinajs.cn/list={market}{stock_code}"
+        # 确定交易所和纯代码
+        market, code = self._get_market(stock_code)
+        url = f"https://hq.sinajs.cn/list={market}{code}"
 
         try:
             response = await self.client.get(url)
@@ -119,21 +119,29 @@ class SinaStockDataSource(DataSource):
         except Exception as e:
             return self._handle_error(e, self.name)
 
-    def _get_market(self, stock_code: str) -> str:
+    def _get_market(self, stock_code: str) -> tuple[str, str]:
         """根据股票代码判断交易所
 
         Args:
-            stock_code: 股票代码
+            stock_code: 股票代码 (支持格式: 600000, sh600000, sz000001)
 
         Returns:
-            'sh' 或 'sz'
+            (market, code) 元组 - 交易所前缀和纯代码
         """
-        if stock_code.startswith("6"):
-            return "sh"
-        elif stock_code.startswith("0") or stock_code.startswith("3"):
-            return "sz"
+        # 移除前缀
+        code = stock_code.upper()
+        if code.startswith("SH"):
+            code = code[2:]
+        elif code.startswith("SZ"):
+            code = code[2:]
+        
+        # 根据数字判断交易所
+        if code.startswith("6"):
+            return ("sh", code)
+        elif code.startswith("0") or code.startswith("3"):
+            return ("sz", code)
         else:
-            return "sh"  # 默认上海
+            return ("sh", code)  # 默认上海
 
     def _parse_response(
         self, response_text: str, stock_code: str, market: str
@@ -173,7 +181,13 @@ class SinaStockDataSource(DataSource):
         change = round(current_price - pre_close, 3)
         change_pct = round(change / pre_close * 100, 2) if pre_close > 0 else 0
 
-        # 构建返回数据
+        # 构建返回数据 - 更安全的解析
+        def safe_int(v, default=0):
+            try:
+                return int(float(v))
+            except (ValueError, TypeError):
+                return default
+        
         data = {
             "code": code,
             "name": values[0],
@@ -184,10 +198,10 @@ class SinaStockDataSource(DataSource):
             "low": float(values[5]),
             "bid": float(values[6]),
             "ask": float(values[7]),
-            "volume": int(values[8]),  # 成交量(手)
-            "amount": round(float(values[9]) / 10000, 2),  # 成交额(万元)
-            "bid_volume": int(values[10]) if len(values) > 10 else 0,
-            "ask_volume": int(values[11]) if len(values) > 11 else 0,
+            "volume": safe_int(values[8]),  # 成交量(手)
+            "amount": round(float(values[9]) / 10000, 2) if values[9] else 0,  # 成交额(万元)
+            "bid_volume": safe_int(values[10]) if len(values) > 10 else 0,
+            "ask_volume": safe_int(values[11]) if len(values) > 11 else 0,
             "time": values[12] if len(values) > 12 else "",
             "change": change,
             "change_pct": change_pct,

@@ -93,6 +93,26 @@ curl "http://localhost:8000/trading-calendar/next-trading-day/china"
 curl "http://localhost:8000/trading-calendar/market-status?markets=china,usa"
 ```
 
+### 数据源统计
+
+```bash
+# 获取数据源请求统计
+curl "http://localhost:8000/api/datasource/statistics"
+
+# 获取数据源健康状态
+curl "http://localhost:8000/api/datasource/health"
+
+# 获取已注册的数据源列表
+curl "http://localhost:8000/api/datasource/sources"
+```
+
+### 缓存统计
+
+```bash
+# 获取缓存统计信息
+curl "http://localhost:8000/api/cache/stats"
+```
+
 ## 许可证
 
 MIT License

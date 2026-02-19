@@ -5,12 +5,15 @@
 """
 
 import asyncio
+import logging
 import re
 import time
 from datetime import datetime, timedelta
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from .base import DataSource, DataSourceResult, DataSourceType
 
@@ -103,7 +106,7 @@ class SinaSectorDataSource(DataSource):
 
     def log(self, message: str) -> None:
         """简单的日志方法"""
-        print(f"[SinaSectorDataSource] {message}")
+        logger.info(f"[SinaSectorDataSource] {message}")
 
     # 主要行业板块配置
     # 使用新浪财经的行业指数代码
@@ -626,7 +629,7 @@ class EastMoneyDirectSource(DataSource):
         self._cache_timeout = 60.0
 
     def log(self, message: str) -> None:
-        print(f"[EastMoneyDirectSource] {message}")
+        logger.info(f"[EastMoneyDirectSource] {message}")
 
     async def fetch(self, sector_type: str = "industry") -> DataSourceResult:
         """
@@ -742,7 +745,7 @@ class EastMoneyDirectSource(DataSource):
             "fields": "f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13",
         }
 
-        sectors = []
+        sectors: list[dict[str, Any]] = []
         try:
             response = await self.client.get(url, params=params)
             response.raise_for_status()

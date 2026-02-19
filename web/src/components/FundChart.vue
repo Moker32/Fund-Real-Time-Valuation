@@ -178,7 +178,8 @@ const updateColor = () => {
 
   const newColor = getTrendColor();
   try {
-    uplotInstance.setSeries(1, { stroke: newColor } as any);
+    // uPlot setSeries API requires series options
+    uplotInstance.setSeries(1, { stroke: newColor });
   } catch {
     // 忽略颜色更新错误
   }
@@ -186,6 +187,13 @@ const updateColor = () => {
 
 // 监听数据变化
 watch(() => props.data, (newData) => {
+  // 如果图表未初始化但有数据，先初始化图表
+  if (!uplotInstance && chartContainer.value && newData && newData.length > 0) {
+    initChart();
+  }
+
+  if (!uplotInstance) return;
+
   if (!newData || newData.length === 0) return;
 
   // 更新颜色
@@ -198,7 +206,11 @@ watch(() => props.data, (newData) => {
 }, { deep: true, flush: 'post' });
 
 onMounted(() => {
-  initChart();
+  // 如果挂载时数据已存在，先初始化图表再更新数据
+  if (props.data && props.data.length > 0) {
+    initChart();
+    updateData();
+  }
   window.addEventListener('resize', handleResize);
 });
 

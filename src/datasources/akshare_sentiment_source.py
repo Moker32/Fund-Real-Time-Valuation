@@ -311,7 +311,7 @@ class AKShareSentimentAggregatorDataSource(DataSource):
                 economic_task, weibo_task, return_exceptions=True
             )
 
-            combined_data = {"economic": None, "weibo": None, "errors": []}
+            combined_data: dict[str, Any] = {"economic": None, "weibo": None, "errors": []}
 
             if isinstance(economic_result, DataSourceResult) and economic_result.success:
                 combined_data["economic"] = economic_result.data

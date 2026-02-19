@@ -722,11 +722,16 @@ def create_default_manager(
     news_source = SinaNewsDataSource()
     manager.register(news_source)
 
+    # 注册东方财富新闻数据源（备用）
+    from .news_source import EastMoneyNewsDataSource
+    eastmoney_news_source = EastMoneyNewsDataSource()
+    manager.register(eastmoney_news_source)
+
     # === 新增 AKShare 舆情数据源 ===
     from .akshare_sentiment_source import (
         AKShareEconomicNewsDataSource,
-        AKShareWeiboSentimentDataSource,
         AKShareSentimentAggregatorDataSource,
+        AKShareWeiboSentimentDataSource,
     )
 
     manager.register(AKShareEconomicNewsDataSource())
