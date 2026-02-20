@@ -26,6 +26,7 @@ ENV/
 
 # 项目特定
 *.bak
+dump.rdb
 
 # Git worktrees
 .worktrees/
