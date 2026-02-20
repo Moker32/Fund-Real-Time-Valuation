@@ -14,14 +14,16 @@
 
   /* Typography */
   --color-text-primary: #FFFFFF;
-  --color-text-secondary: #8A8A8A;
+  --color-text-secondary: #A0A0A0;
   --color-text-tertiary: #666666;
 
   /* Accents - Financial */
   --color-rise: #FF6B6B;
   --color-rise-bg: rgba(255, 107, 107, 0.1);
+  --color-rise-alpha: rgba(255, 107, 107, 0.15);
   --color-fall: #4ADE80;
   --color-fall-bg: rgba(74, 222, 128, 0.1);
+  --color-fall-alpha: rgba(74, 222, 128, 0.15);
   --color-neutral: #71717A;
 
   /* UI Elements */
@@ -131,6 +133,17 @@ button {
   background: none;
 }
 
+/* Focus Visible - Keyboard Accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Remove default focus for mouse users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 input, textarea, select {
   font-family: inherit;
 }
@@ -215,6 +228,18 @@ input, textarea, select {
 .animate-fade-in { animation: fadeIn var(--transition-normal) forwards; }
 .animate-slide-up { animation: slideUp var(--transition-slow) forwards; }
 .animate-slide-left { animation: slideInLeft var(--transition-slow) forwards; }
+
+/* Reduced Motion Preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* Loading Skeleton */
 .skeleton {

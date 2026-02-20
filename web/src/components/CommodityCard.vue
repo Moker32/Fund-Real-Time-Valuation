@@ -23,12 +23,13 @@
             class="action-btn watch-btn"
             :class="{ active: isWatched }"
             :title="isWatched ? '取消关注' : '添加关注'"
+            :aria-label="isWatched ? '取消关注' : '添加关注'"
             @click.stop="toggleWatch"
           >
-            <svg v-if="isWatched" viewBox="0 0 24 24" fill="currentColor">
+            <svg v-if="isWatched" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
             </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
             </svg>
           </button>
