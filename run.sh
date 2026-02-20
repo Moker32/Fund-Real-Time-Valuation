@@ -52,6 +52,40 @@ echo ""
 echo -e "${GREEN}启动服务...${NC}"
 echo ""
 
+# 检测 Redis
+echo -e "${YELLOW}检测 Redis...${NC}"
+if ! pgrep -x "redis-server" > /dev/null; then
+    echo -e "${YELLOW}启动 Redis...${NC}"
+    redis-server --daemonize yes
+    sleep 1
+fi
+if pgrep -x "redis-server" > /dev/null; then
+    echo -e "${GREEN}Redis 运行中${NC}"
+else
+    echo -e "${RED}错误: Redis 启动失败${NC}"
+    exit 1
+fi
+
+# 启动 Celery Worker（后台运行）
+echo -e "${YELLOW}启动 Celery Worker...${NC}"
+CELERY_PID_FILE="/tmp/fund-celery.pid"
+if [ -f "$CELERY_PID_FILE" ]; then
+    OLD_PID=$(cat "$CELERY_PID_FILE")
+    if ps -p "$OLD_PID" &>/dev/null; then
+        echo "停止旧的 Celery 进程 (PID: $OLD_PID)..."
+        kill "$OLD_PID" 2>/dev/null || true
+        sleep 1
+    fi
+    rm -f "$CELERY_PID_FILE"
+fi
+
+$PYTHON_CMD run_celery.py &
+CELERY_PID=$!
+echo $CELERY_PID > "$CELERY_PID_FILE"
+echo -e "${YELLOW}Celery Worker PID: $CELERY_PID${NC}"
+
+sleep 2
+
 # 启动后端（后台运行）
 echo -e "${YELLOW}启动后端服务...${NC}"
 BACKEND_PID_FILE="/tmp/fund-api.pid"
