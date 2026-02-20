@@ -6,6 +6,8 @@
   "scripts": {
     "dev:web": "cd web && pnpm run dev",
     "dev:api": "uv run python run_api.py --reload",
+    "dev:celery": "uv run python run_celery.py",
+    "dev:celery:beat": "uv run python run_celery_beat.py",
     "dev": "concurrently \"pnpm run dev:web\" \"uv run python run_api.py --reload\"",
     "install:all": "pnpm install && uv pip install -r requirements.txt",
     "install:web": "cd web && pnpm install",

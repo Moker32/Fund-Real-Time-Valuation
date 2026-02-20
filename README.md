@@ -28,6 +28,8 @@ pnpm run dev
 
 ```
 ├── run_api.py              # Web 应用入口
+├── run_celery.py           # Celery Worker 入口
+├── run_celery_beat.py      # Celery Beat 定时任务入口
 ├── pyproject.toml          # Python 项目配置
 ├── package.json            # pnpm 工作空间配置
 ├── api/                    # FastAPI 后端
@@ -45,6 +47,7 @@ pnpm run dev
 ├── src/                    # Python 源码
 │   ├── datasources/       # 数据源层
 │   ├── config/            # 配置管理
+│   ├── tasks/             # Celery 异步任务
 │   └── utils/             # 工具模块
 └── tests/                 # 测试
 ```
@@ -55,7 +58,16 @@ pnpm run dev
 # 安装依赖 (前端 + 后端)
 pnpm run install:all
 
-# 并行启动前后端开发服务器
+# 启动 Redis (Celery 依赖)
+redis-server
+
+# 启动 Celery Worker (后台任务)
+pnpm run dev:celery
+
+# 启动 Celery Beat (定时任务，可选)
+pnpm run dev:celery:beat
+
+# 启动前后端开发服务器
 pnpm run dev
 
 # 单独启动

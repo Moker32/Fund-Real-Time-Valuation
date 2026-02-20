@@ -37,7 +37,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     from celery.apps.beat import Beat
-    from src.tasks.celery_app import celery_app
+    from src.tasks import celery_app
 
     beat = Beat(
         app=celery_app,
