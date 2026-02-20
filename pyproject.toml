@@ -35,6 +35,9 @@ dependencies = [
     # FastAPI 后端依赖
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
+    # Celery + Redis 异步任务
+    "celery[redis]>=5.3.0",
+    "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]

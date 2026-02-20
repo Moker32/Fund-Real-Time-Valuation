@@ -113,6 +113,10 @@
           <h1 class="page-title">{{ pageTitle }}</h1>
         </div>
         <div class="header-right">
+          <div class="ws-status" :class="{ connected: wsStore.isConnected.value }">
+            <span class="ws-dot"></span>
+            <span class="ws-text">{{ wsStore.isConnected.value ? '实时' : '轮询' }}</span>
+          </div>
           <div class="status-indicator" :class="healthStatus">
             <span class="status-dot"></span>
             <span class="status-text">{{ statusText }}</span>
@@ -154,18 +158,22 @@ import { useFundStore } from '@/stores/fundStore';
 import { useCommodityStore } from '@/stores/commodityStore';
 import { useIndexStore } from '@/stores/indexStore';
 import { useSectorStore } from '@/stores/sectorStore';
+import { useWSStore } from '@/stores/wsStore';
 import { healthApi } from '@/api';
+import type { Fund, Commodity, MarketIndex } from '@/types';
 
 const route = useRoute();
 const fundStore = useFundStore();
 const commodityStore = useCommodityStore();
 const indexStore = useIndexStore();
 const sectorStore = useSectorStore();
+const wsStore = useWSStore();
 
 const sidebarCollapsed = ref(false);
 const healthStatus = ref<'healthy' | 'degraded' | 'unhealthy'>('healthy');
 const statusText = ref('已连接');
 const refreshing = ref(false);
+const realtimeEnabled = ref(true); // WebSocket real-time updates
 let fundTimer: number | null = null;
 let commodityTimer: number | null = null;
 let indexTimer: number | null = null;
@@ -207,11 +215,10 @@ async function refresh() {
 
   refreshing.value = true;
   try {
-    // 分布刷新，避免同时请求造成阻塞
     fundStore.fetchFunds();
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 2秒后刷新商品
+    await new Promise(resolve => setTimeout(resolve, 2000));
     commodityStore.fetchCategories();
-    await new Promise(resolve => setTimeout(resolve, 2000)); // 再过2秒后刷新指数
+    await new Promise(resolve => setTimeout(resolve, 2000));
     indexStore.fetchIndices();
     sectorStore.refresh();
     await checkHealth();
@@ -222,27 +229,63 @@ async function refresh() {
   }
 }
 
+function setupWebSocketHandlers() {
+  wsStore.on('fund_update', (data) => {
+    const funds = data as Fund[];
+    if (funds && funds.length > 0) {
+      funds.forEach((updatedFund) => {
+        const index = fundStore.funds.findIndex(f => f.code === updatedFund.code);
+        if (index !== -1) {
+          fundStore.funds[index] = { ...fundStore.funds[index], ...updatedFund };
+        }
+      });
+      fundStore.lastUpdated = new Date().toLocaleTimeString();
+    }
+  });
+
+  wsStore.on('commodity_update', (data) => {
+    const commodities = data as Commodity[];
+    if (commodities && commodities.length > 0) {
+      commodityStore.lastUpdated = new Date().toLocaleTimeString();
+    }
+  });
+
+  wsStore.on('index_update', (data) => {
+    const indices = data as MarketIndex[];
+    if (indices && indices.length > 0) {
+      indexStore.lastUpdated = new Date().toLocaleTimeString();
+    }
+  });
+}
+
+function startWebSocket() {
+  if (!realtimeEnabled.value) return;
+  wsStore.connect();
+  wsStore.subscribe(['funds', 'commodities', 'indices']);
+  setupWebSocketHandlers();
+}
+
+function stopWebSocket() {
+  wsStore.disconnect();
+}
+
 function startAutoRefresh() {
-  if (!fundStore.autoRefresh) return;
+  if (!fundStore.autoRefresh || realtimeEnabled.value) return;
 
   const baseInterval = (fundStore.refreshInterval || 30) * 1000;
 
-  // 分布刷新：每个数据源间隔几秒，避免同时请求
-  // 基金：基准间隔
   fundTimer = window.setInterval(() => {
     if (fundStore.autoRefresh) {
       fundStore.fetchFunds();
     }
   }, baseInterval);
 
-  // 商品：基准间隔 + 5秒
   commodityTimer = window.setInterval(() => {
     if (fundStore.autoRefresh) {
       commodityStore.fetchCategories();
     }
   }, baseInterval + 5000);
 
-  // 指数：基准间隔 + 10秒
   indexTimer = window.setInterval(() => {
     if (fundStore.autoRefresh) {
       indexStore.fetchIndices();
@@ -265,27 +308,32 @@ function stopAutoRefresh() {
   }
 }
 
-// 监听自动刷新设置变化
 watch(() => fundStore.autoRefresh, (enabled) => {
-  if (enabled) {
+  if (enabled && !realtimeEnabled.value) {
     startAutoRefresh();
-  } else {
+  } else if (!enabled) {
     stopAutoRefresh();
   }
 });
 
 watch(() => fundStore.refreshInterval, () => {
-  stopAutoRefresh();
-  startAutoRefresh();
+  if (!realtimeEnabled.value) {
+    stopAutoRefresh();
+    startAutoRefresh();
+  }
 });
 
 onMounted(async () => {
   await refresh();
-  startAutoRefresh();
+  startWebSocket();
+  if (!realtimeEnabled.value) {
+    startAutoRefresh();
+  }
   healthTimer = window.setInterval(checkHealth, 30000);
 });
 
 onUnmounted(() => {
+  stopWebSocket();
   stopAutoRefresh();
   if (healthTimer) {
     clearInterval(healthTimer);
@@ -479,6 +527,32 @@ onUnmounted(() => {
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-full);
   background: var(--color-bg-card);
+}
+
+.ws-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-card);
+  
+  .ws-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #FBBF24;
+  }
+  
+  &.connected .ws-dot {
+    background: var(--color-rise);
+    box-shadow: 0 0 8px var(--color-rise);
+  }
+  
+  .ws-text {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+  }
 }
 
 .status-dot {

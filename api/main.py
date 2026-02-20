@@ -14,8 +14,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.datasources.cache_cleaner import CacheCleaner, get_cache_cleaner
-from src.datasources.cache_warmer import CacheWarmer
 from src.datasources.manager import create_default_manager
 from src.utils.log_buffer import get_log_buffer
 
@@ -40,6 +38,7 @@ from .routes import (
     sentiment,
     stocks,
     trading_calendar,
+    websocket,
 )
 
 # 配置日志：将日志同时输出到缓冲区和标准输出
@@ -48,11 +47,6 @@ _buffer_handler = get_log_buffer()
 _buffer_handler.setLevel(logging.DEBUG)
 _root_logger.addHandler(_buffer_handler)
 _root_logger.setLevel(logging.DEBUG)
-
-# 全局预热器实例
-_cache_warmer: CacheWarmer | None = None
-# 全局缓存清理器实例
-_cache_cleaner: CacheCleaner | None = None
 
 
 @asynccontextmanager
@@ -63,62 +57,28 @@ async def lifespan(app: FastAPI):
     Args:
         app: FastAPI 应用实例
     """
-    global _cache_warmer, _cache_cleaner
-
-    # 启动时初始化数据源管理器
     manager = create_default_manager()
     set_data_source_manager(manager)
 
-    # 创建缓存预热器（用于后续操作）
-    _cache_warmer = CacheWarmer(manager)
-
-    # 预加载所有缓存数据到内存（不阻塞服务启动）
-    asyncio.create_task(_cache_warmer.preload_all_cache(timeout=5))
-
-    # 预热基金信息缓存（名称、类型等）- 并行获取，不阻塞服务启动
-    asyncio.create_task(_cache_warmer.preload_fund_info_cache(timeout=60))
-
-    # 启动后台健康检查（非阻塞）
-    asyncio.create_task(manager.start_background_health_check())
-
-    # 移除启动时的 sleep - 健康检查在后台运行，无需等待
-
-    # 启动缓存预热（不阻塞服务启动）
-    asyncio.create_task(_cache_warmer.start_background_warmup(interval=300))
-
-    # 启动时清理过期缓存（不阻塞服务启动）
     try:
-        from src.datasources.cache_cleaner import startup_cleanup
+        from src.tasks.cache_tasks import preload_all, preload_funds
 
-        asyncio.create_task(startup_cleanup())
-        logger.info("启动时缓存清理任务已提交")
+        preload_all.delay()
+        preload_funds.delay()
+        logger.info("Celery 缓存预热任务已提交")
     except Exception as e:
-        logger.warning(f"启动清理任务失败: {e}")
+        logger.warning(f"提交缓存预热任务失败: {e}")
 
-    # 启动后台定时清理任务（每小时执行一次）
     try:
-        from src.datasources.cache_cleaner import start_background_cleanup_task
+        from src.tasks.health_tasks import run_health_check
 
-        start_background_cleanup_task(interval=3600)
-        logger.info("后台定时清理任务已启动")
+        run_health_check.delay()
+        logger.info("Celery 健康检查任务已提交")
     except Exception as e:
-        logger.warning(f"启动后台清理任务失败: {e}")
+        logger.warning(f"提交健康检查任务失败: {e}")
 
     yield
 
-    # 停止后台预热
-    if _cache_warmer:
-        _cache_warmer.stop()
-
-    # 停止后台清理任务
-    try:
-        cleaner = get_cache_cleaner()
-        if cleaner:
-            cleaner.stop()
-    except Exception:
-        pass
-
-    # 关闭时清理资源
     await close_data_source_manager()
 
 
@@ -266,6 +226,7 @@ app.include_router(sentiment.router)
 app.include_router(datasource.router)
 app.include_router(stocks.router)
 app.include_router(bonds.router)
+app.include_router(websocket.router)
 
 
 @app.get(

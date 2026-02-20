@@ -14,6 +14,7 @@ from . import (
     sectors,
     sentiment,
     trading_calendar,
+    websocket,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "sectors",
     "sentiment",
     "trading_calendar",
+    "websocket",
 ]
