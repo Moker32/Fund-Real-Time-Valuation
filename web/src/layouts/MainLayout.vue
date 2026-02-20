@@ -113,9 +113,9 @@
           <h1 class="page-title">{{ pageTitle }}</h1>
         </div>
         <div class="header-right">
-          <div class="ws-status" :class="{ connected: wsStore.isConnected.value }">
+          <div class="ws-status" :class="{ connected: wsStore.isConnected }">
             <span class="ws-dot"></span>
-            <span class="ws-text">{{ wsStore.isConnected.value ? '实时' : '轮询' }}</span>
+            <span class="ws-text">{{ wsStore.isConnected ? '实时' : '轮询' }}</span>
           </div>
           <div class="status-indicator" :class="healthStatus">
             <span class="status-dot"></span>

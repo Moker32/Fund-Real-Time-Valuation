@@ -56,14 +56,6 @@ export const useWSStore = defineStore('websocket', () => {
     typeList.forEach(t => subscriptions.value.delete(t))
   }
 
-  ws.ws.value?.addEventListener('open', () => {
-    isConnected.value = true
-  })
-
-  ws.ws.value?.addEventListener('close', () => {
-    isConnected.value = false
-  })
-
   return {
     isConnected: computed(() => ws.isConnected.value),
     subscriptions: computed(() => ws.subscriptions.value),
