@@ -472,18 +472,15 @@ export const useCommodityStore = defineStore('commodities', () => {
       const response = await commodityApi.getWatchlist();
       watchedCommodities.value = response.watchlist || [];
 
-      // 收集关注商品的实际行情数据
-      const watchedData: Commodity[] = [];
-      for (const watched of watchedCommodities.value) {
+      const fetchPromises = watchedCommodities.value.map(async (watched) => {
         try {
           let data: any;
-          // 根据 symbol 类型调用不同的 API
-          if (watched.symbol === 'Au99.99' || watched.symbol.toLowerCase() === 'sg=f') {
+          if (watched.symbol.toUpperCase() === 'AU99.99' || watched.symbol.toLowerCase() === 'sg=f') {
             data = await commodityApi.getGoldCNY();
           } else {
             data = await commodityApi.getCommodityByTicker(watched.symbol);
           }
-          const commodityData: Commodity = {
+          return {
             symbol: data.symbol,
             name: getCommodityName(data.symbol, data.name),
             price: data.price,
@@ -496,15 +493,15 @@ export const useCommodityStore = defineStore('commodities', () => {
             prevClose: data.prev_close ?? 0,
             source: data.source,
             timestamp: data.time ?? data.timestamp,
-          };
-          watchedData.push(commodityData);
+          } as Commodity;
         } catch (e) {
           console.warn(`[CommodityStore] Failed to fetch ${watched.symbol}:`, e);
+          return null;
         }
-      }
+      });
 
-      // 一次性更新 watchedCommodityData
-      watchedCommodityData.value = watchedData;
+      const results = await Promise.all(fetchPromises);
+      watchedCommodityData.value = results.filter((r): r is Commodity => r !== null);
 
       // 如果有关注的商品且当前没有选中分类，默认选中"我的关注"
       if (watchedCommodities.value.length > 0 && !activeCategory.value) {

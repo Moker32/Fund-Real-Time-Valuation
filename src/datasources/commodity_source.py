@@ -193,6 +193,11 @@ class YFinanceCommoditySource(CommodityDataSource):
             else:
                 timestamp_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+            day_high = info.get("dayHigh")
+            day_low = info.get("dayLow")
+            market_open = info.get("regularMarketOpen")
+            prev_close = info.get("regularMarketPreviousClose")
+
             data = {
                 "commodity": commodity_type,
                 "symbol": ticker,
@@ -203,6 +208,10 @@ class YFinanceCommoditySource(CommodityDataSource):
                 "currency": info.get("currency", "USD"),
                 "exchange": info.get("exchange", ""),
                 "timestamp": timestamp_str,
+                "high": float(day_high) if day_high else None,
+                "low": float(day_low) if day_low else None,
+                "open": float(market_open) if market_open else None,
+                "prev_close": float(prev_close) if prev_close else None,
             }
 
             # 更新缓存
@@ -296,6 +305,68 @@ class YFinanceCommoditySource(CommodityDataSource):
     def clear_cache(self):
         """清空缓存"""
         self._cache.clear()
+
+    async def fetch_by_ticker(self, ticker: str) -> DataSourceResult:
+        """根据任意 ticker 获取商品数据"""
+        import yfinance as yf
+
+        try:
+            ticker_obj = yf.Ticker(ticker)
+            info = ticker_obj.info
+
+            price = info.get("currentPrice", info.get("regularMarketPrice"))
+            change = info.get("regularMarketChange", info.get("change", 0))
+            change_percent = info.get("regularMarketChangePercent", info.get("changePercent", 0))
+
+            if price is None:
+                return DataSourceResult(
+                    success=False,
+                    error=f"无法获取 {ticker} 的价格数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                )
+
+            day_high = info.get("dayHigh")
+            day_low = info.get("dayLow")
+            market_open = info.get("regularMarketOpen")
+            prev_close = info.get("regularMarketPreviousClose")
+
+            market_time = info.get("regularMarketTime")
+            if market_time:
+                try:
+                    utc_dt = datetime.fromtimestamp(market_time, timezone.utc)
+                    timestamp_str = utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                except (ValueError, TypeError, OSError):
+                    timestamp_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            else:
+                timestamp_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            data = {
+                "commodity": ticker.lower(),
+                "symbol": ticker,
+                "name": info.get("shortName", info.get("longName", ticker)),
+                "price": float(price),
+                "change": float(change) if change else 0.0,
+                "change_percent": float(change_percent) if change_percent else 0.0,
+                "currency": info.get("currency", "USD"),
+                "exchange": info.get("exchange", ""),
+                "timestamp": timestamp_str,
+                "high": float(day_high) if day_high else None,
+                "low": float(day_low) if day_low else None,
+                "open": float(market_open) if market_open else None,
+                "prev_close": float(prev_close) if prev_close else None,
+            }
+
+            self._record_success()
+            return DataSourceResult(
+                success=True,
+                data=data,
+                timestamp=time.time(),
+                source=self.name,
+            )
+
+        except Exception as e:
+            return self._handle_error(e, self.name)
 
     def get_status(self) -> dict[str, Any]:
         """获取数据源状态（含缓存信息）"""

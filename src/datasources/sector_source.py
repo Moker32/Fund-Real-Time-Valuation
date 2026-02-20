@@ -17,51 +17,35 @@ logger = logging.getLogger(__name__)
 
 from .base import DataSource, DataSourceResult, DataSourceType
 
-# 中国A股主要节假日（简化版，提前维护）
-CHINA_HOLIDAYS_2026 = [
-    "2026-01-01",  # 元旦
-    "2026-01-26",  # 春节假期开始
-    "2026-01-27",
-    "2026-01-28",
-    "2026-01-29",
-    "2026-01-30",
-    "2026-01-31",
-    "2026-02-01",
-    "2026-02-02",
-    "2026-02-03",
-    "2026-02-04",
-    "2026-02-05",
-    "2026-02-06",
-    "2026-02-07",  # 春节假期结束
-    # 国庆节（假设）
-    "2026-10-01",
-    "2026-10-02",
-    "2026-10-03",
-    "2026-10-04",
-    "2026-10-05",
-    "2026-10-06",
-    "2026-10-07",
-    # 清明节（假设）
-    "2026-04-04",
-    "2026-04-05",
-    "2026-04-06",
-    # 劳动节（假设）
-    "2026-05-01",
-    "2026-05-02",
-    "2026-05-03",
-]
+_holiday_cache: dict[int, set[str]] = {}
+
+
+def _get_china_holidays_from_db(year: int) -> set[str]:
+    if year in _holiday_cache:
+        return _holiday_cache[year]
+    try:
+        from src.db.database import DatabaseManager
+
+        dao = DatabaseManager().holiday_dao
+        holidays = dao.get_holidays(market="china", year=year, active_only=True)
+        holiday_dates = {h.holiday_date for h in holidays}
+        _holiday_cache[year] = holiday_dates
+        return holiday_dates
+    except Exception:
+        return set()
 
 
 def is_trading_day(date: datetime) -> bool:
-    """判断是否是交易日"""
-    # 周末不是交易日
     if date.weekday() >= 5:
         return False
-    # 节假日不是交易日
     date_str = date.strftime("%Y-%m-%d")
-    if date_str in CHINA_HOLIDAYS_2026:
-        return False
-    return True
+    db_holidays = _get_china_holidays_from_db(date.year)
+    if db_holidays:
+        return date_str not in db_holidays
+    from src.datasources.trading_calendar_source import TradingCalendarSource
+
+    cal = TradingCalendarSource()
+    return cal.is_trading_day("china", date)
 
 
 def get_last_trading_day() -> datetime:

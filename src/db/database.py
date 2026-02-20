@@ -168,14 +168,20 @@ class DatabaseManager:
             db_path: 数据库文件路径，默认为 ~/.fund-tui/fund_data.db
         """
         if db_path is None:
-            config_dir = os.environ.get(
-                "FUND_TUI_CONFIG_DIR", str(Path.home() / ".fund-tui")
-            )
+            config_dir = os.environ.get("FUND_TUI_CONFIG_DIR", str(Path.home() / ".fund-tui"))
             os.makedirs(config_dir, exist_ok=True)
             db_path = str(Path(config_dir) / "fund_data.db")
 
         self.db_path = db_path
         self._init_database()
+
+    @property
+    def trading_calendar_dao(self) -> "TradingCalendarDAO":
+        return TradingCalendarDAO(self)
+
+    @property
+    def holiday_dao(self) -> "ExchangeHolidayDAO":
+        return ExchangeHolidayDAO(self)
 
     @contextmanager
     def get_connection(self):
@@ -334,7 +340,42 @@ class DatabaseManager:
                 )
             """)
 
+            # 交易日历缓存表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS trading_calendar_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    market TEXT NOT NULL,
+                    year INTEGER NOT NULL,
+                    day_of_year INTEGER NOT NULL,
+                    is_trading_day INTEGER NOT NULL,
+                    holiday_name TEXT,
+                    is_makeup_day INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                    UNIQUE(market, year, day_of_year)
+                )
+            """)
+
+            # 节假日定义表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS exchange_holidays (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    market TEXT NOT NULL,
+                    holiday_date TEXT NOT NULL,
+                    holiday_name TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                    updated_at TEXT DEFAULT (datetime('now', 'localtime')),
+                    UNIQUE(market, holiday_date)
+                )
+            """)
+
             # 创建索引
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_holidays_market_date ON exchange_holidays(market, holiday_date)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_holidays_active ON exchange_holidays(market, is_active)"
+            )
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_fund_history_code_date ON fund_history(fund_code, date)"
             )
@@ -368,9 +409,7 @@ class DatabaseManager:
 
             # 添加 is_hold 列（如果不存在）
             if "is_hold" not in columns:
-                cursor.execute(
-                    "ALTER TABLE fund_config ADD COLUMN is_hold INTEGER DEFAULT 0"
-                )
+                cursor.execute("ALTER TABLE fund_config ADD COLUMN is_hold INTEGER DEFAULT 0")
 
             # 检查 fund_intraday_cache 表是否有 date 列
             cursor.execute("PRAGMA table_info(fund_intraday_cache)")
@@ -378,9 +417,7 @@ class DatabaseManager:
 
             # 添加 date 列（如果不存在）
             if "date" not in intraday_columns:
-                cursor.execute(
-                    "ALTER TABLE fund_intraday_cache ADD COLUMN date TEXT DEFAULT ''"
-                )
+                cursor.execute("ALTER TABLE fund_intraday_cache ADD COLUMN date TEXT DEFAULT ''")
 
         except Exception as e:
             logger.warning(f"数据库迁移警告: {e}")
@@ -509,9 +546,7 @@ class ConfigDAO:
         """获取持仓基金列表（份额 > 0）"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM fund_config WHERE shares > 0 ORDER BY updated_at DESC"
-            )
+            cursor.execute("SELECT * FROM fund_config WHERE shares > 0 ORDER BY updated_at DESC")
             return [FundConfig(**row) for row in cursor.fetchall()]
 
     def update_fund(self, code: str, **kwargs) -> bool:
@@ -541,9 +576,7 @@ class ConfigDAO:
         set_clause = ", ".join([f"{k} = :{k}" for k in updates.keys()])
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                f"UPDATE fund_config SET {set_clause} WHERE code = :code", updates
-            )
+            cursor.execute(f"UPDATE fund_config SET {set_clause} WHERE code = :code", updates)
             return cursor.rowcount > 0
 
     def remove_fund(self, code: str) -> bool:
@@ -569,9 +602,7 @@ class ConfigDAO:
         """获取标记为持有的基金列表"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT * FROM fund_config WHERE is_hold = 1 ORDER BY updated_at DESC"
-            )
+            cursor.execute("SELECT * FROM fund_config WHERE is_hold = 1 ORDER BY updated_at DESC")
             return [FundConfig(**row) for row in cursor.fetchall()]
 
     def get_funds_by_hold(self, holding: bool) -> list["FundConfig"]:
@@ -620,9 +651,7 @@ class ConfigDAO:
                     "SELECT * FROM commodity_config WHERE enabled = 1 ORDER BY updated_at DESC"
                 )
             else:
-                cursor.execute(
-                    "SELECT * FROM commodity_config ORDER BY updated_at DESC"
-                )
+                cursor.execute("SELECT * FROM commodity_config ORDER BY updated_at DESC")
             return [CommodityConfig(**row) for row in cursor.fetchall()]
 
     def get_commodity(self, symbol: str) -> CommodityConfig | None:
@@ -913,9 +942,7 @@ class NewsDAO:
             except sqlite3.IntegrityError:
                 return False
 
-    def get_news(
-        self, category: str | None = None, limit: int = 50
-    ) -> list[NewsRecord]:
+    def get_news(self, category: str | None = None, limit: int = 50) -> list[NewsRecord]:
         """获取新闻列表"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
@@ -1032,9 +1059,7 @@ class FundIntradayCacheDAO:
                     count += 1
             return count > 0
 
-    def get_intraday(
-        self, fund_code: str, date: str | None = None
-    ) -> list[FundIntradayRecord]:
+    def get_intraday(self, fund_code: str, date: str | None = None) -> list[FundIntradayRecord]:
         """
         获取基金日内分时缓存数据
 
@@ -1162,9 +1187,7 @@ class FundIntradayCacheDAO:
             )
             return cursor.rowcount
 
-    def get_cache_info(
-        self, fund_code: str, date: str | None = None
-    ) -> dict[str, Any]:
+    def get_cache_info(self, fund_code: str, date: str | None = None) -> dict[str, Any]:
         """
         获取缓存信息
 
@@ -1673,9 +1696,7 @@ class FundBasicInfoDAO:
         """
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT 1 FROM fund_basic_info WHERE code = ? LIMIT 1", (code,)
-            )
+            cursor.execute("SELECT 1 FROM fund_basic_info WHERE code = ? LIMIT 1", (code,))
             return cursor.fetchone() is not None
 
     def delete(self, code: str) -> bool:
@@ -1759,7 +1780,219 @@ class FundBasicInfoDAO:
         set_clause = ", ".join([f"{k} = :{k}" for k in updates.keys()])
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
+            cursor.execute(f"UPDATE fund_basic_info SET {set_clause} WHERE code = :code", updates)
+            return cursor.rowcount > 0
+
+
+@dataclass
+class TradingCalendarRecord:
+    market: str
+    year: int
+    is_trading_day: bool
+    holiday_name: str | None = None
+    is_makeup_day: bool = False
+
+
+@dataclass
+class ExchangeHoliday:
+    id: int = 0
+    market: str = ""
+    holiday_date: str = ""
+    holiday_name: str | None = None
+    is_active: int = 1
+    created_at: str = ""
+    updated_at: str = ""
+
+    @property
+    def is_holiday_active(self) -> bool:
+        return bool(self.is_active)
+
+
+class TradingCalendarDAO:
+    def __init__(self, db: DatabaseManager):
+        self.db = db
+
+    def save_calendar(self, market: str, year: int, days: list[TradingCalendarRecord]) -> bool:
+        now = datetime.now().isoformat()
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
             cursor.execute(
-                f"UPDATE fund_basic_info SET {set_clause} WHERE code = :code", updates
+                "DELETE FROM trading_calendar_cache WHERE market = ? AND year = ?", (market, year)
+            )
+            for i, day in enumerate(days):
+                cursor.execute(
+                    """
+                    INSERT INTO trading_calendar_cache
+                    (market, year, day_of_year, is_trading_day, holiday_name, is_makeup_day, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        market,
+                        year,
+                        i + 1,
+                        1 if day.is_trading_day else 0,
+                        day.holiday_name,
+                        1 if day.is_makeup_day else 0,
+                        now,
+                    ),
+                )
+            return True
+
+    def get_calendar(self, market: str, year: int) -> list[TradingCalendarRecord] | None:
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT market, year, day_of_year, is_trading_day, holiday_name, is_makeup_day FROM trading_calendar_cache WHERE market = ? AND year = ? ORDER BY day_of_year",
+                (market, year),
+            )
+            rows = cursor.fetchall()
+            if not rows:
+                return None
+            return [
+                TradingCalendarRecord(
+                    market=row[0],
+                    year=row[1],
+                    is_trading_day=bool(row[3]),
+                    holiday_name=row[4],
+                    is_makeup_day=bool(row[5]),
+                )
+                for row in rows
+            ]
+
+    def clear_cache(self, market: str | None = None) -> int:
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            if market:
+                cursor.execute("DELETE FROM trading_calendar_cache WHERE market = ?", (market,))
+            else:
+                cursor.execute("DELETE FROM trading_calendar_cache")
+            return cursor.rowcount
+
+
+class ExchangeHolidayDAO:
+    def __init__(self, db: DatabaseManager):
+        self.db = db
+
+    def add_holiday(self, market: str, holiday_date: str, holiday_name: str | None = None) -> bool:
+        now = datetime.now().isoformat()
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO exchange_holidays
+                    (market, holiday_date, holiday_name, is_active, created_at, updated_at)
+                    VALUES (?, ?, ?, 1, ?, ?)
+                    """,
+                    (market, holiday_date, holiday_name, now, now),
+                )
+                return True
+            except sqlite3.IntegrityError:
+                cursor.execute(
+                    """
+                    UPDATE exchange_holidays
+                    SET holiday_name = ?, is_active = 1, updated_at = ?
+                    WHERE market = ? AND holiday_date = ?
+                    """,
+                    (holiday_name, now, market, holiday_date),
+                )
+                return True
+
+    def add_holidays(self, holidays: list[ExchangeHoliday]) -> int:
+        now = datetime.now().isoformat()
+        count = 0
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            for h in holidays:
+                try:
+                    cursor.execute(
+                        """
+                        INSERT INTO exchange_holidays
+                        (market, holiday_date, holiday_name, is_active, created_at, updated_at)
+                        VALUES (?, ?, ?, 1, ?, ?)
+                        """,
+                        (h.market, h.holiday_date, h.holiday_name, now, now),
+                    )
+                    count += 1
+                except sqlite3.IntegrityError:
+                    cursor.execute(
+                        """
+                        UPDATE exchange_holidays
+                        SET holiday_name = ?, is_active = 1, updated_at = ?
+                        WHERE market = ? AND holiday_date = ?
+                        """,
+                        (h.holiday_name, now, h.market, h.holiday_date),
+                    )
+                    count += 1
+        return count
+
+    def get_holidays(
+        self, market: str | None = None, year: int | None = None, active_only: bool = True
+    ) -> list[ExchangeHoliday]:
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            query = "SELECT id, market, holiday_date, holiday_name, is_active, created_at, updated_at FROM exchange_holidays WHERE 1=1"
+            params = []
+            if market:
+                query += " AND market = ?"
+                params.append(market)
+            if active_only:
+                query += " AND is_active = 1"
+            query += " ORDER BY holiday_date"
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            result = []
+            for row in rows:
+                h = ExchangeHoliday(
+                    id=row[0],
+                    market=row[1],
+                    holiday_date=row[2],
+                    holiday_name=row[3],
+                    is_active=row[4],
+                    created_at=row[5],
+                    updated_at=row[6],
+                )
+                if year:
+                    try:
+                        if h.holiday_date.startswith(str(year)):
+                            result.append(h)
+                    except Exception:
+                        pass
+                else:
+                    result.append(h)
+            return result
+
+    def soft_delete(self, holiday_id: int) -> bool:
+        now = datetime.now().isoformat()
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE exchange_holidays SET is_active = 0, updated_at = ? WHERE id = ?",
+                (now, holiday_id),
             )
             return cursor.rowcount > 0
+
+    def restore(self, holiday_id: int) -> bool:
+        now = datetime.now().isoformat()
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE exchange_holidays SET is_active = 1, updated_at = ? WHERE id = ?",
+                (now, holiday_id),
+            )
+            return cursor.rowcount > 0
+
+    def delete(self, holiday_id: int) -> bool:
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM exchange_holidays WHERE id = ?", (holiday_id,))
+            return cursor.rowcount > 0
+
+    def clear_all(self, market: str | None = None) -> int:
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            if market:
+                cursor.execute("DELETE FROM exchange_holidays WHERE market = ?", (market,))
+            else:
+                cursor.execute("DELETE FROM exchange_holidays")
+            return cursor.rowcount

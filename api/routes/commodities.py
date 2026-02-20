@@ -484,6 +484,10 @@ class CommodityByTickerResponse(TypedDict):
     currency: str
     change: float | None
     change_percent: float | None
+    high: float | None
+    low: float | None
+    open: float | None
+    prev_close: float | None
     source: str
     timestamp: str
 
@@ -499,63 +503,36 @@ class CommodityByTickerResponse(TypedDict):
     },
 )
 async def get_commodity_by_ticker(symbol: str) -> CommodityByTickerResponse:
-    """
-    按 ticker 获取商品行情
-
-    支持获取任意 yfinance 支持的商品期货 ticker 数据，
-    例如: BTC=F, ETH=F, ZC=F, PT=F, PA=F 等
-
-    Args:
-        symbol: yfinance ticker 符号
-
-    Returns:
-        CommodityByTickerResponse: 商品行情数据
-    """
+    """按 ticker 获取商品行情"""
     try:
-        import yfinance as yf
+        source = YFinanceCommoditySource()
+        result = await source.fetch_by_ticker(symbol)
 
-        ticker_obj = yf.Ticker(symbol)
-        info = ticker_obj.info
-
-        price = info.get("currentPrice", info.get("regularMarketPrice"))
-        change = info.get("regularMarketChange", info.get("change", 0))
-        change_percent = info.get("regularMarketChangePercent", info.get("changePercent", 0))
-
-        if price is None:
+        if not result.success or not result.data:
             raise HTTPException(
                 status_code=500,
-                detail=f"无法获取 {symbol} 的价格数据",
+                detail=result.error or f"无法获取 {symbol} 的价格数据",
             )
 
-        # 转换时间戳为 UTC 时间字符串
-        market_time = info.get("regularMarketTime")
-        if market_time:
-            try:
-                time_str = (
-                    datetime.utcfromtimestamp(market_time).strftime("%Y-%m-%d %H:%M:%S") + " UTC"
-                )
-            except (ValueError, TypeError, OSError):
-                time_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") + " UTC"
-        else:
-            time_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S") + " UTC"
-
+        data = result.data
         return {
-            "commodity": symbol.lower(),
-            "symbol": symbol,
-            "name": info.get("shortName", info.get("longName", symbol)),
-            "price": float(price),
-            "currency": info.get("currency", "USD"),
-            "change": float(change) if change else None,
-            "change_percent": float(change_percent) if change_percent else None,
-            "source": "yfinance",
-            "timestamp": time_str,
+            "commodity": data.get("commodity", symbol.lower()),
+            "symbol": data.get("symbol", symbol),
+            "name": data.get("name", symbol),
+            "price": data.get("price", 0),
+            "currency": data.get("currency", "USD"),
+            "change": data.get("change"),
+            "change_percent": data.get("change_percent"),
+            "high": data.get("high"),
+            "low": data.get("low"),
+            "open": data.get("open"),
+            "prev_close": data.get("prev_close"),
+            "source": data.get("source", "yfinance"),
+            "timestamp": data.get("timestamp"),
         }
 
-    except ImportError:
-        raise HTTPException(
-            status_code=500,
-            detail="yfinance 未安装",
-        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"获取商品 {symbol} 数据失败: {e}")
         raise HTTPException(

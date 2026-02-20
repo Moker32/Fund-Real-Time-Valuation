@@ -39,6 +39,7 @@ from .routes import (
     stocks,
     trading_calendar,
     websocket,
+    holidays,
 )
 
 # 配置日志：将日志同时输出到缓冲区和标准输出
@@ -226,6 +227,7 @@ app.include_router(sentiment.router)
 app.include_router(datasource.router)
 app.include_router(stocks.router)
 app.include_router(bonds.router)
+app.include_router(holidays.router)
 app.include_router(websocket.router)
 
 
