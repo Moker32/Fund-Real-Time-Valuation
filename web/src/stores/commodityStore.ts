@@ -681,4 +681,9 @@ export const useCommodityStore = defineStore('commodities', () => {
     clearWatchlistError,
     clearSearchError,
   };
+}, {
+  persist: {
+    key: 'commodity-store',
+    pick: ['activeCategory'],
+  },
 });

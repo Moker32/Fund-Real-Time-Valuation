@@ -3,8 +3,6 @@ import { ref, computed } from 'vue';
 import { stockApi } from '@/api';
 import type { Stock } from '@/types';
 
-const STORAGE_KEY = 'stock-watchlist';
-
 export const useStockStore = defineStore('stocks', () => {
   // State
   const stocks = ref<Stock[]>([]);
@@ -12,30 +10,7 @@ export const useStockStore = defineStore('stocks', () => {
   const error = ref<string | null>(null);
   const lastUpdated = ref<string | null>(null);
   
-  // 从 localStorage 读取自选股列表
-  function loadWatchlist(): string[] {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error('[StockStore] Failed to load watchlist:', e);
-    }
-    // 默认自选股
-    return ['sh600519', 'sh000001', 'sz300750', 'AAPL', 'MSFT'];
-  }
-
-  const watchlist = ref<string[]>(loadWatchlist());
-
-  // 保存到 localStorage
-  function saveWatchlist() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(watchlist.value));
-    } catch (e) {
-      console.error('[StockStore] Failed to save watchlist:', e);
-    }
-  }
+  const watchlist = ref<string[]>(['sh600519', 'sh000001', 'sz300750', 'AAPL', 'MSFT']);
 
   // Getters
   const risingStocks = computed(() =>
@@ -80,7 +55,6 @@ export const useStockStore = defineStore('stocks', () => {
     const upperCode = code.toUpperCase();
     if (!watchlist.value.includes(upperCode)) {
       watchlist.value.push(upperCode);
-      saveWatchlist();
     }
   }
 
@@ -89,8 +63,6 @@ export const useStockStore = defineStore('stocks', () => {
     const index = watchlist.value.indexOf(upperCode);
     if (index > -1) {
       watchlist.value.splice(index, 1);
-      saveWatchlist();
-      // 同时从列表中移除
       stocks.value = stocks.value.filter((s) => s.code.toUpperCase() !== upperCode);
     }
   }
@@ -112,4 +84,9 @@ export const useStockStore = defineStore('stocks', () => {
     addToWatchlist,
     removeFromWatchlist,
   };
+}, {
+  persist: {
+    key: 'stock-store',
+    pick: ['watchlist'],
+  },
 });

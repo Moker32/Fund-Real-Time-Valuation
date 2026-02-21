@@ -204,6 +204,14 @@ export const fundApi = {
     return api.get(`/api/funds/${code}/intraday`);
   },
 
+  async getWatchlist(): Promise<{
+    success: boolean;
+    watchlist: Array<{ code: string; name: string; isHolding: boolean }>;
+    total: number;
+  }> {
+    return api.get('/api/funds/watchlist');
+  },
+
   async addToWatchlist(code: string, name: string): Promise<{
     success: boolean;
     message: string;

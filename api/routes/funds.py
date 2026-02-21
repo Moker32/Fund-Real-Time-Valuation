@@ -28,6 +28,7 @@ from ..models import (
 
 class FundListData(TypedDict):
     """基金列表响应数据结构"""
+
     funds: list[dict]
     total: int
     timestamp: str
@@ -169,7 +170,9 @@ async def get_funds_list(
                 funds.append(build_fund_response(result.data, result.source, is_holding))
             else:
                 # 记录失败的基金代码
-                fund_code = result.metadata.get("fund_code", "unknown") if result.metadata else "unknown"
+                fund_code = (
+                    result.metadata.get("fund_code", "unknown") if result.metadata else "unknown"
+                )
                 logger.warning(f"基金获取失败: {fund_code} - {result.error}")
                 failed_count += 1
 
@@ -192,7 +195,9 @@ async def get_funds_list(
             funds.append(build_fund_response(result.data, result.source, is_holding))
         else:
             # 记录失败的基金代码
-            fund_code = result.metadata.get("fund_code", "unknown") if result.metadata else "unknown"
+            fund_code = (
+                result.metadata.get("fund_code", "unknown") if result.metadata else "unknown"
+            )
             logger.warning(f"基金获取失败: {fund_code} - {result.error}")
             failed_count += 1
 
@@ -412,6 +417,38 @@ async def get_fund_intraday(
         count=result.data.get("count", 0),
         source=result.source,
     ).model_dump()
+
+
+@router.get(
+    "/watchlist",
+    response_model=dict,
+    summary="获取自选基金列表",
+    description="获取当前用户的自选基金列表",
+    responses={
+        200: {"description": "获取成功"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_watchlist() -> dict:
+    """
+    获取自选基金列表
+
+    Returns:
+        dict: 自选基金列表
+    """
+    config_manager = ConfigManager()
+    fund_list = config_manager.load_funds()
+
+    watchlist_data = [
+        {"code": f.code, "name": f.name, "isHolding": fund_list.is_holding(f.code)}
+        for f in fund_list.watchlist
+    ]
+
+    return {
+        "success": True,
+        "watchlist": watchlist_data,
+        "total": len(watchlist_data),
+    }
 
 
 @router.post(

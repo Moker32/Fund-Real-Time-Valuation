@@ -225,4 +225,9 @@ export const useSectorStore = defineStore('sectors', () => {
     clearDetail,
     retry,
   };
+}, {
+  persist: {
+    key: 'sector-store',
+    pick: ['currentType', 'selectedSector'],
+  },
 });

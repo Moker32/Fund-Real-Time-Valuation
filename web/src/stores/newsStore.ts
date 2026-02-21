@@ -118,4 +118,9 @@ export const useNewsStore = defineStore('news', () => {
     setCategory,
     retry,
   };
+}, {
+  persist: {
+    key: 'news-store',
+    pick: ['activeCategory'],
+  },
 });
