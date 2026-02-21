@@ -420,6 +420,55 @@ async def get_fund_intraday(
 
 
 @router.get(
+    "/{code}/intraday/{date}",
+    response_model=FundIntradayResponse,
+    summary="获取指定日期的基金日内分时数据",
+    description="根据基金代码和日期获取历史日内分时数据",
+    responses={
+        200: {"description": "成功获取日内分时数据"},
+        404: {"model": ErrorResponse, "description": "数据不存在"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_fund_intraday_by_date(
+    code: str,
+    date: str,
+    manager: DataSourceManager = Depends(DataSourceDependency()),
+) -> dict:
+    """
+    获取指定日期的基金日内分时数据（从缓存）
+
+    Args:
+        code: 基金代码 (6位数字)
+        date: 日期 (YYYY-MM-DD 格式)
+        manager: 数据源管理器依赖
+
+    Returns:
+        FundIntradayResponse: 基金日内分时数据
+    """
+    from src.datasources.fund_source import Fund123DataSource
+
+    fund123_source = Fund123DataSource()
+    result = await fund123_source.fetch_intraday_by_date(code, date)
+
+    if not result.success or result.data is None:
+        error_msg = result.error or "数据不存在"
+        raise HTTPException(
+            status_code=404 if "不存在" in error_msg else 500,
+            detail=error_msg,
+        )
+
+    return FundIntradayResponse(
+        fund_code=result.data.get("fund_code", code),
+        name=result.data.get("name", ""),
+        date=result.data.get("date", ""),
+        data=result.data.get("data", []),
+        count=result.data.get("count", 0),
+        source=result.source,
+    ).model_dump()
+
+
+@router.get(
     "/watchlist",
     response_model=dict,
     summary="获取自选基金列表",

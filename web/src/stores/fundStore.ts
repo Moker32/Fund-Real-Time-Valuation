@@ -117,7 +117,18 @@ export const useFundStore = defineStore('funds', () => {
       retryCount.value = attempt;
       try {
         const response = await fundApi.getFunds();
-        funds.value = response.funds || [];
+        // 保留现有的日内分时数据
+        const newFunds = response.funds || [];
+        const existingFunds = funds.value;
+        
+        funds.value = newFunds.map((newFund) => {
+          const existing = existingFunds.find((f) => f.code === newFund.code);
+          return {
+            ...newFund,
+            intraday: existing?.intraday || [],
+            history: existing?.history || [],
+          };
+        });
         loading.value = false;
         loadingProgress.value = 100;  // 加载完成
         lastUpdated.value = formatTime(new Date());
@@ -358,6 +369,32 @@ export const useFundStore = defineStore('funds', () => {
     }
   }
 
+  // 根据指定日期获取日内分时数据
+  async function fetchIntradayByDate(code: string, date: string): Promise<FundIntraday[]> {
+    try {
+      const response = await fundApi.getFundIntradayByDate(code, date);
+
+      if (response.data && response.data.length > 0) {
+        const intraday: FundIntraday[] = response.data.map((item) => ({
+          time: item.time,
+          price: item.price,
+        }));
+
+        const index = funds.value.findIndex((f) => f.code === code);
+        if (index !== -1) {
+          funds.value[index] = { ...funds.value[index], intraday } as Fund;
+        }
+
+        return intraday;
+      }
+
+      return [];
+    } catch (err) {
+      console.error(`[FundStore] fetchIntradayByDate error for ${code}:`, err);
+      return [];
+    }
+  }
+
   return {
     // State
     funds,
@@ -382,6 +419,7 @@ export const useFundStore = defineStore('funds', () => {
     fetchFundEstimate,
     fetchHistory,
     fetchIntraday,
+    fetchIntradayByDate,
     setRefreshInterval,
     setAutoRefresh,
     setShowChart,

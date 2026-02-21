@@ -2296,6 +2296,59 @@ class Fund123DataSource(DataSource):
             metadata={"fund_code": fund_code},
         )
 
+    async def fetch_intraday_by_date(self, fund_code: str, date: str) -> DataSourceResult:
+        """
+        获取指定日期的基金日内分时数据（仅从缓存读取）
+
+        Args:
+            fund_code: 基金代码 (6位数字)
+            date: 日期 (YYYY-MM-DD 格式)
+
+        Returns:
+            DataSourceResult: 包含日内分时数据的结果
+        """
+        if not self._validate_fund_code(fund_code):
+            return DataSourceResult(
+                success=False,
+                error=f"无效的基金代码: {fund_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code},
+            )
+
+        # 从数据库缓存读取指定日期的数据
+        intraday_dao = get_intraday_cache_dao()
+        cached_records = intraday_dao.get_intraday(fund_code, date)
+
+        if cached_records:
+            intraday_points = [
+                {"time": record.time, "price": record.price, "change": record.change_rate}
+                for record in cached_records
+            ]
+            result_data = {
+                "fund_code": fund_code,
+                "name": "",
+                "date": date,
+                "data": intraday_points,
+                "count": len(intraday_points),
+                "from_cache": "database",
+            }
+            return DataSourceResult(
+                success=True,
+                data=result_data,
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code, "date": date, "cache": "database"},
+            )
+
+        return DataSourceResult(
+            success=False,
+            error=f"指定日期 {date} 的数据不存在",
+            timestamp=time.time(),
+            source=self.name,
+            metadata={"fund_code": fund_code, "date": date},
+        )
+
     async def health_check(self) -> bool:
         """
         健康检查

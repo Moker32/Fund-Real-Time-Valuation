@@ -1,13 +1,13 @@
 <template>
   <div class="fund-chart" ref="chartContainer">
-    <div v-if="!data || data.length === 0" class="chart-empty">
+    <div v-if="!hasData" class="chart-empty">
       <span class="chart-empty-text">暂无数据</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { FundHistory, FundIntraday } from '@/types';
@@ -21,6 +21,14 @@ const props = withDefaults(defineProps<{
 
 const chartContainer = ref<Element | null>(null);
 let uplotInstance: uPlot | null = null;
+
+// 判断是否有有效数据用于显示空状态
+const hasData = computed(() => {
+  // 如果没有图表实例且没有数据，显示空状态
+  if (!uplotInstance && (!props.data || props.data.length === 0)) return false;
+  // 其他情况（图表已初始化，或者正在等待数据）
+  return true;
+});
 
 // 缓存上次数据，用于比较
 let lastDataJson: string = '';
@@ -80,49 +88,54 @@ const parseTimeToTimestamp = (timeStr: string): number => {
 const initChart = () => {
   if (!chartContainer.value) return;
 
-  // 清空容器
+  if (uplotInstance) return;
+  
   chartContainer.value.innerHTML = '';
 
   const color = getTrendColor();
 
-  uplotInstance = new uPlot({
-    width: chartContainer.value.clientWidth,
-    height: props.height,
-    series: [
-      {
-        show: false, // 隐藏时间轴
+  try {
+    uplotInstance = new uPlot({
+      width: chartContainer.value.clientWidth || 300,
+      height: props.height,
+      series: [
+        {
+          label: '时间',
+        },
+        {
+          label: '价格',
+          stroke: color,
+          width: 2,
+          fill: undefined,
+          points: { show: false },
+        },
+      ],
+      axes: [
+        { show: false },
+        { show: false },
+      ],
+      scales: {
+        x: {
+          time: true,
+        },
+        y: {
+          auto: true,
+        },
       },
-      {
-        show: false, // 隐藏图例
-        stroke: color,
-        width: 2,
-        fill: undefined,
-        points: { show: false }, // 隐藏数据点
+      cursor: {
+        drag: { x: false, y: false },
+        show: false,
       },
-    ],
-    axes: [
-      { show: false }, // 隐藏 X 轴
-      { show: false }, // 隐藏 Y 轴
-    ],
-    scales: {
-      x: {
-        time: true,
-      },
-      y: {
-        auto: true,
-      },
-    },
-    // 禁用交互
-    cursor: {
-      drag: { x: false, y: false },
-      show: false,
-    },
-    // 无水印 - uPlot 无水印
-  }, [], chartContainer.value);
+    }, [], chartContainer.value);
+  } catch (e) {
+    console.error('[FundChart] 初始化图表失败:', e);
+  }
 };
 
 const updateData = () => {
-  if (!uplotInstance || !props.data || props.data.length === 0) return;
+  if (!uplotInstance) return;
+  
+  if (!props.data || props.data.length === 0) return;
 
   // 过滤无效数据
   const validData = props.data.filter((item): item is { time: string; price: number; close?: number } => {

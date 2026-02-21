@@ -84,9 +84,9 @@
         <span class="source" v-if="fund.source">{{ fund.source }}</span>
       </div>
 
-      <!-- 分时图区域（当有日内数据时显示） -->
+      <!-- 分时图区域（当有日内数据或历史数据时显示） -->
       <div v-if="shouldShowChart" class="fund-card-chart">
-        <FundChart :data="fund.intraday" :height="80" chart-type="line" />
+        <FundChart :data="chartData" :height="80" chart-type="line" />
       </div>
     </template>
   </div>
@@ -113,9 +113,20 @@ defineEmits<{
   (e: 'remove', code: string): void;
 }>();
 
+// 图表数据：优先使用日内分时数据，如果没有则使用历史数据
+const chartData = computed(() => {
+  if (props.fund.intraday && props.fund.intraday.length > 0) {
+    return props.fund.intraday;
+  }
+  if (props.fund.history && props.fund.history.length > 0) {
+    return props.fund.history;
+  }
+  return [];
+});
+
 // 是否显示图表
 const shouldShowChart = computed(() => {
-  return fundStore.showChart && props.fund.intraday && props.fund.intraday.length > 0;
+  return fundStore.showChart && chartData.value.length > 0;
 });
 
 // 涨跌样式

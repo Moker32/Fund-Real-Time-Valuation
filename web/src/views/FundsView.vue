@@ -179,15 +179,26 @@ function handleFundAdded() {
 
 onMounted(async () => {
   isMounted.value = true;
-  // 只在数据为空时加载
+  // 只在数据为空时加载基金列表
   if (fundStore.funds.length === 0) {
     await fundStore.fetchFunds();
   }
 
   // 加载每个基金的分时数据
-  fundStore.funds.forEach((fund) => {
-    fundStore.fetchIntraday(fund.code);
-  });
+  for (const fund of fundStore.funds) {
+    // 尝试获取当天的日内数据
+    const intraday = await fundStore.fetchIntraday(fund.code, true);
+    
+    // 如果当天没有数据，使用基金卡片上显示的更新时间对应的日期
+    if (!intraday || intraday.length === 0) {
+      const updateTime = fund.estimateTime || fund.netValueDate || '';
+      const match = updateTime.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const dateStr = `${match[1]}-${match[2]}-${match[3]}`;
+        await fundStore.fetchIntradayByDate(fund.code, dateStr);
+      }
+    }
+  }
 });
 
 onUnmounted(() => {
