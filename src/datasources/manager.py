@@ -59,7 +59,6 @@ class DataSourceManager:
             DataSourceType.SECTOR: [],
             DataSourceType.STOCK: [],
             DataSourceType.BOND: [],
-            DataSourceType.CRYPTO: [],
         }
         self._max_concurrent = max_concurrent  # 延迟创建 semaphore
         self._semaphore: asyncio.Semaphore | None = None  # 延迟初始化
@@ -71,7 +70,6 @@ class DataSourceManager:
             DataSourceType.SECTOR: 0,
             DataSourceType.STOCK: 0,
             DataSourceType.BOND: 0,
-            DataSourceType.CRYPTO: 0,
         }
         self._request_history: list[dict[str, Any]] = []
         self._max_history = 1000
@@ -636,12 +634,7 @@ def create_default_manager(
         DataSourceManager: 配置好的管理器实例
     """
     from .commodity_source import AKShareCommoditySource, YFinanceCommoditySource
-    from .fund_source import (
-        EastMoneyFundDataSource,
-        Fund123DataSource,
-        FundDataSource,
-        SinaFundDataSource,
-    )
+    from .fund_source import Fund123DataSource
     from .news_source import SinaNewsDataSource
     from .sector_source import (
         EastMoneyConceptDetailSource,
@@ -671,45 +664,6 @@ def create_default_manager(
         ),
     )
 
-    # 天天基金接口（备用数据源）
-    fund_tiantian = FundDataSource()
-    manager.register(
-        fund_tiantian,
-        DataSourceConfig(
-            source_class=type(fund_tiantian),
-            name=fund_tiantian.name,
-            source_type=DataSourceType.FUND,
-            enabled=False,  # 默认禁用，fund123 足够快
-            priority=2,
-        ),
-    )
-
-    # 暂时禁用备用数据源，因为它们响应慢且容易超时
-    # 如需启用，请将 enabled 改为 True
-    fund_sina = SinaFundDataSource()
-    manager.register(
-        fund_sina,
-        DataSourceConfig(
-            source_class=type(fund_sina),
-            name=fund_sina.name,
-            source_type=DataSourceType.FUND,
-            enabled=False,  # 禁用：响应慢(~2s)且经常失败
-            priority=2,
-        ),
-    )
-
-    fund_eastmoney = EastMoneyFundDataSource()
-    manager.register(
-        fund_eastmoney,
-        DataSourceConfig(
-            source_class=type(fund_eastmoney),
-            name=fund_eastmoney.name,
-            source_type=DataSourceType.FUND,
-            enabled=False,  # 禁用：响应慢(~2s)且经常失败
-            priority=3,
-        ),
-    )
-
     # 注册商品数据源
     commodity_source = AKShareCommoditySource()
     manager.register(commodity_source)
@@ -724,6 +678,7 @@ def create_default_manager(
 
     # 注册东方财富新闻数据源（备用）
     from .news_source import EastMoneyNewsDataSource
+
     eastmoney_news_source = EastMoneyNewsDataSource()
     manager.register(eastmoney_news_source)
 
@@ -814,12 +769,6 @@ def create_default_manager(
 
     manager.register(SinaBondDataSource())
     manager.register(AKShareBondSource())
-
-    # === 新增加密货币数据源 ===
-    from .crypto_source import BinanceCryptoSource, CoinGeckoCryptoSource
-
-    manager.register(BinanceCryptoSource())
-    manager.register(CoinGeckoCryptoSource())
 
     # === 新增全球指数数据源 ===
     from .index_source import HybridIndexSource

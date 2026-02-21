@@ -75,13 +75,6 @@ from .hot_backup import (
 )
 from .manager import DataSourceConfig, DataSourceManager, create_default_manager
 from .news_source import NewsAggregatorDataSource, SinaNewsDataSource
-from .portfolio import (
-    AssetType,
-    PortfolioAllocation,
-    PortfolioAnalyzer,
-    PortfolioPosition,
-    PortfolioResult,
-)
 from .stock_source import (
     BaostockStockSource,
     SinaStockDataSource,
@@ -143,12 +136,6 @@ __all__ = [
     "SameSourceAggregator",
     "LoadBalancedAggregator",
     "AggregatorSourceInfo",
-    # 组合分析器
-    "AssetType",
-    "PortfolioPosition",
-    "PortfolioAllocation",
-    "PortfolioResult",
-    "PortfolioAnalyzer",
     # 管理器
     "DataSourceManager",
     "DataSourceConfig",

@@ -33,6 +33,13 @@ def push_fund_update_task(self):
         from api.routes.websocket import push_fund_update
         from src.datasources import FundDataSource
         from src.db.database import DatabaseManager
+        from src.utils.websocket_manager import get_websocket_manager
+
+        # 检查是否有活跃的 WebSocket 连接
+        ws_manager = get_websocket_manager()
+        if ws_manager.get_client_count() == 0:
+            logger.info("没有活跃的 WebSocket 连接，跳过推送")
+            return {"status": "success", "message": "no active connections"}
 
         # 获取自选基金列表
         db = DatabaseManager()
@@ -82,6 +89,12 @@ def push_commodity_update_task(self):
     try:
         from api.routes.websocket import push_commodity_update
         from src.datasources import CommodityDataAggregator
+        from src.utils.websocket_manager import get_websocket_manager
+
+        ws_manager = get_websocket_manager()
+        if ws_manager.get_client_count() == 0:
+            logger.info("没有活跃的 WebSocket 连接，跳过推送")
+            return {"status": "success", "message": "no active connections"}
 
         # 商品类型列表
         commodity_types = ["gold", "silver", "wti", "brent"]
@@ -125,6 +138,12 @@ def push_index_update_task(self):
         from api.routes.websocket import push_index_update
         from src.datasources.base import DataSourceType
         from src.datasources.manager import DataSourceManager
+        from src.utils.websocket_manager import get_websocket_manager
+
+        ws_manager = get_websocket_manager()
+        if ws_manager.get_client_count() == 0:
+            logger.info("没有活跃的 WebSocket 连接，跳过推送")
+            return {"status": "success", "message": "no active connections"}
 
         manager = DataSourceManager()
         index_data_list = []
@@ -158,46 +177,3 @@ def push_index_update_task(self):
     except Exception as e:
         logger.error(f"推送指数数据失败: {e}")
         raise
-
-
-@celery_app.task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_backoff_max=60,
-    max_retries=3,
-    name="src.tasks.push_tasks.push_all_data",
-)
-def push_all_data_task(self):
-    """定时推送所有数据（基金+商品+指数）"""
-    logger.info("开始推送所有数据")
-
-    results = {
-        "funds": 0,
-        "commodities": 0,
-        "indices": 0,
-    }
-
-    # Push funds
-    try:
-        push_fund_update_task.apply()
-        results["funds"] = 1
-    except Exception as e:
-        logger.warning(f"推送基金数据失败: {e}")
-
-    # Push commodities
-    try:
-        push_commodity_update_task.apply()
-        results["commodities"] = 1
-    except Exception as e:
-        logger.warning(f"推送商品数据失败: {e}")
-
-    # Push indices
-    try:
-        push_index_update_task.apply()
-        results["indices"] = 1
-    except Exception as e:
-        logger.warning(f"推送指数数据失败: {e}")
-
-    logger.info(f"所有数据推送完成: {results}")
-    return {"status": "success", "results": results}

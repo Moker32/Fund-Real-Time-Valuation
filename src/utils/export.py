@@ -64,47 +64,12 @@ def export_funds_to_csv(funds: list[dict | object], filepath: str | Path) -> boo
             writer.writeheader()
 
             for fund in funds:
-                writer.writerow({
-                    "code": _get_value(fund, "code"),
-                    "name": _get_value(fund, "name"),
-                })
-
-        return True
-    except Exception:
-        return False
-
-
-def export_portfolio_report(holdings: list[dict | object], filepath: str | Path) -> bool:
-    """导出持仓报告到 CSV 文件
-
-    Args:
-        holdings: 持仓对象或字典列表，每个元素应包含 'code'、'name'、'shares' 和 'cost' 属性/键
-        filepath: 输出文件路径
-
-    Returns:
-        bool: 导出成功返回 True，失败返回 False
-    """
-    try:
-        filepath = Path(filepath)
-        filepath.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(filepath, "w", encoding="utf-8-sig", newline="") as f:
-            fieldnames = ["code", "name", "shares", "cost", "total_cost"]
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-
-            for holding in holdings:
-                shares = _get_float(holding, "shares")
-                cost = _get_float(holding, "cost")
-                total_cost = shares * cost
-
-                writer.writerow({
-                    "code": _get_value(holding, "code"),
-                    "name": _get_value(holding, "name"),
-                    "shares": shares,
-                    "cost": cost,
-                    "total_cost": total_cost,
-                })
+                writer.writerow(
+                    {
+                        "code": _get_value(fund, "code"),
+                        "name": _get_value(fund, "name"),
+                    }
+                )
 
         return True
     except Exception:
