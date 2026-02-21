@@ -2019,12 +2019,31 @@ class Fund123DataSource(DataSource):
         if not fund_type:
             fund_type = _infer_fund_type_from_name(fund_name)
 
+        # 从数据库缓存获取上一交易日净值
+        prev_net_value = None
+        prev_net_value_date = None
+        try:
+            daily_dao = get_daily_cache_dao()
+            recent_days = daily_dao.get_recent_days(fund_code, 2)
+            if len(recent_days) >= 2:
+                # 第二条记录是上一个交易日
+                prev_record = recent_days[1]
+                prev_net_value = prev_record.unit_net_value
+                prev_net_value_date = prev_record.date
+            elif len(recent_days) == 1:
+                # 只有今天一条记录，无法获取上一交易日
+                pass
+        except Exception as e:
+            logger.warning(f"获取上一交易日净值失败: {e}")
+
         result_data = {
             "fund_code": fund_code,
             "name": fund_name,
             "type": fund_type,
             "net_value_date": net_date,
             "unit_net_value": net_value,
+            "prev_net_value": prev_net_value,
+            "prev_net_value_date": prev_net_value_date,
             "estimated_net_value": estimate_value,
             "estimated_growth_rate": growth_rate if growth_rate else None,
             "estimate_time": estimate_time,

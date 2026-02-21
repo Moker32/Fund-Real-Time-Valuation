@@ -125,6 +125,8 @@ export const useFundStore = defineStore('funds', () => {
           const existing = existingFunds.find((f) => f.code === newFund.code);
           return {
             ...newFund,
+            prevNetValue: (newFund as { prev_net_value?: number }).prev_net_value,
+            prevNetValueDate: (newFund as { prev_net_value_date?: string }).prev_net_value_date,
             intraday: existing?.intraday || [],
             history: existing?.history || [],
           };

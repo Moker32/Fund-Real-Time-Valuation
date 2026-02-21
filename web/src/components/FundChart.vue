@@ -15,6 +15,7 @@ import type { FundHistory, FundIntraday } from '@/types';
 const props = withDefaults(defineProps<{
   data: FundHistory[] | FundIntraday[];
   height?: number;
+  baseline?: number;
 }>(), {
   height: 100,
 });
@@ -98,16 +99,17 @@ const initChart = () => {
     uplotInstance = new uPlot({
       width: chartContainer.value.clientWidth || 300,
       height: props.height,
+      legend: {
+        show: false,
+      },
       series: [
+        {},
         {
-          label: '时间',
-        },
-        {
-          label: '价格',
           stroke: color,
           width: 2,
           fill: undefined,
           points: { show: false },
+          spanGaps: false,
         },
       ],
       axes: [
@@ -125,6 +127,31 @@ const initChart = () => {
       cursor: {
         drag: { x: false, y: false },
         show: false,
+      },
+      hooks: {
+        draw: [
+          (u: uPlot) => {
+            if (props.baseline === undefined) return;
+            const baseline = props.baseline;
+            const yScale = u.scales.y;
+            if (!yScale) return;
+            
+            // 计算基准线在图表中的 Y 坐标
+            const yPos = u.valToPos(baseline, 'y', true);
+            if (yPos < 0 || yPos > u.bbox.height) return; // 如果在图表外则不绘制
+            
+            const ctx = u.ctx;
+            ctx.save();
+            ctx.strokeStyle = getTrendColor(); // 动态获取涨跌颜色
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]); // 虚线
+            ctx.beginPath();
+            ctx.moveTo(0, yPos);
+            ctx.lineTo(u.bbox.width, yPos);
+            ctx.stroke();
+            ctx.restore();
+          },
+        ],
       },
     }, [], chartContainer.value);
   } catch (e) {
@@ -164,17 +191,37 @@ const updateData = () => {
     }
   }
 
-  // 按时间排序
-  const sortedIndices = timestamps.map((ts, i) => ({ ts, i })).sort((a, b) => a.ts - b.ts);
+  // 按时间排序并检测午间休市断点
+  // 原始数据格式: "HH:mm" (如 "09:30", "13:00")
+  const sortedData = [...validData].sort((a, b) => {
+    const tsA = parseTimeToTimestamp(a.time);
+    const tsB = parseTimeToTimestamp(b.time);
+    return tsA - tsB;
+  });
+
   const sortedTimestamps: number[] = [];
   const sortedValues: number[] = [];
 
-  for (const { ts, i } of sortedIndices) {
-    const val = values[i];
-    if (val !== undefined) {
-      sortedTimestamps.push(ts);
-      sortedValues.push(val);
+  // 检测午间休市断点 (A股: 11:30-13:00 休市)
+  let prevHour = -1;
+  for (const item of sortedData) {
+    const ts = parseTimeToTimestamp(item.time);
+    const price = 'close' in item ? (item.close ?? item.price) : item.price;
+    if (price === undefined) continue;
+
+    // 从时间字符串提取小时
+    const hourMatch = item.time.match(/^(\d{1,2}):/);
+    const hour = hourMatch ? parseInt(hourMatch[1], 10) : -1;
+
+    // 如果从上午跳到下午 (hour < 11:59 -> hour >= 13)，插入 null 断点
+    if (prevHour >= 0 && prevHour <= 11 && hour >= 13) {
+      sortedTimestamps.push(ts - 60); // 提前1分钟作为断点
+      sortedValues.push(null);
     }
+
+    sortedTimestamps.push(ts);
+    sortedValues.push(price);
+    prevHour = hour;
   }
 
   const newData: [number[], number[]] = [sortedTimestamps, sortedValues];

@@ -63,17 +63,21 @@
         </div>
 
         <div class="change-section" :class="[changeClass, { 'value-updated': changeAnimating }]">
-          <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
-          <span class="change-indicator-value">
-            <svg v-if="fund.estimateChangePercent > 0" viewBox="0 0 24 24" fill="none">
-              <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            <svg v-else-if="fund.estimateChangePercent < 0" viewBox="0 0 24 24" fill="none">
-              <path d="M12 5V19M19 12L12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            <span v-else>—</span>
-          </span>
-          <span class="change-value font-mono">{{ formatChange(fund.estimateChange) }}</span>
+          <!-- 分时图（当有日内数据或历史数据时显示） -->
+          <FundChart v-if="shouldShowChart" :data="chartData" :height="40" chart-type="line" :baseline="baseline" class="inline-chart" />
+          <div class="change-info">
+            <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
+            <span class="change-indicator-value">
+              <svg v-if="fund.estimateChangePercent > 0" viewBox="0 0 24 24" fill="none">
+                <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <svg v-else-if="fund.estimateChangePercent < 0" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5V19M19 12L12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <span v-else>—</span>
+            </span>
+            <span class="change-value font-mono">{{ formatChange(fund.estimateChange) }}</span>
+          </div>
         </div>
       </div>
 
@@ -82,11 +86,6 @@
           {{ fund.hasRealTimeEstimate === false ? '净值日期' : '更新' }}: {{ formatTime(fund.hasRealTimeEstimate === false ? fund.netValueDate : fund.estimateTime) }}
         </span>
         <span class="source" v-if="fund.source">{{ fund.source }}</span>
-      </div>
-
-      <!-- 分时图区域（当有日内数据或历史数据时显示） -->
-      <div v-if="shouldShowChart" class="fund-card-chart">
-        <FundChart :data="chartData" :height="80" chart-type="line" />
       </div>
     </template>
   </div>
@@ -127,6 +126,20 @@ const chartData = computed(() => {
 // 是否显示图表
 const shouldShowChart = computed(() => {
   return fundStore.showChart && chartData.value.length > 0;
+});
+
+// 计算基准线：优先使用 prevNetValue，否则使用日内数据第一个价格（开盘价）
+const baseline = computed(() => {
+  // 优先使用上一日净值
+  if (props.fund.prevNetValue) {
+    return props.fund.prevNetValue;
+  }
+  // 其次使用日内数据第一个价格（开盘价）
+  if (chartData.value.length > 0) {
+    const first = chartData.value[0];
+    return first.price ?? first.close;
+  }
+  return undefined;
 });
 
 // 涨跌样式
@@ -434,12 +447,24 @@ function formatNetValueDate(dateStr: string): string {
 
 .change-section {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+  align-items: center;
+  gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
+
+  .inline-chart {
+    flex-shrink: 0;
+    width: 120px;
+    height: 40px;
+  }
+
+  .change-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
 
   &.rising {
     background: var(--color-rise-bg);
