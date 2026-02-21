@@ -17,8 +17,13 @@ pnpm run dev
 
 # 单独启动
 pnpm run dev:web    # 前端 (Vite + Vue 3, 端口 3000)
-pnpm run dev:api    # 后端 (FastAPI, 端口 8000)
+pnpm run dev:api    # 后端 (FastAPI, 端口 8000, 基于 run_app.py)
 uv run python run_app.py --reload  # 后端 (FastAPI)
+uv run python run_app.py --fast --reload  # 后端 (快速启动，跳过缓存预热)
+
+# Celery 后台任务
+pnpm run dev:celery     # 启动 Celery Worker
+pnpm run dev:celery:beat  # 启动 Celery Beat 定时任务
 
 # 构建
 pnpm run build:web  # 构建前端
@@ -120,10 +125,28 @@ pnpm run check                  # 运行所有检查 (lint + typecheck)
 | `/api/indices` | GET | 获取全球市场指数 |
 | `/api/indices/{index_type}` | GET | 获取单个指数 |
 | `/api/indices/regions` | GET | 获取支持的区域 |
-| `/api/health` | GET | 健康检查 (详细) |
-| `/api/health/simple` | GET | 健康检查 (简单) |
-| `/api/overview` | GET | 市场概览 |
-| `/api/overview/simple` | GET | 简版市场概览 |
+| `/api/sectors` | GET | 获取行业板块 |
+| `/api/sectors/industry` | GET | 获取行业板块行情 |
+| `/api/sectors/concept` | GET | 获取概念板块行情 |
+| `/api/news` | GET | 获取财经新闻 |
+| `/api/news/categories` | GET | 获取新闻分类 |
+| `/api/sentiment` | GET | 获取舆情数据 |
+| `/api/sentiment/economic` | GET | 获取经济舆情 |
+| `/api/sentiment/weibo` | GET | 获取微博舆情 |
+| `/trading-calendar/calendar/{market}` | GET | 获取交易日历 |
+| `/trading-calendar/is-trading-day/{market}` | GET | 判断是否交易日 |
+| `/trading-calendar/next-trading-day/{market}` | GET | 获取下一个交易日 |
+| `/trading-calendar/market-status` | GET | 获取多市场状态 |
+| `/api/holidays` | GET | 获取节假日列表 |
+| `/api/holidays` | POST | 添加节假日 |
+| `/api/holidays/{id}` | PUT | 更新节假日 |
+| `/api/holidays/{id}` | DELETE | 删除节假日 |
+| `/api/ws` | WebSocket | 实时数据推送 |
+| `/api/cache/stats` | GET | 缓存统计 |
+| `/api/datasource/statistics` | GET | 数据源统计 |
+| `/api/datasource/health` | GET | 数据源健康状态 |
+| `/api/datasource/sources` | GET | 数据源列表 |
+| `/api/logs` | GET | 获取日志 |
 
 #### Pydantic 模型 (api/models.py)
 
@@ -156,6 +179,28 @@ pnpm run check                  # 运行所有检查 (lint + typecheck)
 - **数据源超时**: 基金数据源默认超时 30 秒，某些数据源可能较慢
 - **CORS 配置**: 生产环境应限制 CORS 来源域名
 - **类型检查**: `src/datasources/*` 模块由于第三方库兼容性问题，在 mypy 中被禁用类型检查
+- **Redis**: Celery 依赖 Redis，运行前需启动 `redis-server`
+
+## 交易日历 API
+
+支持多市场交易状态查询：
+
+```bash
+# A股
+curl "http://localhost:8000/trading-calendar/is-trading-day/china"
+# 上海黄金交易所
+curl "http://localhost:8000/trading-calendar/is-trading-day/sge"
+# COMEX
+curl "http://localhost:8000/trading-calendar/is-trading-day/comex"
+
+# 获取年度交易日历
+curl "http://localhost:8000/trading-calendar/calendar/china?year=2025"
+
+# 获取多市场状态
+curl "http://localhost:8000/trading-calendar/market-status?markets=china,usa,comex"
+```
+
+支持的交易所: china, hk, usa, japan, uk, germany, france, sge, comex, cme, lbma
 
 ## 测试方法
 
