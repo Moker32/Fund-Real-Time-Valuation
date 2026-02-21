@@ -13,7 +13,7 @@
 
     <!-- Error State -->
     <div v-if="fundStore.error" class="error-state">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
         <circle cx="12" cy="12" r="10"/>
         <path d="M12 8V12M12 16H12.01"/>
       </svg>
@@ -30,14 +30,14 @@
 
     <!-- Empty State -->
     <div v-else-if="!hasFunds && !hasError" class="empty-state">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
         <path d="M3 3V21H21"/>
         <path d="M7 14L11 10L15 12L21 6"/>
       </svg>
       <span>暂无基金数据</span>
       <p>点击下方按钮添加自选基金</p>
       <button class="btn-primary" @click="showAddDialog = true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <path d="M12 5V19M5 12H19"/>
         </svg>
         添加基金
@@ -52,7 +52,7 @@
           <span class="fund-count">{{ fundStore.holdingFirstFunds.length }} 只</span>
         </div>
         <button class="btn-add" @click="showAddDialog = true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M12 5V19M5 12H19"/>
           </svg>
           添加基金
@@ -77,6 +77,17 @@
       @close="showAddDialog = false"
       @added="handleFundAdded"
     />
+
+    <!-- Confirm Remove Dialog -->
+    <ConfirmDialog
+      :visible="showConfirmDialog"
+      title="确认移除"
+      :message="`确定要从自选移除基金 ${removingFundCode} 吗？`"
+      confirm-text="移除"
+      cancel-text="取消"
+      @confirm="confirmRemove"
+      @cancel="showConfirmDialog = false"
+    />
   </div>
 </template>
 
@@ -86,6 +97,7 @@ import { useFundStore } from '@/stores/fundStore';
 import FundCard from '@/components/FundCard.vue';
 import MarketOverview from '@/components/MarketOverview.vue';
 import AddFundDialog from '@/components/AddFundDialog.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import type { Overview } from '@/types';
 
 // 加载骨架屏数量常量
@@ -105,6 +117,10 @@ interface EmptyFundState {
 const fundStore = useFundStore();
 const showAddDialog = ref(false);
 const isMounted = ref(true);
+
+// 确认对话框状态
+const showConfirmDialog = ref(false);
+const removingFundCode = ref('');
 
 // 空基金数据用于加载骨架屏
 const emptyFund: EmptyFundState = {
@@ -146,8 +162,14 @@ const overviewData = computed<Overview | null>(() => {
 });
 
 async function handleRemoveFund(code: string) {
-  if (confirm(`确定要从自选移除基金 ${code} 吗？`)) {
-    await fundStore.removeFund(code);
+  removingFundCode.value = code;
+  showConfirmDialog.value = true;
+}
+
+async function confirmRemove() {
+  if (removingFundCode.value) {
+    await fundStore.removeFund(removingFundCode.value);
+    removingFundCode.value = '';
   }
 }
 

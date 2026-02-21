@@ -97,8 +97,8 @@
       </nav>
 
       <div class="sidebar-footer">
-        <button class="collapse-btn" @click="toggleSidebar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <button class="collapse-btn" @click="toggleSidebar" :aria-label="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
             <path d="M15 18L9 12L15 6"/>
           </svg>
         </button>
@@ -121,8 +121,8 @@
             <span class="status-dot"></span>
             <span class="status-text">{{ statusText }}</span>
           </div>
-          <button class="refresh-btn" @click="refresh" :disabled="refreshing">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" :class="{ spinning: refreshing }">
+          <button class="refresh-btn" @click="refresh" :disabled="refreshing" :aria-label="refreshing ? '刷新中' : '刷新数据'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" :class="{ spinning: refreshing }" aria-hidden="true">
               <path d="M23 4V6H19"/>
               <path d="M1 20V18H5"/>
               <path d="M3.5 14.5C3.5 10.5 6.5 7 10.5 7H14.5"/>

@@ -2,6 +2,8 @@
 
 基金实时估值 Web 应用，基于 Vue 3 + FastAPI 开发。
 
+**单端口部署**：前后端统一通过 FastAPI 在端口 8000 提供服务。
+
 ## 功能特性
 
 - **基金实时估值监控** - 实时追踪基金净值和估值变化
@@ -17,19 +19,16 @@
 # 安装依赖 (前端 + 后端)
 pnpm run install:all
 
-# 并行启动前后端开发服务器
+# 构建并启动应用（前后端统一在端口 8000）
 pnpm run dev
 
-# 访问 http://localhost:3000 查看前端
-# 访问 http://localhost:8000/docs 查看 API 文档
+# 访问 http://localhost:8000
 ```
 
 ## 项目结构
 
 ```
-├── run_api.py              # Web 应用入口
-├── run_celery.py           # Celery Worker 入口
-├── run_celery_beat.py      # Celery Beat 定时任务入口
+├── run_app.py              # Web 应用入口
 ├── pyproject.toml          # Python 项目配置
 ├── package.json            # pnpm 工作空间配置
 ├── api/                    # FastAPI 后端
@@ -47,7 +46,6 @@ pnpm run dev
 ├── src/                    # Python 源码
 │   ├── datasources/       # 数据源层
 │   ├── config/            # 配置管理
-│   ├── tasks/             # Celery 异步任务
 │   └── utils/             # 工具模块
 └── tests/                 # 测试
 ```
@@ -58,21 +56,11 @@ pnpm run dev
 # 安装依赖 (前端 + 后端)
 pnpm run install:all
 
-# 启动 Redis (Celery 依赖)
-redis-server
-
-# 启动 Celery Worker (后台任务)
-pnpm run dev:celery
-
-# 启动 Celery Beat (定时任务，可选)
-pnpm run dev:celery:beat
-
-# 启动前后端开发服务器
+# 构建并启动应用
 pnpm run dev
 
-# 单独启动
-pnpm run dev:web    # 前端 (Vite + Vue 3)
-uv run python run_api.py --reload  # 后端 (FastAPI)
+# 单独启动后端
+uv run python run_app.py --reload
 
 # 运行测试
 uv run pytest tests/ -v

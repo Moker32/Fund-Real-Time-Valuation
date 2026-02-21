@@ -18,7 +18,7 @@ pnpm run dev
 # 单独启动
 pnpm run dev:web    # 前端 (Vite + Vue 3, 端口 3000)
 pnpm run dev:api    # 后端 (FastAPI, 端口 8000)
-uv run python run_api.py --reload  # 后端 (FastAPI)
+uv run python run_app.py --reload  # 后端 (FastAPI)
 
 # 构建
 pnpm run build:web  # 构建前端
@@ -53,7 +53,7 @@ pnpm run check                  # 运行所有检查 (lint + typecheck)
 
 ```
 .
-├── run_api.py              # Web 应用入口
+├── run_app.py              # Web 应用入口
 ├── pyproject.toml          # Python 项目配置
 ├── package.json            # pnpm 工作空间配置
 ├── requirements.txt        # Python 依赖

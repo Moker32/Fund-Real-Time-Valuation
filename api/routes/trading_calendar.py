@@ -27,6 +27,7 @@ class MarketStatusResponse(BaseModel):
     date: str
     next_trading_day: str
     market: str
+    is_within_session: bool
 
 
 _calendar_source: TradingCalendarSource | None = None

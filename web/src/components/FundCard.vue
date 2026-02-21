@@ -19,16 +19,22 @@
             class="action-btn holding-btn"
             :class="{ active: fund.isHolding }"
             :title="fund.isHolding ? '取消持有' : '标记持有'"
+            :aria-label="fund.isHolding ? '取消持有' : '标记为持有'"
             @click.stop="toggleHolding"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path v-if="fund.isHolding" d="M5 12l5 5L19 7" stroke-linecap="round" stroke-linejoin="round"/>
               <path v-else d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>
           <span class="fund-type">{{ fund.type || '其他' }}</span>
-          <button class="action-btn delete-btn" title="从自选移除" @click.stop="$emit('remove', fund.code)">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <button 
+            class="action-btn delete-btn" 
+            title="从自选移除" 
+            aria-label="从自选移除"
+            @click.stop="$emit('remove', fund.code)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
             </svg>
           </button>

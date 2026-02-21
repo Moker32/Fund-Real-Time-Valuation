@@ -11,9 +11,12 @@ from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from src.datasources.cache_cleaner import CacheCleaner, get_cache_cleaner
+from src.datasources.cache_warmer import CacheWarmer
 from src.datasources.manager import create_default_manager
 from src.utils.log_buffer import get_log_buffer
 
@@ -38,8 +41,6 @@ from .routes import (
     sentiment,
     stocks,
     trading_calendar,
-    websocket,
-    holidays,
 )
 
 # 配置日志：将日志同时输出到缓冲区和标准输出
@@ -48,6 +49,11 @@ _buffer_handler = get_log_buffer()
 _buffer_handler.setLevel(logging.DEBUG)
 _root_logger.addHandler(_buffer_handler)
 _root_logger.setLevel(logging.DEBUG)
+
+# 全局预热器实例
+_cache_warmer: CacheWarmer | None = None
+# 全局缓存清理器实例
+_cache_cleaner: CacheCleaner | None = None
 
 
 @asynccontextmanager
@@ -58,28 +64,68 @@ async def lifespan(app: FastAPI):
     Args:
         app: FastAPI 应用实例
     """
+    import os
+
+    global _cache_warmer, _cache_cleaner
+
+    # 启动时初始化数据源管理器
     manager = create_default_manager()
     set_data_source_manager(manager)
 
-    try:
-        from src.tasks.cache_tasks import preload_all, preload_funds
+    # 快速启动模式 - 跳过缓存预热
+    skip_warmup = os.environ.get("SKIP_CACHE_WARMUP") == "1"
 
-        preload_all.delay()
-        preload_funds.delay()
-        logger.info("Celery 缓存预热任务已提交")
-    except Exception as e:
-        logger.warning(f"提交缓存预热任务失败: {e}")
+    if skip_warmup:
+        logger.info("快速启动模式：跳过缓存预热")
+    else:
+        # 创建缓存预热器（用于后续操作）
+        _cache_warmer = CacheWarmer(manager)
 
-    try:
-        from src.tasks.health_tasks import run_health_check
+        # 预加载所有缓存数据到内存（不阻塞服务启动）
+        asyncio.create_task(_cache_warmer.preload_all_cache(timeout=5))
 
-        run_health_check.delay()
-        logger.info("Celery 健康检查任务已提交")
-    except Exception as e:
-        logger.warning(f"提交健康检查任务失败: {e}")
+        # 预热基金信息缓存（名称、类型等）- 并行获取，不阻塞服务启动
+        asyncio.create_task(_cache_warmer.preload_fund_info_cache(timeout=60))
+
+        # 启动缓存预热（不阻塞服务启动）
+        asyncio.create_task(_cache_warmer.start_background_warmup(interval=300))
+
+        # 启动时清理过期缓存（不阻塞服务启动）
+        try:
+            from src.datasources.cache_cleaner import startup_cleanup
+
+            asyncio.create_task(startup_cleanup())
+            logger.info("启动时缓存清理任务已提交")
+        except Exception as e:
+            logger.warning(f"启动清理任务失败: {e}")
+
+        # 启动后台定时清理任务（每小时执行一次）
+        try:
+            from src.datasources.cache_cleaner import start_background_cleanup_task
+
+            start_background_cleanup_task(interval=3600)
+            logger.info("后台定时清理任务已启动")
+        except Exception as e:
+            logger.warning(f"启动后台清理任务失败: {e}")
+
+    # 启动后台健康检查（非阻塞）
+    asyncio.create_task(manager.start_background_health_check())
 
     yield
 
+    # 停止后台预热
+    if _cache_warmer:
+        _cache_warmer.stop()
+
+    # 停止后台清理任务
+    try:
+        cleaner = get_cache_cleaner()
+        if cleaner:
+            cleaner.stop()
+    except Exception:
+        pass
+
+    # 关闭时清理资源
     await close_data_source_manager()
 
 
@@ -227,28 +273,83 @@ app.include_router(sentiment.router)
 app.include_router(datasource.router)
 app.include_router(stocks.router)
 app.include_router(bonds.router)
-app.include_router(holidays.router)
-app.include_router(websocket.router)
+
+
+# ==================== 静态文件服务 ====================
+
+import os
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+_dist_dir = "web/dist"
+
+
+def setup_static_files(app: FastAPI):
+    """配置静态文件服务和 SPA fallback"""
+
+    if not os.path.isdir(_dist_dir):
+        app.logger.warning(f"静态文件目录不存在: {_dist_dir}，跳过静态文件挂载")
+        return
+
+    # 挂载静态文件
+    app.mount("/static", StaticFiles(directory=_dist_dir), name="static")
+
+    # 注册异常处理器：404 时返回 index.html
+    from fastapi.exceptions import RequestValidationError
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        if exc.status_code == 404:
+            path = request.url.path
+
+            # /assets 路径：尝试返回实际的静态文件
+            if path.startswith("/assets/") or path.startswith("/vite."):
+                file_path = os.path.join(_dist_dir, path.lstrip("/"))
+                if os.path.isfile(file_path):
+                    return FileResponse(file_path)
+
+            # 其他路径：返回 index.html（SPA fallback），排除 API 路径
+            if (
+                not path.startswith("/api/")
+                and not path.startswith("/docs")
+                and not path.startswith("/redoc")
+            ):
+                index_path = os.path.join(_dist_dir, "index.html")
+                if os.path.isfile(index_path):
+                    return FileResponse(index_path)
+        # 其他错误让默认处理器处理
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+        )
+
+
+setup_static_files(app)
 
 
 @app.get(
     "/",
-    summary="API 根路径",
-    description="返回 API 基本信息",
+    summary="前端入口",
+    description="返回前端 index.html",
 )
 async def root():
     """
-    API 根路径
+    前端入口
 
     Returns:
-        dict: API 基本信息
+        FileResponse: 前端 index.html
     """
+    index_path = os.path.join(_dist_dir, "index.html")
+    if os.path.isfile(index_path):
+        return FileResponse(index_path)
     return {
         "name": "基金实时估值 API",
         "version": "0.1.0",
-        "description": "基金实时估值 Web API 服务",
-        "docs": "/docs",
-        "health": "/api/health",
+        "description": "前端未构建，请运行 pnpm run build:web",
     }
 
 

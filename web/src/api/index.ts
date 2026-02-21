@@ -2,7 +2,8 @@ import axios from 'axios';
 import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse, NewsListResponse, NewsCategoriesResponse } from '@/types';
 
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// 生产环境使用相对路径（同源部署），开发环境可通过环境变量覆盖
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // 错误码联合类型
 export type ApiErrorCode =

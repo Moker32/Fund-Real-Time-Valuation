@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from enum import Enum
+from zoneinfo import ZoneInfo
 
 import httpx
 from holidays import CountryHoliday
@@ -24,6 +25,22 @@ class Market(Enum):
     COMEX = "comex"  # 纽约商品交易所
     CME = "cme"  # 芝加哥商品交易所
     LBMA = "lbma"  # 伦敦金银市场协会
+
+
+# 各市场时区映射
+MARKET_TIMEZONES: dict[Market, str] = {
+    Market.CHINA: "Asia/Shanghai",
+    Market.HONG_KONG: "Asia/Hong_Kong",
+    Market.USA: "America/New_York",
+    Market.JAPAN: "Asia/Tokyo",
+    Market.UK: "Europe/London",
+    Market.GERMANY: "Europe/Berlin",
+    Market.FRANCE: "Europe/Paris",
+    Market.SGE: "Asia/Shanghai",
+    Market.COMEX: "America/New_York",
+    Market.CME: "America/Chicago",
+    Market.LBMA: "Europe/London",
+}
 
 
 MARKET_COUNTRY_MAP = {
@@ -98,33 +115,19 @@ MARKET_TRADING_HOURS = {
 }
 
 
+def get_market_date(market: Market | str) -> date:
+    """获取市场当前日期（当地时区）"""
+    if isinstance(market, str):
+        market = Market(market)
+
+    tz_name = MARKET_TIMEZONES.get(market, "UTC")
+    tz = ZoneInfo(tz_name)
+    now_utc = datetime.now(timezone.utc)
+    now_local = now_utc.astimezone(tz)
+    return now_local.date()
+
+
 CHINA_SPECIAL_DATES: dict[date, str] = {}
-
-
-class HolidayStrategy(Enum):
-    """休市策略类型"""
-
-    STOCK_MARKET = "stock"  # 股票市场: 使用Python holidays库
-    CHINA_A_SHARE = "china_a"  # A股: 使用东方财富API获取真实交易日
-    CHINA_SGE = "china_sge"  # 上海黄金交易所: 使用中国节假日配置
-    US_COMMODITY = "us_commodity"  # 美国商品交易所: 使用美国节假日
-    UK_PRECIOUS = "uk_precious"  # 伦敦金银: 使用英国节假日
-    WEEKEND_ONLY = "weekend_only"  # 仅周末休市
-
-
-EXCHANGE_HOLIDAY_STRATEGY: dict[Market, HolidayStrategy] = {
-    Market.CHINA: HolidayStrategy.CHINA_A_SHARE,
-    Market.HONG_KONG: HolidayStrategy.STOCK_MARKET,
-    Market.USA: HolidayStrategy.STOCK_MARKET,
-    Market.JAPAN: HolidayStrategy.STOCK_MARKET,
-    Market.UK: HolidayStrategy.STOCK_MARKET,
-    Market.GERMANY: HolidayStrategy.STOCK_MARKET,
-    Market.FRANCE: HolidayStrategy.STOCK_MARKET,
-    Market.SGE: HolidayStrategy.CHINA_SGE,
-    Market.COMEX: HolidayStrategy.US_COMMODITY,
-    Market.CME: HolidayStrategy.US_COMMODITY,
-    Market.LBMA: HolidayStrategy.UK_PRECIOUS,
-}
 
 
 def update_china_special_dates(dates: dict[date, str]) -> None:
@@ -157,10 +160,6 @@ class TradingCalendarSource(DataSource):
     def __init__(self, timeout: float = 10.0):
         super().__init__("trading_calendar", DataSourceType.STOCK, timeout)
         self._cache: dict[str, tuple[datetime, CalendarResult]] = {}
-        from src.db.database import DatabaseManager
-
-        self._db = DatabaseManager()
-        self._dao = self._db.trading_calendar_dao
 
     def _fetch_china_real_trading_days(self, year: int) -> set[date]:
         """从东方财富获取A股真实交易日"""
@@ -194,30 +193,7 @@ class TradingCalendarSource(DataSource):
 
         return trading_days
 
-    def _get_db_holidays(self, market: Market, year: int) -> tuple[set[date], dict[date, str]]:
-        """从数据库获取节假日"""
-        holiday_dates: set[date] = set()
-        holiday_names: dict[date, str] = {}
-        try:
-            dao = self._db.holiday_dao
-            holidays = dao.get_holidays(market=market.value, year=year, active_only=True)
-            for h in holidays:
-                try:
-                    d = date.fromisoformat(h.holiday_date)
-                    holiday_dates.add(d)
-                    if h.holiday_name:
-                        holiday_names[d] = h.holiday_name
-                except Exception:
-                    pass
-        except Exception:
-            pass
-        return holiday_dates, holiday_names
-
     def _get_holidays(self, market: Market, year: int) -> set[date]:
-        db_holidays, _ = self._get_db_holidays(market, year)
-        if db_holidays:
-            return db_holidays
-
         country_code, _ = MARKET_COUNTRY_MAP.get(market, ("US", ["US"]))
 
         try:
@@ -274,6 +250,36 @@ class TradingCalendarSource(DataSource):
         current_time = check_datetime.time()
         current_date = check_datetime.date()
 
+        has_night_session = "night_open" in hours and "night_close" in hours
+        if has_night_session:
+            night_open = hours["night_open"]
+            night_close = hours["night_close"]
+
+            in_night_session = current_time >= night_open or current_time < night_close
+
+            if in_night_session:
+                if current_time >= night_open:
+                    trading_date = current_date
+                else:
+                    trading_date = self._prev_day(current_date)
+
+                is_trading_day = self.is_trading_day(market, trading_date)
+                if not is_trading_day:
+                    return {
+                        "status": "closed",
+                        "reason": "Non-trading day",
+                        "date": current_date.isoformat(),
+                    }
+
+                return {
+                    "status": "open",
+                    "session": "night",
+                    "trading_date": trading_date.isoformat(),
+                    "trading_start": night_open.isoformat(),
+                    "trading_end": night_close.isoformat(),
+                }
+
+        current_date = check_datetime.date()
         is_trading_day = self.is_trading_day(market, current_date)
         if not is_trading_day:
             return {
@@ -291,24 +297,49 @@ class TradingCalendarSource(DataSource):
                     "break_end": hours["break_end"].isoformat(),
                 }
 
-        if hours["open"] <= current_time < hours["close"]:
+        if "day_open" in hours:
+            day_open = hours["day_open"]
+            day_close = hours["day_close"]
+            if day_open <= current_time < day_close:
+                return {
+                    "status": "open",
+                    "session": "day",
+                    "trading_start": day_open.isoformat(),
+                    "trading_end": day_close.isoformat(),
+                }
+        elif "open" in hours:
+            if hours["open"] <= current_time < hours["close"]:
+                return {
+                    "status": "open",
+                    "trading_start": hours["open"].isoformat(),
+                    "trading_end": hours["close"].isoformat(),
+                }
+
+        if "day_open" in hours:
+            if current_time < hours["day_open"]:
+                return {
+                    "status": "pre_market",
+                    "market_open": hours["day_open"].isoformat(),
+                }
             return {
-                "status": "open",
-                "trading_start": hours["open"].isoformat(),
+                "status": "closed",
+                "reason": "After market hours",
+                "trading_end": hours["day_close"].isoformat(),
+            }
+        elif "open" in hours:
+            if current_time < hours["open"]:
+                return {
+                    "status": "pre_market",
+                    "market_open": hours["open"].isoformat(),
+                }
+
+            return {
+                "status": "closed",
+                "reason": "After market hours",
                 "trading_end": hours["close"].isoformat(),
             }
 
-        if current_time < hours["open"]:
-            return {
-                "status": "pre_market",
-                "market_open": hours["open"].isoformat(),
-            }
-
-        return {
-            "status": "closed",
-            "reason": "After market hours",
-            "trading_end": hours["close"].isoformat(),
-        }
+        return {"status": "unknown", "reason": "No trading hours configured"}
 
     def get_calendar(
         self,
@@ -339,51 +370,54 @@ class TradingCalendarSource(DataSource):
             if (datetime.now() - cached_time).total_seconds() < self.CACHE_TTL:
                 return cached_result
 
-        db_records = self._dao.get_calendar(market.value, year)
-        if db_records:
-            trading_days = [
-                TradingDay(
-                    date=start_date + timedelta(days=i),
-                    is_trading_day=r.is_trading_day,
-                    holiday_name=r.holiday_name,
-                    is_makeup_day=r.is_makeup_day,
-                    market=market.value,
-                )
-                for i, r in enumerate(db_records)
-            ]
-            result = CalendarResult(
-                year=year,
-                market=market.value,
-                trading_days=trading_days,
-                total_trading_days=sum(1 for d in trading_days if d.is_trading_day),
-                total_holidays=len(trading_days) - sum(1 for d in trading_days if d.is_trading_day),
-            )
-            self._cache[cache_key] = (datetime.now(), result)
-            return result
-
         holidays = self._get_holidays(market, year)
         special_dates = self._get_special_dates(market, year)
 
-        strategy = EXCHANGE_HOLIDAY_STRATEGY.get(market, HolidayStrategy.STOCK_MARKET)
+        # 判断是否为贵金属交易所
+        is_precious_metal = market in (Market.SGE, Market.COMEX, Market.CME, Market.LBMA)
 
         # 尝试获取A股真实交易日数据
         china_real_days: set[date] = set()
-        if strategy == HolidayStrategy.CHINA_A_SHARE:
+        if market == Market.CHINA:
             china_real_days = self._fetch_china_real_trading_days(year)
 
         trading_days = []
         current = start_date
         while current <= end_date:
-            is_trading, holiday_name, is_makeup_day = self._calculate_trading_day(
-                current, strategy, year, holidays, china_real_days
-            )
+            # 贵金属交易所: 只有周末休市，节假日不休市
+            if is_precious_metal:
+                is_wknd = self._is_weekend(current)
+                is_trading = not is_wknd
+                holiday_name = None
+                is_makeup_day = False
+            else:
+                # 优先使用真实交易日数据
+                if current in china_real_days:
+                    is_trading = True
+                    holiday_name = None
+                    is_makeup_day = False
+                else:
+                    is_holiday = current in holidays
+                    is_wknd = self._is_weekend(current)
+                    special_name = special_dates.get(current)
+
+                    is_makeup_day = special_name and "补班" in special_name
+                    is_trading = not is_holiday and not is_wknd
+                    holiday_name = None
+                    if is_holiday:
+                        try:
+                            country_code, _ = MARKET_COUNTRY_MAP.get(market, ("US", ["US"]))
+                            ch = CountryHoliday(country_code, years=year)
+                            holiday_name = ch.get(current)
+                        except Exception:
+                            holiday_name = "Holiday"
 
             trading_days.append(
                 TradingDay(
                     date=current,
                     is_trading_day=is_trading,
-                    holiday_name=holiday_name,
-                    is_makeup_day=is_makeup_day,
+                    holiday_name=holiday_name or special_dates.get(current),
+                    is_makeup_day=bool(is_makeup_day),
                     market=market.value,
                 )
             )
@@ -398,20 +432,6 @@ class TradingCalendarSource(DataSource):
             total_holidays=len(trading_days) - sum(1 for d in trading_days if d.is_trading_day),
         )
 
-        from src.db.database import TradingCalendarRecord
-
-        db_records = [
-            TradingCalendarRecord(
-                market=market.value,
-                year=year,
-                is_trading_day=d.is_trading_day,
-                holiday_name=d.holiday_name,
-                is_makeup_day=d.is_makeup_day,
-            )
-            for d in trading_days
-        ]
-        self._dao.save_calendar(market.value, year, db_records)
-
         self._cache[cache_key] = (datetime.now(), result)
 
         return result
@@ -425,83 +445,19 @@ class TradingCalendarSource(DataSource):
             else d.replace(year=d.year + 1, month=1, day=1)
         )
 
-    def _calculate_trading_day(
-        self,
-        current: date,
-        strategy: HolidayStrategy,
-        year: int,
-        holidays: set[date],
-        china_real_days: set[date],
-    ) -> tuple[bool, str | None, bool]:
-        """根据策略计算指定日期是否为交易日"""
-        is_wknd = self._is_weekend(current)
-
-        match strategy:
-            case HolidayStrategy.CHINA_SGE:
-                sge_holidays, holiday_names = self._get_db_holidays(Market.SGE, year)
-                is_holiday = current in sge_holidays
-                is_trading = not is_holiday and not is_wknd
-                holiday_name = holiday_names.get(current)
-                if not holiday_name and current in sge_holidays and current.month == 2:
-                    holiday_name = "春节"
-                return is_trading, holiday_name, False
-
-            case HolidayStrategy.CHINA_A_SHARE:
-                china_holidays, holiday_names = self._get_db_holidays(Market.CHINA, year)
-                if china_holidays:
-                    holidays = china_holidays
-                if current in china_real_days:
-                    return True, None, False
-                is_holiday = current in holidays
-                is_trading = not is_holiday and not is_wknd
-                holiday_name = holiday_names.get(current) if holiday_names else None
-                if not holiday_name and is_holiday:
-                    try:
-                        ch = CountryHoliday("CN", years=year)
-                        holiday_name = ch.get(current)
-                    except Exception:
-                        holiday_name = "Holiday"
-                return is_trading, holiday_name, False
-
-            case HolidayStrategy.US_COMMODITY:
-                is_holiday = current in holidays
-                is_trading = not is_holiday and not is_wknd
-                holiday_name = None
-                if is_holiday:
-                    try:
-                        ch = CountryHoliday("US", years=year)
-                        holiday_name = ch.get(current)
-                    except Exception:
-                        holiday_name = "Holiday"
-                return is_trading, holiday_name, False
-
-            case HolidayStrategy.UK_PRECIOUS:
-                is_holiday = current in holidays
-                is_trading = not is_holiday and not is_wknd
-                holiday_name = None
-                if is_holiday:
-                    try:
-                        ch = CountryHoliday("GB", years=year)
-                        holiday_name = ch.get(current)
-                    except Exception:
-                        holiday_name = "Holiday"
-                return is_trading, holiday_name, False
-
-            case HolidayStrategy.STOCK_MARKET:
-                is_holiday = current in holidays
-                is_trading = not is_holiday and not is_wknd
-                holiday_name = None
-                return is_trading, holiday_name, False
-
-            case HolidayStrategy.WEEKEND_ONLY:
-                return not is_wknd, None, False
-
-            case _:
-                return not is_wknd, None, False
+    def _prev_day(self, d: date) -> date:
+        """获取前一天"""
+        return d - timedelta(days=1)
 
     def is_trading_day(self, market: Market | str, check_date: date | None = None) -> bool:
         if check_date is None:
-            check_date = date.today()
+            if isinstance(market, str) and market.lower() == "crypto":
+                check_date = date.today()
+            else:
+                check_date = get_market_date(market)
+
+        if isinstance(market, str) and market.lower() != "crypto":
+            market = Market(market)
 
         result = self.get_calendar(market, year=check_date.year)
         for day in result.trading_days:
@@ -535,11 +491,15 @@ class TradingCalendarSource(DataSource):
         if markets is None:
             markets = list(Market)
 
-        today = date.today()
         status = {}
 
         for market in markets:
+            today = get_market_date(market)
             is_open = self.is_trading_day(market, today)
+
+            # Check if within trading session (uses current time)
+            session_info = self.is_within_trading_hours(market)
+            is_within_session = session_info.get("status") == "open"
 
             if not is_open:
                 next_open = self.get_next_trading_day(market, today)
@@ -551,6 +511,7 @@ class TradingCalendarSource(DataSource):
                 "date": today.isoformat(),
                 "next_trading_day": next_open.isoformat(),
                 "market": market.value,
+                "is_within_session": is_within_session,
             }
 
         return status
