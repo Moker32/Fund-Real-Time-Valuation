@@ -98,7 +98,9 @@ export const useCommodityStore = defineStore('commodities', () => {
     if (activeCategory.value === 'watched') {
       return watchedCommodities.value
         .map(watched => {
-          const marketData = watchedCommodityData.value.find(c => c.symbol === watched.symbol);
+          const marketData = watchedCommodityData.value.find(
+            c => c.symbol.toUpperCase() === watched.symbol.toUpperCase()
+          );
           return marketData || {
             symbol: watched.symbol,
             name: watched.name,
@@ -475,7 +477,8 @@ export const useCommodityStore = defineStore('commodities', () => {
       const fetchPromises = watchedCommodities.value.map(async (watched) => {
         try {
           let data: any;
-          if (watched.symbol.toUpperCase() === 'AU99.99' || watched.symbol.toLowerCase() === 'sg=f') {
+          const symbol = watched.symbol.toUpperCase();
+          if (symbol === 'AU99.99' || symbol === 'SG=F' || symbol.includes('AU99')) {
             data = await commodityApi.getGoldCNY();
           } else {
             data = await commodityApi.getCommodityByTicker(watched.symbol);

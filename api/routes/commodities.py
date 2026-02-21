@@ -14,7 +14,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.config.commodities_config import CommoditiesConfig
 from src.datasources.base import DataSourceType
 from src.datasources.commodity_source import (
-    AKShareCommoditySource,
     YFinanceCommoditySource,
     get_all_available_commodities,
     get_all_commodity_types,
@@ -344,16 +343,17 @@ async def get_history(
         500: {"model": ErrorResponse, "description": "服务器错误"},
     },
 )
-async def get_gold_cny() -> dict:
+async def get_gold_cny(
+    manager: DataSourceManager = Depends(DataSourceDependency()),
+) -> dict:
     """
     获取国内黄金行情（上海黄金交易所 Au99.99）
 
     Returns:
         CommodityResponse: 国内黄金行情
     """
-    # 只使用 AKShare（yfinance 不支持上海黄金交易所）
-    akshare_source = AKShareCommoditySource()
-    result = await akshare_source.fetch("gold_cny")
+    # 使用 DataSourceManager 统一获取（与其他大宗商品一致）
+    result = await manager.fetch(DataSourceType.COMMODITY, "gold_cny")
 
     if not result.success or not result.data:
         raise HTTPException(
@@ -367,10 +367,10 @@ async def get_gold_cny() -> dict:
         symbol=data.get("symbol", ""),
         name=data.get("name", ""),
         price=data.get("price", 0.0),
-        change=None,
+        change=data.get("change"),
         change_percent=data.get("change_percent"),
-        currency="CNY",
-        exchange="SGE",
+        currency=data.get("currency", "CNY"),
+        exchange=data.get("exchange", "SGE"),
         timestamp=data.get("timestamp"),
         source=result.source,
         high=data.get("high"),
