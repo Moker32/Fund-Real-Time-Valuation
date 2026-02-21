@@ -69,7 +69,7 @@ if [ -f "$BACKEND_PID_FILE" ]; then
 fi
 
 # 启动后端
-$PYTHON_CMD run_api.py --reload &
+$PYTHON_CMD run_app.py --reload &
 BACKEND_PID=$!
 echo $BACKEND_PID > "$BACKEND_PID_FILE"
 echo -e "${YELLOW}后端进程 PID: $BACKEND_PID${NC}"

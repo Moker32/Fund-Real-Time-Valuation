@@ -135,7 +135,7 @@
 
 ```
 fund-real-time-valuation/
-├── run_api.py                    # 应用入口
+├── run_app.py                    # 应用入口
 ├── pyproject.toml                # Python 项目配置
 ├── package.json                  # pnpm 工作空间配置
 ├── requirements.txt              # Python 依赖
@@ -627,7 +627,7 @@ pnpm run dev
 
 # 单独启动
 pnpm run dev:web    # 前端 (Vite, 端口 3000)
-uv run python run_api.py --reload  # 后端 (FastAPI, 端口 8000)
+uv run python run_app.py --reload  # 后端 (FastAPI, 端口 8000)
 ```
 
 ### 5.2 生产环境
@@ -637,7 +637,7 @@ uv run python run_api.py --reload  # 后端 (FastAPI, 端口 8000)
 pnpm run build:web
 
 # 启动后端
-uv run python run_api.py
+uv run python run_app.py
 ```
 
 ### 5.3 环境配置

@@ -306,7 +306,7 @@ git commit -m "feat: IndexCard 使用 dataTimestamp 显示用户时区时间"
 
 **Step 1: 启动后端服务**
 
-Run: `uv run python run_api.py`
+Run: `uv run python run_app.py`
 Expected: 服务启动成功
 
 **Step 2: 测试 API 返回**
