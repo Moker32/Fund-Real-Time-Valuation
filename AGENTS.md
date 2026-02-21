@@ -8,6 +8,7 @@
 - **项目**: Fund Real-Time Valuation
 - **技术栈**: Python 3.10+, FastAPI, Vue 3 + TypeScript, SQLite, akshare, yfinance
 - **pnpm 工作空间**: backend (FastAPI) + frontend (Vue 3)
+- **部署模式**: 单端口部署 (FastAPI 统一处理前端和后端)
 
 ## 构建 / Lint / 测试命令
 
@@ -16,9 +17,16 @@
 pnpm run install:all
 
 # 运行开发服务器
-pnpm run dev              # 前端 + 后端
+pnpm run dev              # 前端 + 后端 (concurrently)
 pnpm run dev:web         # 前端 (Vite, 端口 3000)
 pnpm run dev:api         # 后端 (FastAPI, 端口 8000)
+
+# 快速启动 (跳过缓存预热)
+uv run python run_app.py --fast --reload
+
+# Celery 后台任务
+pnpm run dev:celery         # Celery Worker
+pnpm run dev:celery:beat   # Celery Beat 定时任务
 
 # Python 测试
 uv run pytest tests/ -v                              # 所有测试
@@ -79,8 +87,10 @@ src/
   datasources/ # 数据获取器 (akshare, yfinance 等)
   db/          # SQLite DAOs
   config/      # 配置管理
+  tasks/       # Celery 异步任务
 web/           # Vue 3 前端
 tests/         # pytest 测试文件
+docs/          # 设计文档
 ```
 
 ## 数据源模式
@@ -120,6 +130,12 @@ curl "http://localhost:8000/trading-calendar/is-trading-day/china"
 curl "http://localhost:8000/trading-calendar/is-trading-day/sge"
 # COMEX
 curl "http://localhost:8000/trading-calendar/is-trading-day/comex"
+
+# 获取年度交易日历
+curl "http://localhost:8000/trading-calendar/calendar/china?year=2025"
+
+# 获取多市场状态
+curl "http://localhost:8000/trading-calendar/market-status?markets=china,usa,comex"
 ```
 
 支持的交易所: china, hk, usa, japan, uk, germany, france, sge, comex, cme, lbma
@@ -129,14 +145,24 @@ curl "http://localhost:8000/trading-calendar/is-trading-day/comex"
 - 配置: `~/.fund-tui/config.yaml`, `~/.fund-tui/funds.yaml`
 - 数据库: `~/.fund-tui/fund_data.db`
 - mypy 中禁用的第三方类型: akshare, yfinance, matplotlib, pandas, numpy
+- Redis: Celery 依赖，需先启动 `redis-server`
 
 ## 常用 API 端点
 
 | 端点 | 方法 | 描述 |
 |------|------|------|
 | `/api/funds` | GET | 基金列表 |
+| `/api/funds/{code}` | GET | 基金详情 |
+| `/api/funds/{code}/estimate` | GET | 基金估值 |
+| `/api/funds/watchlist` | POST/DELETE | 自选管理 |
 | `/api/commodities` | GET | 商品行情 |
 | `/api/commodities/watchlist` | GET/POST | 关注列表 |
 | `/api/indices` | GET | 全球市场指数 |
+| `/api/sectors` | GET | 行业板块 |
+| `/api/news` | GET | 财经新闻 |
+| `/api/sentiment` | GET | 舆情数据 |
 | `/api/health` | GET | 健康检查 |
 | `/trading-calendar/is-trading-day/{market}` | GET | 交易状态 |
+| `/api/cache/stats` | GET | 缓存统计 |
+| `/api/datasource/statistics` | GET | 数据源统计 |
+| `/api/ws` | WebSocket | 实时数据推送 |
