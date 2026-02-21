@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta, timezone
 from enum import Enum
+from zoneinfo import ZoneInfo
 
 import httpx
 from holidays import CountryHoliday
@@ -24,6 +25,22 @@ class Market(Enum):
     COMEX = "comex"  # 纽约商品交易所
     CME = "cme"  # 芝加哥商品交易所
     LBMA = "lbma"  # 伦敦金银市场协会
+
+
+# 各市场时区映射
+MARKET_TIMEZONES: dict[Market, str] = {
+    Market.CHINA: "Asia/Shanghai",
+    Market.HONG_KONG: "Asia/Hong_Kong",
+    Market.USA: "America/New_York",
+    Market.JAPAN: "Asia/Tokyo",
+    Market.UK: "Europe/London",
+    Market.GERMANY: "Europe/Berlin",
+    Market.FRANCE: "Europe/Paris",
+    Market.SGE: "Asia/Shanghai",
+    Market.COMEX: "America/New_York",
+    Market.CME: "America/Chicago",
+    Market.LBMA: "Europe/London",
+}
 
 
 MARKET_COUNTRY_MAP = {
@@ -96,6 +113,18 @@ MARKET_TRADING_HOURS = {
         "pm_price": time(15, 0),  # 下午定价
     },
 }
+
+
+def get_market_date(market: Market | str) -> date:
+    """获取市场当前日期（当地时区）"""
+    if isinstance(market, str):
+        market = Market(market)
+
+    tz_name = MARKET_TIMEZONES.get(market, "UTC")
+    tz = ZoneInfo(tz_name)
+    now_utc = datetime.now(timezone.utc)
+    now_local = now_utc.astimezone(tz)
+    return now_local.date()
 
 
 CHINA_SPECIAL_DATES: dict[date, str] = {}
@@ -221,6 +250,36 @@ class TradingCalendarSource(DataSource):
         current_time = check_datetime.time()
         current_date = check_datetime.date()
 
+        has_night_session = "night_open" in hours and "night_close" in hours
+        if has_night_session:
+            night_open = hours["night_open"]
+            night_close = hours["night_close"]
+
+            in_night_session = current_time >= night_open or current_time < night_close
+
+            if in_night_session:
+                if current_time >= night_open:
+                    trading_date = current_date
+                else:
+                    trading_date = self._prev_day(current_date)
+
+                is_trading_day = self.is_trading_day(market, trading_date)
+                if not is_trading_day:
+                    return {
+                        "status": "closed",
+                        "reason": "Non-trading day",
+                        "date": current_date.isoformat(),
+                    }
+
+                return {
+                    "status": "open",
+                    "session": "night",
+                    "trading_date": trading_date.isoformat(),
+                    "trading_start": night_open.isoformat(),
+                    "trading_end": night_close.isoformat(),
+                }
+
+        current_date = check_datetime.date()
         is_trading_day = self.is_trading_day(market, current_date)
         if not is_trading_day:
             return {
@@ -238,24 +297,49 @@ class TradingCalendarSource(DataSource):
                     "break_end": hours["break_end"].isoformat(),
                 }
 
-        if hours["open"] <= current_time < hours["close"]:
+        if "day_open" in hours:
+            day_open = hours["day_open"]
+            day_close = hours["day_close"]
+            if day_open <= current_time < day_close:
+                return {
+                    "status": "open",
+                    "session": "day",
+                    "trading_start": day_open.isoformat(),
+                    "trading_end": day_close.isoformat(),
+                }
+        elif "open" in hours:
+            if hours["open"] <= current_time < hours["close"]:
+                return {
+                    "status": "open",
+                    "trading_start": hours["open"].isoformat(),
+                    "trading_end": hours["close"].isoformat(),
+                }
+
+        if "day_open" in hours:
+            if current_time < hours["day_open"]:
+                return {
+                    "status": "pre_market",
+                    "market_open": hours["day_open"].isoformat(),
+                }
             return {
-                "status": "open",
-                "trading_start": hours["open"].isoformat(),
+                "status": "closed",
+                "reason": "After market hours",
+                "trading_end": hours["day_close"].isoformat(),
+            }
+        elif "open" in hours:
+            if current_time < hours["open"]:
+                return {
+                    "status": "pre_market",
+                    "market_open": hours["open"].isoformat(),
+                }
+
+            return {
+                "status": "closed",
+                "reason": "After market hours",
                 "trading_end": hours["close"].isoformat(),
             }
 
-        if current_time < hours["open"]:
-            return {
-                "status": "pre_market",
-                "market_open": hours["open"].isoformat(),
-            }
-
-        return {
-            "status": "closed",
-            "reason": "After market hours",
-            "trading_end": hours["close"].isoformat(),
-        }
+        return {"status": "unknown", "reason": "No trading hours configured"}
 
     def get_calendar(
         self,
@@ -361,9 +445,19 @@ class TradingCalendarSource(DataSource):
             else d.replace(year=d.year + 1, month=1, day=1)
         )
 
+    def _prev_day(self, d: date) -> date:
+        """获取前一天"""
+        return d - timedelta(days=1)
+
     def is_trading_day(self, market: Market | str, check_date: date | None = None) -> bool:
         if check_date is None:
-            check_date = date.today()
+            if isinstance(market, str) and market.lower() == "crypto":
+                check_date = date.today()
+            else:
+                check_date = get_market_date(market)
+
+        if isinstance(market, str) and market.lower() != "crypto":
+            market = Market(market)
 
         result = self.get_calendar(market, year=check_date.year)
         for day in result.trading_days:
@@ -397,11 +491,15 @@ class TradingCalendarSource(DataSource):
         if markets is None:
             markets = list(Market)
 
-        today = date.today()
         status = {}
 
         for market in markets:
+            today = get_market_date(market)
             is_open = self.is_trading_day(market, today)
+
+            # Check if within trading session (uses current time)
+            session_info = self.is_within_trading_hours(market)
+            is_within_session = session_info.get("status") == "open"
 
             if not is_open:
                 next_open = self.get_next_trading_day(market, today)
@@ -413,6 +511,7 @@ class TradingCalendarSource(DataSource):
                 "date": today.isoformat(),
                 "next_trading_day": next_open.isoformat(),
                 "market": market.value,
+                "is_within_session": is_within_session,
             }
 
         return status

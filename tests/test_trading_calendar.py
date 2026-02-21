@@ -187,7 +187,7 @@ class TestTradingCalendarSource:
     def test_is_within_trading_hours(self, calendar_source):
         """测试交易时间判断"""
         # 测试中国股市交易时间
-        with patch.object(calendar_source, 'is_trading_day', return_value=True):
+        with patch.object(calendar_source, "is_trading_day", return_value=True):
             # 交易时间内 (10:00)
             dt = datetime(2024, 1, 15, 10, 0)
             result = calendar_source.is_within_trading_hours(Market.CHINA, dt)
@@ -210,7 +210,7 @@ class TestTradingCalendarSource:
 
     def test_is_within_trading_hours_non_trading_day(self, calendar_source):
         """测试非交易日"""
-        with patch.object(calendar_source, 'is_trading_day', return_value=False):
+        with patch.object(calendar_source, "is_trading_day", return_value=False):
             dt = datetime(2024, 1, 15, 10, 0)
             result = calendar_source.is_within_trading_hours(Market.CHINA, dt)
             assert result["status"] == "closed"
@@ -222,6 +222,100 @@ class TestTradingCalendarSource:
         # 测试当传入无效市场时能正确处理
         with pytest.raises(ValueError):
             calendar_source.is_within_trading_hours("unknown_market")
+
+    def test_is_within_trading_hours_comex_night_session(self, calendar_source):
+        """测试 COMEX 夜盘时段
+
+        COMEX 使用纽约时间 (America/New_York)
+        日盘: 8:00-13:30 ET
+        夜盘: 17:00-8:00 ET (跨日)
+        """
+        # 周五 7:00 ET - 夜盘（周四17:00开始的夜盘延续到周五早上）
+        dt = datetime(2024, 1, 5, 7, 0)
+        result = calendar_source.is_within_trading_hours(Market.COMEX, dt)
+        assert result["status"] == "open"
+        assert result["session"] == "night"
+        assert result["trading_date"] == "2024-01-04"  # 属于周四的夜盘
+
+        # 周五 9:00 ET - 日盘进行中
+        dt = datetime(2024, 1, 5, 9, 0)
+        result = calendar_source.is_within_trading_hours(Market.COMEX, dt)
+        assert result["status"] == "open"
+        assert result["session"] == "day"
+
+        # 周五 14:00 ET - 盘后（日盘13:30结束）
+        dt = datetime(2024, 1, 5, 14, 0)
+        result = calendar_source.is_within_trading_hours(Market.COMEX, dt)
+        assert result["status"] == "closed"
+
+        # 周五 18:00 ET - 夜盘刚开始
+        dt = datetime(2024, 1, 5, 18, 0)
+        result = calendar_source.is_within_trading_hours(Market.COMEX, dt)
+        assert result["status"] == "open"
+        assert result["session"] == "night"
+        assert result["trading_date"] == "2024-01-05"  # 属于周五的夜盘
+
+        # 周五 23:00 ET - 夜盘进行中
+        dt = datetime(2024, 1, 5, 23, 0)
+        result = calendar_source.is_within_trading_hours(Market.COMEX, dt)
+        assert result["status"] == "open"
+        assert result["session"] == "night"
+
+        # 周六 5:00 ET - 夜盘进行中（凌晨）
+        dt = datetime(2024, 1, 6, 5, 0)
+        result = calendar_source.is_within_trading_hours(Market.COMEX, dt)
+        assert result["status"] == "open"
+        assert result["session"] == "night"
+
+        # 周六 9:00 ET - 夜盘结束
+        dt = datetime(2024, 1, 6, 9, 0)
+        result = calendar_source.is_within_trading_hours(Market.COMEX, dt)
+        assert result["status"] == "closed"
+
+    def test_is_within_trading_hours_sge_night_session(self, calendar_source):
+        """测试 SGE 夜盘时段"""
+        # 周五 20:00 北京时间 - 夜盘开始
+        dt = datetime(2024, 1, 5, 20, 0)
+        result = calendar_source.is_within_trading_hours(Market.SGE, dt)
+        assert result["status"] == "open"
+        assert result["session"] == "night"
+
+        # 周五 23:00 北京时间 - 夜盘进行中
+        dt = datetime(2024, 1, 5, 23, 0)
+        result = calendar_source.is_within_trading_hours(Market.SGE, dt)
+        assert result["status"] == "open"
+        assert result["session"] == "night"
+
+        # 周六 2:00 北京时间 - 夜盘结束前
+        dt = datetime(2024, 1, 6, 2, 0)
+        result = calendar_source.is_within_trading_hours(Market.SGE, dt)
+        assert result["status"] == "open"
+        assert result["session"] == "night"
+
+    def test_is_within_trading_hours_sge_day_session(self, calendar_source):
+        """测试 SGE 日盘时段"""
+        # 周五 10:00 北京时间 - 日盘进行中
+        dt = datetime(2024, 1, 5, 10, 0)
+        result = calendar_source.is_within_trading_hours(Market.SGE, dt)
+        assert result["status"] == "open"
+        assert result["session"] == "day"
+
+    def test_is_within_trading_hours_comex_day_session(self, calendar_source):
+        """测试 COMEX 日盘时段"""
+        # 周五 10:00 ET - 日盘进行中
+        dt = datetime(2024, 1, 5, 10, 0)
+        result = calendar_source.is_within_trading_hours(Market.COMEX, dt)
+        assert result["status"] == "open"
+        assert result["session"] == "day"
+
+    def test_is_within_trading_hours_cross_day_night(self, calendar_source):
+        """测试跨日夜盘 - 周六凌晨属于前一天夜盘"""
+        # 周六 1:00 属于周五的夜盘
+        saturday = datetime(2024, 1, 6, 1, 0)
+        result = calendar_source.is_within_trading_hours(Market.COMEX, saturday)
+        assert result["status"] == "open"
+        assert result["session"] == "night"
+        assert result["trading_date"] == "2024-01-05"
 
     @pytest.mark.asyncio
     async def test_fetch(self, calendar_source):
@@ -251,7 +345,7 @@ class TestTradingDay:
             is_trading_day=True,
             holiday_name=None,
             is_makeup_day=False,
-            market="china"
+            market="china",
         )
 
         assert day.date == date(2024, 1, 15)
@@ -277,7 +371,7 @@ class TestCalendarResult:
             market="china",
             trading_days=trading_days,
             total_trading_days=2,
-            total_holidays=1
+            total_holidays=1,
         )
 
         assert result.year == 2024
