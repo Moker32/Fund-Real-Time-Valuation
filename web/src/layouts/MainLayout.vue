@@ -173,10 +173,6 @@ const sidebarCollapsed = ref(false);
 const healthStatus = ref<'healthy' | 'degraded' | 'unhealthy'>('healthy');
 const statusText = ref('已连接');
 const refreshing = ref(false);
-const realtimeEnabled = ref(true); // WebSocket real-time updates
-let fundTimer: number | null = null;
-let commodityTimer: number | null = null;
-let indexTimer: number | null = null;
 let healthTimer: number | null = null;
 
 const currentRoute = computed(() => route.name as string || 'home');
@@ -215,23 +211,22 @@ async function refresh() {
 
   refreshing.value = true;
   try {
-    fundStore.fetchFunds();
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    commodityStore.fetchCategories();
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    indexStore.fetchIndices();
-    sectorStore.refresh();
-    await checkHealth();
+    await Promise.all([
+      fundStore.fetchFunds(),
+      commodityStore.fetchCategories(),
+      indexStore.fetchIndices(),
+      sectorStore.refresh(),
+      checkHealth(),
+    ]);
   } finally {
-    setTimeout(() => {
-      refreshing.value = false;
-    }, 500);
+    refreshing.value = false;
   }
 }
 
 function setupWebSocketHandlers() {
   wsStore.on('fund_update', (data) => {
-    const funds = data as Fund[];
+    const payload = data as { funds?: Fund[] };
+    const funds = payload?.funds;
     if (funds && funds.length > 0) {
       funds.forEach((updatedFund) => {
         const index = fundStore.funds.findIndex(f => f.code === updatedFund.code);
@@ -244,14 +239,16 @@ function setupWebSocketHandlers() {
   });
 
   wsStore.on('commodity_update', (data) => {
-    const commodities = data as Commodity[];
+    const payload = data as { commodities?: Commodity[] };
+    const commodities = payload?.commodities;
     if (commodities && commodities.length > 0) {
       commodityStore.lastUpdated = new Date().toLocaleTimeString();
     }
   });
 
   wsStore.on('index_update', (data) => {
-    const indices = data as MarketIndex[];
+    const payload = data as { indices?: MarketIndex[] };
+    const indices = payload?.indices;
     if (indices && indices.length > 0) {
       indexStore.lastUpdated = new Date().toLocaleTimeString();
     }
@@ -259,7 +256,6 @@ function setupWebSocketHandlers() {
 }
 
 function startWebSocket() {
-  if (!realtimeEnabled.value) return;
   wsStore.connect();
   wsStore.subscribe(['funds', 'commodities', 'indices']);
   setupWebSocketHandlers();
@@ -269,72 +265,24 @@ function stopWebSocket() {
   wsStore.disconnect();
 }
 
-function startAutoRefresh() {
-  if (!fundStore.autoRefresh || realtimeEnabled.value) return;
-
-  const baseInterval = (fundStore.refreshInterval || 30) * 1000;
-
-  fundTimer = window.setInterval(() => {
-    if (fundStore.autoRefresh) {
-      fundStore.fetchFunds();
-    }
-  }, baseInterval);
-
-  commodityTimer = window.setInterval(() => {
-    if (fundStore.autoRefresh) {
-      commodityStore.fetchCategories();
-    }
-  }, baseInterval + 5000);
-
-  indexTimer = window.setInterval(() => {
-    if (fundStore.autoRefresh) {
-      indexStore.fetchIndices();
-    }
-  }, baseInterval + 10000);
-}
-
-function stopAutoRefresh() {
-  if (fundTimer) {
-    clearInterval(fundTimer);
-    fundTimer = null;
-  }
-  if (commodityTimer) {
-    clearInterval(commodityTimer);
-    commodityTimer = null;
-  }
-  if (indexTimer) {
-    clearInterval(indexTimer);
-    indexTimer = null;
-  }
-}
-
-watch(() => fundStore.autoRefresh, (enabled) => {
-  if (enabled && !realtimeEnabled.value) {
-    startAutoRefresh();
-  } else if (!enabled) {
-    stopAutoRefresh();
-  }
-});
-
-watch(() => fundStore.refreshInterval, () => {
-  if (!realtimeEnabled.value) {
-    stopAutoRefresh();
-    startAutoRefresh();
+watch(() => wsStore.isConnected, (connected) => {
+  if (connected) {
+    healthStatus.value = 'healthy';
+    statusText.value = '实时';
+  } else {
+    healthStatus.value = 'degraded';
+    statusText.value = '重连中...';
   }
 });
 
 onMounted(async () => {
   await refresh();
   startWebSocket();
-  if (!realtimeEnabled.value) {
-    startAutoRefresh();
-  }
   healthTimer = window.setInterval(checkHealth, 30000);
 });
 
 onUnmounted(() => {
   stopWebSocket();
-  stopAutoRefresh();
   if (healthTimer) {
     clearInterval(healthTimer);
   }

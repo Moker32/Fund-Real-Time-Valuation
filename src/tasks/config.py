@@ -12,6 +12,7 @@ task_routes = {
     "src.tasks.cache_tasks.*": {"queue": "cache"},
     "src.tasks.health_tasks.*": {"queue": "health"},
     "src.tasks.fund_tasks.*": {"queue": "funds"},
+    "src.tasks.push_tasks.*": {"queue": "pubsub"},
 }
 
 beat_schedule = {
@@ -26,6 +27,19 @@ beat_schedule = {
     "periodic-health-check-every-minute": {
         "task": "src.tasks.health_tasks.periodic_check",
         "schedule": 60.0,
+    },
+    # WebSocket Push Tasks (every 30 seconds)
+    "periodic-push-fund-update": {
+        "task": "src.tasks.push_tasks.push_fund_update",
+        "schedule": 30.0,
+    },
+    "periodic-push-commodity-update": {
+        "task": "src.tasks.push_tasks.push_commodity_update",
+        "schedule": 30.0,
+    },
+    "periodic-push-index-update": {
+        "task": "src.tasks.push_tasks.push_index_update",
+        "schedule": 30.0,
     },
 }
 
