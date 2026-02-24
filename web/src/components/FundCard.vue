@@ -479,6 +479,7 @@ function formatNetValueDate(dateStr: string): string {
   flex: 1 1 50%;
   width: auto;
 
+  .inline-chart {
     flex: 1 1 80px;
     width: auto;
     max-width: 100px;
@@ -497,7 +498,6 @@ function formatNetValueDate(dateStr: string): string {
     flex: 1 1 80px;
     max-width: 100px;
     min-width: 60px;
-  }
   }
 
   .change-info {

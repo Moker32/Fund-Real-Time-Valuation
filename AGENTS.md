@@ -17,16 +17,12 @@
 pnpm run install:all
 
 # 运行开发服务器
-pnpm run dev              # 前端 + 后端 (concurrently)
-pnpm run dev:web         # 前端 (Vite, 端口 3000)
-pnpm run dev:api         # 后端 (FastAPI, 端口 8000)
+pnpm run dev              # 启动 FastAPI (端口 8000，前后端统一服务)
+pnpm run dev:web         # 前端独立开发 (Vite, 端口 3000, 支持热更新)
+pnpm run dev:api         # 后端独立开发 (FastAPI, 端口 8000)
 
 # 快速启动 (跳过缓存预热)
 uv run python run_app.py --fast --reload
-
-# Celery 后台任务
-pnpm run dev:celery         # Celery Worker
-pnpm run dev:celery:beat   # Celery Beat 定时任务
 
 # Python 测试
 uv run pytest tests/ -v                              # 所有测试
@@ -87,7 +83,7 @@ src/
   datasources/ # 数据获取器 (akshare, yfinance 等)
   db/          # SQLite DAOs
   config/      # 配置管理
-  tasks/       # Celery 异步任务
+  utils/       # 工具模块
 web/           # Vue 3 前端
 tests/         # pytest 测试文件
 docs/          # 设计文档
@@ -145,7 +141,20 @@ curl "http://localhost:8000/trading-calendar/market-status?markets=china,usa,com
 - 配置: `~/.fund-tui/config.yaml`, `~/.fund-tui/funds.yaml`
 - 数据库: `~/.fund-tui/fund_data.db`
 - mypy 中禁用的第三方类型: akshare, yfinance, matplotlib, pandas, numpy
-- Redis: Celery 依赖，需先启动 `redis-server`
+
+## 前端独立开发
+
+如需修改前端并启用热更新：
+
+```bash
+# 终端1：启动后端
+pnpm run dev:api
+
+# 终端2：启动前端
+pnpm run dev:web
+```
+
+前端访问 http://localhost:3000，API 请求通过 Vite 代理转发到后端。
 
 ## 常用 API 端点
 
