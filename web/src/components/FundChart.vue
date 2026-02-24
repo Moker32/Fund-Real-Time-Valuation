@@ -16,12 +16,16 @@ const props = withDefaults(defineProps<{
   data: FundHistory[] | FundIntraday[];
   height?: number;
   baseline?: number;
+  changePercent?: number;
 }>(), {
   height: 100,
 });
 
 const chartContainer = ref<Element | null>(null);
 let uplotInstance: uPlot | null = null;
+
+// 响应式获取趋势颜色 - 当数据变化时自动重新计算
+const color = computed(() => getTrendColor());
 
 // 判断是否有有效数据用于显示空状态
 const hasData = computed(() => {
@@ -35,6 +39,12 @@ const hasData = computed(() => {
 let lastDataJson: string = '';
 
 const getTrendColor = (): string => {
+  // 如果传入了 changePercent，基于它来判断颜色
+  if (props.changePercent !== undefined) {
+    return props.changePercent >= 0 ? '#ef4444' : '#22c55e';
+  }
+
+  // 否则回退到原有的数据比较逻辑
   if (!props.data || props.data.length < 2) return '#22c55e';
 
   const firstValue = 'close' in props.data[0]
@@ -93,7 +103,8 @@ const initChart = () => {
   
   chartContainer.value.innerHTML = '';
 
-  const color = getTrendColor();
+  // 调试日志
+  console.log('[FundChart] initChart - baseline:', props.baseline, 'changePercent:', props.changePercent, 'color:', color.value);
 
   try {
     uplotInstance = new uPlot({
@@ -105,7 +116,7 @@ const initChart = () => {
       series: [
         {},
         {
-          stroke: color,
+          stroke: color.value,
           width: 2,
           fill: undefined,
           points: { show: false },
@@ -142,7 +153,8 @@ const initChart = () => {
             
             const ctx = u.ctx;
             ctx.save();
-            ctx.strokeStyle = getTrendColor(); // 动态获取涨跌颜色
+            // 优先使用存储的基准线颜色，否则回退到动态获取
+            ctx.strokeStyle = (u as any)._baselineColor ?? getTrendColor();
             ctx.lineWidth = 1;
             ctx.setLineDash([4, 4]); // 虚线
             ctx.beginPath();
@@ -237,11 +249,15 @@ const updateColor = () => {
   if (!uplotInstance) return;
 
   const newColor = getTrendColor();
+  console.log('[FundChart] updateColor - newColor:', newColor, 'baseline:', props.baseline);
   try {
     // uPlot setSeries API requires series options
     uplotInstance.setSeries(1, { stroke: newColor });
-  } catch {
-    // 忽略颜色更新错误
+    // 存储基准线颜色并强制重绘，以更新基准线颜色
+    (uplotInstance as any)._baselineColor = newColor;
+    uplotInstance.redraw();
+  } catch (e) {
+    console.warn('[FundChart] updateColor error:', e);
   }
 };
 
@@ -257,18 +273,32 @@ watch(() => props.data, (newData) => {
   if (!newData || newData.length === 0) return;
 
   // 更新颜色
-  if (newData.length >= 2) {
-    updateColor();
-  }
+  updateColor();
 
   // 更新数据
   updateData();
 }, { deep: true, flush: 'post' });
 
+// 监听 changePercent 变化以更新颜色
+watch(() => props.changePercent, () => {
+  if (uplotInstance) {
+    updateColor();
+  }
+});
+
+// 监听 baseline 变化以重绘基准线
+watch(() => props.baseline, () => {
+  if (uplotInstance) {
+    console.log('[FundChart] baseline changed:', props.baseline);
+    uplotInstance.redraw();
+  }
+});
+
 onMounted(() => {
   // 如果挂载时数据已存在，先初始化图表再更新数据
   if (props.data && props.data.length > 0) {
     initChart();
+    updateColor(); // 确保初始化时颜色和基准线都正确
     updateData();
   }
   window.addEventListener('resize', handleResize);

@@ -64,7 +64,7 @@
 
         <div class="change-section" :class="[changeClass, { 'value-updated': changeAnimating }]">
           <!-- 分时图（当有日内数据或历史数据时显示） -->
-          <FundChart v-if="shouldShowChart" :data="chartData" :height="40" chart-type="line" :baseline="baseline" class="inline-chart" />
+          <FundChart v-if="shouldShowChart" :data="chartData" :height="40" chart-type="line" :baseline="baseline" :changePercent="fund.estimateChangePercent" class="inline-chart" />
           <div class="change-info">
             <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
             <span class="change-indicator-value">
@@ -447,7 +447,7 @@ function formatNetValueDate(dateStr: string): string {
 
 .change-section {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: var(--spacing-sm);
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-md);
@@ -456,7 +456,8 @@ function formatNetValueDate(dateStr: string): string {
   .inline-chart {
     flex-shrink: 0;
     width: 120px;
-    height: 40px;
+    min-height: 40px;
+    height: auto;
   }
 
   .change-info {
@@ -464,6 +465,7 @@ function formatNetValueDate(dateStr: string): string {
     flex-direction: column;
     align-items: flex-end;
     gap: 2px;
+    justify-content: center;
   }
 
   &.rising {
