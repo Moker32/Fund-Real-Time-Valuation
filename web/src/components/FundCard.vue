@@ -1,5 +1,8 @@
 <template>
-  <div class="fund-card" :class="{ loading: loading }">
+  <div 
+    class="fund-card" 
+    :class="{ loading: loading, 'has-chart': shouldShowChart }"
+  >
     <template v-if="loading">
       <div class="skeleton-content">
         <div class="skeleton skeleton-title"></div>
@@ -46,13 +49,13 @@
           <div class="value-row">
             <span class="label">净值</span>
             <span class="value font-mono">{{ formatNumber(fund.netValue, 4) }}</span>
-            <span class="value-date">{{ formatNetValueDate(fund.netValueDate) }}</span>
+            <span class="value-date">{{ fund.netValueDate ? formatNetValueDate(fund.netValueDate) : '--' }}</span>
           </div>
           <!-- 非 QDII 基金显示估值 -->
           <div v-if="fund.hasRealTimeEstimate !== false" class="value-row">
             <span class="label">估值</span>
             <span class="value font-mono" :class="{ 'value-updated': valueAnimating }">{{ formatNumber(fund.estimateValue, 4) }}</span>
-            <span class="value-date">{{ formatNetValueDate(fund.estimateTime) }}</span>
+            <span class="value-date">{{ fund.estimateTime ? formatNetValueDate(fund.estimateTime) : '--' }}</span>
           </div>
           <!-- QDII 基金显示前日净值 -->
           <div v-else-if="fund.prevNetValue" class="value-row qdii-prev-row">
@@ -126,20 +129,6 @@ const chartData = computed(() => {
 // 是否显示图表
 const shouldShowChart = computed(() => {
   return fundStore.showChart && chartData.value.length > 0;
-});
-
-// 计算基准线：优先使用 prevNetValue，否则使用日内数据第一个价格（开盘价）
-const baseline = computed(() => {
-  // 优先使用上一日净值
-  if (props.fund.prevNetValue) {
-    return props.fund.prevNetValue;
-  }
-  // 其次使用日内数据第一个价格（开盘价）
-  if (chartData.value.length > 0) {
-    const first = chartData.value[0];
-    return first.price ?? first.close;
-  }
-  return undefined;
 });
 
 // 涨跌样式
@@ -237,8 +226,19 @@ function formatNetValueDate(dateStr: string): string {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
-  transition: all var(--transition-normal);
+  transition: all var(--transition-normal), flex 0.3s ease, min-width 0.3s ease;
   cursor: pointer;
+  overflow: hidden;
+  width: 280px;
+  min-width: 260px;
+  max-width: 100%;
+  flex: 0 1 280px;
+
+  &.has-chart {
+    width: 380px;
+    min-width: 340px;
+    flex: 0 1 380px;
+  }
 
   &:hover {
     background: var(--color-bg-card-hover);
@@ -382,18 +382,40 @@ function formatNetValueDate(dateStr: string): string {
   justify-content: space-between;
   align-items: flex-end;
   margin-bottom: var(--spacing-md);
+  min-width: 0;
+  width: 100%;
 }
 
 .value-section {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+  min-width: 0;
+  flex: 1 1 50%;
+  max-width: 55%;
 }
 
 .value-row {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
+  min-width: 0;
+
+  .label {
+    flex-shrink: 0;
+  }
+
+  .value {
+    flex: 1 1 auto;
+    min-width: 60px;
+    max-width: 100px;
+  }
+
+  .value-date {
+    flex-shrink: 0;
+    min-width: 45px;
+    text-align: right;
+  }
 
   &.qdii-prev-row {
     opacity: 0.7;
@@ -401,9 +423,10 @@ function formatNetValueDate(dateStr: string): string {
 }
 
 .value-date {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
   font-family: var(--font-mono);
+  white-space: nowrap;
 }
 
 .label {
@@ -452,20 +475,44 @@ function formatNetValueDate(dateStr: string): string {
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
+  min-width: 120px;
+  flex: 1 1 50%;
+  width: auto;
 
-  .inline-chart {
-    flex-shrink: 0;
-    width: 120px;
-    min-height: 40px;
-    height: auto;
+    flex: 1 1 80px;
+    width: auto;
+    max-width: 100px;
+    height: 40px;
+    min-width: 60px;
+    flex-shrink: 1;
+    opacity: 0;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: all 0.3s ease;
+  }
+
+  .fund-card.has-chart & .inline-chart {
+    opacity: 1;
+    transform: scaleX(1);
+    flex: 1 1 80px;
+    max-width: 100px;
+    min-width: 60px;
+  }
   }
 
   .change-info {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    min-width: 80px;
+    flex-shrink: 0;
     gap: 2px;
     justify-content: center;
+  }
+
+  .change-percent,
+  .change-value {
+    white-space: nowrap;
   }
 
   &.rising {
@@ -548,5 +595,88 @@ function formatNetValueDate(dateStr: string): string {
   margin-top: var(--spacing-sm);
   padding-top: var(--spacing-sm);
   border-top: 1px solid var(--color-divider);
+}
+
+// 响应式布局 - 窄屏幕优化
+@media (max-width: 640px) {
+  .fund-card {
+    padding: var(--spacing-md);
+    
+    &.has-chart {
+      min-width: 100%;
+    }
+  }
+
+  .card-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+
+  .value-section {
+    max-width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .value-row {
+    justify-content: space-between;
+  }
+
+  .change-section {
+    max-width: 100%;
+    width: auto;
+    justify-content: flex-end;
+
+    .inline-chart {
+      display: none;
+    }
+
+    .change-info {
+      flex-direction: row;
+      align-items: center;
+      gap: var(--spacing-sm);
+      max-width: 100%;
+    }
+  }
+
+  .change-percent {
+    font-size: var(--font-size-lg);
+  }
+
+  .change-value {
+    font-size: var(--font-size-xs);
+  }
+
+  .card-footer {
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+}
+
+// 更小屏幕进一步优化
+@media (max-width: 400px) {
+  .fund-card {
+    padding: var(--spacing-sm);
+  }
+
+  .fund-name {
+    font-size: var(--font-size-sm);
+  }
+
+  .value {
+    font-size: var(--font-size-md);
+  }
+
+  .change-percent {
+    font-size: var(--font-size-md);
+  }
+
+  .card-header {
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .card-body {
+    margin-bottom: var(--spacing-sm);
+  }
 }
 </style>

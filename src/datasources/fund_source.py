@@ -14,7 +14,6 @@ from typing import Any
 
 import httpx
 import pandas as pd
-import requests
 
 from src.db.database import (
     DatabaseManager,
@@ -256,6 +255,42 @@ def _infer_fund_type_from_name(fund_name: str) -> str:
         return "股票型"
 
     return ""
+
+
+def _get_net_value_date_from_akshare(fund_code: str) -> tuple[str, float] | None:
+    """
+    从 akshare 获取基金最新净值和日期
+
+    Args:
+        fund_code: 基金代码
+
+    Returns:
+        (净值日期, 单位净值) 元组，获取失败返回 None
+    """
+    try:
+        import akshare as ak
+
+        # 获取基金历史净值数据
+        fund_df = ak.fund_etf_fund_info_em(fund=fund_code)
+
+        if fund_df is None or fund_df.empty:
+            return None
+
+        # 获取最新一条记录（数据按日期升序排列，取最后一行）
+        latest = fund_df.iloc[-1]
+        date = str(latest.get("净值日期", ""))
+        net_value = latest.get("单位净值", None)
+
+        if date and net_value is not None:
+            try:
+                return (date, float(net_value))
+            except (ValueError, TypeError):
+                pass
+
+        return None
+    except Exception as e:
+        logger.warning(f"akshare 获取净值失败: {e}")
+        return None
 
 
 def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
@@ -1719,7 +1754,7 @@ class Fund123DataSource(DataSource):
     BASE_URL = "https://www.fund123.cn"
 
     # 全局 Session 和 CSRF token（单例模式）
-    _session: requests.Session | None = None
+    _client: httpx.AsyncClient | None = None
     _csrf_token: str | None = None
     _csrf_token_time: float = 0.0
     _csrf_token_ttl = 1800  # 30 分钟过期
@@ -1736,26 +1771,26 @@ class Fund123DataSource(DataSource):
         super().__init__(name="fund123", source_type=DataSourceType.FUND, timeout=timeout)
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        self._ensure_session()
+        self._ensure_client()
 
     @classmethod
-    def _ensure_session(cls):
-        """确保存在全局 Session"""
-        if cls._session is None:
-            cls._session = requests.Session()
-            cls._session.headers.update(
-                {
+    def _ensure_client(cls):
+        """确保存在全局 AsyncClient"""
+        if cls._client is None:
+            cls._client = httpx.AsyncClient(
+                verify=False,
+                headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
                     "Accept": "application/json, text/plain, */*",
                     "Accept-Language": "zh-CN,zh;q=0.9",
                     "Referer": "https://www.fund123.cn/fund",
                     "Origin": "https://www.fund123.cn",
                     "X-API-Key": "foobar",
-                }
+                },
             )
 
     @classmethod
-    def _get_csrf_token(cls) -> str | None:
+    async def _get_csrf_token(cls) -> str | None:
         """
         获取 CSRF token
 
@@ -1770,7 +1805,7 @@ class Fund123DataSource(DataSource):
 
         try:
             # 访问首页获取 token
-            response = cls._session.get(f"{cls.BASE_URL}/fund", timeout=15, verify=False)
+            response = await cls._client.get(f"{cls.BASE_URL}/fund", timeout=15.0)
             response.raise_for_status()
 
             # 从响应文本中提取 CSRF
@@ -1789,11 +1824,11 @@ class Fund123DataSource(DataSource):
             return None
 
     @classmethod
-    def _refresh_csrf_token(cls) -> bool:
+    async def _refresh_csrf_token(cls) -> bool:
         """刷新 CSRF token"""
         cls._csrf_token = None
         cls._csrf_token_time = 0
-        token = cls._get_csrf_token()
+        token = await cls._get_csrf_token()
         return token is not None
 
     async def fetch(self, fund_code: str, use_cache: bool = True) -> DataSourceResult:
@@ -1874,9 +1909,8 @@ class Fund123DataSource(DataSource):
         # 3. 从 API 获取数据
         for attempt in range(self.max_retries):
             try:
-                # 在线程池中执行同步请求
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(None, lambda: self._fetch_fund_data(fund_code))
+                # 直接调用异步方法
+                result = await self._fetch_fund_data(fund_code)
 
                 if result.success:
                     self._record_success()
@@ -1912,7 +1946,7 @@ class Fund123DataSource(DataSource):
                 else:
                     # 如果失败且还有重试次数，刷新 token 后重试
                     if attempt < self.max_retries - 1:
-                        self._refresh_csrf_token()
+                        await self._refresh_csrf_token()
                         await asyncio.sleep(self.retry_delay * (attempt + 1))
                         continue
                     return result
@@ -1931,15 +1965,15 @@ class Fund123DataSource(DataSource):
             metadata={"fund_code": fund_code},
         )
 
-    def _fetch_fund_data(self, fund_code: str) -> DataSourceResult:
-        """同步获取基金数据"""
+    async def _fetch_fund_data(self, fund_code: str) -> DataSourceResult:
+        """获取基金数据"""
         # 1. 获取基金基本信息（fund_key 和 fund_name）
-        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={self._csrf_token}"
-        search_response = self._session.post(
-            search_url, json={"fundCode": fund_code}, timeout=self.timeout, verify=False
+        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={type(self)._csrf_token}"
+        search_response = await type(self)._client.post(
+            search_url, json={"fundCode": fund_code}, timeout=self.timeout
         )
 
-        if not search_response.ok:
+        if not search_response.is_success:
             return DataSourceResult(
                 success=False,
                 error=f"搜索基金失败: {search_response.status_code}",
@@ -1965,9 +1999,9 @@ class Fund123DataSource(DataSource):
         # 2. 获取日内估值数据
         today = time.strftime("%Y-%m-%d")
         intraday_url = (
-            f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={self._csrf_token}"
+            f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={type(self)._csrf_token}"
         )
-        intraday_response = self._session.post(
+        intraday_response = await type(self)._client.post(
             intraday_url,
             json={
                 "startTime": today,
@@ -1978,10 +2012,9 @@ class Fund123DataSource(DataSource):
                 "source": "WEALTHBFFWEB",
             },
             timeout=self.timeout,
-            verify=False,
         )
 
-        if not intraday_response.ok:
+        if not intraday_response.is_success:
             return DataSourceResult(
                 success=False,
                 error=f"获取日内数据失败: {intraday_response.status_code}",
@@ -2009,6 +2042,32 @@ class Fund123DataSource(DataSource):
         # 3. 获取最新净值信息（从 search 结果中）
         net_value = float(fund_info.get("netValue", 0)) if fund_info.get("netValue") else None
         net_date = str(fund_info.get("netValueDate", ""))
+
+        # 如果 API 没有返回净值日期，从数据库缓存获取
+        if not net_date:
+            try:
+                daily_dao = get_daily_cache_dao()
+                latest_record = daily_dao.get_latest(fund_code)
+                if latest_record and latest_record.date:
+                    net_date = latest_record.date
+                    if net_value is None and latest_record.unit_net_value:
+                        net_value = latest_record.unit_net_value
+            except Exception as e:
+                logger.warning(f"从数据库获取净值日期失败: {e}")
+
+        # 如果仍然没有净值日期，从 akshare 获取历史净值数据
+        if not net_date:
+            try:
+                loop = asyncio.get_event_loop()
+                history_result = await loop.run_in_executor(
+                    None, lambda: _get_net_value_date_from_akshare(fund_code)
+                )
+                if history_result:
+                    net_date, nav = history_result
+                    if net_value is None and nav:
+                        net_value = nav
+            except Exception as e:
+                logger.warning(f"从 akshare 获取净值日期失败: {e}")
 
         # 获取基金类型
         fund_type = ""
@@ -2181,11 +2240,8 @@ class Fund123DataSource(DataSource):
 
         for attempt in range(self.max_retries):
             try:
-                # 在线程池中执行同步请求
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(
-                    None, lambda: self._fetch_intraday_data(fund_code)
-                )
+                # 直接调用异步方法
+                result = await self._fetch_intraday_data(fund_code)
 
                 if result.success:
                     self._record_success()
@@ -2203,7 +2259,7 @@ class Fund123DataSource(DataSource):
                     return result
                 else:
                     if attempt < self.max_retries - 1:
-                        self._refresh_csrf_token()
+                        await self._refresh_csrf_token()
                         await asyncio.sleep(self.retry_delay * (attempt + 1))
                         continue
                     return result
@@ -2222,15 +2278,15 @@ class Fund123DataSource(DataSource):
             metadata={"fund_code": fund_code},
         )
 
-    def _fetch_intraday_data(self, fund_code: str) -> DataSourceResult:
-        """同步获取基金日内分时数据"""
+    async def _fetch_intraday_data(self, fund_code: str) -> DataSourceResult:
+        """获取基金日内分时数据"""
         # 1. 获取基金基本信息（fund_key 和 fund_name）
-        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={self._csrf_token}"
-        search_response = self._session.post(
-            search_url, json={"fundCode": fund_code}, timeout=self.timeout, verify=False
+        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={type(self)._csrf_token}"
+        search_response = await type(self)._client.post(
+            search_url, json={"fundCode": fund_code}, timeout=self.timeout
         )
 
-        if not search_response.ok:
+        if not search_response.is_success:
             return DataSourceResult(
                 success=False,
                 error=f"搜索基金失败: {search_response.status_code}",
@@ -2256,9 +2312,9 @@ class Fund123DataSource(DataSource):
         # 2. 获取日内估值数据
         today = time.strftime("%Y-%m-%d")
         intraday_url = (
-            f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={self._csrf_token}"
+            f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={type(self)._csrf_token}"
         )
-        intraday_response = self._session.post(
+        intraday_response = await type(self)._client.post(
             intraday_url,
             json={
                 "startTime": today,
@@ -2269,10 +2325,9 @@ class Fund123DataSource(DataSource):
                 "source": "WEALTHBFFWEB",
             },
             timeout=self.timeout,
-            verify=False,
         )
 
-        if not intraday_response.ok:
+        if not intraday_response.is_success:
             return DataSourceResult(
                 success=False,
                 error=f"获取日内数据失败: {intraday_response.status_code}",
@@ -2376,17 +2431,17 @@ class Fund123DataSource(DataSource):
             bool: 健康状态
         """
         try:
-            token = self._get_csrf_token()
+            token = await self._get_csrf_token()
             return token is not None
         except Exception:
             return False
 
-    def close(self):
-        """关闭全局 Session"""
-        if self._session is not None:
-            self._session.close()
-            self._session = None
-            self._csrf_token = None
+    async def close(self):
+        """关闭全局 AsyncClient"""
+        if type(self)._client is not None:
+            await type(self)._client.aclose()
+            type(self)._client = None
+            type(self)._csrf_token = None
 
 
 class TushareFundSource(DataSource):

@@ -305,9 +305,17 @@ onUnmounted(() => {
 }
 
 .funds-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-md);
+  width: 100%;
+}
+
+// 响应式调整
+@media (max-width: 640px) {
+  .funds-grid {
+    gap: var(--spacing-sm);
+  }
 }
 
 // 基金卡片过渡动画
