@@ -138,6 +138,14 @@ const changeClass = computed(() => {
   return 'neutral';
 });
 
+// 基准线 - 昨日净值
+const baseline = computed(() => {
+  if (props.fund.prevNetValue && props.fund.prevNetValue > 0) {
+    return props.fund.prevNetValue;
+  }
+  return props.fund.netValue;
+});
+
 // 价格动画状态
 const valueAnimating = ref(false);
 const changeAnimating = ref(false);
