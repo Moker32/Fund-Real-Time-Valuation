@@ -56,7 +56,7 @@ class MemoryCache:
 
     async def set(self, key: str, value: Any, ttl_seconds: int | None = None):
         """设置缓存"""
-        ttl = ttl_seconds or self.ttl_seconds
+        ttl = ttl_seconds if ttl_seconds is not None else self.ttl_seconds
 
         async with self._lock:
             # LRU 淘汰
@@ -181,7 +181,7 @@ class DualLayerCache:
 
     async def set(self, key: str, value: Any, ttl_seconds: int | None = None):
         """设置缓存"""
-        ttl = ttl_seconds or self.file_ttl
+        ttl = ttl_seconds if ttl_seconds is not None else self.file_ttl
 
         # L1: 内存缓存
         await self.memory_cache.set(key, value, ttl)

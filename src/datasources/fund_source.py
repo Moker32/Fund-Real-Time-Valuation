@@ -849,7 +849,16 @@ class FundDataSource(DataSource):
                 )
 
             # 获取最新一条数据（最后一行是最新的，因为数据是按日期升序排列的）
-            latest = df.iloc[-1]
+            # 注意：akshare 可能返回末尾的"封闭期"记录（净值为 NaT），需要过滤
+            df_valid = df[df["净值日期"].notna()]
+            if df_valid.empty:
+                return DataSourceResult(
+                    success=False,
+                    error=f"基金 {fund_code} 无有效净值数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"fund_code": fund_code},
+                )
 
             # 使用缓存获取基金简称和类型
             fund_info = get_fund_basic_info(fund_code)
@@ -867,9 +876,9 @@ class FundDataSource(DataSource):
             has_real_time = has_real_time_estimate and fund_type not in no_realtime_types
 
             # 提取数据
-            # 最新净值（最后一行）和上一个净值（倒数第二行）
-            latest = df.iloc[-1]
-            prev_row = df.iloc[-2] if len(df) >= 2 else latest
+            # 使用已过滤的有效数据 df_valid 获取最新和上一条记录
+            latest = df_valid.iloc[-1]
+            prev_row = df_valid.iloc[-2] if len(df_valid) >= 2 else df_valid.iloc[-1]
 
             net_date = str(latest.get("净值日期", ""))
             prev_net_date = str(prev_row.get("净值日期", ""))

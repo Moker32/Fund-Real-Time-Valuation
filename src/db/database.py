@@ -1135,6 +1135,11 @@ class FundIntradayCacheDAO:
                 return True
 
             try:
+                # 统一使用本地时间进行比较，避免时区问题
+                fetched_time = datetime.fromisoformat(fetched_at.replace("Z", ""))
+                now = datetime.now()
+                elapsed_seconds = (now - fetched_time).total_seconds()
+                return elapsed_seconds > self.cache_ttl
                 # 解析 ISO 格式的时间（存储的是 UTC 时间）
                 fetched_time = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
                 # 使用 UTC 时间进行比较，确保跨时区一致性
@@ -1338,6 +1343,9 @@ class FundDailyCacheDAO:
             bool: 是否保存成功
         """
         date = data.get("net_value_date", "") or data.get("date", "")
+        # 过滤无效日期（NaT、空字符串等）
+        if not date or date in ("NaT", "NaN", "None", "null"):
+            return False
         if not date:
             return False
 
@@ -1463,6 +1471,26 @@ class FundDailyCacheDAO:
                 return True
 
             try:
+                # 统一使用本地时间进行比较，避免时区问题
+                fetched_time = datetime.fromisoformat(fetched_at.replace("Z", ""))
+                now = datetime.now()
+                elapsed_seconds = (now - fetched_time).total_seconds()
+                return elapsed_seconds > self.cache_ttl
+            except (ValueError, TypeError):
+                return True  # 时间解析失败，视为过期
+                # 统一使用本地时间进行比较，避免时区问题
+                fetched_time = datetime.fromisoformat(fetched_at.replace("Z", ""))
+                now = datetime.now()
+                elapsed_seconds = (now - fetched_time).total_seconds()
+                return elapsed_seconds > self.cache_ttl
+                fetched_time = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
+                # 确保 fetched_at 也使用本地时区，避免时区计算错误
+                if fetched_time.tzinfo is None:
+                    fetched_time = fetched_time.replace(tzinfo=timezone.utc)
+                # 使用 UTC 时间进行比较，确保跨时区一致性
+                now = datetime.now(timezone.utc)
+                elapsed_seconds = (now - fetched_time).total_seconds()
+                return elapsed_seconds > self.cache_ttl
                 fetched_time = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
                 # 使用 UTC 时间进行比较，确保跨时区一致性
                 now = datetime.now(timezone.utc)
