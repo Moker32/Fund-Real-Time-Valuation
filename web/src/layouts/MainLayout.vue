@@ -1,5 +1,8 @@
 <template>
-  <div class="app-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+  <div class="app-layout" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'sidebar-mobile-open': sidebarMobileOpen }">
+    <!-- Mobile Overlay -->
+    <div class="sidebar-overlay" :class="{ open: sidebarMobileOpen }" @click="closeMobileSidebar"></div>
+
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -110,6 +113,11 @@
       <!-- Header -->
       <header class="header">
         <div class="header-left">
+          <button class="hamburger-btn" @click="toggleMobileSidebar" aria-label="Toggle menu">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 12h18M3 6h18M3 18h18"/>
+            </svg>
+          </button>
           <h1 class="page-title">{{ pageTitle }}</h1>
         </div>
         <div class="header-right">
@@ -170,6 +178,7 @@ const sectorStore = useSectorStore();
 const wsStore = useWSStore();
 
 const sidebarCollapsed = ref(false);
+const sidebarMobileOpen = ref(false);
 const healthStatus = ref<'healthy' | 'degraded' | 'unhealthy'>('healthy');
 const statusText = ref('已连接');
 const refreshing = ref(false);
@@ -193,6 +202,14 @@ const lastUpdated = computed(() => fundStore.lastUpdated || commodityStore.lastU
 
 function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value;
+}
+
+function toggleMobileSidebar() {
+  sidebarMobileOpen.value = !sidebarMobileOpen.value;
+}
+
+function closeMobileSidebar() {
+  sidebarMobileOpen.value = false;
 }
 
 async function checkHealth() {
@@ -275,10 +292,29 @@ watch(() => wsStore.isConnected, (connected) => {
   }
 });
 
+watch(() => route.path, () => {
+  sidebarMobileOpen.value = false;
+});
+
+function handleResize() {
+  if (window.innerWidth >= 768) {
+    sidebarMobileOpen.value = false;
+  }
+}
+
 onMounted(async () => {
   await refresh();
   startWebSocket();
   healthTimer = window.setInterval(checkHealth, 30000);
+  window.addEventListener('resize', handleResize);
+});
+
+onUnmounted(() => {
+  stopWebSocket();
+  if (healthTimer) {
+    clearInterval(healthTimer);
+  }
+  window.removeEventListener('resize', handleResize);
 });
 
 onUnmounted(() => {
@@ -603,5 +639,103 @@ onUnmounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Responsive Styles */
+@media (max-width: 767px) {
+  /* Hamburger Button */
+  .hamburger-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+
+    &:hover {
+      color: var(--color-text-primary);
+      background: var(--color-bg-card);
+    }
+
+    svg {
+      width: 24px;
+      height: 24px;
+    }
+  }
+
+  /* Sidebar Overlay */
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: all var(--transition-normal);
+    z-index: 99;
+
+    &.open {
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+
+  /* Mobile Sidebar */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform var(--transition-normal);
+  }
+
+  .sidebar-mobile-open .sidebar {
+    transform: translateX(0);
+  }
+
+  /* Main Content - No margin on mobile */
+  .main-content {
+    margin-left: 0;
+  }
+
+  .sidebar-collapsed .main-content {
+    margin-left: 0;
+  }
+
+  /* Header */
+  .header {
+    padding: 0 var(--spacing-md);
+  }
+
+  .header-left {
+    gap: var(--spacing-sm);
+  }
+
+  .page-title {
+    font-size: var(--font-size-lg);
+  }
+
+  /* Header Right - Hide less important elements */
+  .header-right {
+    gap: var(--spacing-sm);
+  }
+
+  .ws-status,
+  .status-indicator,
+  .last-updated {
+    display: none;
+  }
+
+  /* Content */
+  .content {
+    padding: var(--spacing-md);
+  }
+
+  /* Footer */
+  .footer {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
 }
 </style>
