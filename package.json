@@ -2,7 +2,7 @@
   "name": "fund-real-time-valuation",
   "version": "1.0.0",
   "private": true,
-  "description": "基金实时估值应用 - 前后端统一开发入口",
+  "description": "基金实时估值 Web 应用 - Vue 3 + FastAPI",
   "scripts": {
     "dev": "uv run python run_app.py --fast --reload",
     "dev:web": "cd web && pnpm run dev",
