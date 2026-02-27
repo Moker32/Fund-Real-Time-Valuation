@@ -3,6 +3,8 @@
 统一管理所有配置文件的加载和保存
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 
 from .base import AppConfigLoader, BaseConfigLoader
@@ -13,7 +15,7 @@ class FundConfigLoader(BaseConfigLoader[FundList]):
     """基金配置加载器"""
 
     def __init__(self, config_dir: str | None = None):
-        super().__init__('funds.yaml', config_dir)
+        super().__init__("funds.yaml", config_dir)
 
     def _parse(self, data: dict) -> FundList:
         """解析基金配置数据"""
@@ -21,34 +23,30 @@ class FundConfigLoader(BaseConfigLoader[FundList]):
         holdings = []
 
         # 解析自选基金
-        for item in data.get('watchlist', []):
-            watchlist.append(Fund(
-                code=item.get('code', ''),
-                name=item.get('name', '')
-            ))
+        for item in data.get("watchlist", []):
+            watchlist.append(Fund(code=item.get("code", ""), name=item.get("name", "")))
 
         # 解析持仓基金
-        for item in data.get('holdings', []):
-            holdings.append(Holding(
-                code=item.get('code', ''),
-                name=item.get('name', ''),
-                shares=item.get('shares', 0.0),
-                cost=item.get('cost', 0.0)
-            ))
+        for item in data.get("holdings", []):
+            holdings.append(
+                Holding(
+                    code=item.get("code", ""),
+                    name=item.get("name", ""),
+                    shares=item.get("shares", 0.0),
+                    cost=item.get("cost", 0.0),
+                )
+            )
 
         return FundList(watchlist=watchlist, holdings=holdings)
 
     def _serialize(self, config: FundList) -> dict:
         """序列化基金配置对象"""
         return {
-            'watchlist': [
-                {'code': f.code, 'name': f.name}
-                for f in config.watchlist
-            ],
-            'holdings': [
-                {'code': h.code, 'name': h.name, 'shares': h.shares, 'cost': h.cost}
+            "watchlist": [{"code": f.code, "name": f.name} for f in config.watchlist],
+            "holdings": [
+                {"code": h.code, "name": h.name, "shares": h.shares, "cost": h.cost}
                 for h in config.holdings
-            ]
+            ],
         }
 
 
@@ -56,29 +54,55 @@ class CommodityConfigLoader(BaseConfigLoader[CommodityList]):
     """商品配置加载器"""
 
     def __init__(self, config_dir: str | None = None):
-        super().__init__('commodities.yaml', config_dir)
+        super().__init__("commodities.yaml", config_dir)
 
     def _parse(self, data: dict) -> CommodityList:
         """解析商品配置数据"""
         commodities = []
 
-        for item in data.get('commodities', []):
-            commodities.append(Commodity(
-                symbol=item.get('symbol', ''),
-                name=item.get('name', ''),
-                source=item.get('source', 'akshare')
-            ))
+        for item in data.get("commodities", []):
+            commodities.append(
+                Commodity(
+                    symbol=item.get("symbol", ""),
+                    name=item.get("name", ""),
+                    source=item.get("source", "akshare"),
+                )
+            )
 
         return CommodityList(commodities=commodities)
 
     def _serialize(self, config: CommodityList) -> dict:
         """序列化商品配置对象"""
         return {
-            'commodities': [
-                {'symbol': c.symbol, 'name': c.name, 'source': c.source}
-                for c in config.commodities
+            "commodities": [
+                {"symbol": c.symbol, "name": c.name, "source": c.source} for c in config.commodities
             ]
         }
+
+
+_config_manager_instance: ConfigManager | None = None
+
+
+def get_config_manager(config_dir: str | None = None) -> ConfigManager:
+    """
+    获取 ConfigManager 单例
+
+    Args:
+        config_dir: 配置目录
+
+    Returns:
+        ConfigManager: 配置管理器实例
+    """
+    global _config_manager_instance
+    if _config_manager_instance is None:
+        _config_manager_instance = ConfigManager(config_dir)
+    return _config_manager_instance
+
+
+def reset_config_manager() -> None:
+    """重置配置管理器单例（用于测试）"""
+    global _config_manager_instance
+    _config_manager_instance = None
 
 
 class ConfigManager:
@@ -94,7 +118,7 @@ class ConfigManager:
         Args:
             config_dir: 配置目录，默认为 ~/.fund-tui/
         """
-        self._config_dir = config_dir or str(Path.home() / '.fund-tui')
+        self._config_dir = config_dir or str(Path.home() / ".fund-tui")
         self._ensure_config_dir()
 
         # 初始化各配置加载器
@@ -271,9 +295,7 @@ class ConfigManager:
         """
         commodities = self.load_commodities()
         original_len = len(commodities.commodities)
-        commodities.commodities = [
-            c for c in commodities.commodities if c.symbol != symbol
-        ]
+        commodities.commodities = [c for c in commodities.commodities if c.symbol != symbol]
         if len(commodities.commodities) < original_len:
             self.save_commodities(commodities)
             return True
@@ -289,9 +311,9 @@ class ConfigManager:
             dict: 各配置文件的备份路径
         """
         backups = {
-            'app': self._app_config.backup(),
-            'funds': self._fund_config.backup(),
-            'commodities': self._commodity_config.backup(),
+            "app": self._app_config.backup(),
+            "funds": self._fund_config.backup(),
+            "commodities": self._commodity_config.backup(),
         }
         return backups
 

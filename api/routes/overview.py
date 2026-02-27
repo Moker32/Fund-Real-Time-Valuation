@@ -7,7 +7,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends
 
-from src.config.manager import ConfigManager
+from src.config import get_config_manager
 from src.config.models import FundList
 from src.datasources.base import DataSourceType
 from src.datasources.manager import DataSourceManager
@@ -35,7 +35,7 @@ def load_default_fund_codes() -> list[str]:
     ]
 
     try:
-        config_manager = ConfigManager()
+        config_manager = get_config_manager()
         fund_list: FundList = config_manager.load_funds()
 
         # 获取所有基金代码

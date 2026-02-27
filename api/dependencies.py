@@ -3,7 +3,8 @@
 提供 FastAPI 应用所需的各种依赖项
 """
 
-
+from src.config import get_config_manager as get_config_manager_func
+from src.config.manager import ConfigManager
 from src.datasources.manager import DataSourceManager, create_default_manager
 
 # 全局数据源管理器实例
@@ -12,7 +13,7 @@ _data_source_manager: DataSourceManager | None = None
 
 def get_data_source_manager() -> DataSourceManager:
     """
-    获取数据源管理器实例
+    获取数据源管理器实例（单例）
 
     Returns:
         DataSourceManager: 数据源管理器实例
@@ -23,7 +24,7 @@ def get_data_source_manager() -> DataSourceManager:
     return _data_source_manager
 
 
-def set_data_source_manager(manager: DataSourceManager):
+def set_data_source_manager(manager: DataSourceManager) -> None:
     """
     设置数据源管理器实例（用于测试）
 
@@ -34,7 +35,7 @@ def set_data_source_manager(manager: DataSourceManager):
     _data_source_manager = manager
 
 
-async def close_data_source_manager():
+async def close_data_source_manager() -> None:
     """关闭数据源管理器"""
     global _data_source_manager
     if _data_source_manager is not None:
@@ -42,25 +43,31 @@ async def close_data_source_manager():
         _data_source_manager = None
 
 
-class DataSourceDependency:
-    """数据源管理器依赖类"""
+def DataSourceDependency() -> DataSourceManager:
+    """
+    FastAPI 依赖：获取数据源管理器
 
-    def __init__(self, manager: DataSourceManager | None = None):
-        """
-        初始化数据源依赖
+    Returns:
+        DataSourceManager: 数据源管理器实例
 
-        Args:
-            manager: 可选的数据源管理器实例
-        """
-        self._manager = manager
+    Usage:
+        @app.get("/items")
+        async def read_items(manager: DataSourceManager = Depends(DataSourceDependency)):
+            ...
+    """
+    return get_data_source_manager()
 
-    async def __call__(self) -> DataSourceManager:
-        """
-        获取数据源管理器
 
-        Returns:
-            DataSourceManager: 数据源管理器实例
-        """
-        if self._manager is not None:
-            return self._manager
-        return get_data_source_manager()
+def ConfigManagerDependency() -> ConfigManager:
+    """
+    FastAPI 依赖：获取配置管理器
+
+    Returns:
+        ConfigManager: 配置管理器实例
+
+    Usage:
+        @app.get("/funds")
+        async def get_funds(config: ConfigManager = Depends(ConfigManagerDependency)):
+            ...
+    """
+    return get_config_manager_func()

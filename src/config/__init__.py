@@ -32,11 +32,14 @@ from .manager import (
     CommodityConfigLoader,
     ConfigManager,
     FundConfigLoader,
+    get_config_manager,
+    reset_config_manager,
 )
 from .models import (
     AppConfig,
     Commodity,
     CommodityList,
+    DataProvider,
     DataSource,
     Fund,
     FundList,
@@ -46,19 +49,22 @@ from .models import (
 
 __all__ = [
     # 模型
-    'Fund',
-    'Holding',
-    'Commodity',
-    'FundList',
-    'CommodityList',
-    'AppConfig',
-    'Theme',
-    'DataSource',
+    "Fund",
+    "Holding",
+    "Commodity",
+    "FundList",
+    "CommodityList",
+    "AppConfig",
+    "Theme",
+    "DataSource",
+    "DataProvider",
     # 配置加载器
-    'BaseConfigLoader',
-    'AppConfigLoader',
-    'FundConfigLoader',
-    'CommodityConfigLoader',
+    "BaseConfigLoader",
+    "AppConfigLoader",
+    "FundConfigLoader",
+    "CommodityConfigLoader",
     # 配置管理器
-    'ConfigManager',
+    "ConfigManager",
+    "get_config_manager",
+    "reset_config_manager",
 ]

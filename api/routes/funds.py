@@ -10,7 +10,7 @@ from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.config.manager import ConfigManager
+from src.config import get_config_manager
 from src.config.models import Fund, FundList, Holding
 from src.datasources.base import DataSourceType
 from src.datasources.manager import DataSourceManager
@@ -50,7 +50,7 @@ def _check_is_holding(code: str) -> bool:
         bool: 是否持有
     """
     try:
-        config_manager = ConfigManager()
+        config_manager = get_config_manager()
         fund_list = config_manager.load_funds()
         return code in {h.code for h in fund_list.holdings}
     except Exception:
@@ -60,7 +60,7 @@ def _check_is_holding(code: str) -> bool:
 
 def get_default_fund_codes() -> list[str]:
     """获取默认基金代码列表"""
-    config_manager = ConfigManager()
+    config_manager = get_config_manager()
     fund_list: FundList = config_manager.load_funds()
     codes = fund_list.get_all_codes()
     if codes:
@@ -132,12 +132,10 @@ async def get_funds_list(
     Returns:
         FundListData: 包含基金列表、总数量和时间戳的字典
     """
-    from src.config.manager import ConfigManager
-
     current_time = datetime.now().isoformat() + "Z"
 
     # 加载持仓信息
-    config_manager = ConfigManager()
+    config_manager = get_config_manager()
     fund_list = config_manager.load_funds()
     holding_codes = {h.code for h in fund_list.holdings}
 
@@ -474,7 +472,7 @@ async def get_watchlist() -> dict:
     Returns:
         dict: 自选基金列表
     """
-    config_manager = ConfigManager()
+    config_manager = get_config_manager()
     fund_list = config_manager.load_funds()
 
     watchlist_data = [
@@ -530,7 +528,7 @@ async def add_to_watchlist(
         fund_name = result.data.get("name", "")
 
     # 添加到自选列表
-    config_manager = ConfigManager()
+    config_manager = get_config_manager()
     fund = Fund(code=request.code, name=fund_name)
     config_manager.add_watchlist(fund)
 
@@ -572,9 +570,7 @@ async def toggle_holding(
     Returns:
         dict: 操作结果
     """
-    from src.config.manager import ConfigManager
-
-    config_manager = ConfigManager()
+    config_manager = get_config_manager()
     fund_list = config_manager.load_funds()
 
     if holding:
@@ -653,7 +649,7 @@ async def remove_from_watchlist(code: str) -> dict:
     Returns:
         dict: 删除结果
     """
-    config_manager = ConfigManager()
+    config_manager = get_config_manager()
 
     # 检查是否在自选列表中
     fund_list = config_manager.load_funds()

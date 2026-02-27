@@ -10,28 +10,31 @@ from enum import Enum
 
 class Theme(str, Enum):
     """主题枚举"""
+
     LIGHT = "light"
     DARK = "dark"
 
 
-class DataSource(str, Enum):
-    """数据源标识"""
-    # 基金数据源
-    SINA = "sina"          # 新浪财经
-    EASTMONEY = "eastmoney"  # 东方财富
-    # 商品数据源
+class DataProvider(str, Enum):
+    """数据提供商标识"""
+
+    SINA = "sina"
+    EASTMONEY = "eastmoney"
     ALPHA_VANTAGE = "alpha_vantage"
     AKSHARE = "akshare"
-    # 新闻数据源
     SINA_NEWS = "sina_news"
     EASTMONEY_NEWS = "eastmoney_news"
+
+
+DataSource = DataProvider  # 向后兼容别名
 
 
 @dataclass
 class Fund:
     """基金基础模型"""
-    code: str              # 基金代码
-    name: str              # 基金名称
+
+    code: str  # 基金代码
+    name: str  # 基金名称
 
     def __hash__(self):
         return hash(self.code)
@@ -45,8 +48,9 @@ class Fund:
 @dataclass
 class Holding(Fund):
     """持仓模型"""
-    shares: float = 0.0    # 持有份额
-    cost: float = 0.0      # 成本价
+
+    shares: float = 0.0  # 持有份额
+    cost: float = 0.0  # 成本价
 
     @property
     def total_cost(self) -> float:
@@ -57,9 +61,10 @@ class Holding(Fund):
 @dataclass
 class Commodity:
     """商品模型"""
-    symbol: str            # 商品代码/符号
-    name: str              # 商品名称
-    source: str = DataSource.AKSHARE.value  # 数据源标识
+
+    symbol: str  # 商品代码/符号
+    name: str  # 商品名称
+    source: str = DataProvider.AKSHARE.value  # 数据源标识
 
     def __hash__(self):
         return hash(self.symbol)
@@ -73,17 +78,19 @@ class Commodity:
 @dataclass
 class AppConfig:
     """应用主配置"""
-    refresh_interval: int = 30          # 刷新频率（秒）
-    theme: str = Theme.DARK.value       # 主题
-    default_fund_source: str = DataSource.SINA.value  # 默认基金数据源
-    max_history_points: int = 100       # 历史数据最大点数
-    enable_auto_refresh: bool = True    # 是否启用自动刷新
-    show_profit_loss: bool = True       # 是否显示盈亏
+
+    refresh_interval: int = 30  # 刷新频率（秒）
+    theme: str = Theme.DARK.value  # 主题
+    default_fund_source: str = DataProvider.SINA.value  # 默认基金数据源
+    max_history_points: int = 100  # 历史数据最大点数
+    enable_auto_refresh: bool = True  # 是否启用自动刷新
+    show_profit_loss: bool = True  # 是否显示盈亏
 
 
 @dataclass
 class FundList:
     """基金列表容器"""
+
     watchlist: list[Fund] = field(default_factory=list)
     holdings: list[Holding] = field(default_factory=list)
 
@@ -112,6 +119,7 @@ class FundList:
 @dataclass
 class CommodityList:
     """商品列表容器"""
+
     commodities: list[Commodity] = field(default_factory=list)
 
     def get_by_symbol(self, symbol: str) -> Commodity | None:
@@ -128,6 +136,7 @@ class CommodityList:
 
 class AlertDirection(str, Enum):
     """预警方向"""
+
     ABOVE = "above"  # 高于目标价
     BELOW = "below"  # 低于目标价
 
@@ -135,11 +144,12 @@ class AlertDirection(str, Enum):
 @dataclass
 class PriceAlert:
     """价格预警模型"""
-    fund_code: str                              # 基金代码
-    fund_name: str                              # 基金名称
-    target_price: float                         # 目标价格
-    direction: str = AlertDirection.ABOVE.value # 预警方向
-    triggered: bool = False                     # 是否已触发
+
+    fund_code: str  # 基金代码
+    fund_name: str  # 基金名称
+    target_price: float  # 目标价格
+    direction: str = AlertDirection.ABOVE.value  # 预警方向
+    triggered: bool = False  # 是否已触发
     created_at: datetime = field(default_factory=datetime.now)
 
     def check(self, current_price: float) -> bool:
@@ -155,10 +165,11 @@ class PriceAlert:
 @dataclass
 class NotificationConfig:
     """通知配置模型"""
-    enabled: bool = True                        # 是否启用通知
+
+    enabled: bool = True  # 是否启用通知
     price_alerts: list[PriceAlert] = field(default_factory=list)
-    daily_summary: bool = False                 # 每日汇总
-    alert_sound: bool = False                   # 预警声音
+    daily_summary: bool = False  # 每日汇总
+    alert_sound: bool = False  # 预警声音
 
     def add_alert(self, alert: PriceAlert) -> None:
         """添加预警"""
@@ -168,7 +179,8 @@ class NotificationConfig:
         """移除预警"""
         original_count = len(self.price_alerts)
         self.price_alerts = [
-            a for a in self.price_alerts
+            a
+            for a in self.price_alerts
             if not (a.fund_code == fund_code and a.target_price == target_price)
         ]
         return len(self.price_alerts) < original_count

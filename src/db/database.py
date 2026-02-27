@@ -10,7 +10,7 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -1135,19 +1135,12 @@ class FundIntradayCacheDAO:
                 return True
 
             try:
-                # 统一使用本地时间进行比较，避免时区问题
                 fetched_time = datetime.fromisoformat(fetched_at.replace("Z", ""))
                 now = datetime.now()
                 elapsed_seconds = (now - fetched_time).total_seconds()
                 return elapsed_seconds > self.cache_ttl
-                # 解析 ISO 格式的时间（存储的是 UTC 时间）
-                fetched_time = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
-                # 使用 UTC 时间进行比较，确保跨时区一致性
-                now = datetime.now(timezone.utc)
-                elapsed_seconds = (now - fetched_time).total_seconds()
-                return elapsed_seconds > self.cache_ttl
             except (ValueError, TypeError):
-                return True  # 时间解析失败，视为过期
+                return True
 
     def clear_cache(self, fund_code: str, date: str | None = None) -> int:
         """
@@ -1493,6 +1486,7 @@ class FundDailyCacheDAO:
                     return True  # 时间解析失败，视为过期
 
             return False  # TTL=0 且日期是今天，缓存有效
+
     def clear_cache(self, fund_code: str, date: str | None = None) -> int:
         """
         清除指定基金的每日缓存
