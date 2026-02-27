@@ -2087,6 +2087,26 @@ class Fund123DataSource(DataSource):
             except Exception as e:
                 logger.warning(f"从 akshare 获取净值日期失败: {e}")
 
+        # 如果仍然没有净值日期，尝试从天天基金 API 获取（fund123 不返回此字段）
+        if not net_date:
+            try:
+                tiantian_url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    response = await client.get(tiantian_url)
+                    if response.is_success:
+                        text = response.text.strip()
+                        # 解析 jsonpgz({"jzrq":"2026-02-26",...}) 格式
+                        match = re.search(r'jsonpgz\((.+)\);?', text)
+                        if match:
+                            tiantian_data = json.loads(match.group(1))
+                            tiantian_date = tiantian_data.get("jzrq", "")
+                            if tiantian_date:
+                                net_date = tiantian_date
+                                logger.debug(f"从天天基金获取净值日期: {fund_code} -> {net_date}")
+                                if net_value is None:
+                                    net_value = self._safe_float(tiantian_data.get("dwjz"))
+            except Exception as e:
+                logger.warning(f"从天天基金获取净值日期失败: {fund_code} - {e}")
         # 获取基金类型
         fund_type = ""
         basic_info = get_basic_info_db(fund_code)
