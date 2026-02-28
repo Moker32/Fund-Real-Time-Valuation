@@ -1976,13 +1976,13 @@ class Fund123DataSource(DataSource):
                     daily_dao = get_daily_cache_dao()
                     daily_dao.save_daily_from_fund_data(fund_code, result.data)
 
-                    # 保存基金基本信息到数据库
+                    # 保存基金基本信息到数据库（使用已推断的类型）
                     save_basic_info_to_db(
                         fund_code,
                         {
                             "short_name": result.data.get("name", ""),
                             "name": result.data.get("name", ""),
-                            "type": "",
+                            "type": result.data.get("type", ""),
                             "net_value": result.data.get("unit_net_value"),
                             "net_value_date": result.data.get("net_value_date", ""),
                         },
