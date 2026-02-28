@@ -488,7 +488,7 @@ class FundDataSource(DataSource):
                     # 构建返回数据格式
                     result_data = {
                         "fund_code": fund_code,
-                        "name": cached_daily.fund_name or "",
+                        "name": basic_info.get("name", "") if basic_info else "",
                         "type": fund_type,
                         "net_value_date": cached_daily.date,
                         "unit_net_value": cached_daily.unit_net_value,
@@ -1931,7 +1931,7 @@ class Fund123DataSource(DataSource):
                     # 构建返回数据格式
                     result_data = {
                         "fund_code": fund_code,
-                        "name": cached_daily.fund_name or "",
+                        "name": basic_info.get("name", "") if basic_info else "",
                         "type": fund_type,
                         "net_value_date": cached_daily.date,
                         "unit_net_value": cached_daily.unit_net_value,
