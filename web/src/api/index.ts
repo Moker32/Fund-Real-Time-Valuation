@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse, NewsListResponse, NewsCategoriesResponse, EconomicEventsData, WeiboSentimentData, SentimentAllData } from '@/types';
+import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse, EconomicEventsData, WeiboSentimentData, SentimentAllData } from '@/types';
 
 // API Configuration
 // 生产环境使用相对路径（同源部署），开发环境可通过环境变量覆盖
@@ -408,16 +408,6 @@ export interface TradingDayResponse {
 export const tradingCalendarApi = {
   async isTradingDay(market: string = 'china'): Promise<TradingDayResponse> {
     return api.get(`/trading-calendar/is-trading-day/${market}`);
-  },
-};
-
-export const newsApi = {
-  async getNews(category: string = 'finance'): Promise<NewsListResponse> {
-    return api.get('/api/news', { params: { category } });
-  },
-
-  async getCategories(): Promise<NewsCategoriesResponse> {
-    return api.get('/api/news/categories');
   },
 };
 

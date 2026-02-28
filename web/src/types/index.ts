@@ -287,32 +287,6 @@ export interface AppState {
   showChart: boolean;
 }
 
-// News Types
-export interface NewsItem {
-  title: string;
-  url: string;
-  time: string;
-  source: string;
-}
-
-export interface NewsListResponse {
-  news: NewsItem[];
-  timestamp: string;
-  category: string;
-  source: string;
-}
-
-export interface NewsCategory {
-  id: string;
-  name: string;
-  icon: string;
-}
-
-export interface NewsCategoriesResponse {
-  categories: NewsCategory[];
-  timestamp: string;
-}
-
 // Stock Types
 export interface Stock {
   code: string;

@@ -36,7 +36,6 @@ from .routes import (
     datasource,
     funds,
     indices,
-    news,
     overview,
     sectors,
     sentiment,
@@ -291,7 +290,6 @@ app.include_router(sectors.router)
 app.include_router(overview.router)
 app.include_router(cache.router)
 app.include_router(trading_calendar.router)
-app.include_router(news.router)
 app.include_router(sentiment.router)
 app.include_router(datasource.router)
 app.include_router(stocks.router)
@@ -410,10 +408,6 @@ async def api_info():
             },
             "indices": "GET /api/indices",
             "sectors": "GET /api/sectors",
-            "news": {
-                "list": "GET /api/news",
-                "categories": "GET /api/news/categories",
-            },
             "sentiment": {
                 "economic": "GET /api/sentiment/economic",
                 "weibo": "GET /api/sentiment/weibo",

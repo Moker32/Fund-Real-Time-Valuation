@@ -5,7 +5,7 @@
 - 基金数据源 (fund_source)
 - 商品数据源 (commodity_source)
 - 债券数据源 (bond_source)
-- 新闻数据源 (news_source)
+
 - 数据源管理器 (manager)
 - 数据网关 (gateway)
 
@@ -13,7 +13,6 @@
     from src.datasources import (
         FundDataSource,
         AKShareCommoditySource,
-        SinaNewsDataSource,
         DataSourceManager,
         DataGateway,
     )
@@ -73,8 +72,7 @@ from .hot_backup import (
     HotBackupManager,
     HotBackupResult,
 )
-from .manager import DataSourceConfig, DataSourceManager, create_default_manager
-from .news_source import NewsAggregatorDataSource, SinaNewsDataSource
+
 from .stock_source import (
     BaostockStockSource,
     SinaStockDataSource,
@@ -123,10 +121,7 @@ __all__ = [
     "CommodityDataSource",
     "YFinanceCommoditySource",
     "AKShareCommoditySource",
-    "CommodityDataAggregator",
-    # 新闻数据源
-    "SinaNewsDataSource",
-    "NewsAggregatorDataSource",
+    # 债券数据源
     # 债券数据源
     "SinaBondDataSource",
     "AKShareBondSource",

@@ -199,7 +199,6 @@ const pageTitle = computed(() => {
     funds: '基金自选',
     commodities: '商品行情',
     indices: '全球市场',
-    news: '7×24快讯',
     calendar: '财经日历',
     settings: '设置',
   };

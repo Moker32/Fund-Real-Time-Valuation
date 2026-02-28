@@ -635,7 +635,6 @@ def create_default_manager(
     """
     from .commodity_source import AKShareCommoditySource, YFinanceCommoditySource
     from .fund_source import Fund123DataSource
-    from .news_source import SinaNewsDataSource
     from .sector_source import (
         EastMoneyConceptDetailSource,
         EastMoneyDirectSource,
@@ -672,15 +671,6 @@ def create_default_manager(
     yfinance_commodity_source = YFinanceCommoditySource()
     manager.register(yfinance_commodity_source)
 
-    # 注册新闻数据源
-    news_source = SinaNewsDataSource()
-    manager.register(news_source)
-
-    # 注册东方财富新闻数据源（备用）
-    from .news_source import EastMoneyNewsDataSource
-
-    eastmoney_news_source = EastMoneyNewsDataSource()
-    manager.register(eastmoney_news_source)
 
     # === 新增 AKShare 舆情数据源 ===
     from .akshare_sentiment_source import (

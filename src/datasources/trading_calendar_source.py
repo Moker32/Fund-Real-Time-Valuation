@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from enum import Enum
@@ -7,6 +8,8 @@ import httpx
 from holidays import CountryHoliday
 
 from src.datasources.base import DataSource, DataSourceResult, DataSourceType
+
+logger = logging.getLogger(__name__)
 
 SATURDAY = 5
 SUNDAY = 6
@@ -157,8 +160,9 @@ class TradingCalendarSource(DataSource):
     CACHE_TTL = 24 * 60 * 60
     _china_real_trading_days: dict[int, set[date]] = {}
 
-    def __init__(self, timeout: float = 10.0):
+    def __init__(self, timeout: float = 10.0, cache_ttl: int | None = None):
         super().__init__("trading_calendar", DataSourceType.STOCK, timeout)
+        self._cache_ttl = cache_ttl if cache_ttl is not None else self.CACHE_TTL
         self._cache: dict[str, tuple[datetime, CalendarResult]] = {}
 
     def _fetch_china_real_trading_days(self, year: int) -> set[date]:
@@ -188,8 +192,10 @@ class TradingCalendarSource(DataSource):
 
             self._china_real_trading_days[year] = trading_days
 
-        except Exception:
-            pass
+        except httpx.HTTPError as e:
+            logger.warning(f"获取A股真实交易日失败 (HTTP): {year}, error: {e}")
+        except Exception as e:
+            logger.warning(f"获取A股真实交易日失败: {year}, error: {e}")
 
         return trading_days
 
@@ -367,7 +373,7 @@ class TradingCalendarSource(DataSource):
         cache_key = f"{market.value}_{year}"
         if cache_key in self._cache:
             cached_time, cached_result = self._cache[cache_key]
-            if (datetime.now() - cached_time).total_seconds() < self.CACHE_TTL:
+            if (datetime.now() - cached_time).total_seconds() < self._cache_ttl:
                 return cached_result
 
         holidays = self._get_holidays(market, year)
