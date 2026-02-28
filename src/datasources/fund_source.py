@@ -1895,7 +1895,7 @@ class Fund123DataSource(DataSource):
         """
         获取上一交易日净值（用于折线图基准线）
 
-        优先从数据库缓存获取，如果不足则从 akshare 获取。
+        优先从数据库缓存获取，如果缓存无效或不存在则从 akshare 获取。
 
         Args:
             fund_code: 基金代码
@@ -1906,7 +1906,7 @@ class Fund123DataSource(DataSource):
         prev_net_value: float | None = None
         prev_net_value_date: str | None = None
 
-        # 1. 尝试从数据库缓存获取
+        # 1. 优先从数据库缓存获取
         try:
             daily_dao = get_daily_cache_dao()
             recent_days = daily_dao.get_recent_days(fund_code, 2)
@@ -1915,10 +1915,14 @@ class Fund123DataSource(DataSource):
                 prev_record = recent_days[1]
                 prev_net_value = prev_record.unit_net_value
                 prev_net_value_date = prev_record.date
+                logger.debug(
+                    f"从数据库缓存获取前日净值: {fund_code} -> "
+                    f"{prev_net_value}, 日期: {prev_net_value_date}"
+                )
         except Exception as e:
             logger.warning(f"获取上一交易日净值失败: {e}")
 
-        # 2. 如果数据库缓存不足，尝试从 akshare 获取
+        # 2. 如果数据库缓存无效或不存在，从 akshare 获取
         if prev_net_value is None:
             try:
                 import akshare as ak
@@ -1937,7 +1941,7 @@ class Fund123DataSource(DataSource):
                         if pd.notna(raw_value):
                             prev_net_value = float(raw_value)
                             prev_net_value_date = str(prev_row.get("净值日期", ""))
-                            logger.info(
+                            logger.debug(
                                 f"从 akshare 获取前日净值成功: {fund_code} -> "
                                 f"{prev_net_value}, 日期: {prev_net_value_date}"
                             )
@@ -2172,53 +2176,57 @@ class Fund123DataSource(DataSource):
                 growth_rate = 0.0
 
         # 3. 获取最新净值信息
-        # 注意：fund123 的 netValue 字段不是真正的已发布净值，需要从天天基金获取
+        # 注意：fund123 的 netValue 字段不是真正的已发布净值，需要从外部数据源获取
         net_value = None
         net_date = ""
 
-        # 优先从天天基金获取净值和净值日期（最可靠）
+        # 1. 优先从数据库缓存获取（减轻数据源压力）
         try:
-            tiantian_url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
-            response = await self._get_tiantian_client().get(tiantian_url)
-            if response.is_success:
-                text = response.text.strip()
-                # 检查空响应（基金不支持）
-                if text not in ("jsonpgz();", "jsonpgz()"):
-                    match = re.search(r'jsonpgz\((.+)\);?', text)
-                    if match:
-                        tiantian_data = json.loads(match.group(1))
-                        net_date = tiantian_data.get("jzrq", "")
-                        net_value = self._safe_float(tiantian_data.get("dwjz"))
-                        logger.debug(f"从天天基金获取净值: {fund_code} -> {net_value}, 日期: {net_date}")
+            daily_dao = get_daily_cache_dao()
+            latest_record = daily_dao.get_latest(fund_code)
+            if latest_record and latest_record.date:
+                net_date = latest_record.date
+                if latest_record.unit_net_value:
+                    net_value = latest_record.unit_net_value
+                    logger.debug(f"从数据库缓存获取净值: {fund_code} -> {net_value}, 日期: {net_date}")
         except Exception as e:
-            logger.warning(f"从天天基金获取净值失败: {fund_code} - {e}")
+            logger.warning(f"从数据库获取净值日期失败: {e}")
 
-        # 如果天天基金获取失败，尝试从数据库缓存获取
+        # 2. 如果数据库缓存无效，从 akshare 获取（更新更快）
         if not net_date or net_value is None:
-            try:
-                daily_dao = get_daily_cache_dao()
-                latest_record = daily_dao.get_latest(fund_code)
-                if latest_record and latest_record.date:
-                    if not net_date:
-                        net_date = latest_record.date
-                    if net_value is None and latest_record.unit_net_value:
-                        net_value = latest_record.unit_net_value
-            except Exception as e:
-                logger.warning(f"从数据库获取净值日期失败: {e}")
-
-        # 如果仍然没有净值日期，从 akshare 获取历史净值数据
-        if not net_date:
             try:
                 loop = asyncio.get_running_loop()
                 history_result = await loop.run_in_executor(
                     None, lambda: _get_net_value_date_from_akshare(fund_code)
                 )
                 if history_result:
-                    net_date, nav = history_result
-                    if net_value is None and nav:
-                        net_value = nav
+                    ak_net_date, ak_nav = history_result
+                    if ak_nav:
+                        net_value = ak_nav
+                        net_date = ak_net_date
+                        logger.debug(f"从 akshare 获取净值: {fund_code} -> {net_value}, 日期: {net_date}")
             except Exception as e:
-                logger.warning(f"从 akshare 获取净值日期失败: {e}")
+                logger.warning(f"从 akshare 获取净值失败: {fund_code} - {e}")
+
+        # 3. 如果 akshare 也失败，尝试从天天基金获取（备用方案）
+        if not net_date or net_value is None:
+            try:
+                tiantian_url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
+                response = await self._get_tiantian_client().get(tiantian_url)
+                if response.is_success:
+                    text = response.text.strip()
+                    # 检查空响应（基金不支持）
+                    if text not in ("jsonpgz();", "jsonpgz()"):
+                        match = re.search(r'jsonpgz\((.+)\);?', text)
+                        if match:
+                            tiantian_data = json.loads(match.group(1))
+                            if not net_date:
+                                net_date = tiantian_data.get("jzrq", "")
+                            if net_value is None:
+                                net_value = self._safe_float(tiantian_data.get("dwjz"))
+                            logger.debug(f"从天天基金获取净值: {fund_code} -> {net_value}, 日期: {net_date}")
+            except Exception as e:
+                logger.warning(f"从天天基金获取净值失败: {fund_code} - {e}")
         # 获取基金类型（优先从 akshare 获取并缓存到数据库）
         fund_type = ""
         basic_info = get_basic_info_db(fund_code)
