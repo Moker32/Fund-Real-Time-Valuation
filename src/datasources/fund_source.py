@@ -2153,12 +2153,20 @@ class Fund123DataSource(DataSource):
                         net_value = nav
             except Exception as e:
                 logger.warning(f"从 akshare 获取净值日期失败: {e}")
-        # 获取基金类型
+        # 获取基金类型（优先从 akshare 获取并缓存到数据库）
         fund_type = ""
         basic_info = get_basic_info_db(fund_code)
         if basic_info:
             fund_type = basic_info.get("type", "") or ""
-        # 备选方案：从基金名称中识别
+
+        # 如果数据库中没有类型，从 akshare 获取（首次获取时）
+        if not fund_type:
+            # get_fund_basic_info 会调用 akshare 获取类型并保存到数据库
+            fund_info_result = get_fund_basic_info(fund_code)
+            if fund_info_result:
+                _, fund_type = fund_info_result
+
+        # 备选方案：从基金名称中识别（akshare 获取失败时）
         if not fund_type:
             fund_type = _infer_fund_type_from_name(fund_name)
 
