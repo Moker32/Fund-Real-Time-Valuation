@@ -75,8 +75,8 @@ def _check_is_holding(code: str) -> bool:
         config_manager = get_config_manager()
         fund_list = config_manager.load_funds()
         return code in {h.code for h in fund_list.holdings}
-    except Exception:
-        logger.warning(f"加载持仓信息失败: {code}")
+    except Exception as e:
+        logger.warning(f"加载持仓信息失败: {code} - {e}")
         return False
 
 

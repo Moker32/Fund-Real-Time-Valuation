@@ -723,7 +723,7 @@ class FundDataSource(DataSource):
             # 使用 akshare 获取 ETF 数据
             import asyncio
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             import akshare as ak
 
             # 获取 ETF 最新数据
@@ -828,7 +828,7 @@ class FundDataSource(DataSource):
         try:
             import asyncio
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             import akshare as ak
 
             # 获取基金最新净值数据
@@ -1278,7 +1278,7 @@ class FundHistorySource(DataSource):
             DataSourceResult: 包含历史净值数据的结果
         """
         # akshare 本身是同步的，我们在异步任务中运行
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: self.fetch(fund_code, period))
 
     def _validate_fund_code(self, fund_code: str) -> bool:
@@ -1396,7 +1396,7 @@ class FundHistoryYFinanceSource(DataSource):
 
     async def fetch_async(self, fund_code: str, period: str = "1y") -> DataSourceResult:
         """异步获取历史数据"""
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: self.fetch(fund_code, period))
 
     async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
@@ -2076,7 +2076,7 @@ class Fund123DataSource(DataSource):
         # 如果仍然没有净值日期，从 akshare 获取历史净值数据
         if not net_date:
             try:
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 history_result = await loop.run_in_executor(
                     None, lambda: _get_net_value_date_from_akshare(fund_code)
                 )
@@ -2523,7 +2523,7 @@ class TushareFundSource(DataSource):
             )
 
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(None, lambda: self._fetch_fund_nav(fund_code))
             return result
         except Exception as e:
