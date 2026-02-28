@@ -60,3 +60,9 @@ uv.lock
 
 # Playwright缓存
 .playwright-mcp/
+
+# Playwright E2E 测试产物
+web/e2e/playwright-report/
+web/e2e/test-results/
+web/e2e/screenshots/
+web/test-results/
