@@ -1800,6 +1800,8 @@ class Fund123DataSource(DataSource):
     _csrf_token: str | None = None
     _csrf_token_time: float = 0.0
     _csrf_token_ttl = 1800  # 30 分钟过期
+    # 天天基金专用客户端（单例模式）
+    _tiantian_client: httpx.AsyncClient | None = None
 
     def __init__(self, timeout: float = 15.0, max_retries: int = 3, retry_delay: float = 0.5):
         """
@@ -1830,6 +1832,19 @@ class Fund123DataSource(DataSource):
                     "X-API-Key": "foobar",
                 },
             )
+
+    @classmethod
+    def _get_tiantian_client(cls) -> httpx.AsyncClient:
+        """获取天天基金专用客户端（单例模式）"""
+        if cls._tiantian_client is None:
+            cls._tiantian_client = httpx.AsyncClient(
+                timeout=5.0,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                    "Referer": "http://fundgz.1234567.com.cn/",
+                },
+            )
+        return cls._tiantian_client
 
     @classmethod
     async def _get_csrf_token(cls) -> str | None:
@@ -2090,17 +2105,36 @@ class Fund123DataSource(DataSource):
             except (ValueError, AttributeError):
                 growth_rate = 0.0
 
-        # 3. 获取最新净值信息（从 search 结果中）
-        net_value = float(fund_info.get("netValue", 0)) if fund_info.get("netValue") else None
-        net_date = str(fund_info.get("netValueDate", ""))
+        # 3. 获取最新净值信息
+        # 注意：fund123 的 netValue 字段不是真正的已发布净值，需要从天天基金获取
+        net_value = None
+        net_date = ""
 
-        # 如果 API 没有返回净值日期，从数据库缓存获取
-        if not net_date:
+        # 优先从天天基金获取净值和净值日期（最可靠）
+        try:
+            tiantian_url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
+            response = await self._get_tiantian_client().get(tiantian_url)
+            if response.is_success:
+                text = response.text.strip()
+                # 检查空响应（基金不支持）
+                if text not in ("jsonpgz();", "jsonpgz()"):
+                    match = re.search(r'jsonpgz\((.+)\);?', text)
+                    if match:
+                        tiantian_data = json.loads(match.group(1))
+                        net_date = tiantian_data.get("jzrq", "")
+                        net_value = self._safe_float(tiantian_data.get("dwjz"))
+                        logger.debug(f"从天天基金获取净值: {fund_code} -> {net_value}, 日期: {net_date}")
+        except Exception as e:
+            logger.warning(f"从天天基金获取净值失败: {fund_code} - {e}")
+
+        # 如果天天基金获取失败，尝试从数据库缓存获取
+        if not net_date or net_value is None:
             try:
                 daily_dao = get_daily_cache_dao()
                 latest_record = daily_dao.get_latest(fund_code)
                 if latest_record and latest_record.date:
-                    net_date = latest_record.date
+                    if not net_date:
+                        net_date = latest_record.date
                     if net_value is None and latest_record.unit_net_value:
                         net_value = latest_record.unit_net_value
             except Exception as e:
@@ -2119,27 +2153,6 @@ class Fund123DataSource(DataSource):
                         net_value = nav
             except Exception as e:
                 logger.warning(f"从 akshare 获取净值日期失败: {e}")
-
-        # 如果仍然没有净值日期，尝试从天天基金 API 获取（fund123 不返回此字段）
-        if not net_date:
-            try:
-                tiantian_url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
-                async with httpx.AsyncClient(timeout=5.0) as client:
-                    response = await client.get(tiantian_url)
-                    if response.is_success:
-                        text = response.text.strip()
-                        # 解析 jsonpgz({"jzrq":"2026-02-26",...}) 格式
-                        match = re.search(r'jsonpgz\((.+)\);?', text)
-                        if match:
-                            tiantian_data = json.loads(match.group(1))
-                            tiantian_date = tiantian_data.get("jzrq", "")
-                            if tiantian_date:
-                                net_date = tiantian_date
-                                logger.debug(f"从天天基金获取净值日期: {fund_code} -> {net_date}")
-                                if net_value is None:
-                                    net_value = self._safe_float(tiantian_data.get("dwjz"))
-            except Exception as e:
-                logger.warning(f"从天天基金获取净值日期失败: {fund_code} - {e}")
         # 获取基金类型
         fund_type = ""
         basic_info = get_basic_info_db(fund_code)
@@ -2512,12 +2525,24 @@ class Fund123DataSource(DataSource):
         except Exception:
             return False
 
+    def _safe_float(self, value: Any) -> float | None:
+        """安全转换为浮点数"""
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+
     async def close(self):
         """关闭全局 AsyncClient"""
         if type(self)._client is not None:
             await type(self)._client.aclose()
             type(self)._client = None
             type(self)._csrf_token = None
+        if type(self)._tiantian_client is not None:
+            await type(self)._tiantian_client.aclose()
+            type(self)._tiantian_client = None
 
 
 class TushareFundSource(DataSource):
