@@ -210,6 +210,53 @@
 
 ---
 
+### 9. fund_cache_metadata (缓存元数据表)
+
+存储基金缓存状态信息，支持缓存状态机实现。
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| fund_code | TEXT | PRIMARY KEY | 基金代码 |
+| cache_status | TEXT | NOT NULL DEFAULT 'unknown' | 缓存状态 (unknown/valid/stale/refreshing/error) |
+| last_updated | TIMESTAMP | NOT NULL | 最后更新时间 |
+| expires_at | TIMESTAMP | NOT NULL | 过期时间 |
+| last_error | TEXT | | 最后错误信息 |
+| retry_count | INTEGER | DEFAULT 0 | 重试次数 |
+| created_at | TIMESTAMP | NOT NULL DEFAULT CURRENT_TIMESTAMP | 创建时间 |
+
+**索引**:
+- PRIMARY KEY (fund_code)
+
+**缓存状态流转**:
+```
+unknown → refreshing → valid
+                      ↘ stale → refreshing → valid
+                      ↘ error → refreshing → valid
+```
+
+---
+
+### 10. api_call_stats (API调用统计表)
+
+存储API调用统计信息，用于监控和性能分析。
+
+| 字段 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | INTEGER | PRIMARY KEY AUTOINCREMENT | 自增 ID |
+| api_name | TEXT | NOT NULL | API名称 |
+| call_time | TIMESTAMP | NOT NULL | 调用时间 |
+| duration_ms | INTEGER | NOT NULL | 调用耗时(毫秒) |
+| success | BOOLEAN | NOT NULL | 是否成功 |
+| error_message | TEXT | | 错误信息 |
+| cache_hit | BOOLEAN | DEFAULT FALSE | 是否命中缓存 |
+| fund_code | TEXT | | 关联基金代码 |
+
+**索引**:
+- `idx_api_call_stats_api_name` ON (api_name)
+- `idx_api_call_stats_call_time` ON (call_time)
+
+---
+
 ## 数据模型 (Python)
 
 ### Dataclass 定义
@@ -336,6 +383,7 @@ class NewsRecord:
 | `FundIntradayCacheDAO` | 日内分时缓存存取 |
 | `FundDailyCacheDAO` | 每日缓存存取 |
 | `FundBasicInfoDAO` | 基金基本信息存取 |
+| `CacheMetadataDAO` | 缓存元数据管理、状态机支持 |
 | `CommodityCacheDAO` | 商品行情缓存存取 |
 | `CommodityCategoryDAO` | 商品分类查询 |
 | `NewsDAO` | 新闻缓存存取 |
@@ -356,6 +404,43 @@ class NewsRecord:
 | 每日缓存 | 0 (禁用) | 可配置 |
 | 商品行情 | 24 小时 | 可配置 |
 | 新闻缓存 | 24 小时 | 清理过期新闻 |
+| 静态数据 | 30 天 | 基金名称、类型、管理人等 |
+| 中频数据 | 7 天 | 基金规模等 |
+| 高频数据 | 1 天 | 单位净值、净值日期等 |
+
+### 缓存状态机
+
+缓存元数据表 (`fund_cache_metadata`) 支持以下状态：
+
+| 状态 | 说明 |
+|------|------|
+| `unknown` | 初始状态，缓存状态未知 |
+| `valid` | 缓存有效，在 TTL 内 |
+| `stale` | 缓存过期但数据可用（降级） |
+| `refreshing` | 正在刷新中，防止缓存击穿 |
+| `error` | 刷新失败，记录错误信息 |
+
+状态流转：
+```
+unknown → refreshing → valid
+                      ↘ stale → refreshing → valid
+                      ↘ error → refreshing → valid
+```
+
+### 缓存锁机制
+
+使用 `CacheLockManager` 类实现缓存锁，防止缓存击穿：
+
+- 基于基金代码的细粒度锁
+- 支持超时机制（默认 30 秒）
+- 自动清理不再使用的锁
+
+### 降级策略
+
+当缓存过期但数据存在时：
+1. 触发后台刷新任务
+2. 返回过期数据（标记 `is_stale=True`）
+3. 过期数据在 7 天内仍可使用
 
 ### 缓存清理
 
@@ -363,6 +448,7 @@ class NewsRecord:
 - `FundDailyCacheDAO.cleanup_expired_cache(days=7)` - 清理过期每日缓存
 - `CommodityCacheDAO.cleanup_expired(hours=24)` - 清理过期商品缓存
 - `NewsDAO.cleanup_old_news(hours=24)` - 清理过期新闻
+- `CacheMetadataDAO.get_expired_caches()` - 获取过期缓存列表
 
 ---
 
@@ -476,7 +562,7 @@ def is_watchlist(self) -> bool:
 │ change_rate        │  │ estimated_value    │
 │ fetched_at         │  │ change_rate        │
 └─────────────────────┘  │ fetched_at         │
-                        └─────────────────────┘
+                         └─────────────────────┘
 
 ┌─────────────────────┐  ┌─────────────────────┐
 │  fund_basic_info   │  │  commodity_cache    │
@@ -497,21 +583,34 @@ def is_watchlist(self) -> bool:
 │ full_name          │  │ source             │
 │ fetched_at         │  │ timestamp          │
 │ updated_at         │  │ created_at         │
-└─────────────────────┘  └─────────────────────┘
-
+└─────────┬───────────┘  └─────────────────────┘
+          │ 1:1
+          ▼
 ┌─────────────────────┐
-│    news_cache      │
+│fund_cache_metadata │
 ├─────────────────────┤
-│ id (PK)            │
-│ title              │
-│ url                │
-│ source             │
-│ category           │
-│ publish_time       │
-│ content            │
-│ fetched_at         │
+│ *fund_code (PK)    │
+│ cache_status       │
+│ last_updated       │
+│ expires_at         │
+│ last_error         │
+│ retry_count        │
 │ created_at         │
 └─────────────────────┘
+
+┌─────────────────────┐  ┌─────────────────────┐
+│    news_cache      │  │   api_call_stats    │
+├─────────────────────┤  ├─────────────────────┤
+│ id (PK)            │  │ id (PK)            │
+│ title              │  │ api_name           │
+│ url                │  │ call_time          │
+│ source             │  │ duration_ms        │
+│ category           │  │ success            │
+│ publish_time       │  │ error_message      │
+│ content            │  │ cache_hit          │
+│ fetched_at         │  │ fund_code          │
+│ created_at         │  │ created_at         │
+└─────────────────────┘  └─────────────────────┘
 ```
 
 ---

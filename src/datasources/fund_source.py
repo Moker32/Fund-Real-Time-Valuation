@@ -16,6 +16,7 @@ import httpx
 import pandas as pd
 
 from src.db.database import (
+    CacheMetadata,
     DatabaseManager,
     FundBasicInfoDAO,
     FundDailyCacheDAO,
@@ -2916,6 +2917,34 @@ class TushareFundSource(DataSource):
         return processed_results
 
 
+# 导入缓存策略模块
+from src.datasources.fund.cache_strategy import (
+    CacheLockManager,
+    CacheLockTimeoutError,
+    CacheResult,
+    FundCacheStrategy,
+    get_fund_data_with_cache,
+)
+
+# 缓存策略单例
+_cache_strategy: FundCacheStrategy | None = None
+
+
+def get_cache_strategy() -> FundCacheStrategy:
+    """
+    获取缓存策略单例
+
+    Returns:
+        FundCacheStrategy: 缓存策略实例
+    """
+    global _cache_strategy
+    if _cache_strategy is None:
+        # 复用现有的 DatabaseManager 实例，避免创建多个数据库连接
+        db_manager = get_basic_info_db()
+        _cache_strategy = FundCacheStrategy(db_manager)
+    return _cache_strategy
+
+
 __all__ = [
     "FundDataSource",
     "SinaFundDataSource",
@@ -2930,4 +2959,11 @@ __all__ = [
     "get_basic_info_dao",
     "get_basic_info_db",
     "save_basic_info_to_db",
+    # 缓存策略相关
+    "CacheLockManager",
+    "CacheLockTimeoutError",
+    "CacheResult",
+    "FundCacheStrategy",
+    "get_cache_strategy",
+    "get_fund_data_with_cache",
 ]

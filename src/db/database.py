@@ -155,6 +155,33 @@ class FundBasicInfo:
     updated_at: str = ""  # 更新时间
 
 
+@dataclass
+class CacheMetadata:
+    """缓存元数据"""
+
+    fund_code: str = ""  # 基金代码
+    cache_status: str = "unknown"  # 状态: unknown/valid/stale/refreshing/error
+    last_updated: str = ""  # 最后更新时间
+    expires_at: str = ""  # 过期时间
+    last_error: str | None = None  # 最后错误信息
+    retry_count: int = 0  # 重试次数
+    created_at: str = ""  # 创建时间
+
+
+@dataclass
+class ApiCallStats:
+    """API调用统计"""
+
+    id: int | None = None  # 数据库自增ID
+    api_name: str = ""  # API名称
+    call_time: str = ""  # 调用时间
+    duration_ms: int = 0  # 耗时（毫秒）
+    success: bool = True  # 是否成功
+    error_message: str | None = None  # 错误信息
+    cache_hit: bool = False  # 是否命中缓存
+    fund_code: str | None = None  # 关联的基金代码
+
+
 class DatabaseManager:
     """数据库管理器
 
@@ -371,6 +398,34 @@ class DatabaseManager:
                 )
             """)
 
+            # 缓存元数据表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS fund_cache_metadata (
+                    fund_code TEXT PRIMARY KEY,
+                    cache_status TEXT DEFAULT 'unknown',
+                    last_updated TEXT,
+                    expires_at TEXT,
+                    last_error TEXT,
+                    retry_count INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+                )
+            """)
+
+            # API调用统计表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS api_call_stats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    api_name TEXT NOT NULL,
+                    call_time TEXT NOT NULL,
+                    duration_ms INTEGER DEFAULT 0,
+                    success INTEGER DEFAULT 1,
+                    error_message TEXT,
+                    cache_hit INTEGER DEFAULT 0,
+                    fund_code TEXT,
+                    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+                )
+            """)
+
             # 创建索引
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_holidays_market_date ON exchange_holidays(market, holiday_date)"
@@ -398,6 +453,21 @@ class DatabaseManager:
             )
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_commodity_timestamp ON commodity_cache(created_at)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cache_metadata_status ON fund_cache_metadata(cache_status)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cache_metadata_expires ON fund_cache_metadata(expires_at)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_api_stats_name ON api_call_stats(api_name)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_api_stats_fund ON api_call_stats(fund_code)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_api_stats_time ON api_call_stats(call_time)"
             )
 
             conn.commit()

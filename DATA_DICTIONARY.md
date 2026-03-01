@@ -365,6 +365,35 @@
 
 **索引**: INDEX (commodity_type), INDEX (created_at)
 
+### 3.9 fund_cache_metadata - 缓存元数据表
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| fund_code | TEXT PRIMARY KEY | 基金代码 |
+| cache_status | TEXT NOT NULL DEFAULT 'unknown' | 缓存状态 (unknown/valid/stale/refreshing/error) |
+| last_updated | TEXT NOT NULL | 最后更新时间 |
+| expires_at | TEXT NOT NULL | 过期时间 |
+| last_error | TEXT \| NULL | 最后错误信息 |
+| retry_count | INTEGER DEFAULT 0 | 重试次数 |
+| created_at | TEXT NOT NULL | 创建时间 |
+
+**索引**: PRIMARY KEY (fund_code)
+
+### 3.10 api_call_stats - API调用统计表
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| id | INTEGER PRIMARY KEY AUTOINCREMENT | 自增ID |
+| api_name | TEXT NOT NULL | API名称 |
+| call_time | TEXT NOT NULL | 调用时间 |
+| duration_ms | INTEGER NOT NULL | 调用耗时(毫秒) |
+| success | INTEGER NOT NULL | 是否成功 (1=成功, 0=失败) |
+| error_message | TEXT \| NULL | 错误信息 |
+| cache_hit | INTEGER DEFAULT 0 | 是否命中缓存 (1=命中, 0=未命中) |
+| fund_code | TEXT \| NULL | 关联基金代码 |
+
+**索引**: INDEX (api_name), INDEX (call_time)
+
 ---
 
 ## 4. 数据库模型类 (src/db/database.py)
@@ -474,6 +503,55 @@
 | full_name | str | 基金完整名称 |
 | fetched_at | str | 抓取时间 |
 | updated_at | str | 更新时间 |
+
+### 4.8 CacheMetadata - 缓存元数据
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| fund_code | str | 基金代码 |
+| cache_status | str | 缓存状态 (unknown/valid/stale/refreshing/error) |
+| last_updated | str | 最后更新时间 |
+| expires_at | str | 过期时间 |
+| last_error | str \| None | 最后错误信息 |
+| retry_count | int | 重试次数（默认 0） |
+| created_at | str | 创建时间 |
+
+### 4.9 CacheResult - 缓存获取结果
+
+| 字段 | 类型 | 描述 |
+|------|------|------|
+| data | dict[str, Any] \| None | 缓存数据 |
+| from_cache | bool | 是否来自缓存 |
+| is_stale | bool | 是否为过期数据（降级） |
+| error | str \| None | 错误信息 |
+
+---
+
+## 4.10 缓存策略核心类 (src/datasources/fund/cache_strategy.py)
+
+### CacheLockManager - 缓存锁管理器
+
+| 方法 | 参数 | 返回 | 描述 |
+|------|------|------|------|
+| acquire | key: str, timeout: float = 30.0 | AsyncContextManager | 获取缓存锁，防止缓存击穿 |
+
+**特性**:
+- 基于基金代码的细粒度锁
+- 支持超时机制
+- 自动清理不再使用的锁
+
+### FundCacheStrategy - 基金数据缓存策略
+
+| 方法 | 参数 | 返回 | 描述 |
+|------|------|------|------|
+| get_with_cache | fund_code, fetch_func, ttl, fields | CacheResult | 带缓存的数据获取 |
+| invalidate_cache | fund_code | bool | 使缓存失效 |
+| force_refresh | fund_code, fetch_func, ttl | CacheResult | 强制刷新缓存 |
+
+**TTL 配置**:
+- 静态数据 (STATIC_TTL): 30 天 - name, type, manager 等
+- 中频数据 (MID_TTL): 7 天 - fund_scale 等
+- 高频数据 (HIGH_TTL): 1 天 - net_value, net_value_date 等
 
 ---
 
@@ -807,4 +885,4 @@
 
 ---
 
-*本文档最后更新于 2026-02-20*
+*本文档最后更新于 2026-03-01*

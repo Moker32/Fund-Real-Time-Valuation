@@ -16,6 +16,8 @@ SQLite database for fund/commodity configuration, history data, and news caching
 | Commodity config | `database.py` (CommodityConfig) | Commodity with source, enabled flag |
 | History records | `database.py` (FundHistoryRecord) | Net value history |
 | News cache | `database.py` (NewsRecord) | News with timestamp |
+| Cache metadata | `fund/cache_metadata_dao.py` | CacheMetadataDAO for cache status management |
+| Fund DAOs | `fund/` | Modular DAOs: config_dao, history_dao, basic_info_dao, etc. |
 
 ## CODE MAP
 
@@ -27,6 +29,13 @@ SQLite database for fund/commodity configuration, history data, and news caching
 | CommodityConfig | dataclass | database.py | Commodity config (symbol, name, source, enabled) |
 | FundHistoryRecord | dataclass | database.py | Fund net value history |
 | NewsRecord | dataclass | database.py | News cache record |
+| CacheMetadata | dataclass | database.py | Cache status metadata |
+| CacheMetadataDAO | class | fund/cache_metadata_dao.py | Cache status management, state machine support |
+| FundBasicInfoDAO | class | fund/basic_info_dao.py | Fund basic info CRUD |
+| FundConfigDAO | class | fund/config_dao.py | Fund config CRUD |
+| FundHistoryDAO | class | fund/history_dao.py | Fund history CRUD |
+| FundIntradayCacheDAO | class | fund/intraday_cache_dao.py | Intraday cache CRUD |
+| FundDailyCacheDAO | class | fund/daily_cache_dao.py | Daily cache CRUD |
 
 ## CONVENTIONS
 
@@ -45,6 +54,19 @@ SQLite database for fund/commodity configuration, history data, and news caching
 - `commodity_config` table: symbol, name, source, enabled, notes, created_at, updated_at
 - `fund_history` table: fund_code, date, unit_net_value, estimated_value, growth_rate, fetched_at
 - `news_cache` table: title, url, source, category, published_at, fetched_at
+- `fund_cache_metadata` table: fund_code, cache_status, last_updated, expires_at, last_error, retry_count, created_at
+- `api_call_stats` table: id, api_name, call_time, duration_ms, success, error_message, cache_hit, fund_code
+
+### Cache Metadata DAO
+- `CacheMetadataDAO` provides cache status management
+- `get_cache_status(fund_code)` - Get cache metadata for a fund
+- `set_cache_status(fund_code, status, expires_at, error)` - Set cache status
+- `mark_refreshing(fund_code)` - Mark cache as refreshing (acquire lock)
+- `release_refresh_lock(fund_code)` - Release refresh lock
+- `get_expired_caches(batch_size)` - Get list of expired cache keys
+- `mark_stale(fund_code)` - Mark cache as stale
+- `mark_error(fund_code, error)` - Mark cache as error
+- State machine: unknown → refreshing → valid/stale/error
 
 ### Migrations
 - Auto-migration in `DatabaseManager._migrate_database()`

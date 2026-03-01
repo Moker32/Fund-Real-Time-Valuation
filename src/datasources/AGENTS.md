@@ -15,6 +15,7 @@ Async data sources for fund, stock, commodity, crypto, bond, news, and sector da
 | Manager | `manager.py` | Multi-source orchestration |
 | Aggregator | `aggregator.py` | Same-source, load-balanced aggregation |
 | Fund data | `fund_source.py` | Fund valuations from akshare/yfinance |
+| Fund cache strategy | `fund/cache_strategy.py` | Database-first caching with TTL layers |
 | Stock data | `stock_source.py` | Stock prices from akshare |
 | Commodity | `commodity_source.py` | Commodity prices (gold, oil, etc.) |
 | Crypto | `crypto_source.py` | Crypto prices (BTC, ETH, etc.) |
@@ -35,6 +36,10 @@ Async data sources for fund, stock, commodity, crypto, bond, news, and sector da
 | DataAggregator | abstract class | aggregator.py | Base for aggregators |
 | SameSourceAggregator | class | aggregator.py | Single-source aggregation |
 | LoadBalancedAggregator | class | aggregator.py | Multi-source load balancing |
+| CacheLockManager | class | fund/cache_strategy.py | Cache lock manager to prevent cache stampede |
+| FundCacheStrategy | class | fund/cache_strategy.py | Database-first caching strategy with TTL layers |
+| CacheResult | dataclass | fund/cache_strategy.py | Cache fetch result with stale flag |
+| CacheLockTimeoutError | Exception | fund/cache_strategy.py | Lock timeout exception |
 
 ## CONVENTIONS
 
@@ -70,6 +75,23 @@ class DataSourceResult:
 - All `fetch()` methods are async
 - Use `asyncio.Semaphore` for concurrency control
 - Use `asyncio.gather()` for batch requests
+
+### Cache Strategy Pattern
+- Database-first approach: check DB before API
+- TTL layers: Static (30d), Mid (7d), High (1d)
+- Lock mechanism: `CacheLockManager.acquire(key, timeout=30.0)`
+- Degradation: Return stale data if available when refresh fails
+- Usage:
+  ```python
+  strategy = FundCacheStrategy(db_manager)
+  result = await strategy.get_with_cache(
+      fund_code="000001",
+      fetch_func=lambda: api.fetch_fund("000001"),
+      fields=["name", "net_value"]  # Auto-calculates TTL
+  )
+  if result.data:
+      # Use result.data (may be stale, check result.is_stale)
+  ```
 
 ## ANTI-PATTERNS
 
