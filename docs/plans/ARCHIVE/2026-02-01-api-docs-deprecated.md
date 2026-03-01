@@ -1,5 +1,13 @@
 # API 文档
 
+> **⚠️ 已废弃文档**
+> 
+> 此文档描述已废弃的 Flet GUI 架构，已于 2026-02-09 迁移至 FastAPI + Vue 3 架构。
+> 
+> 请参阅最新的 API 文档：
+> - REST API 文档: [docs/rest-api.md](../rest-api.md)
+> - 系统架构: [docs/architecture/system-architecture.md](../architecture/system-architecture.md)
+
 ## 数据源 API
 
 ### DataSourceBase

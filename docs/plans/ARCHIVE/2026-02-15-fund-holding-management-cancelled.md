@@ -1,5 +1,11 @@
 # 基金持仓管理功能设计方案
 
+> **⚠️ 已取消计划**
+> 
+> 此计划已取消，不再计划实现。
+> 
+> 归档日期：2026-03-01
+
 ## 背景
 
 当前系统已有基础的持仓标记功能（`isHolding`），后端 `Holding` 模型支持 `shares`（份额）和 `cost`（成本价）字段，但前端和 API 尚未实现份额/成本价的设置和展示功能。
@@ -335,4 +341,3 @@ function handleFundClick(code: string) {
    ```bash
    pnpm run dev:web
    # 使用 Playwright 检查控制台无错误
-   ```

@@ -1,5 +1,13 @@
 # 性能评估报告
 
+> **⚠️ 已过时文档**
+> 
+> 此文档为 Flet GUI 时代的性能评估，已过时。项目已于 2026-02-09 迁移至 FastAPI + Vue 3 架构。
+> 
+> 当前前端性能优化相关内容请参考：
+> - 前端组件: [web/src/components/](../../../web/src/components/)
+> - 前端存储: [web/src/stores/](../../../web/src/stores/)
+
 ## 评估日期
 2026-02-05
 
