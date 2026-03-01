@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from src.config import get_config_manager
 from src.config.models import Fund, FundList, Holding
 from src.datasources.base import DataSourceType
-from src.datasources.fund_source import Fund123DataSource
+from src.datasources.fund_source import Fund123DataSource, get_basic_info_db
 from src.datasources.manager import DataSourceManager
 
 if TYPE_CHECKING:
@@ -60,6 +60,47 @@ def _get_fund_history_source() -> "FundHistorySource":
 def _get_fund123_source() -> Fund123DataSource:
     """获取 Fund123 数据源实例（缓存）"""
     return Fund123DataSource()
+
+
+def _is_qdii_fund(code: str) -> bool:
+    """检查基金是否为 QDII 基金或投资海外的 FOF
+
+    QDII 基金和投资海外的 FOF 基金不支持日内分时数据，
+    因为它们投资海外市场，净值更新延迟。
+
+    判断逻辑与 src/datasources/fund_source.py 中的 _has_real_time_estimate() 保持一致。
+
+    Args:
+        code: 基金代码
+
+    Returns:
+        bool: 是否为 QDII 基金或投资海外的 FOF
+    """
+    try:
+        basic_info = get_basic_info_db(code)
+        if not basic_info:
+            logger.debug(f"基金 {code} 基本信息不存在，无法判断是否为 QDII")
+            return False
+
+        # 统一转换为大写进行比较，确保大小写不一致时也能正确识别
+        fund_type = (basic_info.get("type") or "").upper()
+        fund_name = basic_info.get("name") or ""
+
+        # QDII 基金不支持日内分时数据（精确匹配类型）
+        if fund_type == "QDII":
+            return True
+
+        # FOF 基金需要进一步判断是否投资海外（精确匹配类型）
+        if fund_type == "FOF":
+            name_upper = fund_name.upper()
+            # QDII-FOF 或投资海外的 FOF 不支持日内分时数据
+            if "QDII" in name_upper or "海外" in fund_name or "全球" in fund_name:
+                return True
+
+        return False
+    except Exception as e:
+        logger.warning(f"检查基金类型失败: {code} - {e}")
+        return False
 
 
 def _check_is_holding(code: str) -> bool:
@@ -468,6 +509,14 @@ async def get_fund_intraday_by_date(
     Returns:
         FundIntradayResponse: 基金日内分时数据
     """
+    # 首先检查是否为 QDII 基金或投资海外的 FOF
+    # 这类基金不支持日内分时数据，因为投资海外市场，净值更新延迟
+    if _is_qdii_fund(code):
+        raise HTTPException(
+            status_code=400,
+            detail="QDII 基金不支持日内分时数据，因其投资海外市场，净值更新延迟",
+        )
+
     fund123_source = _get_fund123_source()
     result = await fund123_source.fetch_intraday_by_date(code, date)
 
