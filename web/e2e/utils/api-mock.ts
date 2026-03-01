@@ -153,6 +153,70 @@ export async function mockHealthApi(
 }
 
 /**
+ * Mock 概览 API
+ */
+export async function mockOverviewApi(
+  page: Page,
+  options: MockApiOptions = {}
+): Promise<void> {
+  const { delay = 0, status = 200 } = options;
+
+  await page.route('**/api/overview*', async (route: Route) => {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    await route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        funds: { count: 5, updatedAt: new Date().toISOString() },
+        commodities: { count: 3, updatedAt: new Date().toISOString() },
+        indices: { count: 4, updatedAt: new Date().toISOString() },
+      }),
+    });
+  });
+}
+
+/**
+ * Mock 股票 API
+ */
+export async function mockStocksApi(
+  page: Page,
+  options: MockApiOptions = {}
+): Promise<void> {
+  const { delay = 0, status = 200 } = options;
+
+  await page.route('**/api/stocks*', async (route: Route) => {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    await route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify({ stocks: [] }),
+    });
+  });
+}
+
+/**
+ * Mock 舆情 API
+ */
+export async function mockSentimentApi(
+  page: Page,
+  options: MockApiOptions = {}
+): Promise<void> {
+  const { delay = 0, status = 200 } = options;
+
+  await page.route('**/api/sentiment*', async (route: Route) => {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    await route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        economic: { events: [], date: new Date().toISOString().split('T')[0] },
+        weibo: { hotTopics: [], updateTime: new Date().toISOString() },
+      }),
+    });
+  });
+}
+
+/**
  * Mock 所有 API
  * 一键 mock 所有数据源
  */
@@ -167,6 +231,9 @@ export async function mockAllApis(
     mockSectorsApi(page, options),
     mockBondsApi(page, options),
     mockHealthApi(page, options),
+    mockOverviewApi(page, options),
+    mockStocksApi(page, options),
+    mockSentimentApi(page, options),
   ]);
 }
 
