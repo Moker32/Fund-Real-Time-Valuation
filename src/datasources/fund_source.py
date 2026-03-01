@@ -46,6 +46,8 @@ _intraday_cache_dao: FundIntradayCacheDAO | None = None
 _daily_cache_dao: FundDailyCacheDAO | None = None
 # 基金基本信息缓存 DAO 单例
 _basic_info_dao: FundBasicInfoDAO | None = None
+# 交易日历源单例（用于净值缓存有效性判断）
+_trading_calendar_source: "TradingCalendarSource | None" = None  # noqa: F821
 
 
 def get_fund_cache() -> DualLayerCache:
@@ -329,6 +331,164 @@ def _get_net_value_date_from_akshare(fund_code: str) -> tuple[str, float] | None
     except Exception as e:
         logger.warning(f"akshare 获取净值失败: {e}")
         return None
+
+
+def _get_trading_calendar():  # type: ignore[no-untyped-def]
+    """
+    获取交易日历源单例
+
+    Returns:
+        TradingCalendarSource: 交易日历源实例
+    """
+    global _trading_calendar_source
+    if _trading_calendar_source is None:
+        from src.datasources.trading_calendar_source import TradingCalendarSource
+
+        _trading_calendar_source = TradingCalendarSource()
+    return _trading_calendar_source
+
+
+def _get_china_market_date():  # type: ignore[no-untyped-def]
+    """
+    获取中国市场的当前日期（时区感知）
+
+    Returns:
+        date: 中国时区下的当前日期
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("Asia/Shanghai")
+    now = datetime.now(tz)
+    return now.date()
+
+
+def _is_after_market_close() -> bool:
+    """
+    判断当前是否在收盘后（15:00 之后）
+
+    Returns:
+        bool: True 表示已收盘，False 表示未收盘或无法判断
+    """
+    from datetime import datetime
+    from datetime import time as time_type
+    from zoneinfo import ZoneInfo
+
+    try:
+        # 使用中国时区
+        tz = ZoneInfo("Asia/Shanghai")
+        now = datetime.now(tz)
+        current_time = now.time()
+
+        # A股收盘时间为 15:00
+        market_close_time = time_type(15, 0)
+
+        return current_time >= market_close_time
+    except Exception:
+        # 无法判断时，默认返回 True（允许更新缓存）
+        return True
+
+
+def _get_latest_trading_day() -> str | None:
+    """
+    获取最新的交易日期（字符串格式 YYYY-MM-DD）
+
+    Returns:
+        str | None: 最新交易日，获取失败返回 None
+    """
+    from datetime import timedelta
+
+    try:
+        calendar = _get_trading_calendar()
+        today = _get_china_market_date()
+
+        # 如果今天不是交易日，找最近的交易日
+        if not calendar.is_trading_day("china", today):
+            # 往前找最近的交易日
+            for i in range(1, 8):  # 最多往前找7天
+                check_date = today - timedelta(days=i)
+                if calendar.is_trading_day("china", check_date):
+                    return check_date.isoformat()
+            return None
+
+        # 今天是交易日
+        # 如果已收盘，返回今天的日期
+        if _is_after_market_close():
+            return today.isoformat()
+        else:
+            # 未收盘，返回上一个交易日
+            for i in range(1, 8):
+                check_date = today - timedelta(days=i)
+                if calendar.is_trading_day("china", check_date):
+                    return check_date.isoformat()
+            return None
+    except Exception as e:
+        logger.warning(f"获取最新交易日失败: {e}")
+        return None
+
+
+def _is_net_value_cache_valid(fund_code: str) -> tuple[bool, str | None, float | None]:
+    """
+    检查净值缓存是否有效（净值日期是否为最新交易日）
+
+    Args:
+        fund_code: 基金代码
+
+    Returns:
+        tuple[bool, str | None, float | None]: (是否有效, 净值日期, 净值)
+    """
+    try:
+        # 从数据库获取缓存的净值日期
+        basic_info = get_basic_info_db(fund_code)
+        if not basic_info:
+            return (False, None, None)
+
+        cached_date = basic_info.get("net_value_date")
+        cached_value = basic_info.get("net_value")
+
+        if not cached_date or cached_value is None:
+            return (False, None, None)
+
+        # 获取最新交易日
+        latest_trading_day = _get_latest_trading_day()
+        if not latest_trading_day:
+            # 无法获取交易日，缓存可能有效
+            return (True, cached_date, cached_value)
+
+        # 比较净值日期和最新交易日
+        if cached_date == latest_trading_day:
+            # 净值日期是最新的，缓存有效
+            return (True, cached_date, cached_value)
+
+        # 净值日期落后，缓存无效
+        logger.debug(
+            f"净值缓存过期: {fund_code}, 缓存日期={cached_date}, 最新交易日={latest_trading_day}"
+        )
+        return (False, cached_date, cached_value)
+
+    except Exception as e:
+        logger.warning(f"检查净值缓存失败: {fund_code} - {e}")
+        return (False, None, None)
+
+
+def _update_net_value_cache(fund_code: str, net_value: float, net_value_date: str) -> bool:
+    """
+    更新数据库中的净值缓存
+
+    Args:
+        fund_code: 基金代码
+        net_value: 单位净值
+        net_value_date: 净值日期
+
+    Returns:
+        bool: 是否更新成功
+    """
+    try:
+        dao = get_basic_info_dao()
+        return dao.update(fund_code, net_value=net_value, net_value_date=net_value_date)
+    except Exception as e:
+        logger.warning(f"更新净值缓存失败: {fund_code} - {e}")
+        return False
 
 
 def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
@@ -2177,23 +2337,23 @@ class Fund123DataSource(DataSource):
 
         # 3. 获取最新净值信息
         # 注意：fund123 的 netValue 字段不是真正的已发布净值，需要从外部数据源获取
+        # 重要：净值和净值日期必须来自同一数据源，确保数据关联正确
+        # 天天基金接口的 jzrq 是"估值基准日期"（上一交易日），而非"最新确认净值日期"
+        # 因此优先从 akshare 获取净值和净值日期，天天基金仅用于实时估值
         net_value = None
         net_date = ""
 
-        # 1. 优先从数据库缓存获取（减轻数据源压力）
-        try:
-            daily_dao = get_daily_cache_dao()
-            latest_record = daily_dao.get_latest(fund_code)
-            if latest_record and latest_record.date:
-                net_date = latest_record.date
-                if latest_record.unit_net_value:
-                    net_value = latest_record.unit_net_value
-                    logger.debug(f"从数据库缓存获取净值: {fund_code} -> {net_value}, 日期: {net_date}")
-        except Exception as e:
-            logger.warning(f"从数据库获取净值日期失败: {e}")
-
-        # 2. 如果数据库缓存无效，从 akshare 获取（更新更快）
-        if not net_date or net_value is None:
+        # 1. 检查净值缓存是否有效（净值日期是否为最新交易日）
+        cache_valid, cached_date, cached_value = _is_net_value_cache_valid(fund_code)
+        if cache_valid and cached_date and cached_value is not None:
+            # 缓存有效，直接使用缓存的净值数据
+            net_value = cached_value
+            net_date = cached_date
+            logger.debug(
+                f"使用净值缓存: {fund_code} -> {net_value}, 日期: {net_date}"
+            )
+        else:
+            # 缓存无效或不存在，从 akshare 获取最新净值并更新缓存
             try:
                 loop = asyncio.get_running_loop()
                 history_result = await loop.run_in_executor(
@@ -2201,32 +2361,60 @@ class Fund123DataSource(DataSource):
                 )
                 if history_result:
                     ak_net_date, ak_nav = history_result
-                    if ak_nav:
+                    if ak_nav and ak_net_date:
                         net_value = ak_nav
                         net_date = ak_net_date
                         logger.debug(f"从 akshare 获取净值: {fund_code} -> {net_value}, 日期: {net_date}")
+                        # 更新数据库缓存
+                        _update_net_value_cache(fund_code, net_value, net_date)
             except Exception as e:
                 logger.warning(f"从 akshare 获取净值失败: {fund_code} - {e}")
 
-        # 3. 如果 akshare 也失败，尝试从天天基金获取（备用方案）
-        if not net_date or net_value is None:
-            try:
-                tiantian_url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
-                response = await self._get_tiantian_client().get(tiantian_url)
-                if response.is_success:
-                    text = response.text.strip()
-                    # 检查空响应（基金不支持）
-                    if text not in ("jsonpgz();", "jsonpgz()"):
-                        match = re.search(r'jsonpgz\((.+)\);?', text)
-                        if match:
-                            tiantian_data = json.loads(match.group(1))
-                            if not net_date:
-                                net_date = tiantian_data.get("jzrq", "")
-                            if net_value is None:
-                                net_value = self._safe_float(tiantian_data.get("dwjz"))
-                            logger.debug(f"从天天基金获取净值: {fund_code} -> {net_value}, 日期: {net_date}")
-            except Exception as e:
-                logger.warning(f"从天天基金获取净值失败: {fund_code} - {e}")
+            # 2. 如果 akshare 失败，尝试从天天基金获取（备用方案）
+            # 注意：天天基金的 jzrq 是估值基准日期，可能不是最新净值日期
+            if not net_date or net_value is None:
+                try:
+                    tiantian_url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
+                    response = await self._get_tiantian_client().get(tiantian_url)
+                    if response.is_success:
+                        text = response.text.strip()
+                        # 检查空响应（基金不支持）
+                        if text not in ("jsonpgz();", "jsonpgz()"):
+                            match = re.search(r'jsonpgz\((.+)\);?', text)
+                            if match:
+                                tiantian_data = json.loads(match.group(1))
+                                tiantian_net_date = tiantian_data.get("jzrq", "")
+                                tiantian_net_value = self._safe_float(tiantian_data.get("dwjz"))
+                                if tiantian_net_date and tiantian_net_value is not None:
+                                    net_date = tiantian_net_date
+                                    net_value = tiantian_net_value
+                                    logger.debug(
+                                        f"从天天基金获取净值（备用）: {fund_code} -> "
+                                        f"{net_value}, 日期: {net_date}"
+                                    )
+                except Exception as e:
+                    logger.warning(f"从天天基金获取净值失败: {fund_code} - {e}")
+
+            # 3. 最后尝试使用旧缓存（降级方案）
+            if not net_date or net_value is None:
+                if cached_date and cached_value is not None:
+                    net_date = cached_date
+                    net_value = cached_value
+                    logger.debug(
+                        f"使用旧缓存（降级）: {fund_code} -> {net_value}, 日期: {net_date}"
+                    )
+                else:
+                    # 尝试从数据库每日缓存获取
+                    try:
+                        daily_dao = get_daily_cache_dao()
+                        latest_record = daily_dao.get_latest(fund_code)
+                        if latest_record and latest_record.date:
+                            net_date = latest_record.date
+                            if latest_record.unit_net_value:
+                                net_value = latest_record.unit_net_value
+                                logger.debug(f"从数据库缓存获取净值（兜底）: {fund_code} -> {net_value}, 日期: {net_date}")
+                    except Exception as e:
+                        logger.warning(f"从数据库获取净值日期失败: {e}")
         # 获取基金类型（优先从 akshare 获取并缓存到数据库）
         fund_type = ""
         basic_info = get_basic_info_db(fund_code)
