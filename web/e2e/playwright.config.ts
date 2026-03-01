@@ -33,8 +33,8 @@ export default defineConfig({
 
   // 全局配置
   use: {
-    // 基础 URL
-    baseURL: 'http://localhost:3000',
+    // 基础 URL - CI 环境使用 8000（后端服务），本地使用 3000
+    baseURL: process.env.CI ? 'http://localhost:8000' : 'http://localhost:3000',
 
     // 失败时收集 trace
     trace: 'on-first-retry',
@@ -76,12 +76,12 @@ export default defineConfig({
   ],
 
   // 开发服务器配置
-  // 注意: 使用 dev:web 启动 Vite 开发服务器 (端口 3000)
-  // CI 环境会由 GitHub Actions 启动后端服务，这里只启动前端
-  webServer: {
-    command: 'pnpm run dev:web',
+  // 注意: CI 环境由 GitHub Actions 启动后端服务 (端口 8000)，不需要启动 webServer
+  // 本地开发时使用 Vite 开发服务器 (端口 3000)
+  webServer: process.env.CI ? undefined : {
+    command: 'pnpm run dev',
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
     timeout: 120000,
     stdout: 'ignore',
     stderr: 'pipe',
