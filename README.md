@@ -6,39 +6,84 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-teal.svg)](https://fastapi.tiangolo.com/)
 [![Vue 3](https://img.shields.io/badge/Vue-3.4+-42b883.svg)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178c6.svg)](https://www.typescriptlang.org/)
+[![Playwright](https://img.shields.io/badge/E2E-Playwright-green.svg)](https://playwright.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 一个功能完整的基金与金融市场行情监控平台，支持实时数据推送、多数据源聚合、缓存优化。
 
-## 功能特性
+---
+
+## 📸 界面预览
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/home.png" alt="首页" />
+      <p align="center"><b>首页概览</b> - 快速访问各功能模块</p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/funds.png" alt="基金页面" />
+      <p align="center"><b>基金自选</b> - 实时追踪基金估值</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/commodities.png" alt="商品行情" />
+      <p align="center"><b>大宗商品</b> - 黄金、原油等实时价格</p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/indices.png" alt="全球指数" />
+      <p align="center"><b>全球指数</b> - 美股、港股、A股行情</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/sectors.png" alt="行业板块" />
+      <p align="center"><b>行业板块</b> - A股板块涨跌排行</p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/home-mobile.png" alt="移动端" />
+      <p align="center"><b>响应式设计</b> - 完美适配移动端</p>
+    </td>
+  </tr>
+</table>
+
+---
+
+## ✨ 功能特性
 
 ### 核心功能
-- **基金估值监控** - 实时追踪基金净值、估算涨跌幅，支持自选基金
-- **全球指数行情** - 美股、港股、A股、日经、英国富时等主要市场指数
-- **大宗商品** - 黄金、白银、原油、铜等商品实时价格
-- **板块轮动** - A股行业板块涨跌排行与资金流向
-- **股票行情** - 个股实时价格与盘口数据
-- **债券市场** - 国债、企业债收益率曲线
-- **财经新闻** - 聚合多方财经资讯
-- **舆情分析** - 市场情绪指标与热点追踪
+- **📈 基金估值监控** - 实时追踪基金净值、估算涨跌幅，支持自选基金
+- **🌍 全球指数行情** - 美股、港股、A股、日经、英国富时等主要市场指数
+- **🥇 大宗商品** - 黄金、白银、原油、铜等商品实时价格
+- **📊 板块轮动** - A股行业板块涨跌排行与资金流向
+- **📉 股票行情** - 个股实时价格与盘口数据
+- **💰 债券市场** - 国债、企业债收益率曲线
+- **📅 财经日历** - 全球经济事件与数据发布
+- **🔥 舆情分析** - 市场情绪指标与热点追踪
 
 ### 技术特性
-- **实时推送** - WebSocket 长连接，支持数据实时更新
-- **智能缓存** - 多级缓存策略，减少 API 调用
-- **多数据源** - 支持 akshare、yfinance 等多个数据源
-- **交易日历** - 全球 10+ 市场交易/休市日查询
-- **单端口部署** - 前后端统一通过 FastAPI 服务
+- **⚡ 实时推送** - WebSocket 长连接，支持数据实时更新
+- **🧠 智能缓存** - 多级缓存策略，减少 API 调用
+- **🔌 多数据源** - 支持 akshare、yfinance 等多个数据源
+- **📅 交易日历** - 全球 10+ 市场交易/休市日查询
+- **🚀 单端口部署** - 前后端统一通过 FastAPI 服务
 
-## 技术栈
+---
+
+## 🛠️ 技术栈
 
 | 层级 | 技术 |
 |------|------|
 | 后端 | FastAPI, Pydantic, SQLite, async/await |
 | 前端 | Vue 3, TypeScript, Pinia, Vite |
 | 数据 | akshare, yfinance |
-| 工具 | pnpm, ruff, mypy, pytest |
+| 测试 | Playwright, pytest |
+| 工具 | pnpm, ruff, mypy, uv |
 
-## 快速开始
+---
+
+## 🚀 快速开始
 
 ### 前置要求
 
@@ -74,7 +119,38 @@ pnpm run dev:web
 uv run python run_app.py --fast --reload
 ```
 
-## 项目结构
+---
+
+## 🧪 测试
+
+### E2E 测试
+
+使用 Playwright 进行端到端测试：
+
+```bash
+# 运行所有 E2E 测试
+cd web && pnpm run test:e2e
+
+# 运行特定浏览器测试
+cd web && pnpm run test:e2e:chromium
+
+# 生成 README 截图
+cd web && pnpm exec playwright test screenshot-tests/take-screenshots.spec.ts --config=e2e/playwright.screenshot.config.ts
+```
+
+### 单元测试
+
+```bash
+# Python 测试
+uv run pytest tests/ -v
+
+# 前端测试
+cd web && pnpm run test
+```
+
+---
+
+## 📁 项目结构
 
 ```
 Fund-Real-Time-Valuation/
@@ -124,25 +200,24 @@ Fund-Real-Time-Valuation/
 ├── web/                      # Vue 3 前端
 │   ├── src/
 │   │   ├── views/            # 页面视图
-│   │   │   ├── HomeView.vue
-│   │   │   ├── FundsView.vue
-│   │   │   ├── CommoditiesView.vue
-│   │   │   ├── IndicesView.vue
-│   │   │   ├── SectorsView.vue
-│   │   │   ├── StocksView.vue
-│   │   │   ├── BondsView.vue
-│   │   │   ├── NewsView.vue
-│   │   │   └── SettingsView.vue
 │   │   ├── components/       # 组件
 │   │   ├── stores/           # Pinia 状态
 │   │   ├── api/              # API 调用
 │   │   └── styles/           # 样式
-│   └── package.json
+│   └── e2e/                  # E2E 测试
+│       ├── tests/            # 测试用例
+│       ├── page-objects/     # 页面对象
+│       └── screenshot-tests/ # 截图测试
 │
-└── tests/                    # 测试
+├── docs/                     # 文档
+│   └── screenshots/          # 截图资源
+│
+└── tests/                    # 单元测试
 ```
 
-## 开发命令
+---
+
+## 📝 开发命令
 
 ```bash
 # 安装依赖
@@ -161,9 +236,14 @@ cd web && pnpm run lint
 
 # 构建前端
 pnpm run build:web
+
+# 生成截图
+cd web && pnpm exec playwright test screenshot-tests/take-screenshots.spec.ts --config=e2e/playwright.screenshot.config.ts
 ```
 
-## API 接口
+---
+
+## 🔌 API 接口
 
 ### 基金
 
@@ -243,11 +323,14 @@ GET /api/indices
 GET /api/sectors
 ```
 
-### 新闻
+### 财经日历
 
 ```bash
-# 财经新闻
-GET /api/news
+# 财经日历（宏观经济事件）
+GET /api/sentiment/economic?date=2025-03-01
+
+# 微博舆情热点
+GET /api/sentiment/weibo
 ```
 
 ### 舆情
@@ -324,7 +407,9 @@ GET /ws/manager/status
 POST /ws/manager/broadcast
 ```
 
-## 配置
+---
+
+## ⚙️ 配置
 
 配置文件位置: `~/.fund-tui/`
 
@@ -334,7 +419,9 @@ POST /ws/manager/broadcast
 | `funds.yaml` | 自选基金列表 |
 | `fund_data.db` | SQLite 数据库 |
 
-## 部署
+---
+
+## 🐳 部署
 
 ### 生产构建
 
@@ -359,6 +446,8 @@ EXPOSE 8000
 CMD ["uv", "run", "python", "run_app.py"]
 ```
 
-## 许可证
+---
+
+## 📄 许可证
 
 [MIT](LICENSE)
