@@ -55,8 +55,8 @@ coverage_html/
 .sisyphus/
 .claude/
 
-# uv锁定文件
-uv.lock
+# uv锁定文件 - 保留以支持可重现构建
+# uv.lock
 
 # Playwright缓存
 .playwright-mcp/

@@ -30,8 +30,8 @@ def ensure_frontend_built(force_build: bool = False):
         else:
             print("前端未构建，正在构建...")
         subprocess.run(
-            ["pnpm", "run", "build:web"],
-            cwd=web_dir,
+            ["pnpm", "run", "build"],
+            cwd=web_dir / "web",
             check=True,
         )
         print("前端构建完成")
