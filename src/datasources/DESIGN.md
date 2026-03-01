@@ -413,26 +413,30 @@ class ErrorCode(Enum):
 
 ```
 src/datasources/
-├── base.py              # 基础类定义 (DataSource, DataSourceResult, DataSourceType)
-├── manager.py           # DataSourceManager (多源注册、故障切换、负载均衡)
-├── cache.py             # SmartCache (内存+磁盘缓存)
-├── cache_cleaner.py     # 缓存清理任务
-├── cache_warmer.py      # 缓存预热
-├── health.py            # 健康检查
-├── aggregator.py        # 数据聚合器 (同源/负载均衡)
-├── rate_limiter.py      # 速率限制
-├── unified_models.py    # 统一数据模型 (DataRequest, DataResponse)
-├── gateway.py           # DataGateway (统一入口)
-├── hot_backup.py        # 热备份 & 熔断器
-├── fund_source.py       # 基金数据源
-├── stock_source.py      # 股票数据源
-├── commodity_source.py  # 商品数据源
-├── crypto_source.py     # 加密货币数据源
-├── bond_source.py       # 债券数据源
-├── news_source.py       # 新闻数据源
-├── sector_source.py     # 板块数据源
-├── index_source.py      # 指数数据源
-└── portfolio.py         # 组合分析
+├── base.py                 # 基础类定义 (DataSource, DataSourceResult, DataSourceType)
+├── manager.py              # DataSourceManager (多源注册、故障切换、负载均衡)
+├── cache.py                # SmartCache (内存+磁盘缓存)
+├── dual_cache.py           # 双层缓存 (L1内存 + L2数据库)
+├── cache_cleaner.py        # 缓存清理任务
+├── cache_warmer.py         # 缓存预热
+├── health.py               # 健康检查
+├── aggregator.py           # 数据聚合器 (同源/负载均衡)
+├── unified_models.py       # 统一数据模型 (DataRequest, DataResponse)
+├── gateway.py              # DataGateway (统一入口)
+├── hot_backup.py           # 热备份 & 熔断器
+├── fund_source.py          # 基金数据源
+├── stock_source.py         # 股票数据源
+├── commodity_source.py     # 商品数据源
+├── bond_source.py          # 债券数据源
+├── sector_source.py        # 板块数据源
+├── index_source.py         # 指数数据源
+├── trading_calendar_source.py  # 交易日历数据源
+├── akshare_sentiment_source.py # 舆情数据源 (akshare)
+└── fund/                   # 基金数据源子模块
+    ├── __init__.py
+    ├── cache_strategy.py   # 基金缓存策略
+    ├── history_source.py   # 基金历史数据源
+    └── tushare_source.py   # Tushare 数据源
 ```
 
 ---

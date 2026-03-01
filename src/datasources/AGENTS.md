@@ -5,7 +5,7 @@
 
 ## OVERVIEW
 
-Async data sources for fund, stock, commodity, crypto, bond, news, and sector data. Multi-source failover with load balancing.
+Async data sources for fund, stock, commodity, bond, index, sector, and sentiment data. Multi-source failover with load balancing.
 
 ## WHERE TO LOOK
 
@@ -14,15 +14,23 @@ Async data sources for fund, stock, commodity, crypto, bond, news, and sector da
 | Base class | `base.py` | DataSource abstract, DataSourceResult, DataSourceType |
 | Manager | `manager.py` | Multi-source orchestration |
 | Aggregator | `aggregator.py` | Same-source, load-balanced aggregation |
+| Gateway | `gateway.py` | Unified data gateway with failover |
+| Health check | `health.py` | Data source health monitoring |
+| Hot backup | `hot_backup.py` | Hot backup data source switching |
+| Unified models | `unified_models.py` | Shared data models |
 | Fund data | `fund_source.py` | Fund valuations from akshare/yfinance |
 | Fund cache strategy | `fund/cache_strategy.py` | Database-first caching with TTL layers |
 | Stock data | `stock_source.py` | Stock prices from akshare |
 | Commodity | `commodity_source.py` | Commodity prices (gold, oil, etc.) |
-| Crypto | `crypto_source.py` | Crypto prices (BTC, ETH, etc.) |
+| Index | `index_source.py` | Global market indices |
 | Bonds | `bond_source.py` | Bond yields from Sina/AKShare |
-| News | `news_source.py` | Financial news aggregation |
 | Sectors | `sector_source.py` | Sector performance data |
-| Portfolio | `portfolio.py` | Portfolio analysis and metrics |
+| Sentiment | `akshare_sentiment_source.py` | Market sentiment data |
+| Trading calendar | `trading_calendar_source.py` | Trading calendar for multiple markets |
+| Cache | `cache.py` | In-memory caching layer |
+| Dual cache | `dual_cache.py` | Two-tier cache (memory + database) |
+| Cache warmer | `cache_warmer.py` | Preload cache on startup |
+| Cache cleaner | `cache_cleaner.py` | Periodic cache cleanup |
 
 ## CODE MAP
 

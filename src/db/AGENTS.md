@@ -11,13 +11,13 @@ SQLite database for fund/commodity configuration, history data, and news caching
 
 | Task | Location | Notes |
 |------|----------|-------|
-| DB Manager | `database.py` | DatabaseManager, ConfigDAO, table schemas |
+| DB Manager | `database.py` | DatabaseManager, most DAO classes, table schemas |
 | Fund config | `database.py` (FundConfig) | Fund with shares, cost, is_hold, sector |
 | Commodity config | `database.py` (CommodityConfig) | Commodity with source, enabled flag |
 | History records | `database.py` (FundHistoryRecord) | Net value history |
 | News cache | `database.py` (NewsRecord) | News with timestamp |
 | Cache metadata | `fund/cache_metadata_dao.py` | CacheMetadataDAO for cache status management |
-| Fund DAOs | `fund/` | Modular DAOs: config_dao, history_dao, basic_info_dao, etc. |
+| Commodity repo | `commodity_repo.py` | CommodityCacheDAO, CommodityCategoryDAO |
 
 ## CODE MAP
 
@@ -31,11 +31,15 @@ SQLite database for fund/commodity configuration, history data, and news caching
 | NewsRecord | dataclass | database.py | News cache record |
 | CacheMetadata | dataclass | database.py | Cache status metadata |
 | CacheMetadataDAO | class | fund/cache_metadata_dao.py | Cache status management, state machine support |
-| FundBasicInfoDAO | class | fund/basic_info_dao.py | Fund basic info CRUD |
-| FundConfigDAO | class | fund/config_dao.py | Fund config CRUD |
-| FundHistoryDAO | class | fund/history_dao.py | Fund history CRUD |
-| FundIntradayCacheDAO | class | fund/intraday_cache_dao.py | Intraday cache CRUD |
-| FundDailyCacheDAO | class | fund/daily_cache_dao.py | Daily cache CRUD |
+| FundHistoryDAO | class | database.py | Fund history CRUD |
+| NewsDAO | class | database.py | News cache CRUD |
+| FundIntradayCacheDAO | class | database.py | Intraday cache CRUD |
+| FundDailyCacheDAO | class | database.py | Daily cache CRUD |
+| FundBasicInfoDAO | class | database.py | Fund basic info CRUD |
+| TradingCalendarDAO | class | database.py | Trading calendar CRUD |
+| ExchangeHolidayDAO | class | database.py | Exchange holiday CRUD |
+| CommodityCacheDAO | class | commodity_repo.py | Commodity cache CRUD |
+| CommodityCategoryDAO | class | commodity_repo.py | Commodity category CRUD |
 
 ## CONVENTIONS
 
