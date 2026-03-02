@@ -247,7 +247,10 @@ class TradingCalendarSource(DataSource):
             market = Market(market)
 
         if check_datetime is None:
-            check_datetime = datetime.now()
+            # 使用市场当地时区的当前时间
+            tz_name = MARKET_TIMEZONES.get(market, "UTC")
+            tz = ZoneInfo(tz_name)
+            check_datetime = datetime.now(tz)
 
         hours = MARKET_TRADING_HOURS.get(market)
         if not hours:

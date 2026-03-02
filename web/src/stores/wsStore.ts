@@ -1,15 +1,30 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { useWebSocket, type SubscriptionType } from '@/composables/useWebSocket'
+import { ref, computed, watch } from 'vue'
+import { useWebSocket, type SubscriptionType, type WSMessage } from '@/composables/useWebSocket'
 
 export const useWSStore = defineStore('websocket', () => {
+  const messageHandlers = ref<Map<string, ((data: unknown) => void)[]>>(new Map())
+
   const ws = useWebSocket({
     autoReconnect: true,
     reconnectInterval: 3000,
+    onMessage: (message: WSMessage) => {
+      // 当收到消息时，触发对应的处理器
+      console.log('[WSStore] 收到消息:', message.type, message.data)
+      const handlers = messageHandlers.value.get(message.type)
+      if (handlers) {
+        handlers.forEach(handler => {
+          try {
+            handler(message.data)
+          } catch (e) {
+            console.error('[WSStore] 处理器执行错误:', e)
+          }
+        })
+      }
+    },
   })
 
   const subscriptions = ref<Set<SubscriptionType>>(new Set())
-  const messageHandlers = ref<Map<string, ((data: unknown) => void)[]>>(new Map())
 
   function on(type: string, handler: (data: unknown) => void) {
     if (!messageHandlers.value.has(type)) {

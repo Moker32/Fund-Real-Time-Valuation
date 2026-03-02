@@ -51,6 +51,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
+  // 待发送的消息队列（连接建立前缓存）
+  const pendingMessages: { action: string; data?: unknown }[] = []
+
   function connect() {
     if (ws.value?.readyState === WebSocket.OPEN) {
       return
@@ -62,6 +65,15 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
       console.log('[WS] Connected')
       isConnected.value = true
       error.value = null
+      
+      // 发送待处理的消息
+      while (pendingMessages.length > 0) {
+        const msg = pendingMessages.shift()
+        if (msg) {
+          send(msg.action, msg.data)
+        }
+      }
+      
       onConnected?.()
       startHeartbeat()
     }
@@ -115,6 +127,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   function send(action: string, data?: unknown) {
     if (ws.value?.readyState === WebSocket.OPEN) {
       ws.value.send(JSON.stringify({ action, data }))
+    } else if (ws.value?.readyState === WebSocket.CONNECTING) {
+      // 连接建立中，缓存消息
+      pendingMessages.push({ action, data })
+      console.log('[WS] 缓存消息，等待连接:', action, data)
+    } else {
+      console.warn('[WS] 无法发送消息，连接未建立:', action)
     }
   }
 
