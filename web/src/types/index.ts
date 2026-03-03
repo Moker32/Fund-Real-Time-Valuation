@@ -14,6 +14,7 @@ export interface FundHistory {
 export interface FundIntraday {
   time: string;       // 时间 (HH:mm 格式)
   price: number;      // 实时价格
+  change?: number;    // 估算增长率 (%)
 }
 
 // Fund 类型添加日内数据字段
@@ -105,7 +106,7 @@ export interface CommodityHistoryItem {
 }
 
 export interface CommodityHistoryResponse {
-  commodity_type: string;
+  commodityType: string;
   name: string;
   history: CommodityHistoryItem[];
   timestamp: string;
@@ -116,7 +117,7 @@ export interface WatchedCommodity {
   symbol: string;
   name: string;
   category: string;
-  added_at: string;
+  addedAt: string;
 }
 
 export interface WatchlistResponse {
@@ -224,7 +225,7 @@ export interface SectorStock {
 }
 
 export interface SectorDetailResponse {
-  sector_name: string;
+  sectorName: string;
   stocks: SectorStock[];
   count: number;
   timestamp: string;
@@ -282,8 +283,6 @@ export interface AppState {
   overview: Overview | null;
   health: HealthStatus | null;
   sidebarCollapsed: boolean;
-  refreshInterval: number;
-  autoRefresh: boolean;
   showChart: boolean;
 }
 
@@ -293,13 +292,13 @@ export interface Stock {
   name: string;
   price: number;
   change: number;
-  change_pct: number;
+  changePercent: number;
   open: number;
   high: number;
   low: number;
   volume: string;
   amount: string;
-  pre_close: number;
+  prevClose: number;
   timestamp: string;
 }
 
@@ -340,4 +339,40 @@ export interface SentimentAllData {
   timestamp: string;
   source: string;
   errors: string[] | null;
+}
+
+// Bond Types
+export interface Bond {
+  code: string;
+  name: string | null;
+  price: number | null;
+  change: number | null;
+  changePercent: number | null;
+  volume: number | null;
+  amount: number | null;
+  pre_close?: number | null;
+  high?: number | null;
+  low?: number | null;
+  bid?: number | null;
+  ask?: number | null;
+}
+
+export interface BondListResponse {
+  bonds: Bond[];
+  total: number;
+  source: string;
+}
+
+export interface BondDetailResponse {
+  success: boolean;
+  data: Bond | null;
+  error: string | null;
+  source: string;
+  timestamp: number;
+}
+
+export interface BondSearchResponse {
+  keyword: string;
+  bonds: Bond[];
+  total: number;
 }

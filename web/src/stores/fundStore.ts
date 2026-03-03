@@ -37,9 +37,6 @@ export const useFundStore = defineStore('funds', () => {
   const loadingTotal = ref(0);     // 需要加载的总数
   const error = ref<string | null>(null);
   const lastUpdated = ref<string | null>(null);
-  
-  const refreshInterval = ref(30); // seconds
-  const autoRefresh = ref(true);
   const showChart = ref(true); // 是否显示基金卡片图表，默认开启
   const retryCount = ref(0);
   const maxRetries = 2;
@@ -177,14 +174,6 @@ export const useFundStore = defineStore('funds', () => {
     } catch (err) {
       console.error(`[FundStore] fetchFundEstimate error for ${code}:`, err);
     }
-  }
-
-  function setRefreshInterval(seconds: number) {
-    refreshInterval.value = seconds;
-  }
-
-  function setAutoRefresh(enabled: boolean) {
-    autoRefresh.value = enabled;
   }
 
   function setShowChart(enabled: boolean) {
@@ -403,8 +392,6 @@ export const useFundStore = defineStore('funds', () => {
     loadingTotal,
     error,
     lastUpdated,
-    refreshInterval,
-    autoRefresh,
     showChart,
     retryCount,
     maxRetries,
@@ -422,8 +409,6 @@ export const useFundStore = defineStore('funds', () => {
     fetchHistory,
     fetchIntraday,
     fetchIntradayByDate,
-    setRefreshInterval,
-    setAutoRefresh,
     setShowChart,
     clearError,
     retry,
@@ -434,6 +419,6 @@ export const useFundStore = defineStore('funds', () => {
 }, {
   persist: {
     key: 'fund-store',
-    pick: ['refreshInterval', 'autoRefresh', 'showChart'],
+    pick: ['showChart'],
   },
 });

@@ -1,16 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import BondCard from '@/components/BondCard.vue';
-
-interface Bond {
-  code: string;
-  name: string | null;
-  price: number | null;
-  change: number | null;
-  change_pct: number | null;
-  volume: number | null;
-  amount: number | null;
-}
+import { bondApi, ApiError } from '@/api';
+import type { Bond } from '@/types';
 
 const bonds = ref<Bond[]>([]);
 const loading = ref(false);
@@ -40,14 +32,14 @@ async function fetchBonds() {
   error.value = null;
 
   try {
-    const response = await fetch(`/api/bonds?bond_type=${selectedType.value}`);
-    if (!response.ok) {
-      throw new Error('获取债券数据失败');
-    }
-    const data = await response.json();
+    const data = await bondApi.getBonds(selectedType.value);
     bonds.value = data.bonds || [];
   } catch (e) {
-    error.value = e instanceof Error ? e.message : '未知错误';
+    if (e instanceof ApiError) {
+      error.value = e.message;
+    } else {
+      error.value = e instanceof Error ? e.message : '未知错误';
+    }
     console.error('获取债券数据失败:', e);
   } finally {
     loading.value = false;
@@ -129,7 +121,7 @@ onMounted(() => {
         :name="bond.name || undefined"
         :price="bond.price ?? undefined"
         :change="bond.change ?? undefined"
-        :change-pct="bond.change_pct ?? undefined"
+        :change-pct="bond.changePercent ?? undefined"
         :volume="bond.volume ?? undefined"
         :amount="bond.amount ?? undefined"
       />

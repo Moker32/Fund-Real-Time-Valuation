@@ -21,6 +21,29 @@ from fastapi import WebSocket
 logger = logging.getLogger(__name__)
 
 
+def _to_camel_case(name: str) -> str:
+    """将 snake_case 转换为 camelCase"""
+    components = name.split("_")
+    return components[0] + "".join(x.title() for x in components[1:])
+
+
+def _convert_dict_to_camel_case(data: dict) -> dict:
+    """将字典的所有键从 snake_case 转换为 camelCase"""
+    result: dict = {}
+    for key, value in data.items():
+        camel_key = _to_camel_case(key)
+        if isinstance(value, dict):
+            result[camel_key] = _convert_dict_to_camel_case(value)
+        elif isinstance(value, list):
+            result[camel_key] = [
+                _convert_dict_to_camel_case(item) if isinstance(item, dict) else item
+                for item in value
+            ]
+        else:
+            result[camel_key] = value
+    return result
+
+
 def _safe_json_default(obj: Any) -> Any:
     """
     安全的 JSON 序列化默认处理函数。
@@ -464,10 +487,11 @@ class WebSocketManager:
         return len(self._subscriptions.get(subscription, set()))
 
     def get_clients_info(self) -> list[dict[str, Any]]:
-        """获取所有客户端信息"""
+        """获取所有客户端信息（返回 camelCase 格式）"""
         result = []
         for client in self._clients.values():
-            result.append(
+            # 使用 snake_case 构建原始数据，然后转换为 camelCase
+            client_info = _convert_dict_to_camel_case(
                 {
                     "client_id": client.client_id,
                     "state": client.state.value,
@@ -476,6 +500,7 @@ class WebSocketManager:
                     "last_heartbeat": client.last_heartbeat.isoformat(),
                 }
             )
+            result.append(client_info)
         return result
 
     def get_subscriptions_info(self) -> dict[str, int]:

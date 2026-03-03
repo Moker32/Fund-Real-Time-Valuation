@@ -24,13 +24,13 @@ class StockData(TypedDict):
     name: str
     price: float
     change: float
-    change_pct: float
+    changePercent: float
     open: float
     high: float
     low: float
     volume: str
     amount: str
-    pre_close: float
+    prevClose: float
     timestamp: str
 
 
@@ -57,13 +57,13 @@ def parse_stock_result(result, code: str) -> StockData | None:
         name=data.get("name", ""),
         price=float(data.get("price", 0)),
         change=float(data.get("change", 0)),
-        change_pct=float(data.get("change_pct", 0)),
+        changePercent=float(data.get("change_pct", 0)),
         open=float(data.get("open", 0)),
         high=float(data.get("high", 0)),
         low=float(data.get("low", 0)),
         volume=data.get("volume", ""),
         amount=data.get("amount", ""),
-        pre_close=float(data.get("pre_close", 0)),
+        prevClose=float(data.get("pre_close", 0)),
         timestamp=datetime.now().isoformat(),
     )
 

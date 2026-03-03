@@ -11,7 +11,11 @@ import logging
 
 from src.datasources.manager import DataSourceManager, DataSourceType
 from src.datasources.trading_calendar_source import Market, TradingCalendarSource
-from src.utils.websocket_manager import WebSocketManager, get_websocket_manager
+from src.utils.websocket_manager import (
+    WebSocketManager,
+    _convert_dict_to_camel_case,
+    get_websocket_manager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -165,17 +169,21 @@ class RealtimePusher:
                             await asyncio.sleep(fund_interval)
                             continue
 
+                        # 转换为 camelCase 格式
+                        camel_data = [_convert_dict_to_camel_case(item) for item in diff_data]
                         sent = await self.ws_manager.broadcast_to_subscription(
                             subscription="funds",
                             message_type="fund_update",
-                            data={"funds": diff_data},  # 包装为对象，与前端期望格式一致
+                            data={"funds": camel_data},  # 包装为对象，与前端期望格式一致
                         )
                         logger.info(f"推送 {len(diff_data)} 条变化基金数据，发送到 {sent} 个客户端")
                     else:
+                        # 转换为 camelCase 格式
+                        camel_data = [_convert_dict_to_camel_case(item) for item in new_data]
                         sent = await self.ws_manager.broadcast_to_subscription(
                             subscription="funds",
                             message_type="fund_update",
-                            data={"funds": new_data},  # 包装为对象
+                            data={"funds": camel_data},  # 包装为对象
                         )
                         logger.info(f"首次推送 {len(new_data)} 条基金数据，发送到 {sent} 个客户端")
 
@@ -210,17 +218,21 @@ class RealtimePusher:
                             await asyncio.sleep(commodity_interval)
                             continue
 
+                        # 转换为 camelCase 格式
+                        camel_data = [_convert_dict_to_camel_case(item) for item in diff_data]
                         sent = await self.ws_manager.broadcast_to_subscription(
                             subscription="commodities",
                             message_type="commodity_update",
-                            data={"commodities": diff_data},  # 包装为对象
+                            data={"commodities": camel_data},  # 包装为对象
                         )
                         logger.info(f"推送 {len(diff_data)} 条变化商品数据，发送到 {sent} 个客户端")
                     else:
+                        # 转换为 camelCase 格式
+                        camel_data = [_convert_dict_to_camel_case(item) for item in new_data]
                         sent = await self.ws_manager.broadcast_to_subscription(
                             subscription="commodities",
                             message_type="commodity_update",
-                            data={"commodities": new_data},  # 包装为对象
+                            data={"commodities": camel_data},  # 包装为对象
                         )
                         logger.info(f"首次推送 {len(new_data)} 条商品数据，发送到 {sent} 个客户端")
 
@@ -282,17 +294,21 @@ class RealtimePusher:
                             await asyncio.sleep(index_interval)
                             continue
 
+                        # 转换为 camelCase 格式
+                        camel_data = [_convert_dict_to_camel_case(item) for item in diff_data]
                         sent = await self.ws_manager.broadcast_to_subscription(
                             subscription="indices",
                             message_type="index_update",
-                            data={"indices": diff_data},  # 包装为对象
+                            data={"indices": camel_data},  # 包装为对象
                         )
                         logger.info(f"推送 {len(diff_data)} 条变化指数数据，发送到 {sent} 个客户端")
                     else:
+                        # 转换为 camelCase 格式
+                        camel_data = [_convert_dict_to_camel_case(item) for item in new_data]
                         sent = await self.ws_manager.broadcast_to_subscription(
                             subscription="indices",
                             message_type="index_update",
-                            data={"indices": new_data},  # 包装为对象
+                            data={"indices": camel_data},  # 包装为对象
                         )
                         logger.info(f"首次推送 {len(new_data)} 条指数数据，发送到 {sent} 个客户端")
 

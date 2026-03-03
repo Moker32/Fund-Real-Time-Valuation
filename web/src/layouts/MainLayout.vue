@@ -250,36 +250,16 @@ async function refresh() {
 }
 
 function setupWebSocketHandlers() {
-  // 辅助函数：将后端 snake_case 字段映射为前端 camelCase 字段，过滤 undefined 值
-  function mapFundFields(rawFund: Record<string, unknown>): Record<string, unknown> {
-    const mapped: Record<string, unknown> = {};
-    if (rawFund.fund_code !== undefined) mapped.code = rawFund.fund_code;
-    if (rawFund.name !== undefined) mapped.name = rawFund.name;
-    if (rawFund.unit_net_value !== undefined) mapped.netValue = rawFund.unit_net_value;
-    if (rawFund.net_value_date !== undefined) mapped.netValueDate = rawFund.net_value_date;
-    if (rawFund.estimated_net_value !== undefined) mapped.estimateValue = rawFund.estimated_net_value;
-    if (rawFund.estimated_growth_rate !== undefined) mapped.estimateChangePercent = rawFund.estimated_growth_rate;
-    if (rawFund.estimate_time !== undefined) mapped.estimateTime = rawFund.estimate_time;
-    if (rawFund.prev_net_value !== undefined) mapped.prevNetValue = rawFund.prev_net_value;
-    if (rawFund.prev_net_value_date !== undefined) mapped.prevNetValueDate = rawFund.prev_net_value_date;
-    if (rawFund.type !== undefined) mapped.type = rawFund.type;
-    if (rawFund.has_real_time_estimate !== undefined) mapped.hasRealTimeEstimate = rawFund.has_real_time_estimate;
-    return mapped;
-  }
-
   wsStore.on('fund_update', (data) => {
-    const payload = data as { funds?: Record<string, unknown>[] };
+    const payload = data as { funds?: Fund[] };
     const funds = payload?.funds;
     if (funds && funds.length > 0) {
-      funds.forEach((rawFund) => {
-        // 字段名映射：snake_case → camelCase
-        const mappedFund = mapFundFields(rawFund);
-        const fundCode = mappedFund.code as string | undefined;
-        // 只有当 code 存在时才进行更新
+      funds.forEach((updatedFund) => {
+        const fundCode = updatedFund.code;
         if (fundCode) {
           const index = fundStore.funds.findIndex(f => f.code === fundCode);
           if (index !== -1) {
-            fundStore.funds[index] = { ...fundStore.funds[index], ...mappedFund } as Fund;
+            fundStore.funds[index] = { ...fundStore.funds[index], ...updatedFund };
           }
         }
       });

@@ -74,7 +74,7 @@ class CommodityCategoriesResponse(TypedDict):
 class CommodityHistoryResponse(TypedDict):
     """历史数据响应"""
 
-    commodity_type: str
+    commodityType: str
     name: str
     history: list[dict]
     timestamp: str
@@ -322,7 +322,7 @@ async def get_history(
         name = name_source.get_name(commodity_type)
 
         return {
-            "commodity_type": commodity_type,
+            "commodityType": commodity_type,
             "name": name,
             "history": history,
             "timestamp": datetime.now().isoformat() + "Z",
@@ -557,7 +557,7 @@ class WatchedCommodityResponse(TypedDict):
     symbol: str
     name: str
     category: str
-    added_at: str
+    addedAt: str
 
 
 class WatchedCommodityAddRequest(TypedDict):

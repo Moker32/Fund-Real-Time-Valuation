@@ -25,7 +25,7 @@ class SectorListData(TypedDict):
 class SectorDetailData(TypedDict):
     """板块详情响应数据结构"""
 
-    sector_name: str
+    sectorName: str
     stocks: list[dict]
     count: int
     timestamp: str
@@ -264,13 +264,13 @@ async def get_industry_detail(
             )
 
         return {
-            "sector_name": data.get("sector_name", sector_name),
+            "sectorName": data.get("sector_name", sector_name),
             "stocks": stocks,
             "count": data.get("count", len(stocks)),
             "timestamp": current_time,
         }
 
-    return {"sector_name": sector_name, "stocks": [], "count": 0, "timestamp": current_time}
+    return {"sectorName": sector_name, "stocks": [], "count": 0, "timestamp": current_time}
 
 
 @router.get(
@@ -328,10 +328,10 @@ async def get_concept_detail(
             )
 
         return {
-            "sector_name": data.get("sector_name", sector_name),
+            "sectorName": data.get("sector_name", sector_name),
             "stocks": stocks,
             "count": data.get("count", len(stocks)),
             "timestamp": current_time,
         }
 
-    return {"sector_name": sector_name, "stocks": [], "count": 0, "timestamp": current_time}
+    return {"sectorName": sector_name, "stocks": [], "count": 0, "timestamp": current_time}
