@@ -18,8 +18,7 @@ class DataSourceType(Enum):
     COMMODITY = "commodity"
     NEWS = "news"
     SECTOR = "sector"
-    STOCK = "stock"  # 股票行情
-    BOND = "bond"  # 债券数据
+    STOCK = "stock"  # 股票行情（指数数据源复用此类型）
     CRYPTO = "crypto"  # 加密货币
 
 

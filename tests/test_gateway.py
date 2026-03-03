@@ -249,25 +249,6 @@ class TestDataGateway:
         assert result.success is True
 
     @pytest.mark.asyncio
-    async def test_get_stock(self, mock_manager):
-        """测试获取股票数据"""
-        gateway = DataGateway(manager=mock_manager)
-        
-        mock_response = DataResponse(
-            request_id="test_001",
-            success=True,
-            status=ResponseStatus.SUCCESS,
-            data={"price": 100.0},
-            source="stock_source",
-            timestamp=1000.0
-        )
-        mock_manager.request = AsyncMock(return_value=mock_response)
-        
-        result = await gateway.get_stock("600000")
-        
-        assert result.success is True
-
-    @pytest.mark.asyncio
     async def test_get_commodity(self, mock_manager):
         """测试获取大宗商品数据"""
         gateway = DataGateway(manager=mock_manager)

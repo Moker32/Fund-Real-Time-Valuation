@@ -30,7 +30,6 @@ class TestDataSourceType:
         assert DataSourceType.NEWS.value == "news"
         assert DataSourceType.SECTOR.value == "sector"
         assert DataSourceType.STOCK.value == "stock"
-        assert DataSourceType.BOND.value == "bond"
         assert DataSourceType.CRYPTO.value == "crypto"
 
 

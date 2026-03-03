@@ -57,8 +57,7 @@ class DataSourceManager:
             DataSourceType.COMMODITY: [],
             DataSourceType.NEWS: [],
             DataSourceType.SECTOR: [],
-            DataSourceType.STOCK: [],
-            DataSourceType.BOND: [],
+            DataSourceType.STOCK: [],  # 指数数据源复用此类型
         }
         self._max_concurrent = max_concurrent  # 延迟创建 semaphore
         self._semaphore: asyncio.Semaphore | None = None  # 延迟初始化
@@ -68,8 +67,7 @@ class DataSourceManager:
             DataSourceType.COMMODITY: 0,
             DataSourceType.NEWS: 0,
             DataSourceType.SECTOR: 0,
-            DataSourceType.STOCK: 0,
-            DataSourceType.BOND: 0,
+            DataSourceType.STOCK: 0,  # 指数数据源复用此类型
         }
         self._request_history: list[dict[str, Any]] = []
         self._max_history = 1000
@@ -748,27 +746,10 @@ def create_default_manager(
         ),
     )
 
-    # === 新增股票数据源 ===
-    from .stock_source import SinaStockDataSource, YahooStockSource
-
-    manager.register(SinaStockDataSource())
-    manager.register(YahooStockSource())
-
-    # === 新增债券数据源 ===
-    from .bond_source import AKShareBondSource, SinaBondDataSource
-
-    manager.register(SinaBondDataSource())
-    manager.register(AKShareBondSource())
-
     # === 新增全球指数数据源 ===
     from .index_source import HybridIndexSource
 
     manager.register(HybridIndexSource())
-
-    # === 新增 Baostock 股票数据源 ===
-    from .stock_source import BaostockStockSource
-
-    manager.register(BaostockStockSource())
 
     # === 新增 Tushare 基金数据源 ===
     from .fund_source import TushareFundSource

@@ -293,24 +293,6 @@ class DataGateway:
         )
         return await self.request(req)
 
-    async def get_stock(self, code: str, allow_fallback: bool = True) -> DataResponse:
-        """
-        获取股票数据
-
-        Args:
-            code: 股票代码
-            allow_fallback: 是否允许降级
-
-        Returns:
-            DataResponse: 股票数据响应
-        """
-        req = DataRequest(
-            symbol=code,
-            source_type=DataSourceType.STOCK,
-            allow_fallback=allow_fallback,
-        )
-        return await self.request(req)
-
     async def get_commodity(self, name: str, allow_fallback: bool = True) -> DataResponse:
         """
         获取商品数据
@@ -343,24 +325,6 @@ class DataGateway:
         req = DataRequest(
             symbol=symbol,
             source_type=DataSourceType.CRYPTO,
-            allow_fallback=allow_fallback,
-        )
-        return await self.request(req)
-
-    async def get_bond(self, code: str, allow_fallback: bool = True) -> DataResponse:
-        """
-        获取债券数据
-
-        Args:
-            code: 债券代码
-            allow_fallback: 是否允许降级
-
-        Returns:
-            DataResponse: 债券数据响应
-        """
-        req = DataRequest(
-            symbol=code,
-            source_type=DataSourceType.BOND,
             allow_fallback=allow_fallback,
         )
         return await self.request(req)

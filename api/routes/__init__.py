@@ -3,11 +3,11 @@ API 路由模块
 """
 
 from . import (
-    bonds,
     cache,
     commodities,
     datasource,
     funds,
+    holidays,
     indices,
     overview,
     sectors,
@@ -17,11 +17,11 @@ from . import (
 )
 
 __all__ = [
-    "bonds",
     "cache",
     "commodities",
     "datasource",
     "funds",
+    "holidays",
     "indices",
     "overview",
     "sectors",

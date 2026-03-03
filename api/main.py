@@ -30,16 +30,15 @@ from .dependencies import (
 )
 from .models import DataSourceHealthItem, HealthDetailResponse, HealthResponse
 from .routes import (
-    bonds,
     cache,
     commodities,
     datasource,
     funds,
+    holidays,
     indices,
     overview,
     sectors,
     sentiment,
-    stocks,
     trading_calendar,
     websocket,
 )
@@ -292,8 +291,7 @@ app.include_router(cache.router)
 app.include_router(trading_calendar.router)
 app.include_router(sentiment.router)
 app.include_router(datasource.router)
-app.include_router(stocks.router)
-app.include_router(bonds.router)
+app.include_router(holidays.router)
 app.include_router(websocket.router)
 
 

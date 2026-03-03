@@ -8,7 +8,6 @@ API 路由测试
 def test_routes_module_imports():
     """测试各个路由模块可以正确导入"""
     from api.routes import (
-        bonds,
         cache,
         commodities,
         datasource,
@@ -22,7 +21,6 @@ def test_routes_module_imports():
     )
 
     # 验证路由存在
-    assert hasattr(bonds, 'router')
     assert hasattr(cache, 'router')
     assert hasattr(commodities, 'router')
     assert hasattr(datasource, 'router')

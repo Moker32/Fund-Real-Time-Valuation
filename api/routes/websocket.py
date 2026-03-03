@@ -176,26 +176,6 @@ async def push_sector_update(sector_data: dict[str, Any]):
     )
 
 
-async def push_stock_update(stock_data: dict[str, Any]):
-    """Push stock update"""
-    manager = get_websocket_manager()
-    await manager.broadcast_to_subscription(
-        subscription="stocks",
-        message_type="stock_update",
-        data=stock_data,
-    )
-
-
-async def push_bond_update(bond_data: dict[str, Any]):
-    """Push bond update"""
-    manager = get_websocket_manager()
-    await manager.broadcast_to_subscription(
-        subscription="bonds",
-        message_type="bond_update",
-        data=bond_data,
-    )
-
-
 async def push_all_update(data: dict[str, Any]):
     """Push full data update"""
     manager = get_websocket_manager()

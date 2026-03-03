@@ -1,12 +1,10 @@
 import { ref, onUnmounted } from 'vue'
 
-export type MessageType = 
+export type MessageType =
   | 'fund_update'
   | 'commodity_update'
   | 'index_update'
   | 'sector_update'
-  | 'stock_update'
-  | 'bond_update'
   | 'data_update'
   | 'subscribed'
   | 'subscriptions'
@@ -19,7 +17,7 @@ export interface WSMessage {
   timestamp: string
 }
 
-export type SubscriptionType = 'funds' | 'commodities' | 'indices' | 'sectors' | 'stocks' | 'bonds' | 'all'
+export type SubscriptionType = 'funds' | 'commodities' | 'indices' | 'sectors' | 'all'
 
 export interface UseWebSocketOptions {
   url?: string

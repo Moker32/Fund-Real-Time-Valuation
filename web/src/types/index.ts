@@ -286,22 +286,6 @@ export interface AppState {
   showChart: boolean;
 }
 
-// Stock Types
-export interface Stock {
-  code: string;
-  name: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  open: number;
-  high: number;
-  low: number;
-  volume: string;
-  amount: string;
-  prevClose: number;
-  timestamp: string;
-}
-
 // Economic Calendar Types
 export interface EconomicEventItem {
   日期: string;
@@ -341,38 +325,3 @@ export interface SentimentAllData {
   errors: string[] | null;
 }
 
-// Bond Types
-export interface Bond {
-  code: string;
-  name: string | null;
-  price: number | null;
-  change: number | null;
-  changePercent: number | null;
-  volume: number | null;
-  amount: number | null;
-  pre_close?: number | null;
-  high?: number | null;
-  low?: number | null;
-  bid?: number | null;
-  ask?: number | null;
-}
-
-export interface BondListResponse {
-  bonds: Bond[];
-  total: number;
-  source: string;
-}
-
-export interface BondDetailResponse {
-  success: boolean;
-  data: Bond | null;
-  error: string | null;
-  source: string;
-  timestamp: number;
-}
-
-export interface BondSearchResponse {
-  keyword: string;
-  bonds: Bond[];
-  total: number;
-}
