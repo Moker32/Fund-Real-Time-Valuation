@@ -161,32 +161,14 @@ class RealtimePusher:
                     logger.warning(f"基金推送: {failed_count}/{len(fund_codes)} 只获取失败")
                 
                 if new_data:
-                    if self._last_fund_data is not None:
-                        diff_data = self._diff_data("funds", self._last_fund_data, new_data)
-                        if diff_data is None:
-                            logger.debug("基金数据无变化，跳过推送")
-                            self._last_fund_data = new_data
-                            await asyncio.sleep(fund_interval)
-                            continue
-
-                        # 转换为 camelCase 格式
-                        camel_data = [_convert_dict_to_camel_case(item) for item in diff_data]
-                        sent = await self.ws_manager.broadcast_to_subscription(
-                            subscription="funds",
-                            message_type="fund_update",
-                            data={"funds": camel_data},  # 包装为对象，与前端期望格式一致
-                        )
-                        logger.info(f"推送 {len(diff_data)} 条变化基金数据，发送到 {sent} 个客户端")
-                    else:
-                        # 转换为 camelCase 格式
-                        camel_data = [_convert_dict_to_camel_case(item) for item in new_data]
-                        sent = await self.ws_manager.broadcast_to_subscription(
-                            subscription="funds",
-                            message_type="fund_update",
-                            data={"funds": camel_data},  # 包装为对象
-                        )
-                        logger.info(f"首次推送 {len(new_data)} 条基金数据，发送到 {sent} 个客户端")
-
+                    # 每次都推送完整数据（不使用差量更新）
+                    camel_data = [_convert_dict_to_camel_case(item) for item in new_data]
+                    sent = await self.ws_manager.broadcast_to_subscription(
+                        subscription="funds",
+                        message_type="fund_update",
+                        data={"funds": camel_data},
+                    )
+                    logger.info(f"推送 {len(new_data)} 条基金数据，发送到 {sent} 个客户端")
                     self._last_fund_data = new_data
                 else:
                     logger.warning("基金推送: 所有基金数据获取失败")
