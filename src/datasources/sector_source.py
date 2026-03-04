@@ -932,10 +932,35 @@ class EastMoneySectorSource(DataSource):
             loop = asyncio.get_event_loop()
 
             if sector_type == "industry":
-                # 使用 run_in_executor 包装同步调用
-                df = await loop.run_in_executor(None, ak.stock_board_industry_spot_em)
+                # 使用 run_in_executor 包装同步调用，添加10秒超时控制
+                try:
+                    df = await asyncio.wait_for(
+                        loop.run_in_executor(None, ak.stock_board_industry_spot_em),
+                        timeout=10.0,
+                    )
+                except asyncio.TimeoutError:
+                    return DataSourceResult(
+                        success=False,
+                        error="获取行业板块数据超时（10秒）",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"sector_type": sector_type, "error_type": "TimeoutError"},
+                    )
             elif sector_type == "concept":
-                df = await loop.run_in_executor(None, ak.stock_board_concept_spot_em)
+                # 使用 run_in_executor 包装同步调用，添加10秒超时控制
+                try:
+                    df = await asyncio.wait_for(
+                        loop.run_in_executor(None, ak.stock_board_concept_spot_em),
+                        timeout=10.0,
+                    )
+                except asyncio.TimeoutError:
+                    return DataSourceResult(
+                        success=False,
+                        error="获取概念板块数据超时（10秒）",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"sector_type": sector_type, "error_type": "TimeoutError"},
+                    )
             else:
                 return DataSourceResult(
                     success=False,
@@ -1097,8 +1122,15 @@ class EastMoneySectorSource(DataSource):
 
             loop = asyncio.get_event_loop()
 
-            # 尝试获取行业板块实时数据
-            df = await loop.run_in_executor(None, ak.stock_board_industry_spot_em)
+            # 尝试获取行业板块实时数据，添加10秒超时控制
+            try:
+                df = await asyncio.wait_for(
+                    loop.run_in_executor(None, ak.stock_board_industry_spot_em),
+                    timeout=10.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("健康检查超时（10秒）")
+                return False
 
             # 验证返回数据
             if df is not None and not df.empty:

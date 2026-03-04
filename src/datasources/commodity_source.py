@@ -63,6 +63,9 @@ class CommodityDataSource(DataSource):
 class YFinanceCommoditySource(CommodityDataSource):
     """yfinance 商品数据源"""
 
+    # 并发控制：最多 3 个并发请求
+    _semaphore: asyncio.Semaphore | None = None
+
     # 商品 ticker 映射（yfinance 不支持上海黄金交易所 SG=f）
     COMMODITY_TICKERS = {
         # 贵金属
@@ -93,6 +96,9 @@ class YFinanceCommoditySource(CommodityDataSource):
         "eth_futures": "ETH=F",  # 以太坊期货
     }
 
+    # yfinance 调用超时时间（秒）
+    YFINANCE_TIMEOUT = 10.0
+
     def __init__(self, timeout: float = 15.0):
         super().__init__(name="yfinance_commodity", timeout=timeout)
         # 加密货币 ticker 映射 (使用 Binance)
@@ -100,6 +106,43 @@ class YFinanceCommoditySource(CommodityDataSource):
             "btc": "BTCUSDT",
             "eth": "ETHUSDT",
         }
+
+    @classmethod
+    def _get_semaphore(cls) -> asyncio.Semaphore:
+        """获取并发控制信号量（懒加载）"""
+        if cls._semaphore is None:
+            cls._semaphore = asyncio.Semaphore(3)
+        return cls._semaphore
+
+    async def _fetch_yfinance_info(self, ticker: str) -> dict[str, Any]:
+        """
+        使用 run_in_executor 获取 yfinance 数据，带超时控制
+
+        Args:
+            ticker: yfinance ticker 符号
+
+        Returns:
+            dict: yfinance info 字典
+
+        Raises:
+            asyncio.TimeoutError: 超时
+            Exception: 其他错误
+        """
+        import yfinance as yf
+
+        loop = asyncio.get_event_loop()
+
+        async with self._get_semaphore():
+            try:
+                ticker_obj = yf.Ticker(ticker)
+                info = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: ticker_obj.info),
+                    timeout=self.YFINANCE_TIMEOUT
+                )
+                return info
+            except asyncio.TimeoutError:
+                logger.warning(f"[YFinance] 获取 {ticker} 超时 ({self.YFINANCE_TIMEOUT}s)")
+                raise
 
     async def fetch(self, commodity_type: str = "gold") -> DataSourceResult:
         """
@@ -149,8 +192,6 @@ class YFinanceCommoditySource(CommodityDataSource):
             )
 
         try:
-            import yfinance as yf
-
             ticker = self.COMMODITY_TICKERS.get(commodity_type)
             if not ticker:
                 logger.warning(f"[YFinance] 不支持的商品类型: {commodity_type}")
@@ -164,9 +205,8 @@ class YFinanceCommoditySource(CommodityDataSource):
 
             logger.debug(f"[YFinance] fetching {commodity_type} -> ticker={ticker}")
 
-            # 获取数据
-            ticker_obj = yf.Ticker(ticker)
-            info = ticker_obj.info
+            # 使用异步方法获取数据（带超时控制和并发控制）
+            info = await self._fetch_yfinance_info(ticker)
 
             if not info or info.get("symbol") is None:
                 logger.warning(f"[YFinance] ticker {ticker} 返回空数据或 404")
@@ -315,11 +355,9 @@ class YFinanceCommoditySource(CommodityDataSource):
             if symbol == ticker:
                 return await self._fetch_from_binance(commodity_type)
 
-        import yfinance as yf
-
         try:
-            ticker_obj = yf.Ticker(ticker)
-            info = ticker_obj.info
+            # 使用异步方法获取数据（带超时控制和并发控制）
+            info = await self._fetch_yfinance_info(ticker)
 
             price = info.get("currentPrice", info.get("regularMarketPrice"))
             change = info.get("regularMarketChange", info.get("change", 0))

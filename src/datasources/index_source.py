@@ -6,12 +6,15 @@
 """
 
 import asyncio
+import logging
 import re
 import time
 from datetime import datetime
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from .base import DataSource, DataSourceResult, DataSourceType
 
@@ -225,8 +228,51 @@ class IndexDataSource(DataSource):
 class YahooIndexSource(IndexDataSource):
     """Yahoo Finance 全球指数数据源"""
 
-    def __init__(self, timeout: float = 30.0):
+    # 并发控制：最多 3 个并发请求
+    _semaphore: asyncio.Semaphore | None = None
+
+    # yfinance 调用超时时间（秒）
+    YFINANCE_TIMEOUT = 10.0
+
+    def __init__(self, timeout: float = 10.0):
         super().__init__(name="yfinance_index", timeout=timeout)
+
+    @classmethod
+    def _get_semaphore(cls) -> asyncio.Semaphore:
+        """获取并发控制信号量（懒加载）"""
+        if cls._semaphore is None:
+            cls._semaphore = asyncio.Semaphore(3)
+        return cls._semaphore
+
+    async def _fetch_yfinance_info(self, ticker: str) -> dict[str, Any]:
+        """
+        使用 run_in_executor 获取 yfinance 数据，带超时控制
+
+        Args:
+            ticker: yfinance ticker 符号
+
+        Returns:
+            dict: yfinance info 字典
+
+        Raises:
+            asyncio.TimeoutError: 超时
+            Exception: 其他错误
+        """
+        import yfinance as yf
+
+        loop = asyncio.get_event_loop()
+
+        async with self._get_semaphore():
+            try:
+                ticker_obj = yf.Ticker(ticker)
+                info = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: ticker_obj.info),
+                    timeout=self.YFINANCE_TIMEOUT
+                )
+                return info
+            except asyncio.TimeoutError:
+                logger.warning(f"[YFinance Index] 获取 {ticker} 超时 ({self.YFINANCE_TIMEOUT}s)")
+                raise
 
     async def fetch(self, index_type: str) -> DataSourceResult:
         """
@@ -239,8 +285,6 @@ class YahooIndexSource(IndexDataSource):
             DataSourceResult: 指数数据结果
         """
         try:
-            import yfinance as yf
-
             ticker = INDEX_TICKERS.get(index_type)
             if not ticker:
                 return DataSourceResult(
@@ -251,9 +295,8 @@ class YahooIndexSource(IndexDataSource):
                     metadata={"index_type": index_type},
                 )
 
-            # 获取数据
-            ticker_obj = yf.Ticker(ticker)
-            info = ticker_obj.info
+            # 使用异步方法获取数据（带超时控制和并发控制）
+            info = await self._fetch_yfinance_info(ticker)
 
             price = info.get("currentPrice", info.get("regularMarketPrice"))
             change = info.get("regularMarketChange", info.get("change", 0))
@@ -496,10 +539,10 @@ class HybridIndexSource(IndexDataSource):
     - 日经/欧洲 -> yfinance (有延迟)
     """
 
-    def __init__(self, timeout: float = 30.0):
+    def __init__(self, timeout: float = 10.0):
         super().__init__(name="hybrid_index", timeout=timeout)
         self._tencent = TencentIndexSource(timeout=10.0)
-        self._yahoo = YahooIndexSource(timeout=timeout)
+        self._yahoo = YahooIndexSource(timeout=10.0)
 
     async def fetch(self, index_type: str) -> DataSourceResult:
         """获取指数数据，自动选择数据源"""

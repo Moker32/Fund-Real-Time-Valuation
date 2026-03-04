@@ -2018,6 +2018,12 @@ class Fund123DataSource(DataSource):
     _csrf_token_ttl = 1800  # 30 分钟过期
     # 天天基金专用客户端（单例模式）
     _tiantian_client: httpx.AsyncClient | None = None
+    # 并发控制：限制同时请求数，防止连接池耗尽或被限流
+    _semaphore: asyncio.Semaphore | None = None
+    # CSRF token 刷新锁：防止多请求同时刷新 token
+    _csrf_lock: asyncio.Lock | None = None
+    # 最大并发数
+    MAX_CONCURRENT_REQUESTS = 5
 
     def __init__(self, timeout: float = 15.0, max_retries: int = 3, retry_delay: float = 0.5):
         """
@@ -2050,6 +2056,30 @@ class Fund123DataSource(DataSource):
             )
 
     @classmethod
+    def _get_semaphore(cls) -> asyncio.Semaphore:
+        """
+        获取并发控制信号量（单例模式）
+
+        Returns:
+            asyncio.Semaphore: 并发控制信号量
+        """
+        if cls._semaphore is None:
+            cls._semaphore = asyncio.Semaphore(cls.MAX_CONCURRENT_REQUESTS)
+        return cls._semaphore
+
+    @classmethod
+    def _get_csrf_lock(cls) -> asyncio.Lock:
+        """
+        获取 CSRF token 刷新锁（单例模式）
+
+        Returns:
+            asyncio.Lock: CSRF token 刷新锁
+        """
+        if cls._csrf_lock is None:
+            cls._csrf_lock = asyncio.Lock()
+        return cls._csrf_lock
+
+    @classmethod
     def _get_tiantian_client(cls) -> httpx.AsyncClient:
         """获取天天基金专用客户端（单例模式）"""
         if cls._tiantian_client is None:
@@ -2065,7 +2095,7 @@ class Fund123DataSource(DataSource):
     @classmethod
     async def _get_csrf_token(cls) -> str | None:
         """
-        获取 CSRF token
+        获取 CSRF token（带锁保护，防止并发刷新）
 
         Returns:
             CSRF token 字符串，获取失败返回 None
@@ -2076,25 +2106,31 @@ class Fund123DataSource(DataSource):
         if cls._csrf_token and (now - cls._csrf_token_time) < cls._csrf_token_ttl:
             return cls._csrf_token
 
-        try:
-            # 访问首页获取 token
-            response = await cls._client.get(f"{cls.BASE_URL}/fund", timeout=15.0)
-            response.raise_for_status()
-
-            # 从响应文本中提取 CSRF
-            csrf_match = re.search(r'"csrf":"([^"]+)"', response.text)
-            if csrf_match:
-                cls._csrf_token = csrf_match.group(1)
-                cls._csrf_token_time = now
-                logger.debug(f"获取到新的 CSRF token: {cls._csrf_token[:20]}...")
+        # 使用锁保护，防止多个请求同时刷新 token
+        async with cls._get_csrf_lock():
+            # 双重检查：可能在等待锁期间其他协程已经刷新了 token
+            if cls._csrf_token and (now - cls._csrf_token_time) < cls._csrf_token_ttl:
                 return cls._csrf_token
 
-            logger.warning("无法从响应中提取 CSRF token")
-            return None
+            try:
+                # 访问首页获取 token
+                response = await cls._client.get(f"{cls.BASE_URL}/fund", timeout=15.0)
+                response.raise_for_status()
 
-        except Exception as e:
-            logger.error(f"获取 CSRF token 失败: {e}")
-            return None
+                # 从响应文本中提取 CSRF
+                csrf_match = re.search(r'"csrf":"([^"]+)"', response.text)
+                if csrf_match:
+                    cls._csrf_token = csrf_match.group(1)
+                    cls._csrf_token_time = time.time()  # 更新为获取成功的时间
+                    logger.debug(f"获取到新的 CSRF token: {cls._csrf_token[:20]}...")
+                    return cls._csrf_token
+
+                logger.warning("无法从响应中提取 CSRF token")
+                return None
+
+            except Exception as e:
+                logger.error(f"获取 CSRF token 失败: {e}")
+                return None
 
     @classmethod
     async def _refresh_csrf_token(cls) -> bool:
@@ -2306,7 +2342,13 @@ class Fund123DataSource(DataSource):
         )
 
     async def _fetch_fund_data(self, fund_code: str) -> DataSourceResult:
-        """获取基金数据"""
+        """获取基金数据（带并发控制）"""
+        # 使用 semaphore 限制并发数
+        async with self._get_semaphore():
+            return await self._do_fetch_fund_data(fund_code)
+
+    async def _do_fetch_fund_data(self, fund_code: str) -> DataSourceResult:
+        """实际获取基金数据的实现"""
         # 1. 获取基金基本信息（fund_key 和 fund_name）
         search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={type(self)._csrf_token}"
         search_response = await type(self)._client.post(
@@ -2677,7 +2719,13 @@ class Fund123DataSource(DataSource):
         )
 
     async def _fetch_intraday_data(self, fund_code: str) -> DataSourceResult:
-        """获取基金日内分时数据"""
+        """获取基金日内分时数据（带并发控制）"""
+        # 使用 semaphore 限制并发数
+        async with self._get_semaphore():
+            return await self._do_fetch_intraday_data(fund_code)
+
+    async def _do_fetch_intraday_data(self, fund_code: str) -> DataSourceResult:
+        """实际获取基金日内分时数据的实现"""
         # 1. 获取基金基本信息（fund_key 和 fund_name）
         search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={type(self)._csrf_token}"
         search_response = await type(self)._client.post(

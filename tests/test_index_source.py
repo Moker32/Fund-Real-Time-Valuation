@@ -88,9 +88,9 @@ class TestYahooIndexSource:
         assert ds.timeout == 15.0
 
     def test_init_default_timeout(self):
-        """测试默认超时时间"""
+        """测试默认超时时间（已优化为 10 秒以改善高延迟网络环境下的性能）"""
         ds = YahooIndexSource()
-        assert ds.timeout == 30.0
+        assert ds.timeout == 10.0
 
 
 class TestHybridIndexSource:
