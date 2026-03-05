@@ -638,6 +638,8 @@ def create_default_manager(
         EastMoneyDirectSource,
         EastMoneyIndustryDetailSource,
         EastMoneySectorSource,
+        FundFlowConceptSource,
+        FundFlowIndustrySource,
         SinaSectorDataSource,
     )
 
@@ -682,7 +684,38 @@ def create_default_manager(
     manager.register(AKShareSentimentAggregatorDataSource())
 
     # 注册行业板块数据源
-    # 优先使用 AKShare _spot_em 接口（实时行情，数据更完整）
+    # 概念板块数据源优先级：
+    # 1. FundFlowConceptSource - 资金流向接口，非交易时间可用
+    # 2. EastMoneySectorSource - 实时行情接口，交易时间更及时
+    # 3. EastMoneyDirectSource - 直连 API，兜底
+
+    # 概念板块资金流向数据源（非交易时间可用，优先级最高）
+    fundflow_concept_source = FundFlowConceptSource()
+    manager.register(
+        fundflow_concept_source,
+        DataSourceConfig(
+            source_class=type(fundflow_concept_source),
+            name=fundflow_concept_source.name,
+            source_type=DataSourceType.SECTOR,
+            enabled=True,
+            priority=0,  # 最高优先级（非交易时间可用）
+        ),
+    )
+
+    # 行业板块资金流向数据源（非交易时间可用）
+    fundflow_industry_source = FundFlowIndustrySource()
+    manager.register(
+        fundflow_industry_source,
+        DataSourceConfig(
+            source_class=type(fundflow_industry_source),
+            name=fundflow_industry_source.name,
+            source_type=DataSourceType.SECTOR,
+            enabled=True,
+            priority=0,  # 最高优先级（非交易时间可用）
+        ),
+    )
+
+    # AKShare _spot_em 接口（实时行情，数据更完整，交易时间优先）
     eastmoney_sector_source = EastMoneySectorSource()
     manager.register(
         eastmoney_sector_source,
@@ -691,7 +724,7 @@ def create_default_manager(
             name=eastmoney_sector_source.name,
             source_type=DataSourceType.SECTOR,
             enabled=True,
-            priority=1,  # 最高优先级（实时行情接口）
+            priority=1,  # 次高优先级（实时行情接口）
         ),
     )
 

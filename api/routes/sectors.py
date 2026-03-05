@@ -49,22 +49,26 @@ async def get_industry_sectors(
 ) -> SectorListData:
     """
     获取 A 股行业板块列表
-    优先使用 AKShare _spot_em 接口（实时行情），降级使用 EastMoney 直连 API
-    最后降级使用资金流向数据作为备用
+
+    数据源优先级：
+    1. FundFlowIndustrySource - 资金流向接口，非交易时间可用
+    2. EastMoneySectorSource - 实时行情接口，交易时间更及时
+    3. EastMoneyDirectSource - 直连 API，兜底
+    4. SinaSectorDataSource - 最后备用
     """
     current_time = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     sector_type = "industry"
 
-    # 优先使用 AKShare _spot_em 接口（实时行情，数据更完整）
-    result = await manager.fetch_with_source("sector_eastmoney_akshare", "industry")
+    # 优先使用资金流向接口（非交易时间可用）
+    result = await manager.fetch_with_source("sector_industry_fund_flow", "industry")
 
     if not result.success or not result.data:
-        # Fallback to EastMoney 直连 API（包含资金流向）
+        # 备用：AKShare _spot_em 接口（实时行情，数据更完整）
+        result = await manager.fetch_with_source("sector_eastmoney_akshare", "industry")
+
+    if not result.success or not result.data:
+        # 备用：EastMoney 直连 API（包含资金流向）
         result = await manager.fetch_with_source("sector_eastmoney_direct", "industry")
-
-    if not result.success or not result.data:
-        # Fallback to 资金流向作为板块数据源（更稳定）
-        result = await manager.fetch_with_source("sector_fund_flow_as_sector", "industry")
 
     if not result.success or not result.data:
         # 最后尝试 Sina
@@ -156,19 +160,26 @@ async def get_industry_sectors(
 async def get_concept_sectors(
     manager: DataSourceManager = Depends(DataSourceDependency()),
 ) -> SectorListData:
-    """获取 A 股概念板块列表（实时行情数据）"""
+    """
+    获取 A 股概念板块列表
+
+    数据源优先级：
+    1. FundFlowConceptSource - 资金流向接口，非交易时间可用
+    2. EastMoneySectorSource - 实时行情接口，交易时间更及时
+    3. EastMoneyDirectSource - 直连 API，兜底
+    """
     current_time = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-    # 优先使用 AKShare _spot_em 接口（实时行情，数据更完整）
-    result = await manager.fetch_with_source("sector_eastmoney_akshare", "concept")
+    # 优先使用资金流向接口（非交易时间可用）
+    result = await manager.fetch_with_source("sector_concept_fund_flow", "concept")
 
     if not result.success or not result.data:
-        # Fallback to EastMoney 直连 API（包含资金流向）
+        # 备用：AKShare _spot_em 接口（实时行情，数据更完整）
+        result = await manager.fetch_with_source("sector_eastmoney_akshare", "concept")
+
+    if not result.success or not result.data:
+        # 最后备用：EastMoney 直连 API（包含资金流向）
         result = await manager.fetch_with_source("sector_eastmoney_direct", "concept")
-
-    if not result.success or not result.data:
-        # Fallback to 资金流向作为板块数据源（更稳定）
-        result = await manager.fetch_with_source("sector_fund_flow_as_sector", "concept")
 
     if not result.success or not result.data:
         error_msg = result.error or "数据源暂时不可用"
