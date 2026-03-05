@@ -25,19 +25,28 @@
 
 ## 2. akshare py_mini_racer 依赖问题
 
-**问题描述**: akshare 库的 py_mini_racer 依赖导致类型检查失败
+**问题描述**: akshare 库的 py_mini_racer 依赖导致应用崩溃和类型检查失败
 
-**影响范围**: mypy 类型检查、部分 akshare 数据源功能
+**影响范围**: 
+- 应用启动时崩溃（`Check failed: !pool->IsInitialized()`）
+- mypy 类型检查失败
+- 部分 akshare 数据源功能
 
-**当前状态**: 已在 mypy 配置中禁用相关类型检查
+**当前状态**: ✅ **已解决**（2026-03-05）
 
 **根本原因**:
-- py_mini_racer 包缺少类型存根（type stubs）
-- 某些版本的 py_mini_racer 与 Python 3.10+ 存在兼容性问题
+- py_mini_racer 包（v0.6.0，2021年停止维护）与新版 mini_racer（v0.14.1）存在二进制兼容性问题
+- macOS 上的 V8 引擎初始化失败，触发断言崩溃
+- `py_mini_racer 0.6.0` 期望的符号 `mr_eval_context` 在新版中已不存在
 
-**临时解决方案**:
-- 在 `pyproject.toml` 中禁用 akshare 相关模块的 mypy 类型检查
-- 使用 ignore 注释跳过特定类型错误
+**解决方案**:
+- 卸载 `mini_racer` 和 `py_mini_racer` 依赖
+- akshare 核心功能（基金、指数、板块等）不依赖 JS 执行，仍可正常工作
+- 如需使用同花顺等依赖 JS 执行的数据源，需使用其他方案（如 execjs + Node.js）
+
+```bash
+uv pip uninstall mini_racer py_mini_racer
+```
 
 **相关配置**:
 ```toml
@@ -86,7 +95,7 @@ ignore_missing_imports = true
 
 **根本原因**:
 1. 后端 `fund123.cn` API 未返回 `prev_net_value` 字段
-2. akshare 库因 py_mini_racer 依赖问题无法使用（QDII/LOF 基金净值获取）
+2. 原 akshare 库因 py_mini_racer 兼容性问题无法使用（现已卸载）
 3. 数据库 `fund_daily_cache` 表为空，无历史净值数据
 
 **临时解决方案**:
@@ -94,7 +103,7 @@ ignore_missing_imports = true
 - 后备方案：使用日内分时数据的第一个价格（开盘价）作为基准线
 
 **待解决**:
-- [x] 修复 akshare 依赖问题，恢复 LOF/QDII 基金净值获取（已在 mypy 中忽略）
+- [x] 修复 akshare/py_mini_racer 依赖问题（已通过卸载解决）
 - [ ] 建立基金历史净值数据缓存机制
 - [ ] 当获取到真实昨日净值后，优先使用昨日净值作为基准线
 
