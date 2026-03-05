@@ -59,7 +59,9 @@ logger = logging.getLogger(__name__)
     },
 )
 async def search_funds(
-    q: str = Query(..., min_length=1, max_length=20, description="搜索关键词（基金代码或名称）"),
+    q: str | None = Query(
+        None, min_length=1, max_length=20, description="搜索关键词（基金代码或名称）"
+    ),
     limit: int = Query(20, ge=1, le=100, description="返回结果数量"),
 ) -> dict:
     """
@@ -67,6 +69,9 @@ async def search_funds(
 
     优先从本地数据库搜索，响应速度快。
     """
+    if not q:
+        return {"funds": [], "total": 0, "source": "local"}
+
     from src.db.database import FundBasicInfoDAO, DatabaseManager
 
     dao = FundBasicInfoDAO(DatabaseManager())
