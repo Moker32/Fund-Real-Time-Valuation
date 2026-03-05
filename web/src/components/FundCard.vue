@@ -52,43 +52,47 @@
       </div>
 
       <div class="card-body">
-        <div class="value-section">
-          <div class="value-row">
-            <span class="label">净值</span>
-            <span class="value font-mono">{{ formatNumber(fund.netValue, 4) }}</span>
-            <span class="value-date">{{ fund.netValueDate ? formatNetValueDate(fund.netValueDate) : '--' }}</span>
+        <!-- 左侧：净值+估值 | 右侧：涨跌幅 | 下方：折线图 -->
+        <div class="info-section" :class="{ 'has-chart': shouldShowChart }">
+          <div class="value-section">
+            <div class="value-row">
+              <span class="label">净值</span>
+              <span class="value font-mono">{{ formatNumber(fund.netValue, 4) }}</span>
+              <span class="value-date">{{ fund.netValueDate ? formatNetValueDate(fund.netValueDate) : '--' }}</span>
+            </div>
+            <!-- 非 QDII 基金显示估值 -->
+            <div v-if="fund.hasRealTimeEstimate !== false" class="value-row">
+              <span class="label">估值</span>
+              <span class="value font-mono" :class="{ 'value-updated': valueAnimating }">{{ formatNumber(fund.estimateValue, 4) }}</span>
+              <span class="value-date">{{ fund.estimateTime ? formatNetValueDate(fund.estimateTime) : '--' }}</span>
+            </div>
+            <!-- QDII 基金显示前日净值 -->
+            <div v-else-if="fund.prevNetValue" class="value-row qdii-prev-row">
+              <span class="label">前日</span>
+              <span class="value font-mono">{{ formatNumber(fund.prevNetValue, 4) }}</span>
+              <span class="value-date">{{ formatNetValueDate(fund.prevNetValueDate) }}</span>
+            </div>
           </div>
-          <!-- 非 QDII 基金显示估值 -->
-          <div v-if="fund.hasRealTimeEstimate !== false" class="value-row">
-            <span class="label">估值</span>
-            <span class="value font-mono" :class="{ 'value-updated': valueAnimating }">{{ formatNumber(fund.estimateValue, 4) }}</span>
-            <span class="value-date">{{ fund.estimateTime ? formatNetValueDate(fund.estimateTime) : '--' }}</span>
-          </div>
-          <!-- QDII 基金显示前日净值 -->
-          <div v-else-if="fund.prevNetValue" class="value-row qdii-prev-row">
-            <span class="label">前日</span>
-            <span class="value font-mono">{{ formatNumber(fund.prevNetValue, 4) }}</span>
-            <span class="value-date">{{ formatNetValueDate(fund.prevNetValueDate) }}</span>
+
+          <div class="change-section" :class="[changeClass, { 'value-updated': changeAnimating }]">
+            <div class="change-info">
+              <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
+              <span class="change-indicator-value">
+                <svg v-if="fund.estimateChangePercent > 0" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <svg v-else-if="fund.estimateChangePercent < 0" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 5V19M19 12L12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span v-else>—</span>
+              </span>
+              <span class="change-value font-mono">{{ formatChange(fund.estimateChange) }}</span>
+            </div>
           </div>
         </div>
 
-        <div class="change-section" :class="[changeClass, { 'value-updated': changeAnimating }]">
-          <!-- 分时图（当有日内数据或历史数据时显示） -->
-          <FundChart v-if="shouldShowChart" :data="chartData" :height="40" chart-type="line" :baseline="baseline" :trend="changeClass" class="inline-chart" />
-          <div class="change-info">
-            <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
-            <span class="change-indicator-value">
-              <svg v-if="fund.estimateChangePercent > 0" viewBox="0 0 24 24" fill="none">
-                <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-              <svg v-else-if="fund.estimateChangePercent < 0" viewBox="0 0 24 24" fill="none">
-                <path d="M12 5V19M19 12L12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-              <span v-else>—</span>
-            </span>
-            <span class="change-value font-mono">{{ formatChange(fund.estimateChange) }}</span>
-          </div>
-        </div>
+        <!-- 折线图：显示在估值下方 -->
+        <FundChart v-if="shouldShowChart" :data="chartData" :height="60" chart-type="line" :baseline="baseline" :trend="changeClass" class="fund-chart" />
       </div>
 
       <div class="card-footer">
@@ -253,9 +257,9 @@ function formatNetValueDate(dateStr: string | undefined): string {
   flex: 0 1 280px;
 
   &.has-chart {
-    width: 380px;
-    min-width: 340px;
-    flex: 0 1 380px;
+    width: 280px;
+    min-width: 260px;
+    flex: 0 1 280px;
   }
 
   &:hover {
@@ -412,11 +416,18 @@ function formatNetValueDate(dateStr: string | undefined): string {
 
 .card-body {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: var(--spacing-xs);
   margin-bottom: var(--spacing-md);
   min-width: 0;
   width: 100%;
+}
+
+.info-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  min-width: 0;
 }
 
 .value-section {
@@ -425,7 +436,13 @@ function formatNetValueDate(dateStr: string | undefined): string {
   gap: var(--spacing-xs);
   min-width: 0;
   flex: 0 0 auto;
-  margin-right: var(--spacing-md);
+  max-width: 100%;
+}
+
+.fund-chart {
+  width: 100%;
+  min-height: 60px;
+  flex-shrink: 0;
 }
 
 .value-row {
@@ -505,45 +522,13 @@ function formatNetValueDate(dateStr: string | undefined): string {
 
 .change-section {
   display: flex;
-  align-items: stretch;
-  gap: var(--spacing-sm);
+  align-items: center;
+  justify-content: flex-end;
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
-  min-width: 100px;
+  min-width: 80px;
   flex: 0 0 auto;
-  width: auto;
-
-  .fund-card.has-chart & {
-    flex: 1 1 50%;
-    min-width: 120px;
-  }
-
-  .inline-chart {
-    flex: 0 1 0;
-    width: 0;
-    max-width: 0;
-    height: 40px;
-    min-width: 0;
-    flex-shrink: 0;
-    opacity: 0;
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: all 0.3s ease;
-    margin: 0;
-    padding: 0;
-  }
-
-  .fund-card.has-chart & .inline-chart {
-    opacity: 1;
-    transform: scaleX(1);
-    flex: 1 1 80px;
-    width: auto;
-    max-width: 100px;
-    min-width: 60px;
-    flex-shrink: 1;
-    margin-right: var(--spacing-sm);
-  }
 
   .change-info {
     display: flex;
@@ -666,17 +651,13 @@ function formatNetValueDate(dateStr: string | undefined): string {
     max-width: 100%;
     width: auto;
     justify-content: flex-end;
+  }
 
-    .inline-chart {
-      display: none;
-    }
-
-    .change-info {
-      flex-direction: row;
-      align-items: center;
-      gap: var(--spacing-sm);
-      max-width: 100%;
-    }
+  .change-info {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-sm);
+    max-width: 100%;
   }
 
   .change-percent {

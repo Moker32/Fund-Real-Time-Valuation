@@ -94,25 +94,18 @@ const isIntradayData = (data: FundHistory[] | FundIntraday[]): boolean => {
   return 'price' in firstItem && !('close' in firstItem);
 };
 
-// 计算日内分时数据的x轴范围 (09:30 - 15:00)
+// 计算日内分时数据的x轴范围
+// x轴始终显示完整市场时间 09:30-15:00，让用户知道当前显示的是部分数据
 const getIntradayXRange = (data: FundHistory[] | FundIntraday[]): { min: number; max: number } | null => {
   if (!isIntradayData(data)) return null;
 
-  // 获取第一个数据点的时间来获取日期
-  const firstItem = data[0] as FundIntraday;
-  const timeStr = firstItem.time;
-
-  // 解析 "HH:mm" 格式
-  const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
-  if (!timeMatch) return null;
-
-  // 使用当前日期
+  // x轴始终显示完整市场时间范围
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
   const day = now.getDate();
 
-  // 计算 min (09:30) 和 max (15:00) 的 Unix 时间戳
+  // 固定范围：09:30 - 15:00（完整市场时间）
   const minTs = Math.floor(new Date(year, month, day, 9, 30, 0).getTime() / 1000);
   const maxTs = Math.floor(new Date(year, month, day, 15, 0, 0).getTime() / 1000);
 
@@ -239,6 +232,12 @@ const updateData = () => {
   const sortedTimestamps: number[] = [];
   const sortedValues: number[] = [];
 
+  // 获取当前时间和市场结束时间
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const currentTimeInMinutes = currentHour * 60 + currentMinute;
+
   // 检测午间休市断点 (A股: 11:30-13:00 休市)
   let prevHour = -1;
   for (const item of sortedData) {
@@ -259,6 +258,28 @@ const updateData = () => {
     sortedTimestamps.push(ts);
     sortedValues.push(price);
     prevHour = hour;
+  }
+
+  // 如果当前时间在交易时间内（09:30-15:00），在最后一个数据点之后插入 null 断点
+  // 这样线条不会拉伸到 15:00
+  const lastTs = sortedTimestamps[sortedTimestamps.length - 1];
+  const marketEndInMinutes = 15 * 60; // 15:00
+  const marketStartInMinutes = 9 * 60 + 30; // 09:30
+
+  if (lastTs && currentTimeInMinutes > marketStartInMinutes && currentTimeInMinutes < marketEndInMinutes) {
+    // 计算市场结束时间戳
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const day = now.getDate();
+    const marketEndTs = Math.floor(new Date(year, month, day, 15, 0, 0).getTime() / 1000);
+
+    // 插入断点在最后一个数据点之后
+    sortedTimestamps.push(lastTs + 60); // 延后1分钟
+    sortedValues.push(null);
+
+    // 延后到市场结束时间（作为占位，保持轴范围）
+    sortedTimestamps.push(marketEndTs);
+    sortedValues.push(null);
   }
 
   const newData: [number[], number[]] = [sortedTimestamps, sortedValues];
