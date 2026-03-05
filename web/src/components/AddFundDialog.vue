@@ -13,41 +13,28 @@
 
         <div class="dialog-body">
           <div class="form-group">
-            <label>基金代码</label>
-            <input
-              v-model="form.code"
-              type="text"
-              placeholder="例如: 161039"
-              maxlength="6"
-              @input="onCodeInput"
-            />
-            <span class="hint">请输入6位数字基金代码</span>
+            <label>搜索基金</label>
+            <el-autocomplete
+              v-model="searchText"
+              :fetch-suggestions="querySearch"
+              :trigger-on-focus="false"
+              placeholder="输入基金代码或名称搜索"
+              clearable
+              @select="handleSelect"
+            >
+              <template #default="{ item }">
+                <div class="fund-item">
+                  <span class="fund-code">{{ item.code }}</span>
+                  <span class="fund-name">{{ item.name }}</span>
+                  <span class="fund-type">{{ item.type }}</span>
+                </div>
+              </template>
+            </el-autocomplete>
+            <span class="hint">支持输入6位代码或基金名称搜索</span>
           </div>
 
-          <div class="form-group">
-            <label>基金名称</label>
-            <input
-              v-model="form.name"
-              type="text"
-              placeholder="例如: 易方达消费行业股票"
-            />
-          </div>
-
-          <div v-if="searchResult" class="search-result">
-            <div class="result-item">
-              <div class="fund-info">
-                <span class="fund-code">{{ searchResult.code }}</span>
-                <span class="fund-name">{{ searchResult.name }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div v-if="searchLoading" class="search-loading">
-            <span>正在查询基金信息...</span>
-          </div>
-
-          <div v-if="searchError" class="search-error">
-            {{ searchError }}
+          <div v-if="submitting" class="submitting">
+            <span>添加中...</span>
           </div>
         </div>
 
@@ -70,6 +57,7 @@
 import { ref, computed, watch } from 'vue';
 import { fundApi } from '@/api';
 import type { Fund } from '@/types';
+import { ElMessage } from 'element-plus';
 
 interface Props {
   visible: boolean;
@@ -82,69 +70,69 @@ const emit = defineEmits<{
   (e: 'added'): void;
 }>();
 
-const form = ref({
-  code: '',
-  name: '',
-});
+interface FundSearchItem {
+  code: string;
+  name: string;
+  type: string;
+  value: string;
+}
 
-const searchResult = ref<Fund | null>(null);
-const searchLoading = ref(false);
-const searchError = ref<string | null>(null);
+const searchText = ref('');
+const selectedFund = ref<FundSearchItem | null>(null);
 const submitting = ref(false);
 const existingCodes = ref<Set<string>>(new Set());
-
-const isInWatchlist = computed(() => {
-  if (!searchResult.value) return false;
-  return existingCodes.value.has(searchResult.value.code);
-});
+const searchLoading = ref(false);
 
 const canSubmit = computed(() => {
   if (submitting.value) return false;
-  if (!form.value.code || form.value.code.length !== 6) return false;
-  if (!form.value.name) return false;
-  if (searchError.value) return false;
-  if (isInWatchlist.value) return false;
+  if (!selectedFund.value) return false;
+  if (existingCodes.value.has(selectedFund.value.code)) return false;
   return true;
 });
 
-async function searchFund(code: string) {
-  if (code.length !== 6) {
-    searchResult.value = null;
-    searchError.value = null;
+async function querySearch(keyword: string, cb: (results: FundSearchItem[]) => void) {
+  if (!keyword || keyword.length < 1) {
+    cb([]);
     return;
   }
 
   searchLoading.value = true;
-  searchError.value = null;
 
   try {
-    const fund = await fundApi.getFund(code);
-    searchResult.value = fund;
-    form.value.name = fund.name;
-  } catch (err: unknown) {
-    const axiosError = err as { response?: { data?: { detail?: string } } };
-    searchResult.value = null;
-    searchError.value = axiosError.response?.data?.detail || '未找到该基金';
+    const localResult = await fundApi.searchFunds(keyword, 20);
+    
+    const results: FundSearchItem[] = localResult.funds.map(f => ({
+      code: f.code,
+      name: f.name,
+      type: f.type,
+      value: `${f.code} - ${f.name}`,
+    }));
+
+    cb(results);
+  } catch {
+    cb([]);
   } finally {
     searchLoading.value = false;
   }
 }
 
-function onCodeInput() {
-  form.value.code = form.value.code.replace(/\D/g, '');
-  searchFund(form.value.code);
+function handleSelect(item: FundSearchItem) {
+  selectedFund.value = item;
+  searchText.value = `${item.code} - ${item.name}`;
 }
 
 async function handleSubmit() {
-  if (!canSubmit.value) return;
+  if (!canSubmit.value || !selectedFund.value) return;
 
   submitting.value = true;
   try {
-    await fundApi.addToWatchlist(form.value.code, form.value.name);
+    await fundApi.addToWatchlist(selectedFund.value.code, selectedFund.value.name);
+    ElMessage.success('添加成功');
     emit('added');
     close();
   } catch (err) {
     console.error('添加基金失败:', err);
+    ElMessage.error('添加失败');
   } finally {
     submitting.value = false;
   }
@@ -152,11 +140,8 @@ async function handleSubmit() {
 
 function close() {
   emit('close');
-  setTimeout(() => {
-    form.value = { code: '', name: '' };
-    searchResult.value = null;
-    searchError.value = null;
-  }, 200);
+  searchText.value = '';
+  selectedFund.value = null;
 }
 
 watch(() => props.visible, async (visible) => {
@@ -184,7 +169,7 @@ watch(() => props.visible, async (visible) => {
 
 .dialog {
   width: 90%;
-  max-width: 420px;
+  max-width: 480px;
   background: #1e1e1e;
   border-radius: 12px;
   border: 1px solid #2a2a2a;
@@ -238,21 +223,6 @@ watch(() => props.visible, async (visible) => {
   margin-bottom: 4px;
 }
 
-.form-group input {
-  width: 100%;
-  padding: 10px 12px;
-  background: #2a2a2a;
-  border: 1px solid #2a2a2a;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 16px;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: #1890ff;
-}
-
 .form-group .hint {
   display: block;
   font-size: 12px;
@@ -260,58 +230,34 @@ watch(() => props.visible, async (visible) => {
   margin-top: 4px;
 }
 
-.search-result {
-  margin-top: 16px;
-}
-
-.result-item {
+.fund-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px;
-  background: #2a2a2a;
-  border: 1px solid #2a2a2a;
-  border-radius: 8px;
+  gap: 12px;
+  padding: 4px 0;
 }
 
-.fund-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.fund-item .fund-code {
+  font-size: 12px;
+  color: #666;
+  min-width: 60px;
 }
 
-.fund-code {
+.fund-item .fund-name {
+  flex: 1;
+  font-size: 14px;
+  color: #fff;
+}
+
+.fund-item .fund-type {
   font-size: 12px;
   color: #666;
 }
 
-.fund-name {
-  font-size: 14px;
-  color: #fff;
-  font-weight: 500;
-}
-
-.search-loading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.submitting {
   padding: 12px;
-  margin-top: 16px;
-  background: #2a2a2a;
-  border-radius: 8px;
+  text-align: center;
   color: #999;
-  font-size: 14px;
-}
-
-.search-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  margin-top: 16px;
-  background: rgba(82, 196, 26, 0.15);
-  color: #52c41a;
-  border-radius: 8px;
   font-size: 14px;
 }
 
@@ -357,7 +303,6 @@ watch(() => props.visible, async (visible) => {
   opacity: 0.9;
 }
 
-/* Transitions */
 .dialog-enter-active,
 .dialog-leave-active {
   transition: all 0.2s ease;
@@ -371,5 +316,36 @@ watch(() => props.visible, async (visible) => {
 .dialog-enter-from .dialog,
 .dialog-leave-to .dialog {
   transform: scale(0.95);
+}
+
+:deep(.el-autocomplete) {
+  width: 100%;
+}
+
+:deep(.el-input__wrapper) {
+  background: #2a2a2a;
+  border: 1px solid #2a2a2a;
+  box-shadow: none;
+}
+
+:deep(.el-input__inner) {
+  color: #fff;
+}
+
+:deep(.el-input__inner::placeholder) {
+  color: #666;
+}
+
+:deep(.el-autocomplete-suggestion) {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+}
+
+:deep(.el-autocomplete-suggestion li) {
+  color: #fff;
+}
+
+:deep(.el-autocomplete-suggestion li:hover) {
+  background: #3a3a3a;
 }
 </style>

@@ -163,6 +163,14 @@ api.interceptors.response.use(
 
 // API Methods
 export const fundApi = {
+  async searchFunds(query: string, limit: number = 20): Promise<{
+    funds: Array<{ code: string; name: string; type: string }>;
+    total: number;
+    source: string;
+  }> {
+    return api.get('/api/funds/search', { q: query, limit });
+  },
+
   async getFunds(): Promise<{ funds: Fund[]; total: number; timestamp: string }> {
     return api.get('/api/funds');
   },
