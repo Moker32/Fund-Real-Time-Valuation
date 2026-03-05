@@ -75,17 +75,6 @@
       @close="showAddDialog = false"
       @added="handleFundAdded"
     />
-
-    <!-- Confirm Remove Dialog -->
-    <ConfirmDialog
-      :visible="showConfirmDialog"
-      title="确认移除"
-      :message="`确定要从自选移除基金 ${removingFundCode} 吗？`"
-      confirm-text="移除"
-      cancel-text="取消"
-      @confirm="confirmRemove"
-      @cancel="showConfirmDialog = false"
-    />
   </div>
 </template>
 
@@ -94,7 +83,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useFundStore } from '@/stores/fundStore';
 import FundCard from '@/components/FundCard.vue';
 import AddFundDialog from '@/components/AddFundDialog.vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import { confirm } from '@/utils/confirm';
 
 // 加载骨架屏数量常量
 // eslint-disable-next-line no-useless-assignment
@@ -116,10 +105,6 @@ const fundStore = useFundStore();
 const showAddDialog = ref(false);
 const isMounted = ref(true);
 
-// 确认对话框状态
-const showConfirmDialog = ref(false);
-const removingFundCode = ref('');
-
 // 空基金数据用于加载骨架屏
 // eslint-disable-next-line no-useless-assignment
 const emptyFund: EmptyFundState = {
@@ -133,11 +118,10 @@ const emptyFund: EmptyFundState = {
 };
 
 // 计算属性：是否显示加载状态
- 
 const isLoading = computed(() => fundStore.loading);
- 
+
 const hasFunds = computed(() => fundStore.holdingFirstFunds.length > 0);
- 
+
 const hasError = computed(() => !!fundStore.error);
 
 // 模板条件简化：显示骨架屏
@@ -148,14 +132,16 @@ const showSkeleton = computed(() => isLoading.value && !hasFunds.value);
 const showFundList = computed(() => hasFunds.value && !hasError.value);
 
 async function handleRemoveFund(code: string) {
-  removingFundCode.value = code;
-  showConfirmDialog.value = true;
-}
-
-async function confirmRemove() {
-  if (removingFundCode.value) {
-    await fundStore.removeFund(removingFundCode.value);
-    removingFundCode.value = '';
+  const confirmed = await confirm({
+    title: '确认移除',
+    message: `确定要从自选移除基金 ${code} 吗？`,
+    confirmText: '移除',
+    cancelText: '取消',
+    type: 'warning',
+  });
+  
+  if (confirmed) {
+    await fundStore.removeFund(code);
   }
 }
 
