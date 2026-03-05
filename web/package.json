@@ -16,7 +16,9 @@
     "test:e2e:chromium": "playwright test --config=e2e/playwright.config.ts --project=chromium"
   },
   "dependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
     "axios": "^1.13.5",
+    "element-plus": "^2.13.3",
     "lightweight-charts": "^5.1.0",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.1.3",
