@@ -49,6 +49,45 @@ router = APIRouter(prefix="/api/funds", tags=["基金"])
 
 logger = logging.getLogger(__name__)
 
+
+@router.get(
+    "/search",
+    summary="搜索基金",
+    description="本地搜索基金，搜索不到时返回空列表（前端可选择是否降级到外部API）",
+    responses={
+        200: {"description": "搜索成功"},
+    },
+)
+async def search_funds(
+    q: str = Query(..., min_length=1, max_length=20, description="搜索关键词（基金代码或名称）"),
+    limit: int = Query(20, ge=1, le=100, description="返回结果数量"),
+) -> dict:
+    """
+    本地搜索基金
+
+    优先从本地数据库搜索，响应速度快。
+    """
+    from src.db.database import FundBasicInfoDAO, DatabaseManager
+
+    dao = FundBasicInfoDAO(DatabaseManager())
+    results = dao.search(q, limit=limit)
+
+    funds = [
+        {
+            "code": f.code,
+            "name": f.short_name or f.name,
+            "type": f.type,
+        }
+        for f in results
+    ]
+
+    return {
+        "funds": funds,
+        "total": len(funds),
+        "source": "local",
+    }
+
+
 # 交易日历源单例（用于判断是否交易时段）
 _trading_calendar_source: TradingCalendarSource | None = None
 
@@ -172,7 +211,7 @@ def _calculate_estimate_change(unit_net: float | None, estimate_net: float | Non
 
 def build_fund_response(data: dict, source: str = "", is_holding: bool = False) -> dict:
     """构建基金响应数据
-    
+
     使用 model_validate 进行数据验证，确保数据完整性
     """
     unit_net = data.get("unit_net_value")
@@ -181,19 +220,21 @@ def build_fund_response(data: dict, source: str = "", is_holding: bool = False) 
 
     # 使用 model_validate 进行验证 (修复: 不再绕过验证)
     # 数据使用 alias 名称 (snake_case) 以匹配字段定义
-    validated = FundResponse.model_validate({
-        "fund_code": data.get("fund_code", ""),
-        "name": data.get("name", ""),
-        "type": data.get("type"),
-        "unit_net_value": data.get("unit_net_value"),
-        "net_value_date": data.get("net_value_date"),
-        "prev_net_value": data.get("prev_net_value"),
-        "prev_net_value_date": data.get("prev_net_value_date"),
-        "estimated_net_value": data.get("estimated_net_value"),
-        "estimated_growth_rate": data.get("estimated_growth_rate"),
-        "estimate_time": data.get("estimate_time"),
-        "has_real_time_estimate": data.get("has_real_time_estimate", True),
-    })
+    validated = FundResponse.model_validate(
+        {
+            "fund_code": data.get("fund_code", ""),
+            "name": data.get("name", ""),
+            "type": data.get("type"),
+            "unit_net_value": data.get("unit_net_value"),
+            "net_value_date": data.get("net_value_date"),
+            "prev_net_value": data.get("prev_net_value"),
+            "prev_net_value_date": data.get("prev_net_value_date"),
+            "estimated_net_value": data.get("estimated_net_value"),
+            "estimated_growth_rate": data.get("estimated_growth_rate"),
+            "estimate_time": data.get("estimate_time"),
+            "has_real_time_estimate": data.get("has_real_time_estimate", True),
+        }
+    )
 
     # 设置计算属性和额外字段
     validated.estimateChange = estimate_change
@@ -334,19 +375,21 @@ async def get_fund_detail(
     is_holding = _check_is_holding(code)
 
     # 使用 model_validate 进行验证
-    validated = FundDetailResponse.model_validate({
-        "fund_code": data.get("fund_code", ""),
-        "name": data.get("name", ""),
-        "type": data.get("type"),
-        "unit_net_value": data.get("unit_net_value"),
-        "net_value_date": data.get("net_value_date"),
-        "prev_net_value": data.get("prev_net_value"),
-        "prev_net_value_date": data.get("prev_net_value_date"),
-        "estimated_net_value": data.get("estimated_net_value"),
-        "estimated_growth_rate": data.get("estimated_growth_rate"),
-        "estimate_time": data.get("estimate_time"),
-        "has_real_time_estimate": data.get("has_real_time_estimate", True),
-    })
+    validated = FundDetailResponse.model_validate(
+        {
+            "fund_code": data.get("fund_code", ""),
+            "name": data.get("name", ""),
+            "type": data.get("type"),
+            "unit_net_value": data.get("unit_net_value"),
+            "net_value_date": data.get("net_value_date"),
+            "prev_net_value": data.get("prev_net_value"),
+            "prev_net_value_date": data.get("prev_net_value_date"),
+            "estimated_net_value": data.get("estimated_net_value"),
+            "estimated_growth_rate": data.get("estimated_growth_rate"),
+            "estimate_time": data.get("estimate_time"),
+            "has_real_time_estimate": data.get("has_real_time_estimate", True),
+        }
+    )
 
     # 设置计算属性和额外字段
     validated.estimateChange = estimate_change
@@ -406,17 +449,19 @@ async def get_fund_estimate(
     is_holding = _check_is_holding(code)
 
     # 使用 model_validate 进行验证
-    validated = FundEstimateResponse.model_validate({
-        "fund_code": data.get("fund_code", ""),
-        "name": data.get("name", ""),
-        "type": data.get("type"),
-        "unit_net_value": data.get("unit_net_value"),
-        "net_value_date": data.get("net_value_date"),
-        "estimated_net_value": data.get("estimated_net_value"),
-        "estimated_growth_rate": data.get("estimated_growth_rate"),
-        "estimate_time": data.get("estimate_time"),
-        "has_real_time_estimate": data.get("has_real_time_estimate", True),
-    })
+    validated = FundEstimateResponse.model_validate(
+        {
+            "fund_code": data.get("fund_code", ""),
+            "name": data.get("name", ""),
+            "type": data.get("type"),
+            "unit_net_value": data.get("unit_net_value"),
+            "net_value_date": data.get("net_value_date"),
+            "estimated_net_value": data.get("estimated_net_value"),
+            "estimated_growth_rate": data.get("estimated_growth_rate"),
+            "estimate_time": data.get("estimate_time"),
+            "has_real_time_estimate": data.get("has_real_time_estimate", True),
+        }
+    )
 
     # 设置计算属性和额外字段
     validated.estimateChange = estimate_change

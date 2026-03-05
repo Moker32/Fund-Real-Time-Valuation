@@ -497,7 +497,9 @@ class DatabaseManager:
 
             # 添加 estimate_time 列（如果不存在）
             if "estimate_time" not in daily_columns:
-                cursor.execute("ALTER TABLE fund_daily_cache ADD COLUMN estimate_time TEXT DEFAULT ''")
+                cursor.execute(
+                    "ALTER TABLE fund_daily_cache ADD COLUMN estimate_time TEXT DEFAULT ''"
+                )
 
         except Exception as e:
             logger.warning(f"数据库迁移警告: {e}")
@@ -1851,6 +1853,61 @@ class FundBasicInfoDAO:
                 (fund_type,),
             )
             return [FundBasicInfo(**row) for row in cursor.fetchall()]
+
+    def search(self, keyword: str, limit: int = 20) -> list[FundBasicInfo]:
+        """
+        搜索基金基本信息
+
+        支持按基金代码、基金名称模糊搜索。
+
+        Args:
+            keyword: 搜索关键词
+            limit: 返回结果数量限制
+
+        Returns:
+            list[FundBasicInfo]: 匹配的基金基本信息列表
+        """
+        if not keyword:
+            return []
+
+        keyword = keyword.strip()
+        pattern = f"%{keyword}%"
+
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM fund_basic_info
+                WHERE code LIKE ? OR name LIKE ? OR short_name LIKE ?
+                ORDER BY 
+                    CASE 
+                        WHEN code = ? THEN 0
+                        WHEN code LIKE ? THEN 1
+                        WHEN name LIKE ? THEN 2
+                        ELSE 3
+                    END,
+                    updated_at DESC
+                LIMIT ?
+                """,
+                (pattern, pattern, pattern, keyword, f"{keyword}%", f"{keyword}%", limit),
+            )
+            return [FundBasicInfo(**row) for row in cursor.fetchall()]
+
+    def get_by_code(self, code: str) -> FundBasicInfo | None:
+        """
+        根据基金代码获取基金基本信息
+
+        Args:
+            code: 基金代码
+
+        Returns:
+            FundBasicInfo | None: 基金基本信息，不存在返回 None
+        """
+        with self.db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM fund_basic_info WHERE code = ?", (code,))
+            row = cursor.fetchone()
+            return FundBasicInfo(**row) if row else None
 
     def update(self, code: str, **kwargs) -> bool:
         """
