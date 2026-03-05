@@ -112,6 +112,37 @@ const getIntradayXRange = (data: FundHistory[] | FundIntraday[]): { min: number;
   return { min: minTs, max: maxTs };
 };
 
+// 计算 Y 轴范围，确保始终包含 baseline 值
+const getYScaleRange = (data: [number[], number[]] | null, baseline: number | undefined): { min: number; max: number } | undefined => {
+  if (!data || data[0].length === 0) return undefined;
+
+  const values = data[1];
+  let min = Infinity;
+  let max = -Infinity;
+
+  for (const v of values) {
+    if (v !== null && typeof v === 'number') {
+      min = Math.min(min, v);
+      max = Math.max(max, v);
+    }
+  }
+
+  if (min === Infinity || max === -Infinity) return undefined;
+
+  // 添加 2% 边距
+  const padding = (max - min) * 0.02;
+  min -= padding;
+  max += padding;
+
+  // 确保 baseline 包含在范围内
+  if (baseline !== undefined && baseline > 0) {
+    min = Math.min(min, baseline);
+    max = Math.max(max, baseline);
+  }
+
+  return { min, max };
+};
+
 const initChart = () => {
   if (!chartContainer.value) return;
 
@@ -286,8 +317,24 @@ const updateData = () => {
 
   try {
     uplotInstance.setData(newData);
+    // 更新 Y 轴范围，确保包含 baseline
+    updateYScaleRange(newData);
   } catch (e) {
     console.warn('[FundChart] setData error:', e);
+  }
+};
+
+// 更新 Y 轴范围，确保始终包含 baseline
+const updateYScaleRange = (data: [number[], number[]]) => {
+  if (!uplotInstance) return;
+
+  const range = getYScaleRange(data, props.baseline);
+  if (!range) return;
+
+  try {
+    uplotInstance.setScale('y', range);
+  } catch (e) {
+    console.warn('[FundChart] setScale error:', e);
   }
 };
 
@@ -347,9 +394,14 @@ watch(() => props.trend, () => {
   }
 });
 
-// 监听 baseline 变化以重绘基准线
+// 监听 baseline 变化以重绘基准线并更新 Y 轴范围
 watch(() => props.baseline, () => {
   if (uplotInstance) {
+    // 获取当前数据并更新 Y 轴范围
+    const data = uplotInstance.data;
+    if (data && data[0].length > 0) {
+      updateYScaleRange(data as [number[], number[]]);
+    }
     uplotInstance.redraw();
   }
 });
