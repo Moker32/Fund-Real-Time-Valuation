@@ -18,6 +18,7 @@
               v-model="searchText"
               :fetch-suggestions="querySearch"
               :trigger-on-focus="false"
+              value-key="value"
               placeholder="输入基金代码或名称搜索"
               clearable
               @select="handleSelect"
@@ -108,7 +109,8 @@ async function querySearch(keyword: string, cb: (results: FundSearchItem[]) => v
       value: `${f.code} - ${f.name}`,
     }));
 
-    cb(results);
+    // Use Promise.resolve to ensure callback is called properly in next tick
+    Promise.resolve(results).then((data) => cb(data));
   } catch {
     cb([]);
   } finally {
@@ -336,16 +338,16 @@ watch(() => props.visible, async (visible) => {
   color: #666;
 }
 
-:deep(.el-autocomplete-suggestion) {
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
+:deep(.el-autocomplete__popper) {
+  background: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
 }
 
-:deep(.el-autocomplete-suggestion li) {
+:deep(.el-autocomplete__popper li) {
   color: #fff;
 }
 
-:deep(.el-autocomplete-suggestion li:hover) {
+:deep(.el-autocomplete__popper li:hover) {
   background: #3a3a3a;
 }
 </style>

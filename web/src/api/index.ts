@@ -168,7 +168,7 @@ export const fundApi = {
     total: number;
     source: string;
   }> {
-    return api.get('/api/funds/search', { q: query, limit });
+    return api.get('/api/funds/search', { params: { q: query, limit } });
   },
 
   async getFunds(): Promise<{ funds: Fund[]; total: number; timestamp: string }> {
