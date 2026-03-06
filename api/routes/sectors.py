@@ -193,12 +193,8 @@ async def get_concept_sectors(
         result = await manager.fetch_with_source("sector_eastmoney_akshare", "concept")
 
     if not _check_result_success(result):
-        # 最后备用：EastMoney 直连 API（包含资金流向）
-        result = await manager.fetch_with_source("sector_eastmoney_direct", "concept")
-
-    if not _check_result_success(result):
-        # 最后备用：EastMoney 直连 API（包含资金流向）
-        result = await manager.fetch_with_source("sector_eastmoney_direct", "concept")
+        # 最后备用：Sina 数据源
+        result = await manager.fetch_with_source("sina_sector")
 
     # 检查所有数据源是否都失败
     if not _check_result_success(result):
