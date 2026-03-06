@@ -101,3 +101,8 @@ disable_error_code = [
     "assignment",
     "return-value",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.0.0",
+]
