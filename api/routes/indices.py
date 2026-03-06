@@ -302,6 +302,35 @@ async def get_indices(
 
 
 @router.get(
+    "/regions",
+    summary="获取支持的区域",
+    description="获取所有支持的指数区域列表",
+)
+async def get_regions() -> dict:
+    """
+    获取支持的区域列表
+
+    Returns:
+        dict: 区域信息
+    """
+    regions: dict[str, dict[str, Any]] = {}
+    for index_type, region in INDEX_REGIONS.items():
+        if region not in regions:
+            regions[region] = {"name": region, "indices": []}
+        regions[region]["indices"].append(
+            {
+                "index": index_type,
+                "name": INDEX_NAMES.get(index_type, index_type),
+            }
+        )
+
+    return {
+        "regions": list(regions.values()),
+        "supported_indices": SUPPORTED_INDICES,
+    }
+
+
+@router.get(
     "/{index_type}",
     summary="获取单个指数",
     description="根据指数类型获取单个指数的实时行情",
@@ -370,35 +399,6 @@ async def get_index(
         "isDelayed": is_delayed,
         "dataTimestamp": display_timestamp,  # 新增
         "timezone": market_info.get("tz"),  # 新增
-    }
-
-
-@router.get(
-    "/regions",
-    summary="获取支持的区域",
-    description="获取所有支持的指数区域列表",
-)
-async def get_regions() -> dict:
-    """
-    获取支持的区域列表
-
-    Returns:
-        dict: 区域信息
-    """
-    regions: dict[str, dict[str, Any]] = {}
-    for index_type, region in INDEX_REGIONS.items():
-        if region not in regions:
-            regions[region] = {"name": region, "indices": []}
-        regions[region]["indices"].append(
-            {
-                "index": index_type,
-                "name": INDEX_NAMES.get(index_type, index_type),
-            }
-        )
-
-    return {
-        "regions": list(regions.values()),
-        "supported_indices": SUPPORTED_INDICES,
     }
 
 
