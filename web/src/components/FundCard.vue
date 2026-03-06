@@ -92,7 +92,7 @@
         </div>
 
         <!-- 折线图：显示在估值下方 -->
-        <FundChart v-if="shouldShowChart" :data="chartData" :height="60" chart-type="line" :baseline="baseline" :trend="changeClass" class="fund-chart" />
+        <LineChart v-if="shouldShowChart" :data="chartData" :height="60" chart-type="line" :baseline="baseline" :trend="changeClass" class="fund-chart" />
       </div>
 
       <div class="card-footer">
@@ -109,7 +109,7 @@
 import { computed, ref, watch } from 'vue';
 import { useFundStore } from '@/stores/fundStore';
 import type { Fund } from '@/types';
-import FundChart from './FundChart.vue';
+import LineChart from './LineChart.vue';
 
 interface Props {
   fund: Fund;
