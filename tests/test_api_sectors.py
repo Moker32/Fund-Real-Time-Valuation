@@ -3,12 +3,13 @@ sectors.py API 路由测试
 测试行业板块和概念板块 API 端点的功能
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from fastapi.testclient import TestClient
 
-from api.main import app
 from api.dependencies_impl import set_data_source_manager
+from api.main import app
 from src.datasources.base import DataSourceResult
 
 

@@ -51,7 +51,6 @@ def get_mini_racer_status() -> dict[str, Any]:
             status["installed"] = True
             status["version"] = "mini_racer"
             try:
-                import mini_racer
 
                 status["working"] = True
             except Exception as e:

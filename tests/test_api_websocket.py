@@ -3,8 +3,9 @@ websocket.py API 路由测试
 测试 WebSocket 实时推送 API 端点的功能
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -60,7 +61,6 @@ class TestBroadcastMsg:
 
     def test_broadcast_msg_success(self):
         """测试广播消息成功 - 修复请求参数格式"""
-        import json
         
         with patch("api.routes.websocket.get_websocket_manager") as mock_get_manager:
             mock_manager = MagicMock()

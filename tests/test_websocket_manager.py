@@ -11,23 +11,20 @@ WebSocket 连接管理器测试
 """
 
 import asyncio
-import math
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import WebSocket
 
 from src.utils.websocket_manager import (
     ConnectionState,
+    WebSocketManager,
     WSClient,
     WSMessage,
-    WebSocketManager,
     _safe_json_default,
-    _to_camel_case,
-    _convert_dict_to_camel_case,
-    safe_json_dumps,
     get_websocket_manager,
+    safe_json_dumps,
     set_websocket_manager,
 )
 
@@ -264,9 +261,7 @@ class TestWebSocketManagerConnection:
         ws2.close = AsyncMock()
 
         # 第一个连接
-        client1 = None
-        async with manager.connection(ws1) as client:
-            client1 = client
+        async with manager.connection(ws1):
             assert manager.get_client_count() == 1
 
             # 第二个连接
@@ -405,8 +400,8 @@ class TestWebSocketManagerBroadcast:
         message = WSMessage(type="test", data={"key": "value"})
 
         # 手动添加客户端
-        async with manager.connection(ws1) as client1:
-            async with manager.connection(ws2) as client2:
+        async with manager.connection(ws1):
+            async with manager.connection(ws2):
                 count = await manager.broadcast(message)
 
                 assert count == 2
@@ -431,7 +426,7 @@ class TestWebSocketManagerBroadcast:
         async with manager.connection(ws1) as client1:
             await manager.subscribe(client1.client_id, "funds")
 
-            async with manager.connection(ws2) as client2:
+            async with manager.connection(ws2):
                 # client2 不订阅 funds
                 count = await manager.broadcast(message, subscription="funds")
 
@@ -492,7 +487,7 @@ class TestWebSocketManagerBroadcast:
 
         message = WSMessage(type="test", data={"key": "value"})
 
-        async with manager.connection(ws) as client:
+        async with manager.connection(ws):
             # 广播应该处理异常并返回 0
             count = await manager.broadcast(message)
 
@@ -605,7 +600,7 @@ class TestWebSocketManagerInfo:
     @pytest.mark.asyncio
     async def test_get_client_count(self, manager, mock_websocket):
         """测试获取连接数"""
-        async with manager.connection(mock_websocket) as client:
+        async with manager.connection(mock_websocket):
             assert manager.get_client_count() == 1
 
     def test_get_subscribers_count_empty(self, manager):

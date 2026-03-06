@@ -12,12 +12,11 @@
 - 错误处理和重试逻辑
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.datasources.manager import DataSourceManager, DataSourceResult, DataSourceType
+from src.datasources.manager import DataSourceManager, DataSourceResult
 from src.utils.realtime_pusher import (
     NON_TRADING_COMMODITY_INTERVAL,
     NON_TRADING_FUND_INTERVAL,
@@ -34,7 +33,6 @@ from src.utils.websocket_manager import (
     WebSocketManager,
     _convert_dict_to_camel_case,
     _to_camel_case,
-    set_websocket_manager,
 )
 
 

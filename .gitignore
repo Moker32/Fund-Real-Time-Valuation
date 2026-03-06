@@ -61,6 +61,9 @@ coverage_html/
 # Playwright缓存
 .playwright-mcp/
 
+# AI 工具配置
+.roo/
+
 # Playwright E2E 测试产物
 web/e2e/playwright-report/
 web/e2e/test-results/
