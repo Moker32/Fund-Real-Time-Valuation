@@ -34,10 +34,16 @@ dependencies = [
     "holidays>=0.40",
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
-    # akshare 声明了 mini-racer>=0.12.4 但没设上限
-    # v0.14.x 在 macOS ARM64 上有 V8 崩溃问题，需限制上限
+    # mini-racer 版本对齐方案:
+    # - mini-racer 0.14.x 导出的符号从 mr_eval 改为 mr_eval_context，与 py_mini_racer 0.6.0 不兼容
+    # - 解决方案：固定使用兼容版本
+    #   * macOS/Windows: 使用 mini-racer 0.13.x（最后稳定版）
+    #   * Linux: 使用 py-mini-racer（官方推荐）
+    # - 兼容矩阵:
+    #   mini-racer 0.12.4-0.13.x + py_mini_racer 0.6.0 ✓
+    #   mini-racer 0.14.x + py_mini_racer 0.6.0 ✗ (符号不匹配)
     "mini-racer>=0.12.4,<0.14; platform_system != 'Linux'",
-    "py-mini-racer>=0.6.0; platform_system == 'Linux'",
+    "py-mini-racer>=0.6.0,<0.7; platform_system == 'Linux'",
 ]
 
 [project.optional-dependencies]

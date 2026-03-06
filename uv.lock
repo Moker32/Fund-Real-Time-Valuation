@@ -659,7 +659,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.24.0" },
     { name = "matplotlib", specifier = ">=3.7.0" },
     { name = "mini-racer", marker = "sys_platform != 'linux'", specifier = ">=0.12.4,<0.14" },
-    { name = "py-mini-racer", marker = "sys_platform == 'linux'", specifier = ">=0.6.0" },
+    { name = "py-mini-racer", marker = "sys_platform == 'linux'", specifier = ">=0.6.0,<0.7" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "python-dateutil", specifier = ">=2.8.2" },
