@@ -152,12 +152,15 @@ const changeClass = computed(() => {
 });
 
 // 基准线 - 昨日净值
+// 只有当 prevNetValue 有效时才返回，否则返回 undefined（不显示基准线）
 // eslint-disable-next-line no-useless-assignment
 const baseline = computed(() => {
   if (props.fund.prevNetValue && props.fund.prevNetValue > 0) {
     return props.fund.prevNetValue;
   }
-  return props.fund.netValue;
+  // 当没有前日净值时，返回 undefined，让图表不显示基准线
+  // 而不是回退到当前净值（那样会失去基准线的意义）
+  return undefined;
 });
 
 // 价格动画状态

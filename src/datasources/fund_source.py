@@ -81,8 +81,10 @@ def get_daily_cache_dao() -> FundDailyCacheDAO:
     global _daily_cache_dao
     if _daily_cache_dao is None:
         db_manager = DatabaseManager()
-        # 设置 5 分钟缓存过期时间
-        _daily_cache_dao = FundDailyCacheDAO(db_manager, cache_ttl=300)
+        # 设置 1 小时缓存过期时间（3600秒）
+        # 延长缓存时间以减少 API 调用，提高性能
+        # 历史净值数据不会频繁变化，较长的缓存时间是安全的
+        _daily_cache_dao = FundDailyCacheDAO(db_manager, cache_ttl=3600)
     return _daily_cache_dao
 
 

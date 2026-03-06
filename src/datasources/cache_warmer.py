@@ -224,6 +224,7 @@ async def prewarm_new_fund(fund_code: str, timeout: float = 30.0):
     预热单个基金数据
 
     在添加基金到自选后立即触发数据预热，将数据写入缓存供后续请求使用。
+    增强版：同时预热实时数据和历史数据（用于前日净值计算）。
 
     Args:
         fund_code: 基金代码
@@ -232,7 +233,7 @@ async def prewarm_new_fund(fund_code: str, timeout: float = 30.0):
     try:
         logger.info(f"开始预热基金数据: {fund_code}")
 
-        # 获取基金实时数据并写入缓存
+        # 1. 获取基金实时数据并写入缓存
         try:
             from src.datasources.fund_source import FundDataSource
 
@@ -243,14 +244,59 @@ async def prewarm_new_fund(fund_code: str, timeout: float = 30.0):
             )
 
             if result.success:
-                logger.info(f"基金数据预热成功: {fund_code}")
+                logger.info(f"基金实时数据预热成功: {fund_code}")
             else:
-                logger.warning(f"基金数据预热失败: {fund_code} - {result.error}")
+                logger.warning(f"基金实时数据预热失败: {fund_code} - {result.error}")
 
         except asyncio.TimeoutError:
-            logger.warning(f"基金数据预热超时: {fund_code}")
+            logger.warning(f"基金实时数据预热超时: {fund_code}")
         except Exception as e:
-            logger.error(f"基金数据预热异常: {fund_code} - {e}")
+            logger.error(f"基金实时数据预热异常: {fund_code} - {e}")
+
+        # 2. 获取基金历史数据（用于前日净值计算和折线图基准线）
+        try:
+            from src.datasources.fund_source import FundHistorySource
+            from src.db.database import DatabaseManager, FundDailyCacheDAO
+
+            history_source = FundHistorySource()
+            history_result = await asyncio.wait_for(
+                history_source.fetch(fund_code, period="近一月"),
+                timeout=timeout
+            )
+
+            if history_result.success and history_result.data:
+                # 将历史数据写入数据库缓存
+                db_manager = DatabaseManager()
+                daily_dao = FundDailyCacheDAO(db_manager)
+
+                history_data = history_result.data.get("data", [])
+                cached_count = 0
+
+                for record in history_data:
+                    try:
+                        # 保存到每日缓存表
+                        daily_dao.save_daily_from_fund_data(fund_code, {
+                            "fund_code": fund_code,
+                            "name": "",
+                            "date": record["time"],
+                            "unit_net_value": record["close"],
+                            "estimated_value": None,
+                            "change_rate": 0,
+                            "estimate_time": None,
+                        })
+                        cached_count += 1
+                    except Exception as e:
+                        logger.debug(f"保存历史记录失败: {fund_code} - {e}")
+                        continue
+
+                logger.info(f"基金历史数据预热成功: {fund_code}, 缓存 {cached_count} 条记录")
+            else:
+                logger.warning(f"基金历史数据预热失败: {fund_code} - {history_result.error}")
+
+        except asyncio.TimeoutError:
+            logger.warning(f"基金历史数据预热超时: {fund_code}")
+        except Exception as e:
+            logger.error(f"基金历史数据预热异常: {fund_code} - {e}")
 
     except Exception as e:
         logger.error(f"预热基金数据失败: {fund_code} - {e}")
