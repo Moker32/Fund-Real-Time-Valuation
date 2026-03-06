@@ -772,7 +772,9 @@ async def add_to_watchlist(
         success, message = config.add_watched_commodity(symbol, name, category)
         return {"success": success, "message": message}
     except Exception as e:
-        return {"success": False, "message": f"添加失败: {e}"}
+        raise HTTPException(
+            status_code=500, detail=f"添加失败: {e}"
+        )
 
 
 @router.delete(

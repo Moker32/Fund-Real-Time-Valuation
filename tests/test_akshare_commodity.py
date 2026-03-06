@@ -149,9 +149,9 @@ class TestCommodityTickerMapping:
 
         # 基本金属 (预留)
         assert tickers["copper"] == "HG=F"
-        assert tickers["aluminum"] == "AL=f"
-        assert tickers["zinc"] == "ZN=f"
-        assert tickers["nickel"] == "NI=f"
+        assert tickers["aluminum"] == "AL=F"
+        assert tickers["zinc"] == "ZN=F"
+        assert tickers["nickel"] == "NI=F"
 
 
 if __name__ == "__main__":

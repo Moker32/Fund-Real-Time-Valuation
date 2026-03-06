@@ -156,8 +156,10 @@ class CommoditiesConfig:
         Returns:
             tuple[bool, str]: (是否成功, 消息)
         """
-        # 清理 symbol - 保持原样，不自动添加 =F
+        # 清理 symbol - 统一处理 =F 后缀
         clean_symbol = symbol.upper().strip()
+        if not clean_symbol.endswith("=F"):
+            clean_symbol = f"{clean_symbol}=F"
 
         # 检查是否已存在
         if self.is_watching(clean_symbol):

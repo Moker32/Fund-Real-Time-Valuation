@@ -13,6 +13,7 @@
 import asyncio
 import logging
 import time
+from collections import OrderedDict
 from datetime import datetime, timezone
 from typing import Any
 
@@ -23,6 +24,14 @@ from src.db.commodity_repo import CommodityCacheDAO, CommodityCategory
 from .base import DataSource, DataSourceResult, DataSourceType
 
 logger = logging.getLogger(__name__)
+
+# 重试配置
+MAX_RETRIES = 3
+INITIAL_RETRY_DELAY = 1.0  # 初始延迟1秒
+RETRY_BACKOFF_FACTOR = 2.0  # 指数增长因子
+
+# 内存缓存配置
+MAX_CACHE_SIZE = 100  # 最大缓存条目数
 
 
 class CommodityDataSource(DataSource):
@@ -37,7 +46,8 @@ class CommodityDataSource(DataSource):
             timeout: 请求超时时间(秒)
         """
         super().__init__(name=name, source_type=DataSourceType.COMMODITY, timeout=timeout)
-        self._cache: dict[str, dict[str, Any]] = {}
+        # 使用 OrderedDict 实现 LRU 缓存
+        self._cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._cache_timeout = 60.0  # 内存缓存60秒
         self._db_dao: CommodityCacheDAO | None = None
 
@@ -54,6 +64,107 @@ class CommodityDataSource(DataSource):
                 self._db_dao.save_from_api(commodity_type, data, source)
             except Exception as e:
                 logger.error(f"保存商品数据到数据库失败: {e}")
+
+    def _add_to_cache(self, cache_key: str, data: dict[str, Any]) -> None:
+        """
+        添加数据到LRU缓存
+
+        如果缓存已满，移除最久未使用的条目
+        """
+        # 如果键已存在，先移除它（后面会重新添加以更新顺序）
+        if cache_key in self._cache:
+            del self._cache[cache_key]
+        # 如果缓存已满，移除最久未使用的条目
+        elif len(self._cache) >= MAX_CACHE_SIZE:
+            oldest_key = next(iter(self._cache))
+            del self._cache[oldest_key]
+            logger.debug(f"LRU缓存已满，移除最久未使用的条目: {oldest_key}")
+
+        # 添加新数据到末尾（最新使用）
+        self._cache[cache_key] = data
+
+    def _get_from_cache(self, cache_key: str) -> dict[str, Any] | None:
+        """
+        从LRU缓存获取数据
+
+        访问数据时会将其移到末尾（标记为最新使用）
+        """
+        if cache_key not in self._cache:
+            return None
+
+        # 移动到末尾（标记为最新使用）
+        data = self._cache.pop(cache_key)
+        self._cache[cache_key] = data
+        return data
+
+    async def _fetch_with_retry(
+        self,
+        fetch_func: callable,
+        *args,
+        **kwargs
+    ) -> Any:
+        """
+        带指数退避重试的获取方法
+
+        Args:
+            fetch_func: 实际获取数据的函数
+            *args, **kwargs: 传递给 fetch_func 的参数
+
+        Returns:
+            获取的数据
+
+        Raises:
+            Exception: 所有重试都失败后的最后一个异常
+        """
+        last_exception: Exception | None = None
+
+        for attempt in range(MAX_RETRIES):
+            try:
+                return await fetch_func(*args, **kwargs)
+            except asyncio.TimeoutError as e:
+                last_exception = e
+                # 超时错误需要重试
+                if attempt < MAX_RETRIES - 1:
+                    delay = INITIAL_RETRY_DELAY * (RETRY_BACKOFF_FACTOR ** attempt)
+                    logger.warning(
+                        f"[{self.name}] 请求超时 (尝试 {attempt + 1}/{MAX_RETRIES}), "
+                        f"{delay:.1f}秒后重试..."
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    logger.error(f"[{self.name}] 请求超时，已重试{MAX_RETRIES}次，放弃")
+            except Exception as e:
+                last_exception = e
+                # 检查是否是网络相关错误
+                error_str = str(e).lower()
+                is_network_error = any(
+                    keyword in error_str
+                    for keyword in [
+                        "network", "connection", "timeout", "dns",
+                        "unreachable", "refused", "reset", "abort",
+                        "ssl", "certificate", "handshake"
+                    ]
+                )
+
+                if is_network_error and attempt < MAX_RETRIES - 1:
+                    delay = INITIAL_RETRY_DELAY * (RETRY_BACKOFF_FACTOR ** attempt)
+                    logger.warning(
+                        f"[{self.name}] 网络错误 (尝试 {attempt + 1}/{MAX_RETRIES}): {e}, "
+                        f"{delay:.1f}秒后重试..."
+                    )
+                    await asyncio.sleep(delay)
+                else:
+                    if is_network_error:
+                        logger.error(f"[{self.name}] 网络错误，已重试{MAX_RETRIES}次，放弃: {e}")
+                    else:
+                        # 业务错误不重试
+                        logger.warning(f"[{self.name}] 业务错误，不重试: {e}")
+                    raise
+
+        # 所有重试都失败了
+        if last_exception:
+            raise last_exception
+        raise Exception("未知错误")
 
     async def close(self):
         """关闭数据源（子类应重写此方法）"""
@@ -80,9 +191,9 @@ class YFinanceCommoditySource(CommodityDataSource):
         "natural_gas": "NG=F",  # 天然气
         # 基本金属
         "copper": "HG=F",  # 铜
-        "aluminum": "AL=f",  # 铝
-        "zinc": "ZN=f",  # 锌
-        "nickel": "NI=f",  # 镍
+        "aluminum": "AL=F",  # 铝
+        "zinc": "ZN=F",  # 锌
+        "nickel": "NI=F",  # 镍
         # 农产品
         "soybean": "ZS=F",  # 大豆
         "corn": "ZC=F",  # 玉米
@@ -116,7 +227,7 @@ class YFinanceCommoditySource(CommodityDataSource):
 
     async def _fetch_yfinance_info(self, ticker: str) -> dict[str, Any]:
         """
-        使用 run_in_executor 获取 yfinance 数据，带超时控制
+        使用 run_in_executor 获取 yfinance 数据，带超时控制和重试机制
 
         Args:
             ticker: yfinance ticker 符号
@@ -132,17 +243,20 @@ class YFinanceCommoditySource(CommodityDataSource):
 
         loop = asyncio.get_event_loop()
 
-        async with self._get_semaphore():
-            try:
+        async def _fetch() -> dict[str, Any]:
+            async with self._get_semaphore():
                 ticker_obj = yf.Ticker(ticker)
                 info = await asyncio.wait_for(
                     loop.run_in_executor(None, lambda: ticker_obj.info),
                     timeout=self.YFINANCE_TIMEOUT
                 )
                 return info
-            except asyncio.TimeoutError:
-                logger.warning(f"[YFinance] 获取 {ticker} 超时 ({self.YFINANCE_TIMEOUT}s)")
-                raise
+
+        try:
+            return await self._fetch_with_retry(_fetch)
+        except asyncio.TimeoutError:
+            logger.warning(f"[YFinance] 获取 {ticker} 超时 ({self.YFINANCE_TIMEOUT}s)")
+            raise
 
     async def fetch(self, commodity_type: str = "gold") -> DataSourceResult:
         """
@@ -157,6 +271,19 @@ class YFinanceCommoditySource(CommodityDataSource):
         # 加密货币使用 Binance (实时 ~100ms)
         if commodity_type in self._crypto_tickers:
             return await self._fetch_from_binance(commodity_type)
+
+        # 检查内存缓存（优先检查内存缓存，更快）
+        cache_key = commodity_type
+        cached_data = self._get_from_cache(cache_key)
+        if cached_data and self._is_cache_valid(cache_key):
+            return DataSourceResult(
+                success=True,
+                data=cached_data,
+                timestamp=cached_data.get("_cache_time", time.time()),
+                source=self.name,
+                metadata={"commodity_type": commodity_type, "from_cache": "memory"},
+            )
+
         # 检查数据库缓存
         if self._db_dao:
             try:
@@ -180,17 +307,6 @@ class YFinanceCommoditySource(CommodityDataSource):
             except Exception as e:
                 logger.warning(f"查询数据库缓存失败: {e}")
 
-        # 检查内存缓存
-        cache_key = commodity_type
-        if self._is_cache_valid(cache_key):
-            return DataSourceResult(
-                success=True,
-                data=self._cache[cache_key],
-                timestamp=self._cache[cache_key].get("_cache_time", time.time()),
-                source=self.name,
-                metadata={"commodity_type": commodity_type, "from_cache": "memory"},
-            )
-
         try:
             ticker = self.COMMODITY_TICKERS.get(commodity_type)
             if not ticker:
@@ -205,7 +321,7 @@ class YFinanceCommoditySource(CommodityDataSource):
 
             logger.debug(f"[YFinance] fetching {commodity_type} -> ticker={ticker}")
 
-            # 使用异步方法获取数据（带超时控制和并发控制）
+            # 使用异步方法获取数据（带超时控制、并发控制和重试机制）
             info = await self._fetch_yfinance_info(ticker)
 
             if not info or info.get("symbol") is None:
@@ -230,7 +346,8 @@ class YFinanceCommoditySource(CommodityDataSource):
                 try:
                     utc_dt = datetime.fromtimestamp(market_time, timezone.utc)
                     timestamp_str = utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-                except (ValueError, TypeError, OSError):
+                except (ValueError, TypeError, OSError) as e:
+                    logger.warning(f"转换时间戳失败: {e}")
                     timestamp_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             else:
                 timestamp_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -256,9 +373,9 @@ class YFinanceCommoditySource(CommodityDataSource):
                 "prev_close": float(prev_close) if prev_close else None,
             }
 
-            # 更新缓存
+            # 更新LRU缓存
             data["_cache_time"] = time.time()
-            self._cache[cache_key] = data
+            self._add_to_cache(cache_key, data)
 
             # 异步保存到数据库
             await self._save_to_database(commodity_type, data, self.name)
@@ -273,6 +390,7 @@ class YFinanceCommoditySource(CommodityDataSource):
             )
 
         except ImportError:
+            logger.error("yfinance 未安装")
             return DataSourceResult(
                 success=False,
                 error="yfinance 未安装，请运行: pip install yfinance",
@@ -281,6 +399,7 @@ class YFinanceCommoditySource(CommodityDataSource):
                 metadata={"commodity_type": commodity_type, "error_type": "ImportError"},
             )
         except Exception as e:
+            logger.error(f"[YFinance] 获取 {commodity_type} 数据失败: {e}")
             return self._handle_error(e, self.name)
 
     async def fetch_batch(self, commodity_types: list[str]) -> list[DataSourceResult]:
@@ -295,6 +414,7 @@ class YFinanceCommoditySource(CommodityDataSource):
         processed_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
+                logger.error(f"批量获取商品 {commodity_types[i]} 失败: {result}")
                 processed_results.append(
                     DataSourceResult(
                         success=False,
@@ -347,6 +467,7 @@ class YFinanceCommoditySource(CommodityDataSource):
     def clear_cache(self):
         """清空缓存"""
         self._cache.clear()
+        logger.info(f"[{self.name}] 缓存已清空")
 
     async def fetch_by_ticker(self, ticker: str) -> DataSourceResult:
         """根据任意 ticker 获取商品数据"""
@@ -381,7 +502,8 @@ class YFinanceCommoditySource(CommodityDataSource):
                 try:
                     utc_dt = datetime.fromtimestamp(market_time, timezone.utc)
                     timestamp_str = utc_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-                except (ValueError, TypeError, OSError):
+                except (ValueError, TypeError, OSError) as e:
+                    logger.warning(f"转换时间戳失败: {e}")
                     timestamp_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             else:
                 timestamp_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -411,12 +533,14 @@ class YFinanceCommoditySource(CommodityDataSource):
             )
 
         except Exception as e:
+            logger.error(f"[YFinance] 获取 ticker {ticker} 数据失败: {e}")
             return self._handle_error(e, self.name)
 
     def get_status(self) -> dict[str, Any]:
         """获取数据源状态（含缓存信息）"""
         status = super().get_status()
         status["cache_size"] = len(self._cache)
+        status["cache_max_size"] = MAX_CACHE_SIZE
         status["cache_timeout"] = self._cache_timeout
         status["supported_commodities"] = list(self.COMMODITY_TICKERS.keys())
         # 标记预留商品
@@ -441,50 +565,54 @@ class YFinanceCommoditySource(CommodityDataSource):
                 source=self.name,
             )
 
-        try:
+        async def _fetch() -> dict[str, Any]:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 url = "https://api.binance.com/api/v3/ticker/24hr"
                 response = await client.get(url, params={"symbol": symbol})
                 response.raise_for_status()
-                data = response.json()
+                return response.json()
 
-                crypto_names = {
-                    "btc": "比特币",
-                    "eth": "以太坊",
-                }
+        try:
+            data = await self._fetch_with_retry(_fetch)
 
-                result_data = {
-                    "commodity": commodity_type,
-                    "symbol": symbol,
-                    "name": crypto_names.get(commodity_type, commodity_type),
-                    "price": float(data.get("lastPrice", 0)),
-                    "change": float(data.get("priceChange", 0)),
-                    "change_percent": float(data.get("priceChangePercent", 0)),
-                    "currency": "USDT",
-                    "exchange": "Binance",
-                    "high": float(data.get("highPrice", 0)),
-                    "low": float(data.get("lowPrice", 0)),
-                    "open": float(data.get("openPrice", 0)),
-                    "prev_close": float(data.get("prevClosePrice", 0)),
-                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                }
+            crypto_names = {
+                "btc": "比特币",
+                "eth": "以太坊",
+            }
 
-                cache_key = commodity_type
-                result_data["_cache_time"] = time.time()
-                self._cache[cache_key] = result_data
+            result_data = {
+                "commodity": commodity_type,
+                "symbol": symbol,
+                "name": crypto_names.get(commodity_type, commodity_type),
+                "price": float(data.get("lastPrice", 0)),
+                "change": float(data.get("priceChange", 0)),
+                "change_percent": float(data.get("priceChangePercent", 0)),
+                "currency": "USDT",
+                "exchange": "Binance",
+                "high": float(data.get("highPrice", 0)),
+                "low": float(data.get("lowPrice", 0)),
+                "open": float(data.get("openPrice", 0)),
+                "prev_close": float(data.get("prevClosePrice", 0)),
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
 
-                await self._save_to_database(commodity_type, result_data, self.name)
+            cache_key = commodity_type
+            result_data["_cache_time"] = time.time()
+            self._add_to_cache(cache_key, result_data)
 
-                self._record_success()
-                return DataSourceResult(
-                    success=True,
-                    data=result_data,
-                    timestamp=time.time(),
-                    source=self.name,
-                    metadata={"commodity_type": commodity_type, "source": "binance"},
-                )
+            await self._save_to_database(commodity_type, result_data, self.name)
+
+            self._record_success()
+            return DataSourceResult(
+                success=True,
+                data=result_data,
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"commodity_type": commodity_type, "source": "binance"},
+            )
 
         except Exception as e:
+            logger.error(f"[Binance] 获取 {commodity_type} 数据失败: {e}")
             return self._handle_error(e, self.name)
 
 
@@ -521,11 +649,12 @@ class AKShareCommoditySource(CommodityDataSource):
 
         # 检查内存缓存
         cache_key = commodity_type
-        if self._is_cache_valid(cache_key):
+        cached_data = self._get_from_cache(cache_key)
+        if cached_data and self._is_cache_valid(cache_key):
             return DataSourceResult(
                 success=True,
-                data=self._cache[cache_key],
-                timestamp=self._cache[cache_key].get("_cache_time", time.time()),
+                data=cached_data,
+                timestamp=cached_data.get("_cache_time", time.time()),
                 source=self.name,
                 metadata={"commodity_type": commodity_type, "from_cache": "memory"},
             )
@@ -536,6 +665,7 @@ class AKShareCommoditySource(CommodityDataSource):
             if commodity_type == "gold_cny":
                 data = await self._fetch_gold_cny()
             else:
+                logger.warning(f"[AKShare] 不支持的商品类型: {commodity_type}")
                 return DataSourceResult(
                     success=False,
                     error=f"不支持的商品类型: {commodity_type}",
@@ -546,7 +676,7 @@ class AKShareCommoditySource(CommodityDataSource):
 
             if data:
                 data["_cache_time"] = time.time()
-                self._cache[cache_key] = data
+                self._add_to_cache(cache_key, data)
                 # 异步保存到数据库
                 await self._save_to_database(commodity_type, data, self.name)
                 self._record_success()
@@ -558,6 +688,7 @@ class AKShareCommoditySource(CommodityDataSource):
                     metadata={"commodity_type": commodity_type},
                 )
 
+            logger.error(f"[AKShare] 获取 {commodity_type} 数据为空")
             return DataSourceResult(
                 success=False,
                 error="获取商品数据为空",
@@ -567,6 +698,7 @@ class AKShareCommoditySource(CommodityDataSource):
             )
 
         except ImportError:
+            logger.error("AKShare 未安装")
             return DataSourceResult(
                 success=False,
                 error="AKShare 未安装",
@@ -575,63 +707,64 @@ class AKShareCommoditySource(CommodityDataSource):
                 metadata={"commodity_type": commodity_type},
             )
         except Exception as e:
+            logger.error(f"[AKShare] 获取 {commodity_type} 数据失败: {e}")
             return self._handle_error(e, self.name)
 
     async def _fetch_gold_cny(self) -> dict[str, Any] | None:
         """获取上海黄金交易所 Au99.99 实时行情数据"""
         import akshare as ak
 
-        try:
+        async def _fetch_realtime() -> dict[str, Any] | None:
+            """获取实时行情"""
             # 优先使用实时行情接口
             df = ak.spot_quotations_sge()
             if df is not None and not df.empty:
                 au_df = df[df["品种"] == "Au99.99"]
                 if not au_df.empty:
                     latest = au_df.iloc[-1]
-                price = float(latest.get("现价", 0) or 0)
+                    price = float(latest.get("现价", 0) or 0)
 
-                # 获取当日开盘价（第一条数据）
-                open_price = float(au_df.iloc[0].get("现价", 0)) if len(au_df) > 0 else None
-                # 获取当日最高最低
-                high_price = au_df["现价"].astype(float).max()
-                low_price = au_df["现价"].astype(float).min()
+                    # 获取当日开盘价（第一条数据）
+                    open_price = float(au_df.iloc[0].get("现价", 0)) if len(au_df) > 0 else None
+                    # 获取当日最高最低
+                    high_price = au_df["现价"].astype(float).max()
+                    low_price = au_df["现价"].astype(float).min()
 
-                # 获取昨日收盘价（从历史接口）
-                prev_close = None
-                try:
-                    hist_df = ak.spot_hist_sge(symbol="Au99.99")
-                    if hist_df is not None and len(hist_df) >= 2:
-                        prev_close = float(hist_df.iloc[-2].get("close", 0) or 0)
-                except Exception:
-                    pass
+                    # 获取昨日收盘价（从历史接口）
+                    prev_close = None
+                    try:
+                        hist_df = ak.spot_hist_sge(symbol="Au99.99")
+                        if hist_df is not None and len(hist_df) >= 2:
+                            prev_close = float(hist_df.iloc[-2].get("close", 0) or 0)
+                    except Exception as e:
+                        logger.warning(f"获取 Au99.99 历史数据失败: {e}")
 
-                # 计算涨跌幅
-                change = None
-                change_percent = None
-                if prev_close and prev_close > 0:
-                    change = round(price - prev_close, 2)
-                    change_percent = round((change / prev_close) * 100, 2)
+                    # 计算涨跌幅
+                    change = None
+                    change_percent = None
+                    if prev_close and prev_close > 0:
+                        change = round(price - prev_close, 2)
+                        change_percent = round((change / prev_close) * 100, 2)
 
-                return {
-                    "commodity": "gold_cny",
-                    "symbol": "Au99.99",
-                    "name": "Au99.99 (上海黄金)",
-                    "price": price,
-                    "change": change,
-                    "change_percent": change_percent,
-                    "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "high": high_price if high_price > 0 else None,
-                    "low": low_price if low_price > 0 else None,
-                    "open": open_price if open_price and open_price > 0 else None,
-                    "prev_close": prev_close,
-                    "currency": "CNY",
-                    "exchange": "SGE",
-                }
-        except Exception as e:
-            logger.warning(f"获取沪金实时数据失败，尝试备用接口: {e}")
+                    return {
+                        "commodity": "gold_cny",
+                        "symbol": "Au99.99",
+                        "name": "Au99.99 (上海黄金)",
+                        "price": price,
+                        "change": change,
+                        "change_percent": change_percent,
+                        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "high": high_price if high_price > 0 else None,
+                        "low": low_price if low_price > 0 else None,
+                        "open": open_price if open_price and open_price > 0 else None,
+                        "prev_close": prev_close,
+                        "currency": "CNY",
+                        "exchange": "SGE",
+                    }
+            return None
 
-        # 备用：使用历史数据接口
-        try:
+        async def _fetch_history() -> dict[str, Any] | None:
+            """获取历史数据作为备用"""
             df = ak.spot_hist_sge(symbol="Au99.99")
             if df is not None and not df.empty:
                 latest = df.iloc[-1]
@@ -665,8 +798,23 @@ class AKShareCommoditySource(CommodityDataSource):
                     "currency": "CNY",
                     "exchange": "SGE",
                 }
-        except Exception as e2:
-            logger.warning(f"备用接口也失败: {e2}")
+            return None
+
+        try:
+            # 尝试获取实时数据
+            result = await _fetch_realtime()
+            if result:
+                return result
+        except Exception as e:
+            logger.warning(f"获取沪金实时数据失败，尝试备用接口: {e}")
+
+        # 备用：使用历史数据接口
+        try:
+            result = await _fetch_history()
+            if result:
+                return result
+        except Exception as e:
+            logger.error(f"备用接口也失败: {e}")
 
         return None
 
@@ -678,6 +826,7 @@ class AKShareCommoditySource(CommodityDataSource):
         processed_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
+                logger.error(f"批量获取商品 {commodity_types[i]} 失败: {result}")
                 processed_results.append(
                     DataSourceResult(
                         success=False,
@@ -700,6 +849,7 @@ class AKShareCommoditySource(CommodityDataSource):
 
     def clear_cache(self):
         self._cache.clear()
+        logger.info(f"[{self.name}] 缓存已清空")
 
     async def close(self):
         """关闭数据源"""
@@ -780,11 +930,12 @@ class AKShareForeignFuturesSource(CommodityDataSource):
         self._cache_timeout = 30.0  # 缓存30秒
 
     async def fetch(self, commodity_type: str = "gold_london") -> DataSourceResult:
-        if self._is_cache_valid(commodity_type):
+        cached_data = self._get_from_cache(commodity_type)
+        if cached_data and self._is_cache_valid(commodity_type):
             return DataSourceResult(
                 success=True,
-                data=self._cache[commodity_type],
-                timestamp=self._cache[commodity_type].get("_cache_time", time.time()),
+                data=cached_data,
+                timestamp=cached_data.get("_cache_time", time.time()),
                 source=self.name,
                 metadata={"commodity_type": commodity_type, "from_cache": "memory"},
             )
@@ -794,6 +945,7 @@ class AKShareForeignFuturesSource(CommodityDataSource):
 
             akshare_symbol = FOREIGN_FUTURES_REVERSE.get(commodity_type)
             if not akshare_symbol:
+                logger.warning(f"[AKShare Foreign] 不支持的商品类型: {commodity_type}")
                 return DataSourceResult(
                     success=False,
                     error=f"不支持的商品类型: {commodity_type}",
@@ -803,6 +955,7 @@ class AKShareForeignFuturesSource(CommodityDataSource):
 
             df = ak.futures_foreign_hist(symbol=akshare_symbol)
             if df is None or df.empty:
+                logger.warning(f"[AKShare Foreign] 无法获取 {commodity_type} 数据")
                 return DataSourceResult(
                     success=False,
                     error=f"无法获取 {commodity_type} 数据",
@@ -865,7 +1018,7 @@ class AKShareForeignFuturesSource(CommodityDataSource):
                 "exchange": exchange_map.get(commodity_type, "OTHER"),
             }
             data["_cache_time"] = time.time()
-            self._cache[commodity_type] = data
+            self._add_to_cache(commodity_type, data)
 
             return DataSourceResult(
                 success=True,
@@ -875,6 +1028,7 @@ class AKShareForeignFuturesSource(CommodityDataSource):
             )
 
         except Exception as e:
+            logger.error(f"[AKShare Foreign] 获取 {commodity_type} 数据失败: {e}")
             return self._handle_error(e, self.name)
 
     async def fetch_batch(self, commodity_types: list[str]) -> list[DataSourceResult]:
@@ -883,6 +1037,7 @@ class AKShareForeignFuturesSource(CommodityDataSource):
         processed_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
+                logger.error(f"批量获取商品 {commodity_types[i]} 失败: {result}")
                 processed_results.append(
                     DataSourceResult(
                         success=False,
@@ -932,6 +1087,7 @@ class CommodityDataAggregator(CommodityDataSource):
                     return result
                 errors.append(f"{self._primary_source.name}: {result.error}")
             except Exception as e:
+                logger.error(f"主数据源 {self._primary_source.name} 获取失败: {e}")
                 errors.append(f"{self._primary_source.name}: {str(e)}")
 
         # 尝试其他数据源
@@ -944,8 +1100,10 @@ class CommodityDataAggregator(CommodityDataSource):
                     return result
                 errors.append(f"{source.name}: {result.error}")
             except Exception as e:
+                logger.error(f"数据源 {source.name} 获取失败: {e}")
                 errors.append(f"{source.name}: {str(e)}")
 
+        logger.error(f"所有数据源均失败: {'; '.join(errors)}")
         return DataSourceResult(
             success=False,
             error=f"所有数据源均失败: {'; '.join(errors)}",
@@ -962,6 +1120,7 @@ class CommodityDataAggregator(CommodityDataSource):
         processed_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
+                logger.error(f"批量获取商品 {commodity_types[i]} 失败: {result}")
                 processed_results.append(
                     DataSourceResult(
                         success=False,
@@ -990,8 +1149,8 @@ class CommodityDataAggregator(CommodityDataSource):
             if hasattr(source, "close"):
                 try:
                     await source.close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"关闭数据源 {source.name} 失败: {e}")
 
 
 def get_all_commodity_types() -> list[str]:
