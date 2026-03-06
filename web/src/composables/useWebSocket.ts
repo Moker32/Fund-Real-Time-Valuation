@@ -72,6 +72,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         }
       }
       
+      // 重连后重新订阅之前的频道
+      if (subscriptions.value.size > 0) {
+        console.log('[WS] Resubscribing:', Array.from(subscriptions.value))
+        send('subscribe', Array.from(subscriptions.value))
+      }
+      
       onConnected?.()
       startHeartbeat()
     }
