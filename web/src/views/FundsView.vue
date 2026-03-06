@@ -147,7 +147,7 @@ async function handleRemoveFund(code: string) {
     cancelText: '取消',
     type: 'warning',
   });
-  
+
   if (confirmed) {
     await fundStore.removeFund(code);
   }
@@ -173,7 +173,7 @@ onMounted(async () => {
 
     // 尝试获取当天的日内数据
     const intraday = await fundStore.fetchIntraday(fund.code, true);
-    
+
     // 如果当天没有数据，使用基金卡片上显示的更新时间对应的日期
     if (!intraday || intraday.length === 0) {
       const updateTime = fund.estimateTime || fund.netValueDate || '';
@@ -194,6 +194,9 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .funds-view {
   animation: fadeIn var(--transition-normal);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 @keyframes fadeIn {
@@ -250,6 +253,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--spacing-lg);
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
 }
 
 .header-left {
@@ -281,10 +286,12 @@ onUnmounted(() => {
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   transition: background-color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
+  white-space: nowrap;
 
   svg {
     width: 16px;
     height: 16px;
+    flex-shrink: 0;
   }
 }
 
@@ -317,17 +324,98 @@ onUnmounted(() => {
   }
 }
 
+// ==================== 网格布局优化 ====================
+
 .funds-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--spacing-md);
   width: 100%;
 }
 
-// 响应式调整
-@media (max-width: var(--breakpoint-sm)) {
+// 响应式断点优化
+
+// 大桌面 (>= 1440px)
+@media (min-width: 1440px) {
   .funds-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
+}
+
+// 桌面 (1024px - 1439px)
+@media (max-width: 1439px) {
+  .funds-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+// 平板 (768px - 1023px)
+@media (max-width: 1023px) {
+  .funds-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: var(--spacing-sm);
+  }
+}
+
+// 大手机/小平板 (640px - 767px)
+@media (max-width: 767px) {
+  .funds-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--spacing-sm);
+  }
+
+  .list-header {
+    margin-bottom: var(--spacing-md);
+  }
+
+  .section-title {
+    font-size: var(--font-size-md);
+  }
+}
+
+// 小手机 (< 640px) - 单列布局
+@media (max-width: 639px) {
+  .funds-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+  }
+
+  .list-header {
+    margin-bottom: var(--spacing-sm);
+    padding: 0 var(--spacing-xs);
+  }
+
+  .header-left {
+    gap: var(--spacing-sm);
+  }
+
+  .section-title {
+    font-size: var(--font-size-md);
+  }
+
+  .fund-count {
+    font-size: var(--font-size-xs);
+  }
+
+  .btn-add {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+
+    svg {
+      width: 14px;
+      height: 14px;
+    }
+  }
+}
+
+// 超小屏 (< 480px)
+@media (max-width: 479px) {
+  .funds-grid {
+    gap: var(--spacing-xs);
+  }
+
+  .list-header {
+    padding: 0;
   }
 }
 
@@ -424,9 +512,34 @@ onUnmounted(() => {
 
 .loading-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--spacing-md);
   width: 100%;
+}
+
+// 加载网格响应式
+@media (max-width: 1439px) {
+  .loading-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+@media (max-width: 1023px) {
+  .loading-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .loading-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 639px) {
+  .loading-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 // 减少动画偏好支持

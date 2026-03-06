@@ -736,7 +736,7 @@ onMounted(async () => {
 }
 
 /* Responsive */
-@media (max-width: var(--breakpoint-md)) {
+@media (max-width: 768px) {
   .hero-section {
     flex-direction: column;
     gap: var(--spacing-lg);
