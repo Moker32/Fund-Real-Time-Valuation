@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing_extensions import TypedDict
 
-from src.config import get_config_manager
+from src.config.manager import ConfigManager
 from src.config.models import Fund, FundList, Holding
 from src.datasources.base import DataSourceType
 from src.datasources.fund_source import Fund123DataSource, get_basic_info_db
@@ -22,7 +22,7 @@ from src.datasources.trading_calendar_source import Market, TradingCalendarSourc
 if TYPE_CHECKING:
     from src.datasources.fund_source import FundHistorySource
 
-from ..dependencies import DataSourceDependency
+from ..dependencies import ConfigManagerDependency, DataSourceDependency
 from ..models import (
     AddFundRequest,
     ErrorResponse,
@@ -72,7 +72,7 @@ async def search_funds(
     if not q:
         return {"funds": [], "total": 0, "source": "local"}
 
-    from src.db.database import FundBasicInfoDAO, DatabaseManager
+    from src.db.database import DatabaseManager, FundBasicInfoDAO
 
     dao = FundBasicInfoDAO(DatabaseManager())
     results = dao.search(q, limit=limit)
@@ -171,7 +171,7 @@ def _is_qdii_fund(code: str) -> bool:
         return False
 
 
-def _check_is_holding(code: str) -> bool:
+def _check_is_holding(code: str, config_manager: ConfigManager) -> bool:
     """检查基金是否为持仓
 
     Args:
@@ -181,7 +181,6 @@ def _check_is_holding(code: str) -> bool:
         bool: 是否持有
     """
     try:
-        config_manager = get_config_manager()
         fund_list = config_manager.load_funds()
         return code in {h.code for h in fund_list.holdings}
     except Exception as e:
@@ -189,9 +188,8 @@ def _check_is_holding(code: str) -> bool:
         return False
 
 
-def get_default_fund_codes() -> list[str]:
+def get_default_fund_codes(config_manager: ConfigManager) -> list[str]:
     """获取默认基金代码列表"""
-    config_manager = get_config_manager()
     fund_list: FundList = config_manager.load_funds()
     codes = fund_list.get_all_codes()
     if codes:
@@ -262,6 +260,7 @@ def build_fund_response(data: dict, source: str = "", is_holding: bool = False) 
 async def get_funds_list(
     codes: str | None = None,
     manager: DataSourceManager = Depends(DataSourceDependency()),
+    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
 ) -> FundListData:
     """
     获取基金列表
@@ -276,7 +275,6 @@ async def get_funds_list(
     current_time = datetime.now().isoformat() + "Z"
 
     # 加载持仓信息
-    config_manager = get_config_manager()
     fund_list = config_manager.load_funds()
     holding_codes = {h.code for h in fund_list.holdings}
 
@@ -309,7 +307,7 @@ async def get_funds_list(
         return {"funds": funds, "total": len(funds), "timestamp": current_time, "progress": 100}
 
     # 没有指定 codes 时，使用默认基金代码获取真实数据
-    fund_codes = get_default_fund_codes()
+    fund_codes = get_default_fund_codes(config_manager)
 
     # 构建参数列表
     params_list = [{"args": [code]} for code in fund_codes]
@@ -348,6 +346,7 @@ async def get_funds_list(
 async def get_fund_detail(
     code: str,
     manager: DataSourceManager = Depends(DataSourceDependency()),
+    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
 ) -> dict:
     """
     获取基金详情
@@ -377,7 +376,7 @@ async def get_fund_detail(
     estimate_change = _calculate_estimate_change(unit_net, estimate_net)
 
     # 检查是否持仓
-    is_holding = _check_is_holding(code)
+    is_holding = _check_is_holding(code, config_manager)
 
     # 使用 model_validate 进行验证
     validated = FundDetailResponse.model_validate(
@@ -418,6 +417,7 @@ async def get_fund_detail(
 async def get_fund_estimate(
     code: str,
     manager: DataSourceManager = Depends(DataSourceDependency()),
+    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
 ) -> dict:
     """
     获取基金估值
@@ -451,7 +451,7 @@ async def get_fund_estimate(
     estimate_change = _calculate_estimate_change(unit_net, estimate_net)
 
     # 检查是否持仓
-    is_holding = _check_is_holding(code)
+    is_holding = _check_is_holding(code, config_manager)
 
     # 使用 model_validate 进行验证
     validated = FundEstimateResponse.model_validate(
@@ -630,14 +630,15 @@ async def get_fund_intraday_by_date(
         500: {"model": ErrorResponse, "description": "服务器错误"},
     },
 )
-async def get_watchlist() -> WatchlistResponse:
+async def get_watchlist(
+    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
+) -> WatchlistResponse:
     """
     获取自选基金列表
 
     Returns:
         WatchlistResponse: 自选基金列表
     """
-    config_manager = get_config_manager()
     fund_list = config_manager.load_funds()
 
     watchlist_data = [
@@ -667,6 +668,7 @@ async def get_watchlist() -> WatchlistResponse:
 async def add_to_watchlist(
     request: AddFundRequest,
     manager: DataSourceManager = Depends(DataSourceDependency()),
+    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
 ) -> OperationResponse:
     """
     添加基金到自选列表
@@ -693,7 +695,6 @@ async def add_to_watchlist(
         fund_name = result.data.get("name", "")
 
     # 添加到自选列表
-    config_manager = get_config_manager()
     fund = Fund(code=request.code, name=fund_name)
     config_manager.add_watchlist(fund)
 
@@ -722,6 +723,7 @@ async def toggle_holding(
     code: str,
     holding: bool = Query(..., description="True 表示标记为持有，False 表示取消持有"),
     manager: DataSourceManager = Depends(DataSourceDependency()),
+    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
 ) -> OperationResponse:
     """
     标记/取消持有基金
@@ -734,7 +736,6 @@ async def toggle_holding(
     Returns:
         OperationResponse: 操作结果
     """
-    config_manager = get_config_manager()
     fund_list = config_manager.load_funds()
 
     if holding:
@@ -803,7 +804,9 @@ async def toggle_holding(
         500: {"model": ErrorResponse, "description": "服务器错误"},
     },
 )
-async def remove_from_watchlist(code: str) -> OperationResponse:
+async def remove_from_watchlist(
+    code: str, config_manager: ConfigManager = Depends(ConfigManagerDependency())
+) -> OperationResponse:
     """
     从自选列表中移除基金
 
@@ -813,7 +816,7 @@ async def remove_from_watchlist(code: str) -> OperationResponse:
     Returns:
         OperationResponse: 删除结果
     """
-    config_manager = get_config_manager()
+    # config_manager provided via DI
 
     # 检查是否在自选列表中
     fund_list = config_manager.load_funds()

@@ -7,18 +7,18 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends
 
-from src.config import get_config_manager
+from src.config.manager import ConfigManager
 from src.config.models import FundList
 from src.datasources.base import DataSourceType
 from src.datasources.manager import DataSourceManager
 
-from ..dependencies import DataSourceDependency
+from ..dependencies import ConfigManagerDependency, DataSourceDependency
 from ..models import ErrorResponse, OverviewResponse
 
 router = APIRouter(prefix="/api", tags=["概览"])
 
 
-def load_default_fund_codes() -> list[str]:
+def load_default_fund_codes(config_manager: ConfigManager) -> list[str]:
     """
     加载默认的基金代码列表
 
@@ -35,7 +35,6 @@ def load_default_fund_codes() -> list[str]:
     ]
 
     try:
-        config_manager = get_config_manager()
         fund_list: FundList = config_manager.load_funds()
 
         # 获取所有基金代码
@@ -64,6 +63,7 @@ def load_default_fund_codes() -> list[str]:
 )
 async def get_overview(
     manager: DataSourceManager = Depends(DataSourceDependency()),
+    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
 ) -> dict:
     """
     获取市场概览数据
@@ -75,7 +75,7 @@ async def get_overview(
         OverviewResponse: 市场概览数据
     """
     # 加载基金代码列表
-    fund_codes = load_default_fund_codes()
+    fund_codes = load_default_fund_codes(config_manager)
 
     if not fund_codes:
         # 没有基金时返回默认值
@@ -160,6 +160,7 @@ async def get_overview(
 )
 async def get_simple_overview(
     manager: DataSourceManager = Depends(DataSourceDependency()),
+    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
 ) -> dict:
     """
     获取简版市场概览数据
@@ -171,4 +172,4 @@ async def get_simple_overview(
         OverviewResponse: 市场概览数据
     """
     # 直接调用完整的概览接口
-    return await get_overview(manager)
+    return await get_overview(manager, config_manager)
