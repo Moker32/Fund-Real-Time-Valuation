@@ -4,6 +4,7 @@
 """
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -11,6 +12,8 @@ from enum import Enum
 from typing import Any
 
 from .base import DataSource
+
+logger = logging.getLogger(__name__)
 
 
 class HealthStatus(Enum):
@@ -20,6 +23,43 @@ class HealthStatus(Enum):
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
     UNKNOWN = "unknown"
+
+
+def get_mini_racer_status() -> dict[str, Any]:
+    """检测 MiniRacer 库状态，用于可观测性"""
+    status = {
+        "installed": False,
+        "version": None,
+        "working": False,
+        "error": None,
+    }
+    try:
+        import importlib.util
+
+        if importlib.util.find_spec("py_mini_racer") is not None:
+            status["installed"] = True
+            try:
+                from py_mini_racer import MiniRacer
+
+                mr = MiniRacer()
+                result = mr.eval("1 + 1")
+                status["working"] = result == 2
+                status["version"] = "py_mini_racer"
+            except Exception as e:
+                status["error"] = f"py_mini_racer init failed: {type(e).__name__}: {str(e)}"
+        elif importlib.util.find_spec("mini_racer") is not None:
+            status["installed"] = True
+            status["version"] = "mini_racer"
+            try:
+                import mini_racer
+
+                status["working"] = True
+            except Exception as e:
+                status["error"] = f"mini_racer import failed: {type(e).__name__}: {str(e)}"
+    except Exception as e:
+        status["error"] = f"detection failed: {type(e).__name__}: {str(e)}"
+
+    return status
 
 
 @dataclass
@@ -170,17 +210,23 @@ class DataSourceHealthChecker:
             self._consecutive_failures[source_name] = (
                 self._consecutive_failures.get(source_name, 0) + 1
             )
+            error_count = self._consecutive_failures[source_name]
+
+            logger.warning(
+                f"Health check timeout for source '{source_name}' "
+                f"(consecutive failures: {error_count}, response_time: {response_time_ms:.2f}ms)"
+            )
 
             result = HealthCheckResult(
                 source_name=source_name,
                 status=HealthStatus.UNHEALTHY,
                 response_time_ms=response_time_ms,
-                error_count=self._consecutive_failures[source_name],
+                error_count=error_count,
                 last_check=datetime.now(),
                 message=f"健康检查超时（>{self.timeout}s）",
+                details={"error_type": "TimeoutError", "timeout": self.timeout},
             )
 
-            # 保存到历史记录
             if save_history:
                 if source_name not in self.health_history:
                     self.health_history[source_name] = []
@@ -193,18 +239,26 @@ class DataSourceHealthChecker:
             self._consecutive_failures[source_name] = (
                 self._consecutive_failures.get(source_name, 0) + 1
             )
+            error_count = self._consecutive_failures[source_name]
+            error_type = type(e).__name__
+
+            logger.error(
+                f"Health check failed for source '{source_name}': "
+                f"{error_type}: {str(e)} "
+                f"(consecutive failures: {error_count})",
+                exc_info=True,
+            )
 
             result = HealthCheckResult(
                 source_name=source_name,
                 status=HealthStatus.UNHEALTHY,
                 response_time_ms=response_time_ms,
-                error_count=self._consecutive_failures[source_name],
+                error_count=error_count,
                 last_check=datetime.now(),
-                message=f"健康检查异常: {str(e)}",
-                details={"error_type": type(e).__name__},
+                message=f"健康检查异常: {error_type}",
+                details={"error_type": error_type, "error_message": str(e)},
             )
 
-            # 保存到历史记录
             if save_history:
                 if source_name not in self.health_history:
                     self.health_history[source_name] = []
@@ -468,4 +522,10 @@ class HealthCheckInterceptor:
 
 
 # 导出
-__all__ = ["HealthStatus", "HealthCheckResult", "DataSourceHealthChecker", "HealthCheckInterceptor"]
+__all__ = [
+    "HealthStatus",
+    "HealthCheckResult",
+    "DataSourceHealthChecker",
+    "HealthCheckInterceptor",
+    "get_mini_racer_status",
+]
