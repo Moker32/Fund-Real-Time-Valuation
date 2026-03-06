@@ -65,20 +65,22 @@
 
     <!-- Events List -->
     <div v-else class="events-container">
-      <div 
-        v-for="time in sentimentStore.sortedTimeKeys" 
-        :key="time" 
+      <div
+        v-for="(time, timeIndex) in sentimentStore.sortedTimeKeys"
+        :key="time"
         class="time-group"
+        :style="{ animationDelay: `${timeIndex * 100}ms` }"
       >
         <div class="time-header">
           <span class="time-label">{{ time }}</span>
           <span class="event-count">{{ sentimentStore.eventsByTime[time].length }}条</span>
         </div>
         <div class="events-list">
-          <div 
-            v-for="(event, index) in sentimentStore.eventsByTime[time]" 
+          <div
+            v-for="(event, index) in sentimentStore.eventsByTime[time]"
             :key="index"
             :class="['event-card', { important: event.重要性 >= 2 }]"
+            :style="{ animationDelay: `${timeIndex * 100 + index * 50}ms` }"
           >
             <div class="event-main">
               <div class="event-region">
@@ -313,6 +315,18 @@ onMounted(async () => {
 // Time Group
 .time-group {
   margin-bottom: var(--spacing-lg);
+  animation: slideInUp 0.5s ease-out both;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .time-header {
@@ -352,6 +366,7 @@ onMounted(async () => {
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   transition: all var(--transition-fast);
+  animation: fadeInScale 0.4s ease-out both;
 
   &:hover {
     background: var(--color-bg-tertiary);
@@ -359,6 +374,25 @@ onMounted(async () => {
 
   &.important {
     border-left: 3px solid var(--color-primary);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// 减少动画偏好支持
+@media (prefers-reduced-motion: reduce) {
+  .time-group,
+  .event-card {
+    animation: none;
   }
 }
 

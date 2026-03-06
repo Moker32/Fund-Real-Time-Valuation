@@ -49,7 +49,9 @@
           <span class="change-value font-mono">{{ formatChange(indexData.change) }}</span>
         </div>
 
-        <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" class="index-chart" />
+        <Transition name="chart-expand">
+          <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" class="index-chart" />
+        </Transition>
       </div>
 
       <div class="card-footer">
@@ -520,6 +522,32 @@ function formatToUserTimezone(isoTimestamp: string | undefined): string {
   width: 100%;
   min-height: 60px;
   margin-top: var(--spacing-sm);
+  will-change: transform, opacity;
+}
+
+// 图表展开动画
+.chart-expand-enter-active,
+.chart-expand-leave-active {
+  transition: all var(--transition-normal) cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 80px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.chart-expand-enter-from,
+.chart-expand-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-10px);
+  margin-top: 0;
+}
+
+// 减少动画偏好支持
+@media (prefers-reduced-motion: reduce) {
+  .chart-expand-enter-active,
+  .chart-expand-leave-active {
+    transition: none;
+  }
 }
 
 @keyframes change-pulse {

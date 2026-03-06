@@ -21,7 +21,7 @@
           </div>
           <button
             class="action-btn watch-btn"
-            :class="{ active: isWatched }"
+            :class="{ active: isWatched, 'heart-beating': isHeartBeating }"
             :title="isWatched ? '取消关注' : '添加关注'"
             :aria-label="isWatched ? '取消关注' : '添加关注'"
             @click.stop="toggleWatch"
@@ -324,6 +324,9 @@ const statusText = computed(() => {
 const priceAnimating = ref(false);
 const changeAnimating = ref(false);
 
+// 收藏心跳动画状态
+const isHeartBeating = ref(false);
+
 // 监听价格变化触发动画
 watch(() => props.commodity.price, (newVal, oldVal) => {
   if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) {
@@ -348,6 +351,12 @@ function triggerChangeAnimation() {
 }
 
 async function toggleWatch() {
+  // 触发心跳动画
+  isHeartBeating.value = true;
+  setTimeout(() => {
+    isHeartBeating.value = false;
+  }, 600);
+
   const category = getCommodityCategory(props.commodity.symbol);
   if (isWatched.value) {
     await store.removeFromWatchlist(props.commodity.symbol);
@@ -588,6 +597,42 @@ function formatTime(dateStr: string | undefined | null): string {
     svg {
       fill: #fbbf24;
     }
+  }
+
+  // 心跳动画
+  &.heart-beating {
+    animation: heart-beat 0.6s ease-in-out;
+  }
+}
+
+@keyframes heart-beat {
+  0% {
+    transform: scale(1);
+  }
+  15% {
+    transform: scale(1.3);
+  }
+  30% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.2);
+  }
+  60% {
+    transform: scale(1);
+  }
+  75% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+// 减少动画偏好支持
+@media (prefers-reduced-motion: reduce) {
+  .watch-btn.heart-beating {
+    animation: none;
   }
 }
 

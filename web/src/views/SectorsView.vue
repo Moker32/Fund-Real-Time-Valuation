@@ -113,8 +113,9 @@
     </div>
 
     <!-- Sector Detail Drawer -->
-    <div v-if="showDetail" class="detail-drawer-overlay" @click="closeDetail">
-      <div class="detail-drawer" @click.stop>
+    <Transition name="drawer">
+      <div v-if="showDetail" class="detail-drawer-overlay" @click="closeDetail">
+        <div class="detail-drawer" @click.stop>
         <div class="drawer-header">
           <h3>{{ selectedSectorData?.name }}</h3>
           <button class="close-btn" @click="closeDetail">
@@ -172,8 +173,9 @@
             </div>
           </div>
         </div>
+        </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
 
@@ -492,6 +494,47 @@ onMounted(async () => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  will-change: transform;
+}
+
+// 抽屉滑入动画
+.drawer-enter-active,
+.drawer-leave-active {
+  transition: opacity var(--transition-normal) ease;
+
+  .detail-drawer {
+    transition: transform var(--transition-normal) cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+.drawer-enter-from,
+.drawer-leave-to {
+  opacity: 0;
+
+  .detail-drawer {
+    transform: translateX(100%);
+  }
+}
+
+.drawer-enter-to,
+.drawer-leave-from {
+  opacity: 1;
+
+  .detail-drawer {
+    transform: translateX(0);
+  }
+}
+
+// 减少动画偏好支持
+@media (prefers-reduced-motion: reduce) {
+  .drawer-enter-active,
+  .drawer-leave-active {
+    transition: none;
+
+    .detail-drawer {
+      transition: none;
+    }
+  }
 }
 
 .drawer-header {
