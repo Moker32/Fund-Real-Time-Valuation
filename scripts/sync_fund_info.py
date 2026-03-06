@@ -11,7 +11,6 @@
 
 import sys
 import time
-from datetime import datetime
 
 # 添加项目根目录到路径
 sys.path.insert(0, str(__file__).replace("scripts/sync_fund_info.py", ""))
