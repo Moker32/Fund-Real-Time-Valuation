@@ -15,6 +15,8 @@ from src.datasources.manager import DataSourceManager, create_default_manager
 
 from .dependencies_impl import (
     CloseDataSourceManager,
+    ConfigManagerDependency,
+    ConfigManagerDependencyCallable,
     DataSourceDependency,
     close_data_source_manager,
     get_data_source_manager,
@@ -34,4 +36,6 @@ __all__ = [
     "close_data_source_manager",
     "DataSourceDependency",
     "CloseDataSourceManager",
+    "ConfigManagerDependency",
+    "ConfigManagerDependencyCallable",
 ]
