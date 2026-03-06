@@ -671,7 +671,6 @@ def create_default_manager(
     yfinance_commodity_source = YFinanceCommoditySource()
     manager.register(yfinance_commodity_source)
 
-
     # === 新增 AKShare 舆情数据源 ===
     from .akshare_sentiment_source import (
         AKShareEconomicNewsDataSource,
@@ -697,7 +696,7 @@ def create_default_manager(
             source_class=type(fundflow_concept_source),
             name=fundflow_concept_source.name,
             source_type=DataSourceType.SECTOR,
-            enabled=True,
+            enabled=False,  # 禁用：当前环境的 mini_racer 兼容性问题，改用直接的数据源
             priority=0,  # 最高优先级（非交易时间可用）
         ),
     )
@@ -710,7 +709,7 @@ def create_default_manager(
             source_class=type(fundflow_industry_source),
             name=fundflow_industry_source.name,
             source_type=DataSourceType.SECTOR,
-            enabled=True,
+            enabled=False,  # 禁用：当前环境的 mini_racer 兼容性问题，改用直接的数据源
             priority=0,  # 最高优先级（非交易时间可用）
         ),
     )

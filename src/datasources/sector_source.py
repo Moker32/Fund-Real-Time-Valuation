@@ -310,9 +310,9 @@ class SinaSectorDataSource(DataSource):
 
             if json_match:
                 try:
-                    import json
+                    import json as _json
 
-                    sector_info = json.loads(json_match.group(1))
+                    sector_info = _json.loads(json_match.group(1))
 
                     return {
                         "code": code,
@@ -329,7 +329,7 @@ class SinaSectorDataSource(DataSource):
                         "trading_status": self._get_trading_status(sector_info),
                         "time": sector_info.get("time", ""),
                     }
-                except (json.JSONDecodeError, ValueError) as e:
+                except Exception as e:
                     self.log(f"解析板块 {name} 数据失败: {e}")
                     return self._get_mock_sector(code, name, category)
 
@@ -592,13 +592,32 @@ class EastMoneySectorDataSource(DataSource):
     def _get_category(self, name: str) -> str:
         """根据板块名称推断类别"""
         category_map = {
-            "白酒": "消费", "食品饮料": "消费", "家电": "消费", "纺织服装": "消费",
-            "新能源车": "新能源", "锂电池": "新能源", "光伏": "新能源", "风电": "新能源",
-            "医药": "医药", "医疗器械": "医药", "中药": "医药", "生物疫苗": "医药",
-            "半导体": "科技", "芯片": "科技", "人工智能": "科技", "软件服务": "科技",
-            "银行": "金融", "证券": "金融", "保险": "金融",
-            "房地产": "周期", "基建": "周期", "钢铁": "周期", "煤炭": "周期",
-            "军工": "制造", "机械": "制造", "汽车": "制造",
+            "白酒": "消费",
+            "食品饮料": "消费",
+            "家电": "消费",
+            "纺织服装": "消费",
+            "新能源车": "新能源",
+            "锂电池": "新能源",
+            "光伏": "新能源",
+            "风电": "新能源",
+            "医药": "医药",
+            "医疗器械": "医药",
+            "中药": "医药",
+            "生物疫苗": "医药",
+            "半导体": "科技",
+            "芯片": "科技",
+            "人工智能": "科技",
+            "软件服务": "科技",
+            "银行": "金融",
+            "证券": "金融",
+            "保险": "金融",
+            "房地产": "周期",
+            "基建": "周期",
+            "钢铁": "周期",
+            "煤炭": "周期",
+            "军工": "制造",
+            "机械": "制造",
+            "汽车": "制造",
         }
         return category_map.get(name, "其他")
 
@@ -615,6 +634,7 @@ class EastMoneySectorDataSource(DataSource):
         """健康检查"""
         try:
             import akshare as ak
+
             loop = asyncio.get_event_loop()
             df = await asyncio.wait_for(
                 loop.run_in_executor(None, lambda: ak.stock_board_industry_spot_em()),
@@ -1562,6 +1582,8 @@ class FundFlowConceptSource(DataSource):
         )
         self._cache: dict[str, dict[str, Any]] = {}
         self._cache_timeout = 60.0
+        # 运行时检测 mini_racer 是否可用（防止 JS 引擎崩溃导致服务进程崩溃）
+        self._mini_racer_ok = self._check_mini_racer_availability()
 
     def log(self, message: str) -> None:
         """日志方法"""
@@ -1578,6 +1600,15 @@ class FundFlowConceptSource(DataSource):
             DataSourceResult: 板块数据结果
         """
         cache_key = "concept"
+        # 如果 mini_racer 不可用，直接降级退出，避免直接调用 akshare 的 JS 相关实现
+        if not self._mini_racer_ok:
+            return DataSourceResult(
+                success=False,
+                error="mini_racer 不可用，跳过 concept 资金流向数据源",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_type": sector_type},
+            )
         if self._is_cache_valid(cache_key):
             return DataSourceResult(
                 success=True,
@@ -1639,6 +1670,27 @@ class FundFlowConceptSource(DataSource):
         except Exception as e:
             logger.error(f"获取概念板块资金流向数据失败: {e}")
             return self._handle_error(e, self.name)
+
+    def _check_mini_racer_availability(self) -> bool:
+        """快速检查 py_mini_racer / mini_racer 的可用性。
+
+        目标是避免因 JS 引擎崩溃导致 Python 进程不可用的问题。
+        该检查仅做最基本的可用性测试：导入模块、创建上下文并执行简单表达式。
+        """
+        try:
+            import importlib
+
+            spec = importlib.util.find_spec("py_mini_racer")
+            if spec is None:
+                return False
+            from py_mini_racer import MiniRacer
+
+            mr = MiniRacer()
+            # 运行一个简单表达式，确保引擎能工作
+            res = mr.eval("1 + 1")
+            return res == 2
+        except Exception:
+            return False
 
     def _parse_dataframe(self, df) -> dict[str, Any]:
         """
@@ -1953,5 +2005,3 @@ class FundFlowIndustrySource(DataSource):
         except Exception as e:
             logger.warning(f"健康检查失败: {e}")
             return False
-
-
