@@ -222,4 +222,41 @@ watch(showChart, (value) => {
   color: var(--color-text-secondary);
   margin-top: var(--spacing-sm);
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .settings-view {
+    max-width: 100%;
+  }
+
+  .page-title {
+    font-size: var(--font-size-xl);
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .settings-section {
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+  }
+
+  .setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) 0;
+  }
+
+  .setting-info {
+    width: 100%;
+  }
+
+  .setting-input {
+    min-width: 100%;
+    width: 100%;
+  }
+
+  .toggle {
+    align-self: flex-end;
+  }
+}
 </style>

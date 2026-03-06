@@ -159,4 +159,32 @@ function handleCommodityAdded(symbol: string, name: string) {
     color: var(--color-neutral);
   }
 }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .view-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .add-button {
+    width: 100%;
+    justify-content: center;
+    padding: var(--spacing-md);
+  }
+
+  .quick-stats {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .stats-card {
+    padding: var(--spacing-sm);
+  }
+
+  .stats-value {
+    font-size: var(--font-size-lg);
+  }
+}
 </style>

@@ -307,8 +307,12 @@ onMounted(async () => {
 
 .indices-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--spacing-md);
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
 }
 
 .quick-stats {
@@ -428,9 +432,13 @@ onMounted(async () => {
 
 .loading-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--spacing-md);
   width: 100%;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
 }
 
 // Modal Styles
@@ -550,6 +558,68 @@ onMounted(async () => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .view-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .indices-grid {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+  }
+
+  .loading-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+  }
+
+  .stats-card {
+    padding: var(--spacing-sm);
+  }
+
+  .stats-value {
+    font-size: var(--font-size-lg);
+  }
+
+  .market-status {
+    padding: var(--spacing-sm);
+  }
+
+  .status-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  .modal-content {
+    width: 95%;
+    max-height: 90vh;
+  }
+
+  .period-selector {
+    padding: var(--spacing-sm);
+    overflow-x: auto;
+    flex-wrap: nowrap;
+
+    button {
+      white-space: nowrap;
+      padding: var(--spacing-xs) var(--spacing-sm);
+      font-size: var(--font-size-xs);
+    }
+  }
+
+  .modal-chart {
+    padding: var(--spacing-md);
   }
 }
 </style>
