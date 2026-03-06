@@ -1,6 +1,6 @@
 <template>
-  <div 
-    class="fund-card" 
+  <div
+    class="fund-card"
     :class="{ loading: loading, 'has-chart': shouldShowChart }"
   >
     <template v-if="loading">
@@ -255,15 +255,15 @@ function formatNetValueDate(dateStr: string | undefined): string {
   will-change: transform;
   cursor: pointer;
   overflow: hidden;
-  width: 280px;
-  min-width: 260px;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
-  flex: 0 1 280px;
+  flex: 1 1 auto;
 
   &.has-chart {
-    width: 280px;
-    min-width: 260px;
-    flex: 0 1 280px;
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
   &:hover {
@@ -315,6 +315,7 @@ function formatNetValueDate(dateStr: string | undefined): string {
   align-items: center;
   justify-content: space-between;
   min-height: 28px;
+  gap: var(--spacing-xs);
 }
 
 .card-actions {
@@ -365,8 +366,10 @@ function formatNetValueDate(dateStr: string | undefined): string {
 }
 
 .action-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -432,6 +435,7 @@ function formatNetValueDate(dateStr: string | undefined): string {
   justify-content: space-between;
   align-items: flex-end;
   min-width: 0;
+  gap: var(--spacing-md);
 }
 
 .value-section {
@@ -439,8 +443,9 @@ function formatNetValueDate(dateStr: string | undefined): string {
   flex-direction: column;
   gap: var(--spacing-xs);
   min-width: 0;
-  flex: 0 0 auto;
-  max-width: 100%;
+  flex: 1 1 auto;
+  /* 移除 max-width，让 flex 布局自然分配空间 */
+  overflow: hidden;
 }
 
 .fund-chart {
@@ -452,25 +457,29 @@ function formatNetValueDate(dateStr: string | undefined): string {
 .value-row {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+  width: 100%;
 
   .label {
     flex-shrink: 0;
-    min-width: 24px;
+    min-width: 28px;
   }
 
   .value {
-    flex: 0 0 auto;
-    min-width: 50px;
-    max-width: 60px;
+    flex: 0 1 auto;
+    min-width: 45px;
     text-align: right;
+    /* 允许数值收缩但保持可读性 */
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .value-date {
     flex-shrink: 0;
     min-width: 36px;
     text-align: right;
+    margin-left: auto; /* 将日期推到右侧 */
   }
 
   &.qdii-prev-row {
@@ -527,18 +536,22 @@ function formatNetValueDate(dateStr: string | undefined): string {
 .change-section {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-md);
   transition: all var(--transition-fast);
-  min-width: 80px;
+  /* 固定宽度，防止压缩 */
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
   flex: 0 0 auto;
+  box-sizing: border-box;
 
   .change-info {
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    min-width: 80px;
+    align-items: center;
+    width: 100%;
     flex-shrink: 0;
     gap: 2px;
     justify-content: center;
@@ -617,88 +630,42 @@ function formatNetValueDate(dateStr: string | undefined): string {
   justify-content: space-between;
   padding-top: var(--spacing-sm);
   border-top: 1px solid var(--color-divider);
+  gap: var(--spacing-xs);
 }
 
 .update-time,
 .source {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-// 响应式布局 - 窄屏幕优化
-// 断点说明：--breakpoint-sm 用于标准小屏适配，400px 为自定义超小屏断点（小于 xs）
-@media (max-width: var(--breakpoint-sm)) {
+// ==================== 响应式布局优化 ====================
+
+// 平板及以下 (< 1024px)
+@media (max-width: 1024px) {
   .fund-card {
     padding: var(--spacing-md);
-    
-    &.has-chart {
-      min-width: 100%;
-    }
-  }
-
-  .card-body {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--spacing-sm);
-  }
-
-  .value-section {
-    max-width: 100%;
-    flex: 1 1 auto;
-  }
-
-  .value-row {
-    justify-content: space-between;
   }
 
   .change-section {
-    max-width: 100%;
-    width: auto;
-    justify-content: flex-end;
-  }
-
-  .change-info {
-    flex-direction: row;
-    align-items: center;
-    gap: var(--spacing-sm);
-    max-width: 100%;
+    width: 85px;
+    min-width: 85px;
+    max-width: 85px;
+    padding: var(--spacing-xs);
   }
 
   .change-percent {
     font-size: var(--font-size-lg);
   }
-
-  .change-value {
-    font-size: var(--font-size-xs);
-  }
-
-  .card-footer {
-    flex-wrap: wrap;
-    gap: var(--spacing-xs);
-  }
 }
 
-// 更小屏幕进一步优化（自定义断点：小于 xs 的超小屏）
-// 注：400px 是 FundCard 组件特定的超小屏断点，比 --breakpoint-xs(480px) 更小
-@media (max-width: 400px) {
+// 手机横屏/大手机 (< 768px)
+@media (max-width: 768px) {
   .fund-card {
-    padding: var(--spacing-sm);
-  }
-
-  .fund-name {
-    font-size: var(--font-size-sm);
-  }
-
-  .fund-code {
-    font-size: var(--font-size-xs);
-  }
-
-  .value {
-    font-size: var(--font-size-md);
-  }
-
-  .change-percent {
-    font-size: var(--font-size-md);
+    padding: var(--spacing-md);
   }
 
   .card-header {
@@ -707,6 +674,332 @@ function formatNetValueDate(dateStr: string | undefined): string {
 
   .card-body {
     margin-bottom: var(--spacing-sm);
+  }
+
+  .info-section {
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .value-section {
+    /* 移除 max-width，让 flex 布局自然分配 */
+    overflow: hidden;
+  }
+
+  .value-row {
+    gap: 6px;
+
+    .value {
+      font-size: var(--font-size-md);
+      min-width: 40px;
+    }
+
+    .value-date {
+      min-width: 32px;
+    }
+  }
+
+  .change-section {
+    width: 80px;
+    min-width: 80px;
+    max-width: 80px;
+    padding: var(--spacing-xs) 6px;
+
+    .change-info {
+      gap: 1px;
+    }
+  }
+
+  .change-percent {
+    font-size: var(--font-size-md);
+  }
+
+  .change-value {
+    font-size: var(--font-size-xs);
+  }
+
+  .change-indicator-value {
+    margin: 1px 0;
+
+    svg {
+      width: 12px;
+      height: 12px;
+    }
+  }
+
+  .card-footer {
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+}
+
+// 标准小屏手机 (< 640px)
+@media (max-width: 640px) {
+  .fund-card {
+    padding: var(--spacing-sm);
+    min-width: 0;
+    width: 100%;
+
+    &.has-chart {
+      min-width: 0;
+      width: 100%;
+    }
+  }
+
+  // 移动端始终显示操作按钮（触摸设备无法 hover）
+  .action-btn {
+    opacity: 1;
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+
+    svg {
+      width: 18px;
+      height: 18px;
+    }
+  }
+
+  .header-row {
+    min-height: 36px;
+  }
+
+  .fund-name {
+    font-size: var(--font-size-sm);
+  }
+
+  .info-section {
+    gap: var(--spacing-xs);
+  }
+
+  .value-section {
+    /* 移除 max-width，让 flex 布局自然分配 */
+    overflow: hidden;
+  }
+
+  .value-row {
+    gap: 4px;
+
+    .label {
+      min-width: 26px;
+    }
+
+    .value {
+      font-size: var(--font-size-md);
+      min-width: 38px;
+    }
+
+    .value-date {
+      min-width: 30px;
+      font-size: 10px;
+    }
+  }
+
+  .change-section {
+    width: 72px;
+    min-width: 72px;
+    max-width: 72px;
+    padding: 4px 6px;
+  }
+
+  .change-percent {
+    font-size: var(--font-size-md);
+  }
+
+  .change-value {
+    font-size: 10px;
+  }
+
+  .card-footer {
+    padding-top: var(--spacing-xs);
+  }
+
+  .update-time,
+  .source {
+    font-size: 10px;
+  }
+}
+
+// 超小屏手机 (< 480px)
+@media (max-width: 480px) {
+  .fund-card {
+    padding: var(--spacing-sm);
+  }
+
+  .card-header {
+    margin-bottom: var(--spacing-xs);
+    gap: 2px;
+  }
+
+  .header-row {
+    min-height: 32px;
+  }
+
+  .fund-name {
+    font-size: var(--font-size-xs);
+    line-height: 1.2;
+  }
+
+  .fund-code {
+    font-size: 10px;
+  }
+
+  .fund-type {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+
+  .action-btn {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+
+  .card-body {
+    margin-bottom: var(--spacing-xs);
+    gap: var(--spacing-xs);
+  }
+
+  .info-section {
+    gap: 6px;
+  }
+
+  .value-section {
+    gap: 2px;
+    /* 移除 max-width，让 flex 布局自然分配 */
+    overflow: hidden;
+  }
+
+  .value-row {
+    gap: 4px;
+
+    .label {
+      min-width: 24px;
+      font-size: 10px;
+    }
+
+    .value {
+      font-size: var(--font-size-sm);
+      min-width: 35px;
+    }
+
+    .value-date {
+      min-width: 28px;
+      font-size: 9px;
+    }
+  }
+
+  .change-section {
+    width: 64px;
+    min-width: 64px;
+    max-width: 64px;
+    padding: 3px 5px;
+
+    .change-info {
+      gap: 0;
+    }
+  }
+
+  .change-percent {
+    font-size: var(--font-size-sm);
+  }
+
+  .change-value {
+    font-size: 9px;
+  }
+
+  .change-indicator-value {
+    margin: 0;
+
+    svg {
+      width: 10px;
+      height: 10px;
+    }
+  }
+
+  .card-footer {
+    padding-top: var(--spacing-xs);
+    gap: 4px;
+  }
+
+  .update-time,
+  .source {
+    font-size: 9px;
+  }
+
+  .fund-chart {
+    min-height: 50px;
+  }
+}
+
+// 极小屏 (< 360px)
+@media (max-width: 360px) {
+  .fund-card {
+    padding: 8px;
+  }
+
+  .fund-name {
+    font-size: 10px;
+  }
+
+  .value-section {
+    /* 移除 max-width，让 flex 布局自然分配 */
+    overflow: hidden;
+  }
+
+  .value-row {
+    .value {
+      font-size: var(--font-size-xs);
+      min-width: 32px;
+    }
+
+    .value-date {
+      min-width: 26px;
+      font-size: 9px;
+    }
+  }
+
+  .change-section {
+    width: 58px;
+    min-width: 58px;
+    max-width: 58px;
+    padding: 2px 4px;
+  }
+
+  .change-percent {
+    font-size: var(--font-size-xs);
+  }
+}
+
+// 减少动画偏好支持
+@media (prefers-reduced-motion: reduce) {
+  .fund-card {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+
+  .value-updated {
+    animation: none !important;
+  }
+
+  .change-section.value-updated {
+    animation: none !important;
+  }
+}
+
+// 触摸设备优化：始终显示操作按钮
+@media (hover: none) and (pointer: coarse) {
+  .action-btn {
+    opacity: 1;
   }
 }
 </style>
