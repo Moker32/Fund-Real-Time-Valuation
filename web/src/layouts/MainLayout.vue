@@ -356,23 +356,26 @@ onUnmounted(() => {
   background: var(--color-bg-primary);
 }
 
-/* Sidebar */
+/* Sidebar - 使用 transform 动画优化性能 */
 .sidebar {
   width: var(--sidebar-width);
   background: var(--color-bg-secondary);
   border-right: 1px solid var(--color-divider);
   display: flex;
   flex-direction: column;
-  transition: width var(--transition-normal);
   position: fixed;
   left: 0;
   top: 0;
   bottom: 0;
   z-index: 100;
+  /* 使用 transform 替代 width 过渡，避免重排 */
+  transition: transform var(--transition-normal);
+  will-change: transform;
 }
 
+/* 收起状态：向左平移，只显示图标区域 (72px) */
 .sidebar-collapsed .sidebar {
-  width: 72px;
+  transform: translateX(calc(-1 * (var(--sidebar-width) - 72px)));
 }
 
 .sidebar-header {
@@ -482,14 +485,14 @@ onUnmounted(() => {
   transform: rotate(180deg);
 }
 
-/* Main Content */
+/* Main Content - 固定 margin-left，无过渡动画 */
 .main-content {
   flex: 1;
   margin-left: var(--sidebar-width);
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  transition: margin-left var(--transition-normal);
+  /* 移除 margin-left 过渡，避免重排 */
 }
 
 .sidebar-collapsed .main-content {
@@ -639,7 +642,7 @@ onUnmounted(() => {
 }
 
 /* Responsive Styles */
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   /* Hamburger Button */
   .hamburger-btn {
     display: flex;
@@ -698,13 +701,21 @@ onUnmounted(() => {
     }
   }
 
-  /* Mobile Sidebar */
+  /* Mobile Sidebar - 使用 transform 动画 */
   .sidebar {
+    /* 重置桌面端的 transform */
     transform: translateX(-100%);
     transition: transform var(--transition-normal);
+    will-change: transform;
   }
 
+  /* 移动端展开状态 */
   .sidebar-mobile-open .sidebar {
+    transform: translateX(0);
+  }
+
+  /* 移动端收起按钮状态 - 重置桌面端的旋转 */
+  .sidebar-mobile-open.sidebar-collapsed .sidebar {
     transform: translateX(0);
   }
 

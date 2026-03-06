@@ -83,17 +83,6 @@
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
   --breakpoint-xl: 1280px;
-  /* Usage in media queries: @media (max-width: var(--breakpoint-sm)) { ... } */
-  /* Or use calc(): @media (max-width: calc(var(--breakpoint-sm) - 1px)) { ... } */
-  --breakpoint-xs: 480px;
-  --breakpoint-sm: 640px;
-  --breakpoint-md: 768px;
-  --breakpoint-lg: 1024px;
-  --breakpoint-xl: 1280px;
---breakpoint-sm: 640px;
---breakpoint-md: 768px;
---breakpoint-lg: 1024px;
---breakpoint-xl: 1280px;
 
 /* Layout */
   --sidebar-width: 240px;

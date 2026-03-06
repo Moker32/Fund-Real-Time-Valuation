@@ -251,7 +251,8 @@ function formatNetValueDate(dateStr: string | undefined): string {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
-  transition: all var(--transition-normal), flex 0.3s ease, min-width 0.3s ease;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+  will-change: transform;
   cursor: pointer;
   overflow: hidden;
   width: 280px;
@@ -625,8 +626,8 @@ function formatNetValueDate(dateStr: string | undefined): string {
 }
 
 // 响应式布局 - 窄屏幕优化
-// 断点说明：640px 对应 --breakpoint-sm，400px 为自定义超小屏断点
-@media (max-width: 640px) {
+// 断点说明：--breakpoint-sm 用于标准小屏适配，400px 为自定义超小屏断点（小于 xs）
+@media (max-width: var(--breakpoint-sm)) {
   .fund-card {
     padding: var(--spacing-md);
     
@@ -677,7 +678,8 @@ function formatNetValueDate(dateStr: string | undefined): string {
   }
 }
 
-// 更小屏幕进一步优化
+// 更小屏幕进一步优化（自定义断点：小于 xs 的超小屏）
+// 注：400px 是 FundCard 组件特定的超小屏断点，比 --breakpoint-xs(480px) 更小
 @media (max-width: 400px) {
   .fund-card {
     padding: var(--spacing-sm);
