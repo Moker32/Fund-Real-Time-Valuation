@@ -381,6 +381,10 @@ class DataSourceManager:
         Returns:
             Dict: 健康检查结果
         """
+        from .health import get_mini_racer_status
+
+        mini_racer_status = get_mini_racer_status()
+
         if source_name:
             source = self._sources.get(source_name)
             if not source:
@@ -395,6 +399,7 @@ class DataSourceManager:
                 "last_check": result.last_check.isoformat(),
                 "message": result.message,
                 "details": result.details,
+                "mini_racer": mini_racer_status,
             }
 
         # 检查所有数据源
@@ -411,6 +416,7 @@ class DataSourceManager:
             "degraded_count": degraded_count,
             "unhealthy_count": unhealthy_count,
             "sources": {name: result.to_dict() for name, result in results.items()},
+            "mini_racer": mini_racer_status,
         }
 
     async def health_check_all_sources(self) -> dict[str, HealthCheckResult]:
@@ -684,9 +690,16 @@ def create_default_manager(
 
     # 注册行业板块数据源
     # 概念板块数据源优先级：
-    # 1. FundFlowConceptSource - 资金流向接口，非交易时间可用
+    # 1. FundFlowConceptSource - 资金流向接口，非交易时间可用（需要 mini_racer）
     # 2. EastMoneySectorSource - 实时行情接口，交易时间更及时
     # 3. EastMoneyDirectSource - 直连 API，兜底
+    #
+    # 注意：FundFlowConceptSource 和 FundFlowIndustrySource 依赖 py_mini_racer/mini_racer
+    # 如果版本不兼容会导致进程崩溃。当前默认禁用，改用 EastMoneyDirectSource 作为主数据源。
+    # 如需启用：
+    # 1. 确认 pyproject.toml 中的版本约束已安装（mini-racer<0.14 或 py-mini-racer<0.7）
+    # 2. 通过 /api/datasource/health 接口检查 mini_racer.working 是否为 true
+    # 3. 将 enabled 改为 True
 
     # 概念板块资金流向数据源（非交易时间可用，优先级最高）
     fundflow_concept_source = FundFlowConceptSource()
@@ -696,8 +709,8 @@ def create_default_manager(
             source_class=type(fundflow_concept_source),
             name=fundflow_concept_source.name,
             source_type=DataSourceType.SECTOR,
-            enabled=False,  # 禁用：当前环境的 mini_racer 兼容性问题，改用直接的数据源
-            priority=0,  # 最高优先级（非交易时间可用）
+            enabled=False,
+            priority=0,
         ),
     )
 
@@ -709,8 +722,8 @@ def create_default_manager(
             source_class=type(fundflow_industry_source),
             name=fundflow_industry_source.name,
             source_type=DataSourceType.SECTOR,
-            enabled=False,  # 禁用：当前环境的 mini_racer 兼容性问题，改用直接的数据源
-            priority=0,  # 最高优先级（非交易时间可用）
+            enabled=False,
+            priority=0,
         ),
     )
 
