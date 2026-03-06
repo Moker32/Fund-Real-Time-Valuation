@@ -4,10 +4,11 @@
 """
 
 from datetime import datetime, time
+from functools import lru_cache
 from typing import Any
 
 import pytz
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from typing_extensions import TypedDict
 
 from src.datasources.base import DataSourceType
@@ -396,3 +397,70 @@ async def get_regions() -> dict:
         "regions": list(regions.values()),
         "supported_indices": SUPPORTED_INDICES,
     }
+
+
+# 支持的历史周期参数
+INDEX_HISTORY_PERIODS = ["1d", "5d", "1w", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max"]
+
+# 历史数据源单例（缓存）
+_index_history_source: "HybridIndexSource | None" = None
+
+
+def _get_index_history_source() -> "HybridIndexSource":
+    """获取指数历史数据源实例（缓存）"""
+    global _index_history_source
+    if _index_history_source is None:
+        from src.datasources.index_source import HybridIndexSource
+
+        _index_history_source = HybridIndexSource()
+    return _index_history_source
+
+
+@lru_cache
+def _validate_period(period: str) -> str:
+    """验证并返回有效的时间周期参数"""
+    if period not in INDEX_HISTORY_PERIODS:
+        return "1y"
+    return period
+
+
+@router.get(
+    "/{index_type}/history",
+    response_model=dict,
+    summary="获取指数历史数据",
+    description="根据指数类型获取历史行情数据，支持多种时间周期",
+    responses={
+        200: {"description": "成功获取指数历史数据"},
+        400: {"model": ErrorResponse, "description": "不支持的指数类型或周期"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_index_history(
+    index_type: str,
+    period: str = "1y",
+) -> dict:
+    """
+    获取指数历史数据
+
+    Args:
+        index_type: 指数类型 (shanghai, shenzhen, hang_seng, nikkei225, dow_jones, nasdaq, sp500, dax, ftse, cac40)
+        period: 时间周期，支持: 1d, 5d, 1w, 1mo, 3mo, 6mo, 1y, 2y, 5d, max
+
+    Returns:
+        dict: 包含历史数据的字典
+    """
+    if index_type not in SUPPORTED_INDICES:
+        raise ValueError(
+            f"不支持的指数类型: {index_type}，支持类型: {', '.join(SUPPORTED_INDICES)}"
+        )
+
+    validated_period = _validate_period(period)
+
+    history_source = _get_index_history_source()
+    result = await history_source.fetch_history(index_type, validated_period)
+
+    if not result.success or result.data is None:
+        error_msg = result.error or "获取历史数据失败"
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    return result.data

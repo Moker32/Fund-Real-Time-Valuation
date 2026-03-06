@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Any
 
 import httpx
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,12 @@ TENCENT_CODES = {
     "hang_seng": "hkHSI",
     "hang_seng_tech": "hkHSTECH",  # 恒生科技
     # 美股 (us 前缀)
-    "dow_jones": "usDJI",
-    "nasdaq": "usIXIC",
-    "sp500": "usINX",
+    "dow_jones": "^DJI",
+    "nasdaq": "^IXIC",
+    "sp500": "^GSPC",
 }
 
-# Yahoo Finance ticker 映射 (日经、欧洲)
+# Yahoo Finance ticker 映射 (只包含有历史数据的指数)
 YAHOO_TICKERS = {
     # 日经
     "nikkei225": "^N225",
@@ -47,6 +48,9 @@ YAHOO_TICKERS = {
     "dax": "^GDAXI",
     "ftse": "^FTSE",
     "cac40": "^FCHI",
+    # 港股
+    "hang_seng": "^HSI",
+    "hang_seng_tech": "HSTECH.HK",
 }
 
 # 合并所有 ticker 映射
@@ -191,6 +195,19 @@ class IndexDataSource(DataSource):
         """关闭数据源"""
         pass
 
+    async def fetch_history(self, index_type: str, period: str = "1y") -> DataSourceResult:
+        """
+        获取指数历史数据
+
+        Args:
+            index_type: 指数类型
+            period: 时间周期 (1d, 5d, 1w, 1mo, 3mo, 6mo, 1y, 2y, 5y, max)
+
+        Returns:
+            DataSourceResult: 包含历史数据的结果
+        """
+        raise NotImplementedError("子类必须实现 fetch_history 方法")
+
     async def fetch_batch(self, index_types: list[str]) -> list[DataSourceResult]:
         """批量获取指数数据的通用实现
 
@@ -267,7 +284,7 @@ class YahooIndexSource(IndexDataSource):
                 ticker_obj = yf.Ticker(ticker)
                 info = await asyncio.wait_for(
                     loop.run_in_executor(None, lambda: ticker_obj.info),
-                    timeout=self.YFINANCE_TIMEOUT
+                    timeout=self.YFINANCE_TIMEOUT,
                 )
                 return info
             except asyncio.TimeoutError:
@@ -369,6 +386,91 @@ class YahooIndexSource(IndexDataSource):
         status = super().get_status()
         status["supported_indices"] = list(INDEX_TICKERS.keys())
         return status
+
+    async def fetch_history(self, index_type: str, period: str = "1y") -> DataSourceResult:
+        """获取指数历史数据"""
+        try:
+            ticker = INDEX_TICKERS.get(index_type)
+            if not ticker:
+                return DataSourceResult(
+                    success=False,
+                    error=f"不支持的指数类型: {index_type}",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            import yfinance as yf
+
+            loop = asyncio.get_event_loop()
+
+            async with self._get_semaphore():
+                try:
+                    ticker_obj = yf.Ticker(ticker)
+                    hist = await asyncio.wait_for(
+                        loop.run_in_executor(None, lambda: ticker_obj.history(period=period)),
+                        timeout=self.YFINANCE_TIMEOUT * 2,
+                    )
+
+                    if hist is None or hist.empty:
+                        return DataSourceResult(
+                            success=False,
+                            error="无法获取历史数据",
+                            timestamp=time.time(),
+                            source=self.name,
+                            metadata={"index_type": index_type, "period": period},
+                        )
+
+                    data = []
+                    for idx, row in hist.iterrows():
+                        data.append(
+                            {
+                                "time": idx.strftime("%Y-%m-%d"),
+                                "open": float(row["Open"]) if pd.notna(row["Open"]) else None,
+                                "high": float(row["High"]) if pd.notna(row["High"]) else None,
+                                "low": float(row["Low"]) if pd.notna(row["Low"]) else None,
+                                "close": float(row["Close"]) if pd.notna(row["Close"]) else None,
+                                "volume": int(row["Volume"]) if pd.notna(row["Volume"]) else None,
+                            }
+                        )
+
+                    result_data = {
+                        "index": index_type,
+                        "symbol": ticker,
+                        "name": INDEX_NAMES.get(index_type, index_type),
+                        "period": period,
+                        "data": data,
+                        "count": len(data),
+                        "currency": "USD",
+                    }
+
+                    self._record_success()
+                    return DataSourceResult(
+                        success=True,
+                        data=result_data,
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"index_type": index_type, "period": period},
+                    )
+
+                except asyncio.TimeoutError:
+                    return DataSourceResult(
+                        success=False,
+                        error=f"获取历史数据超时 ({self.YFINANCE_TIMEOUT * 2}s)",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"index_type": index_type, "period": period},
+                    )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="yfinance 未安装",
+                timestamp=time.time(),
+                source=self.name,
+            )
+        except Exception as e:
+            return self._handle_error(e, self.name)
 
 
 class TencentIndexSource(IndexDataSource):
@@ -577,3 +679,21 @@ class HybridIndexSource(IndexDataSource):
         status["tencent_status"] = self._tencent.get_status()
         status["yahoo_status"] = self._yahoo.get_status()
         return status
+
+    async def fetch_history(self, index_type: str, period: str = "1y") -> DataSourceResult:
+        """获取指数历史数据，根据指数类型选择数据源
+
+        - 日经/欧洲/港股 -> Yahoo Finance
+        - A股 -> 不支持历史数据（需要使用其他数据源）
+        """
+        # 检查是否支持历史数据
+        if index_type not in YAHOO_TICKERS:
+            return DataSourceResult(
+                success=False,
+                error=f"指数 {INDEX_NAMES.get(index_type, index_type)} 暂不支持历史数据查询（仅支持: nikkei225, dax, ftse, cac40, hang_seng, hang_seng_tech）",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type, "period": period},
+            )
+
+        return await self._yahoo.fetch_history(index_type, period)
