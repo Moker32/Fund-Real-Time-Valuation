@@ -149,8 +149,30 @@ function handleCategorySelect(categoryId: string) {
 
 .commodity-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: 1fr;
   gap: var(--spacing-md);
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .commodity-view {
+    gap: var(--spacing-sm);
+  }
+
+  .loading-state,
+  .error-state,
+  .empty-state {
+    padding: var(--spacing-lg);
+  }
+
+  .last-updated {
+    text-align: left;
+    font-size: var(--font-size-xs);
+  }
 }
 
 .last-updated {
