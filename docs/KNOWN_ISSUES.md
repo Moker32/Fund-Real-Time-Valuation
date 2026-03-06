@@ -23,36 +23,45 @@
 
 ---
 
-## 2. akshare py_mini_racer 依赖问题
+## 2. akshare mini_racer 依赖问题
 
-**问题描述**: akshare 库的 py_mini_racer 依赖导致应用崩溃和类型检查失败
+**问题描述**: akshare 库的 JavaScript 执行依赖导致应用崩溃
 
 **影响范围**: 
 - 应用启动时崩溃（`Check failed: !pool->IsInitialized()`）
+- WebSocket 连接时触发崩溃
 - mypy 类型检查失败
-- 部分 akshare 数据源功能
+- 部分 akshare 数据源功能（如资金流向）
 
 **当前状态**: ✅ **已解决**（2026-03-05）
 
 **根本原因**:
-- py_mini_racer 包（v0.6.0，2021年停止维护）与新版 mini_racer（v0.14.1）存在二进制兼容性问题
-- macOS 上的 V8 引擎初始化失败，触发断言崩溃
-- `py_mini_racer 0.6.0` 期望的符号 `mr_eval_context` 在新版中已不存在
+- akshare 新版本 (1.12+) 依赖 `mini-racer` 包（非 `py-mini-racer`）
+- `mini-racer` v0.14.1 在 macOS ARM64 (M1/M2/M3) 上存在 V8 引擎初始化问题
+- 这是 mini-racer 包的已知问题，与 V8 14.x 版本相关
 
 **解决方案**:
-- 卸载 `mini_racer` 和 `py_mini_racer` 依赖
-- akshare 核心功能（基金、指数、板块等）不依赖 JS 执行，仍可正常工作
-- 如需使用同花顺等依赖 JS 执行的数据源，需使用其他方案（如 execjs + Node.js）
 
 ```bash
-uv pip uninstall mini_racer py_mini_racer
+# 固定 mini-racer 版本（推荐使用 0.12.x 或 0.13.x）
+uv pip install "mini-racer>=0.12.4,<0.14" --force-reinstall
+
+# 或者直接指定版本
+uv pip install mini-racer==0.13.2 --force-reinstall
 ```
+
+**平台差异**:
+| 平台 | 应安装的包 | 版本要求 | 备注 |
+|------|-----------|---------|------|
+| macOS ARM64 (M系列) | `mini-racer` | >= 0.12.4, < 0.14 | v0.14.x 有兼容性问题 |
+| macOS Intel | `mini-racer` | >= 0.12.4 | 可能正常 |
+| Linux | `py-mini-racer` + `akracer` | >= 0.6.0 | - |
 
 **相关配置**:
 ```toml
 # pyproject.toml
 [[tool.mypy.overrides]]
-module = ["akshare.*", "py_mini_racer.*"]
+module = ["akshare.*", "py_mini_racer.*", "mini_racer.*"]
 ignore_missing_imports = true
 ```
 
