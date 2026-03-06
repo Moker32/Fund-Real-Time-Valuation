@@ -33,8 +33,12 @@ $radius-lg: 12px;
 $radius-full: 9999px;
 
 // 过渡动画
-$transition-fast: 0.15s ease;
-$transition-normal: 0.3s ease;
+// 注意：SCSS 变量已废弃，请使用 global.scss 中的 CSS 变量
+// --transition-fast: 150ms ease
+// --transition-normal: 250ms ease
+// --transition-slow: 400ms ease
+// $transition-fast: 0.15s ease;
+// $transition-normal: 0.3s ease;
 
 // 阴影
 $shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);

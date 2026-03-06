@@ -39,9 +39,9 @@
   --radius-lg: #{$radius-lg};
   --radius-full: #{$radius-full};
 
-  // 过渡动画
-  --transition-fast: #{$transition-fast};
-  --transition-normal: #{$transition-normal};
+  // 过渡动画 - 使用 CSS 变量，不再依赖 SCSS 变量
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
 
   // 阴影
   --shadow-sm: #{$shadow-sm};

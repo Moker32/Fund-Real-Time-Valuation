@@ -133,7 +133,7 @@ function handleCancel() {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
 
   &:disabled {
     opacity: 0.5;

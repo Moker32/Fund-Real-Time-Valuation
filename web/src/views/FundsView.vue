@@ -49,7 +49,7 @@
           <h2 class="section-title">自选基金</h2>
           <span class="fund-count">{{ fundStore.holdingFirstFunds.length }} 只</span>
         </div>
-        <button class="btn-add" @click="showAddDialog = true">
+        <button class="btn-add" :class="{ 'pulse-hint': shouldShowPulseHint }" @click="showAddDialog = true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M12 5V19M5 12H19"/>
           </svg>
@@ -60,9 +60,11 @@
       <div class="funds-grid">
         <TransitionGroup name="fund-card">
           <FundCard
-            v-for="fund in fundStore.holdingFirstFunds"
+            v-for="(fund, index) in fundStore.holdingFirstFunds"
             :key="fund.code"
             :fund="fund"
+            :style="{ animationDelay: `${index * 50}ms` }"
+            class="fund-item"
             @remove="handleRemoveFund"
           />
         </TransitionGroup>
@@ -130,6 +132,12 @@ const showSkeleton = computed(() => isLoading.value && !hasFunds.value);
 // 模板条件简化：显示基金列表
 // eslint-disable-next-line no-useless-assignment
 const showFundList = computed(() => hasFunds.value && !hasError.value);
+
+// 是否显示脉冲提示（当基金数量较少时）
+// eslint-disable-next-line no-useless-assignment
+const shouldShowPulseHint = computed(() => {
+  return fundStore.holdingFirstFunds.length > 0 && fundStore.holdingFirstFunds.length < 3;
+});
 
 async function handleRemoveFund(code: string) {
   const confirmed = await confirm({
@@ -216,9 +224,20 @@ onUnmounted(() => {
 
 .progress-fill {
   height: 100%;
-  background: var(--color-primary);
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary-light, #60a5fa) 50%, var(--color-primary) 100%);
+  background-size: 200% 100%;
   border-radius: var(--radius-full);
-  transition: width 0.3s ease;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: progress-shimmer 1.5s infinite;
+}
+
+@keyframes progress-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .progress-text {
@@ -261,7 +280,7 @@ onUnmounted(() => {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
 
   svg {
     width: 16px;
@@ -279,6 +298,23 @@ onUnmounted(() => {
     opacity: 0.9;
     transform: translateY(-1px);
   }
+
+  // 脉冲提示动画
+  &.pulse-hint {
+    animation: pulse-ring 2s ease-out infinite;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--color-primary-rgb, 59, 130, 246), 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(var(--color-primary-rgb, 59, 130, 246), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--color-primary-rgb, 59, 130, 246), 0);
+  }
 }
 
 .funds-grid {
@@ -289,26 +325,42 @@ onUnmounted(() => {
 }
 
 // 响应式调整
-@media (max-width: 640px) {
+@media (max-width: var(--breakpoint-sm)) {
   .funds-grid {
     gap: var(--spacing-sm);
   }
 }
 
-// 基金卡片过渡动画
+// 基金卡片 stagger 入场动画
+.fund-item {
+  animation: slideInUp 0.4s ease-out both;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// 基金卡片过渡动画（用于添加/删除）
 .fund-card-enter-active,
 .fund-card-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .fund-card-enter-from {
   opacity: 0;
-  transform: translateY(-20px);
+  transform: translateY(-20px) scale(0.95);
 }
 
 .fund-card-leave-to {
   opacity: 0;
-  transform: scale(0.95);
+  transform: translateX(100%) scale(0.9);
 }
 
 /* 移除 move 动画避免自动刷新时页面抖动 */
@@ -350,7 +402,7 @@ onUnmounted(() => {
     border-radius: var(--radius-md);
     color: var(--color-text-primary);
     font-size: var(--font-size-sm);
-    transition: all var(--transition-fast);
+    transition: background-color var(--transition-fast), border-color var(--transition-fast);
 
     &:hover {
       background: var(--color-bg-card);
@@ -375,5 +427,25 @@ onUnmounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--spacing-md);
   width: 100%;
+}
+
+// 减少动画偏好支持
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill {
+    animation: none;
+  }
+
+  .btn-add.pulse-hint {
+    animation: none;
+  }
+
+  .fund-item {
+    animation: none;
+  }
+
+  .fund-card-enter-active,
+  .fund-card-leave-active {
+    transition: none;
+  }
 }
 </style>

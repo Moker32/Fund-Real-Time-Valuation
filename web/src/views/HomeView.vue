@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFundStore } from '@/stores/fundStore';
 import { useCommodityStore } from '@/stores/commodityStore';
@@ -20,6 +20,91 @@ const hasFunds = computed(() => fundStore.funds.length > 0);
 const topGainers = computed(() => fundStore.topGainers.slice(0, 3));
 // eslint-disable-next-line no-useless-assignment
 const topLosers = computed(() => fundStore.topLosers.slice(0, 3));
+
+// 数字计数动画
+const animatedFundCount = ref(0);
+const animatedCommodityCount = ref(0);
+const animatedIndexCount = ref(0);
+
+// 缓动函数：easeOutQuart
+const easeOutQuart = (t: number): number => {
+  return 1 - Math.pow(1 - t, 4);
+};
+
+// 数字动画函数
+const animateNumber = (
+  targetValue: number,
+  duration: number,
+  delay: number,
+  callback: (value: number) => void
+) => {
+  let startTime: number | null = null;
+  let animationFrameId: number | null = null;
+
+  const animate = (timestamp: number) => {
+    if (startTime === null) {
+      startTime = timestamp;
+    }
+
+    const elapsed = timestamp - startTime;
+
+    if (elapsed < delay) {
+      animationFrameId = window.requestAnimationFrame(animate);
+      return;
+    }
+
+    const progress = Math.min((elapsed - delay) / duration, 1);
+    const easedProgress = easeOutQuart(progress);
+    const currentValue = Math.round(targetValue * easedProgress);
+
+    callback(currentValue);
+
+    if (progress < 1) {
+      animationFrameId = window.requestAnimationFrame(animate);
+    } else {
+      callback(targetValue);
+    }
+  };
+
+  animationFrameId = window.requestAnimationFrame(animate);
+
+  return () => {
+    if (animationFrameId !== null) {
+      window.cancelAnimationFrame(animationFrameId);
+    }
+  };
+};
+
+// 监听数据变化并触发动画
+watch(
+  () => fundStore.funds.length,
+  (newValue) => {
+    animateNumber(newValue, 1500, 0, (val) => {
+      animatedFundCount.value = val;
+    });
+  },
+  { immediate: true }
+);
+
+watch(
+  () => commodityStore.commodities.length,
+  (newValue) => {
+    animateNumber(newValue, 1500, 150, (val) => {
+      animatedCommodityCount.value = val;
+    });
+  },
+  { immediate: true }
+);
+
+watch(
+  () => indexStore.indices.length,
+  (newValue) => {
+    animateNumber(newValue, 1500, 300, (val) => {
+      animatedIndexCount.value = val;
+    });
+  },
+  { immediate: true }
+);
 
 function formatPercent(value: number | undefined | null): string {
   if (value == null) return '--';
@@ -55,17 +140,17 @@ onMounted(async () => {
       </div>
       <div class="hero-stats">
         <div class="stat-item">
-          <span class="stat-value">{{ fundStore.funds.length }}</span>
+          <span class="stat-value">{{ animatedFundCount }}</span>
           <span class="stat-label">自选基金</span>
         </div>
         <div class="stat-divider"></div>
         <div class="stat-item">
-          <span class="stat-value">{{ commodityStore.commodities.length }}</span>
+          <span class="stat-value">{{ animatedCommodityCount }}</span>
           <span class="stat-label">关注商品</span>
         </div>
         <div class="stat-divider"></div>
         <div class="stat-item">
-          <span class="stat-value">{{ indexStore.indices.length }}</span>
+          <span class="stat-value">{{ animatedIndexCount }}</span>
           <span class="stat-label">全球指数</span>
         </div>
       </div>
@@ -275,6 +360,12 @@ onMounted(async () => {
   font-weight: var(--font-weight-bold);
   font-family: var(--font-mono);
   color: var(--color-text-primary);
+  transition: color var(--transition-fast);
+  will-change: transform;
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
 }
 
 .stat-label {
@@ -378,7 +469,7 @@ onMounted(async () => {
   align-items: center;
   gap: var(--spacing-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 
   &:hover {
     background: var(--color-bg-card-hover);
@@ -625,7 +716,7 @@ onMounted(async () => {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
 
   svg {
     width: 16px;
@@ -645,7 +736,7 @@ onMounted(async () => {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: var(--breakpoint-md)) {
   .hero-section {
     flex-direction: column;
     gap: var(--spacing-lg);
