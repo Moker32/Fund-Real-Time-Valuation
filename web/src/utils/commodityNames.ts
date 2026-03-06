@@ -2,7 +2,7 @@
 export const commodityNameMap: Record<string, string> = {
   // 贵金属
   'GC=F': '黄金 (COMEX)',
-  'SG=f': '沪金 Au99.99',
+  'SG=F': '沪金 Au99.99',
   'PAXG-USD': 'Pax Gold',
   'SI=F': '白银 (COMEX)',
   'PT=F': '铂金',
@@ -90,7 +90,7 @@ export function getCommodityName(symbol: string, englishName: string): string {
 export const commodityCategoryMap: Record<string, string> = {
   // 贵金属
   'GC=F': 'precious_metal',
-  'SG=f': 'precious_metal',
+  'SG=F': 'precious_metal',
   'SI=F': 'precious_metal',
   'PT=F': 'precious_metal',
   'PA=F': 'precious_metal',
@@ -127,7 +127,7 @@ export function getCommodityCategory(symbol: string): string {
 // 商品对应的交易所映射
 export const commodityExchangeMap: Record<string, string> = {
   // 上海黄金交易所
-  'SG=f': 'sge',
+  'SG=F': 'sge',
   'Au99.99': 'sge',
   // COMEX 纽约商品交易所 (贵金属 + 能源 + 基本金属)
   'GC=F': 'comex',

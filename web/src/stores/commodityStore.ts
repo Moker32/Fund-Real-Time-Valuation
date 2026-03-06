@@ -5,6 +5,7 @@ import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHist
 import { ApiError } from '@/api';
 import { formatTime } from '@/utils/time';
 import { getCommodityName } from '@/utils/commodityNames';
+import { useWSStore } from './wsStore';
 
 // 商品详情 API 返回类型联合
 type CommodityDetailResponse = {
@@ -13,17 +14,27 @@ type CommodityDetailResponse = {
   price: number;
   currency?: string;
   change: number | null;
-  change_percent?: number | null;
-  changePercent?: number;
+  changePercent: number | null;
   high?: number;
   low?: number;
   open?: number;
-  prev_close?: number;
   prevClose?: number;
   source: string;
-  time?: string;
   timestamp: string;
 };
+
+// WebSocket 商品更新数据类型
+interface WSCommodityUpdate {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  timestamp: string;
+  high?: number;
+  low?: number;
+  open?: number;
+  prevClose?: number;
+}
 
 // 防抖函数（支持异步函数返回 Promise）
 function debounce<T extends (...args: Parameters<T>) => ReturnType<T>>(
@@ -77,6 +88,10 @@ export const useCommodityStore = defineStore('commodities', () => {
   const lastUpdated = ref<string | null>(null);
   const retryCount = ref(0);
   const maxRetries = 2;
+
+  // WebSocket 相关状态
+  const wsConnected = ref(false);
+  const wsSubscribed = ref(false);
 
   // Getters
   const risingCommodities = computed(() =>
@@ -162,6 +177,46 @@ export const useCommodityStore = defineStore('commodities', () => {
 
     return list;
   });
+
+  // 获取所有分类中的商品（用于统计）
+  const allCategoryCommodities = computed(() => {
+    const all: Commodity[] = [];
+    for (const category of categories.value) {
+      for (const item of category.commodities) {
+        // 避免重复添加相同 symbol 的商品
+        if (!all.some(c => c.symbol === item.symbol)) {
+          all.push({
+            symbol: item.symbol,
+            name: item.name,
+            price: item.price,
+            currency: item.currency,
+            change: item.change ?? 0,
+            changePercent: item.changePercent ?? 0,
+            high: item.high ?? 0,
+            low: item.low ?? 0,
+            open: item.open ?? 0,
+            prevClose: item.prevClose ?? 0,
+            source: item.source,
+            timestamp: item.timestamp,
+          });
+        }
+      }
+    }
+    return all;
+  });
+
+  // 基于分类数据的涨跌统计
+  const categoryRisingCount = computed(() =>
+    allCategoryCommodities.value.filter((c) => c.changePercent > 0).length
+  );
+
+  const categoryFallingCount = computed(() =>
+    allCategoryCommodities.value.filter((c) => c.changePercent < 0).length
+  );
+
+  const categoryNeutralCount = computed(() =>
+    allCategoryCommodities.value.filter((c) => c.changePercent === 0).length
+  );
 
   // 预处理 API 响应中的 commodities 字段
   function processApiCommodities(apiCommodities: CommodityCategoryItem[]): Commodity[] {
@@ -510,13 +565,14 @@ export const useCommodityStore = defineStore('commodities', () => {
             };
           } else {
             const tickerData = await commodityApi.getCommodityByTicker(watched.symbol);
+            // API 返回 snake_case，转换为 camelCase
             data = {
               symbol: tickerData.symbol,
               name: tickerData.name,
               price: tickerData.price,
               currency: tickerData.currency,
               change: tickerData.change,
-              change_percent: tickerData.change_percent,
+              changePercent: tickerData.change_percent,
               source: tickerData.source,
               timestamp: tickerData.timestamp,
             };
@@ -526,14 +582,14 @@ export const useCommodityStore = defineStore('commodities', () => {
             name: getCommodityName(data.symbol, data.name),
             price: data.price,
             currency: data.currency,
-            change: data.change ?? (data.change_percent ? (data.price * data.change_percent / 100) : 0),
-            changePercent: data.change_percent ?? data.changePercent ?? 0,
+            change: data.change ?? (data.changePercent ? (data.price * data.changePercent / 100) : 0),
+            changePercent: data.changePercent ?? 0,
             high: data.high ?? 0,
             low: data.low ?? 0,
             open: data.open ?? 0,
-            prevClose: data.prev_close ?? data.prevClose ?? 0,
+            prevClose: data.prevClose ?? 0,
             source: data.source,
-            timestamp: data.time ?? data.timestamp,
+            timestamp: data.timestamp,
           } as Commodity;
         } catch (e) {
           console.warn(`[CommodityStore] Failed to fetch ${watched.symbol}:`, e);
@@ -669,6 +725,146 @@ export const useCommodityStore = defineStore('commodities', () => {
     searchError.value = null;
   }
 
+  // ========== WebSocket 实时更新相关 ==========
+
+  /**
+   * 更新单个商品数据（用于 WebSocket 实时更新）
+   */
+  function updateCommodity(updatedData: WSCommodityUpdate) {
+    const { symbol, price, change, changePercent, timestamp, high, low, open, prevClose } = updatedData;
+
+    // 更新 commodities 列表
+    const index = commodities.value.findIndex((c) => c.symbol === symbol);
+    if (index !== -1) {
+      const current = commodities.value[index];
+      if (current) {
+        commodities.value[index] = {
+          symbol: current.symbol,
+          name: current.name,
+          currency: current.currency,
+          price,
+          change,
+          changePercent,
+          timestamp,
+          high: high ?? current.high,
+          low: low ?? current.low,
+          open: open ?? current.open,
+          prevClose: prevClose ?? current.prevClose,
+          source: current.source,
+        };
+      }
+    }
+
+    // 更新 watchedCommodityData 列表
+    const watchedIndex = watchedCommodityData.value.findIndex((c) => c.symbol === symbol);
+    if (watchedIndex !== -1) {
+      const current = watchedCommodityData.value[watchedIndex];
+      if (current) {
+        watchedCommodityData.value[watchedIndex] = {
+          symbol: current.symbol,
+          name: current.name,
+          currency: current.currency,
+          price,
+          change,
+          changePercent,
+          timestamp,
+          high: high ?? current.high,
+          low: low ?? current.low,
+          open: open ?? current.open,
+          prevClose: prevClose ?? current.prevClose,
+          source: current.source,
+        };
+      }
+    }
+
+    // 更新 categories 中的商品数据
+    for (const category of categories.value) {
+      const commodityIndex = category.commodities.findIndex((c) => c.symbol === symbol);
+      if (commodityIndex !== -1) {
+        const current = category.commodities[commodityIndex];
+        if (current) {
+          category.commodities[commodityIndex] = {
+            symbol: current.symbol,
+            name: current.name,
+            currency: current.currency,
+            price,
+            change,
+            changePercent,
+            timestamp,
+            high: high ?? current.high,
+            low: low ?? current.low,
+            open: open ?? current.open,
+            prevClose: prevClose ?? current.prevClose,
+            source: current.source,
+          };
+        }
+        break; // 找到并更新后退出
+      }
+    }
+
+    // 更新最后更新时间
+    lastUpdated.value = formatTime(new Date());
+  }
+
+  /**
+   * 批量更新商品数据（用于 WebSocket 批量推送）
+   */
+  function updateCommoditiesBatch(updates: WSCommodityUpdate[]) {
+    for (const update of updates) {
+      updateCommodity(update);
+    }
+  }
+
+  /**
+   * 初始化 WebSocket 连接并订阅大宗商品频道
+   */
+  function initWebSocket() {
+    const wsStore = useWSStore();
+
+    // 监听连接状态
+    wsStore.on('connected', () => {
+      wsConnected.value = true;
+      // 连接成功后订阅大宗商品频道
+      wsStore.subscribe('commodities');
+      wsSubscribed.value = true;
+    });
+
+    wsStore.on('disconnected', () => {
+      wsConnected.value = false;
+      wsSubscribed.value = false;
+    });
+
+    // 监听大宗商品更新消息
+    wsStore.on('commodity_update', (data: unknown) => {
+      try {
+        const update = data as WSCommodityUpdate | WSCommodityUpdate[];
+        if (Array.isArray(update)) {
+          updateCommoditiesBatch(update);
+        } else {
+          updateCommodity(update);
+        }
+      } catch (e) {
+        console.error('[CommodityStore] 处理 WebSocket 消息失败:', e);
+      }
+    });
+
+    // 如果已经连接，直接订阅
+    if (wsStore.isConnected) {
+      wsConnected.value = true;
+      wsStore.subscribe('commodities');
+      wsSubscribed.value = true;
+    }
+  }
+
+  /**
+   * 取消 WebSocket 订阅
+   */
+  function unsubscribeWebSocket() {
+    const wsStore = useWSStore();
+    wsStore.unsubscribe('commodities');
+    wsSubscribed.value = false;
+  }
+
   return {
     // State
     commodities,
@@ -679,6 +875,9 @@ export const useCommodityStore = defineStore('commodities', () => {
     lastUpdated,
     retryCount,
     maxRetries,
+    // WebSocket State
+    wsConnected,
+    wsSubscribed,
     // 关注列表 State
     watchedCommodities,
     watchlistLoading,
@@ -697,6 +896,11 @@ export const useCommodityStore = defineStore('commodities', () => {
     activeCategoryData,
     activeCommodities,
     categoryList,
+    // 分类数据统计
+    allCategoryCommodities,
+    categoryRisingCount,
+    categoryFallingCount,
+    categoryNeutralCount,
     // 关注列表 Getters
     watchedByCategory,
     watchedCategories,
@@ -721,6 +925,11 @@ export const useCommodityStore = defineStore('commodities', () => {
     fetchAvailableCommodities,
     clearWatchlistError,
     clearSearchError,
+    // WebSocket Actions
+    updateCommodity,
+    updateCommoditiesBatch,
+    initWebSocket,
+    unsubscribeWebSocket,
   };
 }, {
   persist: {

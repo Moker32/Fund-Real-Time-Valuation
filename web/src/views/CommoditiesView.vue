@@ -14,19 +14,19 @@
     <!-- Commodity View with Categories -->
     <CommodityView />
 
-    <!-- Quick Stats (保留原有统计) -->
-    <div v-if="commodityStore.commodities.length > 0" class="quick-stats">
+    <!-- Quick Stats (基于分类数据统计) -->
+    <div v-if="commodityStore.allCategoryCommodities.length > 0" class="quick-stats">
       <div class="stats-card">
         <span class="stats-label">上涨</span>
-        <span class="stats-value rising">{{ commodityStore.risingCommodities.length }}</span>
+        <span class="stats-value rising">{{ commodityStore.categoryRisingCount }}</span>
       </div>
       <div class="stats-card">
         <span class="stats-label">下跌</span>
-        <span class="stats-value falling">{{ commodityStore.fallingCommodities.length }}</span>
+        <span class="stats-value falling">{{ commodityStore.categoryFallingCount }}</span>
       </div>
       <div class="stats-card">
         <span class="stats-label">持平</span>
-        <span class="stats-value neutral">{{ commodityStore.commodities.length - commodityStore.risingCommodities.length - commodityStore.fallingCommodities.length }}</span>
+        <span class="stats-value neutral">{{ commodityStore.categoryNeutralCount }}</span>
       </div>
     </div>
 

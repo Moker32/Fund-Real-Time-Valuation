@@ -96,7 +96,6 @@ const props = withDefaults(defineProps<Props>(), {
 const store = useCommodityStore();
 
 // 简化数据源名称显示
-// eslint-disable-next-line no-useless-assignment
 const sourceName = computed(() => {
   const source = props.commodity.source;
   if (!source) return '';
@@ -136,7 +135,6 @@ const isWatched = computed(() => {
   );
 });
 
-// eslint-disable-next-line no-useless-assignment
 const changeClass = computed(() => {
   if (props.commodity.changePercent > 0) return 'rising';
   if (props.commodity.changePercent < 0) return 'falling';
@@ -310,7 +308,6 @@ const tradingStatus = computed(() => {
   return 'unknown';
 });
 
-// eslint-disable-next-line no-useless-assignment
 const statusText = computed(() => {
   const labels: Record<string, string> = {
     'open': '交易中',
@@ -506,13 +503,6 @@ function formatTime(dateStr: string | undefined | null): string {
   color: var(--color-text-primary);
 }
 
-.commodity-source {
-  font-size: var(--font-size-xs);
-  padding: 2px 8px;
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-full);
-  color: var(--color-text-secondary);
-}
 
 .trading-status {
   display: flex;
@@ -638,14 +628,6 @@ function formatTime(dateStr: string | undefined | null): string {
 
 .commodity-card:hover .action-btn {
   opacity: 1;
-}
-
-.card-body {
-  font-size: var(--font-size-xs);
-  padding: 2px 8px;
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-full);
-  color: var(--color-text-secondary);
 }
 
 .card-body {
