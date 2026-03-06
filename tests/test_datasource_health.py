@@ -231,7 +231,7 @@ class TestDataSourceHealthChecker:
 
         assert result.source_name == "healthy_source"
         assert result.status == HealthStatus.UNHEALTHY
-        assert "Connection failed" in result.message
+        assert "Connection failed" in result.details.get("error_message", "")
 
     @pytest.mark.asyncio
     async def test_check_all_sources(self, checker, mock_source_healthy, mock_source_unhealthy):

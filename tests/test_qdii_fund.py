@@ -9,7 +9,7 @@ QDII/FOF 基金核心功能单元测试
 4. build_fund_response 函数
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -357,8 +357,7 @@ class TestCalculateEstimateChange:
 class TestCheckIsHolding:
     """测试 _check_is_holding 函数"""
 
-    @patch("api.routes.funds.get_config_manager")
-    def test_check_is_holding_with_holding(self, mock_cfg_mgr):
+    def test_check_is_holding_with_holding(self):
         """持仓中 - 应返回 True"""
         from api.routes.funds import _check_is_holding
 
@@ -369,14 +368,14 @@ class TestCheckIsHolding:
             MagicMock(code="000002"),
             MagicMock(code="161039"),
         ]
-        mock_cfg_mgr.return_value.load_funds.return_value = mock_fund_list
+        mock_cfg_mgr = MagicMock()
+        mock_cfg_mgr.load_funds.return_value = mock_fund_list
 
-        result = _check_is_holding("000001")
+        result = _check_is_holding("000001", mock_cfg_mgr)
 
         assert result is True
 
-    @patch("api.routes.funds.get_config_manager")
-    def test_check_is_holding_without_holding(self, mock_cfg_mgr):
+    def test_check_is_holding_without_holding(self):
         """未持仓 - 应返回 False"""
         from api.routes.funds import _check_is_holding
 
@@ -386,35 +385,36 @@ class TestCheckIsHolding:
             MagicMock(code="000001"),
             MagicMock(code="000002"),
         ]
-        mock_cfg_mgr.return_value.load_funds.return_value = mock_fund_list
+        mock_cfg_mgr = MagicMock()
+        mock_cfg_mgr.load_funds.return_value = mock_fund_list
 
-        result = _check_is_holding("999999")
+        result = _check_is_holding("999999", mock_cfg_mgr)
 
         assert result is False
 
-    @patch("api.routes.funds.get_config_manager")
-    def test_check_is_holding_empty_holdings(self, mock_cfg_mgr):
+    def test_check_is_holding_empty_holdings(self):
         """空持仓列表 - 应返回 False"""
         from api.routes.funds import _check_is_holding
 
         # 模拟空持仓
         mock_fund_list = MagicMock()
         mock_fund_list.holdings = []
-        mock_cfg_mgr.return_value.load_funds.return_value = mock_fund_list
+        mock_cfg_mgr = MagicMock()
+        mock_cfg_mgr.load_funds.return_value = mock_fund_list
 
-        result = _check_is_holding("000001")
+        result = _check_is_holding("000001", mock_cfg_mgr)
 
         assert result is False
 
-    @patch("api.routes.funds.get_config_manager")
-    def test_check_is_holding_exception(self, mock_cfg_mgr):
+    def test_check_is_holding_exception(self):
         """加载失败时返回 False"""
         from api.routes.funds import _check_is_holding
 
         # 模拟加载异常
-        mock_cfg_mgr.return_value.load_funds.side_effect = Exception("Config error")
+        mock_cfg_mgr = MagicMock()
+        mock_cfg_mgr.load_funds.side_effect = Exception("Config error")
 
-        result = _check_is_holding("000001")
+        result = _check_is_holding("000001", mock_cfg_mgr)
 
         assert result is False
 
