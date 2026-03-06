@@ -15,7 +15,7 @@
 
           <!-- Search Input -->
           <div class="search-section">
-            <div class="search-input-wrapper">
+            <div class="search-input-wrapper" :class="{ 'has-error': localError }">
               <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"/>
                 <path d="M21 21l-4.35-4.35"/>
@@ -26,35 +26,53 @@
                 type="text"
                 class="search-input"
                 placeholder="搜索商品代码或名称（如：黄金、GC）"
-                @input="handleSearch"
+                :disabled="isLoading"
+                @input="handleSearchInput"
+                @keydown.enter="handleSearch"
               />
-              <button v-if="searchQuery" class="clear-button" @click="clearSearch">
+              <button v-if="searchQuery && !isLoading" class="clear-button" @click="clearSearch">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="10"/>
                   <path d="M15 9l-6 6M9 9l6 6"/>
                 </svg>
               </button>
+              <div v-if="isLoading" class="input-spinner">
+                <div class="spinner"></div>
+              </div>
+            </div>
+            <!-- 输入错误提示 -->
+            <div v-if="localError" class="input-error">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 8v4M12 16h.01"/>
+              </svg>
+              <span>{{ localError }}</span>
             </div>
           </div>
 
           <!-- Loading State -->
-          <div v-if="store.searchLoading" class="loading-state">
+          <div v-if="isLoading && !hasResults" class="loading-state">
             <div class="loading-spinner"></div>
             <span>搜索中...</span>
           </div>
 
           <!-- Error State -->
-          <div v-else-if="store.searchError" class="error-state">
+          <div v-else-if="displayError" class="error-state">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
               <path d="M12 8v4M12 16h.01"/>
             </svg>
-            <span>{{ store.searchError }}</span>
-            <button class="retry-button" @click="handleSearch">重试</button>
+            <span>{{ displayError }}</span>
+            <div class="error-actions">
+              <button class="retry-button" @click="handleRetry">重试</button>
+              <button v-if="canUseOfflineData" class="offline-button" @click="useOfflineData">
+                使用离线数据
+              </button>
+            </div>
           </div>
 
           <!-- Empty State -->
-          <div v-else-if="!store.searchQuery && !hasSearched" class="empty-state">
+          <div v-else-if="!searchQuery && !hasSearched" class="empty-state">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"/>
               <path d="M21 21l-4.35-4.35"/>
@@ -64,7 +82,7 @@
           </div>
 
           <!-- No Results State -->
-          <div v-else-if="hasSearched && results.length === 0" class="empty-state">
+          <div v-else-if="hasSearched && results.length === 0 && !isLoading" class="empty-state">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"/>
               <path d="M8 15s1.5-2 4-2 4 2 4 2M9 9h.01M15 9h.01"/>
@@ -74,12 +92,17 @@
           </div>
 
           <!-- Results List -->
-          <div v-else class="results-section">
+          <div v-else-if="results.length > 0" class="results-section">
+            <div class="results-header">
+              <span class="results-count">找到 {{ results.length }} 个商品</span>
+              <span v-if="isLoading" class="updating-hint">更新中...</span>
+            </div>
             <div class="results-list">
               <div
                 v-for="result in results"
                 :key="result.symbol"
                 class="result-item"
+                :class="{ 'is-adding': addingSymbol === result.symbol }"
                 @click="handleSelect(result)"
               >
                 <div class="result-info">
@@ -96,6 +119,14 @@
                   disabled
                 >
                   已关注
+                </button>
+                <button
+                  v-else-if="addingSymbol === result.symbol"
+                  class="add-button loading"
+                  disabled
+                >
+                  <span class="btn-spinner"></span>
+                  添加中...
                 </button>
                 <button
                   v-else
@@ -119,9 +150,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, computed } from 'vue';
 import { useCommodityStore } from '@/stores/commodityStore';
 import type { CommoditySearchResult } from '@/types';
+
+// 定义 clearTimeout 类型
+declare function clearTimeout(id: ReturnType<typeof setTimeout>): void;
 
 const props = defineProps<{
   visible: boolean;
@@ -130,55 +164,212 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   added: [symbol: string, name: string];
+  error: [message: string];
 }>();
 
 const store = useCommodityStore();
-const searchInputRef = ref<Element | null>(null);
+const searchInputRef = ref<HTMLInputElement | null>(null);
 const searchQuery = ref('');
 const results = ref<CommoditySearchResult[]>([]);
 const hasSearched = ref(false);
+const isLoading = ref(false);
+const localError = ref<string | null>(null);
+const addingSymbol = ref<string | null>(null);
+const retryCount = ref(0);
+const maxRetries = 2;
+
+// 离线数据缓存（用于网络错误时）
+const offlineData = ref<CommoditySearchResult[]>([]);
+const canUseOfflineData = computed(() => offlineData.value.length > 0);
+
+// 计算是否有结果
+const hasResults = computed(() => results.value.length > 0);
+
+// 计算显示的错误信息（优先显示本地错误，其次是 store 错误）
+const displayError = computed(() => {
+  if (localError.value) return localError.value;
+  if (store.searchError) return store.searchError;
+  return null;
+});
 
 // 监听对话框显示
 watch(() => props.visible, (visible) => {
   if (visible) {
-    // 打开时聚焦搜索框
+    // 打开时重置状态
+    resetState();
+    // 聚焦搜索框
     nextTick(() => {
       searchInputRef.value?.focus();
     });
     // 加载所有可用商品
-    store.fetchAvailableCommodities().then((data) => {
-      results.value = data;
-    });
+    loadAvailableCommodities();
   } else {
     // 关闭时清空
     clearSearch();
   }
 });
 
-// 监听可用商品列表变化
+// 监听 store 中的搜索结果变化
 watch(() => store.searchResults, (newResults) => {
   if (!searchQuery.value && hasSearched.value === false) {
     results.value = newResults;
+    // 缓存离线数据
+    if (newResults.length > 0) {
+      offlineData.value = [...newResults];
+    }
   }
 });
 
-// 搜索处理
-function handleSearch() {
+// 监听 store 错误
+watch(() => store.searchError, (error) => {
+  if (error) {
+    isLoading.value = false;
+  }
+});
+
+// 重置状态
+function resetState() {
+searchQuery.value = '';
+results.value = [];
+hasSearched.value = false;
+isLoading.value = false;
+localError.value = null;
+addingSymbol.value = null;
+retryCount.value = 0;
+// 清除搜索超时
+if (searchTimeout) {
+  clearTimeout(searchTimeout);
+  searchTimeout = null;
+}
+}
+
+// 加载所有可用商品
+async function loadAvailableCommodities() {
+  isLoading.value = true;
+  localError.value = null;
+
+  try {
+    const data = await store.fetchAvailableCommodities();
+    results.value = data;
+    // 缓存离线数据
+    if (data.length > 0) {
+      offlineData.value = [...data];
+    }
+  } catch (err) {
+    console.error('[CommoditySearchDialog] 加载可用商品失败:', err);
+    // 如果有离线数据，使用离线数据
+    if (offlineData.value.length > 0) {
+      results.value = [...offlineData.value];
+      localError.value = '使用离线数据，可能不是最新';
+    } else {
+      localError.value = store.searchError || '加载商品列表失败';
+    }
+  } finally {
+    isLoading.value = false;
+  }
+}
+
+// 搜索输入处理（防抖）
+let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+function handleSearchInput() {
+  // 清除之前的错误
+  localError.value = null;
+
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+  }
+
   if (!searchQuery.value.trim()) {
     results.value = store.searchResults;
     hasSearched.value = false;
     return;
   }
+
+  searchTimeout = setTimeout(() => {
+    performSearch();
+  }, 300);
+}
+
+// 执行搜索
+async function performSearch() {
+  if (!searchQuery.value.trim()) {
+    results.value = store.searchResults;
+    hasSearched.value = false;
+    return;
+  }
+
   hasSearched.value = true;
-  store.executeSearch(searchQuery.value).then((data) => {
-    results.value = data;
-  });
+  isLoading.value = true;
+  localError.value = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    retryCount.value = attempt;
+    try {
+      const data = await store.searchCommodities(searchQuery.value);
+      results.value = data;
+      isLoading.value = false;
+      return;
+    } catch (err) {
+      console.error(`[CommoditySearchDialog] 搜索失败 (尝试 ${attempt + 1}/${maxRetries + 1}):`, err);
+
+      if (attempt < maxRetries) {
+        // 指数退避重试
+        const delayMs = 1000 * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  // 所有重试都失败了
+  isLoading.value = false;
+
+  // 如果有离线数据，尝试在离线数据中搜索
+  if (offlineData.value.length > 0) {
+    const query = searchQuery.value.toLowerCase();
+    const filtered = offlineData.value.filter(item =>
+      item.symbol.toLowerCase().includes(query) ||
+      item.name.toLowerCase().includes(query)
+    );
+    if (filtered.length > 0) {
+      results.value = filtered;
+      localError.value = '使用离线数据搜索，结果可能不完整';
+      return;
+    }
+  }
+
+  localError.value = store.searchError || '搜索失败，请稍后重试';
+  emit('error', localError.value);
+}
+
+// 搜索处理（回车键）
+function handleSearch() {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+  }
+  performSearch();
+}
+
+// 重试
+function handleRetry() {
+  localError.value = null;
+  if (searchQuery.value.trim()) {
+    performSearch();
+  } else {
+    loadAvailableCommodities();
+  }
+}
+
+// 使用离线数据
+function useOfflineData() {
+  results.value = [...offlineData.value];
+  localError.value = null;
 }
 
 // 清空搜索
 function clearSearch() {
   searchQuery.value = '';
   hasSearched.value = false;
+  localError.value = null;
   store.clearSearch();
   results.value = store.searchResults;
 }
@@ -209,16 +400,33 @@ async function handleSelect(result: CommoditySearchResult) {
     return;
   }
 
-  const success = await store.addToWatchlist(
-    result.symbol,
-    result.name,
-    result.category
-  );
+  // 防止重复点击
+  if (addingSymbol.value) {
+    return;
+  }
 
-  if (success) {
-    emit('added', result.symbol, result.name);
-    // 显示成功提示后关闭或保持打开
-    // 可以在这里添加 toast 提示
+  addingSymbol.value = result.symbol;
+
+  try {
+    const success = await store.addToWatchlist(
+      result.symbol,
+      result.name,
+      result.category
+    );
+
+    if (success) {
+      emit('added', result.symbol, result.name);
+      // 可以在这里添加 toast 提示
+    } else {
+      localError.value = store.watchlistError || '添加失败';
+      emit('error', localError.value);
+    }
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : '添加失败';
+    localError.value = errorMsg;
+    emit('error', errorMsg);
+  } finally {
+    addingSymbol.value = null;
   }
 }
 
@@ -313,10 +521,16 @@ function handleClose() {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 0 var(--spacing-md);
+  transition: all var(--transition-fast);
 
   &:focus-within {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 2px var(--color-primary-light);
+  }
+
+  &.has-error {
+    border-color: var(--color-fall);
+    box-shadow: 0 0 0 2px rgba(var(--color-fall-rgb), 0.2);
   }
 }
 
@@ -338,6 +552,11 @@ function handleClose() {
 
   &::placeholder {
     color: var(--color-text-tertiary);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 }
 
@@ -365,10 +584,80 @@ function handleClose() {
   }
 }
 
+.input-spinner {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--color-border);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+}
+
+.input-error {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-fall);
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
 .results-section {
   flex: 1;
   overflow-y: auto;
   padding: 0 var(--spacing-lg);
+}
+
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xs) 0;
+  margin-bottom: var(--spacing-xs);
+}
+
+.results-count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-tertiary);
+}
+
+.updating-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+
+  &::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    background: var(--color-primary);
+    border-radius: 50%;
+    animation: pulse 1s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .results-list {
@@ -388,6 +677,11 @@ function handleClose() {
 
   &:hover {
     background: var(--color-bg-secondary);
+  }
+
+  &.is-adding {
+    opacity: 0.7;
+    pointer-events: none;
   }
 }
 
@@ -441,9 +735,30 @@ function handleClose() {
   cursor: pointer;
   transition: background var(--transition-fast);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: var(--color-primary-hover);
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+
+  &.loading {
+    background: var(--color-primary-light);
+  }
+
+  .btn-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
   }
 }
 
@@ -462,11 +777,6 @@ function handleClose() {
   padding: var(--spacing-md) var(--spacing-lg);
   border-top: 1px solid var(--color-divider);
   text-align: center;
-}
-
-.results-count {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-tertiary);
 }
 
 .loading-state,
@@ -515,6 +825,12 @@ function handleClose() {
   }
 }
 
+.error-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
 .retry-button {
   padding: var(--spacing-xs) var(--spacing-md);
   background: var(--color-primary);
@@ -527,6 +843,21 @@ function handleClose() {
 
   &:hover {
     background: var(--color-primary-hover);
+  }
+}
+
+.offline-button {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: var(--color-bg-tertiary);
   }
 }
 

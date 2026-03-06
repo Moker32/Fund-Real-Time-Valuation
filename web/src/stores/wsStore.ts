@@ -22,6 +22,32 @@ export const useWSStore = defineStore('websocket', () => {
         })
       }
     },
+    onConnected: () => {
+      // 触发连接成功事件
+      const handlers = messageHandlers.value.get('connected')
+      if (handlers) {
+        handlers.forEach(handler => {
+          try {
+            handler({ connected: true })
+          } catch (e) {
+            console.error('[WSStore] 连接处理器执行错误:', e)
+          }
+        })
+      }
+    },
+    onDisconnected: () => {
+      // 触发断开连接事件
+      const handlers = messageHandlers.value.get('disconnected')
+      if (handlers) {
+        handlers.forEach(handler => {
+          try {
+            handler({ connected: false })
+          } catch (e) {
+            console.error('[WSStore] 断开连接处理器执行错误:', e)
+          }
+        })
+      }
+    },
   })
 
   const subscriptions = ref<Set<SubscriptionType>>(new Set())
