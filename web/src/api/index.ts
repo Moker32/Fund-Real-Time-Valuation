@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, CommodityCategory, CommodityHistoryItem, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse, EconomicEventsData, WeiboSentimentData, SentimentAllData } from '@/types';
+import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, IndexHistoryResponse, CommodityCategory, CommodityHistoryItem, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse, EconomicEventsData, WeiboSentimentData, SentimentAllData } from '@/types';
 
 // API Configuration
 // 生产环境使用相对路径（同源部署），开发环境可通过环境变量覆盖
@@ -376,6 +376,10 @@ export const indexApi = {
 
   async getIndex(indexType: string): Promise<MarketIndex> {
     return api.get(`/api/indices/${indexType}`);
+  },
+
+  async getIndexHistory(indexType: string, period: string = '1y'): Promise<IndexHistoryResponse> {
+    return api.get(`/api/indices/${indexType}/history`, { params: { period } });
   },
 
   async getRegions(): Promise<{

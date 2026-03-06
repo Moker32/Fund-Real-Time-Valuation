@@ -1,5 +1,5 @@
 <template>
-  <div class="index-card" :class="{ loading: loading }">
+  <div class="index-card" :class="{ loading: loading }" @click="handleCardClick">
     <template v-if="loading">
       <div class="skeleton-content">
         <div class="skeleton skeleton-title"></div>
@@ -48,6 +48,8 @@
           </span>
           <span class="change-value font-mono">{{ formatChange(indexData.change) }}</span>
         </div>
+
+        <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" class="index-chart" />
       </div>
 
       <div class="card-footer">
@@ -87,6 +89,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { MarketIndex } from '@/types';
+import LineChart from './LineChart.vue';
 
 interface Props {
   index: MarketIndex;
@@ -96,6 +99,10 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
 });
+
+const emit = defineEmits<{
+  (e: 'click', index: MarketIndex): void;
+}>();
 
 // Use a computed property to handle potential undefined values
 // eslint-disable-next-line no-useless-assignment
@@ -132,11 +139,29 @@ function triggerChangeAnimation() {
   setTimeout(() => changeAnimating.value = false, 500);
 }
 
+function handleCardClick() {
+  if (!props.loading) {
+    emit('click', props.index);
+  }
+}
+
 // eslint-disable-next-line no-useless-assignment
 const changeClass = computed(() => {
   if (props.index.changePercent > 0) return 'rising';
   if (props.index.changePercent < 0) return 'falling';
   return 'neutral';
+});
+
+const showChart = computed(() => {
+  return props.index.history && props.index.history.length > 0;
+});
+
+const chartData = computed(() => {
+  return props.index.history || [];
+});
+
+const baseline = computed(() => {
+  return props.index.prevClose;
 });
 
 // eslint-disable-next-line no-useless-assignment
@@ -403,8 +428,10 @@ function formatToUserTimezone(isoTimestamp: string | undefined): string {
 
 .card-body {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-end;
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
 }
 
@@ -487,6 +514,12 @@ function formatToUserTimezone(isoTimestamp: string | undefined): string {
   &.value-updated {
     animation: change-pulse 0.5s ease-out;
   }
+}
+
+.index-chart {
+  width: 100%;
+  min-height: 60px;
+  margin-top: var(--spacing-sm);
 }
 
 @keyframes change-pulse {

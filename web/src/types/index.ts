@@ -174,11 +174,32 @@ export interface MarketIndex {
   tradingStatus?: string;   // 交易状态: 'open', 'closed', 'pre'
   marketTime?: string;     // 市场当前时间（用于判断状态）
   isDelayed?: boolean;     // 是否为延时数据
+  history?: IndexHistory[];  // 历史K线数据（用于图表展示）
 }
 
 export interface IndexListResponse {
   indices: MarketIndex[];
   timestamp: string;
+}
+
+// Index History Types
+export interface IndexHistory {
+  time: string;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  close: number | null;
+  volume: number | null;
+}
+
+export interface IndexHistoryResponse {
+  index: string;
+  symbol: string;
+  name: string;
+  period: string;
+  data: IndexHistory[];
+  count: number;
+  currency: string;
 }
 
 // Sector Types

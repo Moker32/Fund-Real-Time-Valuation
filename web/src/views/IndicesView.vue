@@ -41,8 +41,56 @@
         v-for="index in indexStore.sortedIndices"
         :key="index.index"
         :index="index"
+        @click="openIndexDetail"
       />
     </div>
+
+    <!-- Index Detail Modal -->
+    <Teleport to="body">
+      <div v-if="showDetailModal" class="modal-overlay" @click.self="closeDetailModal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>{{ selectedIndex?.name }}</h3>
+            <button class="close-btn" @click="closeDetailModal">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          
+          <!-- Period Selector -->
+          <div class="period-selector">
+            <button
+              v-for="p in periods"
+              :key="p.value"
+              :class="{ active: selectedPeriod === p.value }"
+              @click="selectPeriod(p.value)"
+            >
+              {{ p.label }}
+            </button>
+          </div>
+          
+          <!-- Chart -->
+          <div class="modal-chart">
+            <div v-if="historyLoading" class="chart-loading">
+              加载中...
+            </div>
+            <div v-else-if="historyError" class="chart-error">
+              {{ historyError }}
+            </div>
+            <LineChart
+              v-else-if="historyData.length > 0"
+              :data="chartData"
+              :height="250"
+              :trend="chartTrend"
+            />
+            <div v-else class="chart-empty">
+              暂无数据
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Quick Stats -->
     <div v-if="indexStore.indices.length > 0" class="quick-stats">
@@ -83,12 +131,86 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useIndexStore } from '@/stores/indexStore';
+import { indexApi } from '@/api';
 import IndexCard from '@/components/IndexCard.vue';
-import type { MarketIndex } from '@/types';
+import LineChart from '@/components/LineChart.vue';
+import type { MarketIndex, IndexHistory } from '@/types';
 
 const indexStore = useIndexStore();
+
+// Modal state
+const showDetailModal = ref(false);
+const selectedIndex = ref<MarketIndex | null>(null);
+const selectedPeriod = ref('1y');
+const historyData = ref<IndexHistory[]>([]);
+const historyLoading = ref(false);
+const historyError = ref<string | null>(null);
+const historyPreloadLoading = ref(false);
+
+// Period options
+const periods = [
+  { label: '1周', value: '1w' },
+  { label: '1月', value: '1mo' },
+  { label: '3月', value: '3mo' },
+  { label: '半年', value: '6mo' },
+  { label: '1年', value: '1y' },
+  { label: '2年', value: '2y' },
+];
+
+// Transform history data for FundChart
+const chartData = computed(() => {
+  return historyData.value.map(item => ({
+    time: item.time,
+    close: item.close ?? item.price ?? 0,
+  }));
+});
+
+// Determine trend based on first and last data points
+const chartTrend = computed((): 'rising' | 'falling' | 'neutral' => {
+  if (historyData.value.length < 2) return 'neutral';
+  const first = historyData.value[0].close;
+  const last = historyData.value[historyData.value.length - 1].close;
+  if (last > first) return 'rising';
+  if (last < first) return 'falling';
+  return 'neutral';
+});
+
+async function openIndexDetail(index: MarketIndex) {
+  selectedIndex.value = index;
+  showDetailModal.value = true;
+  await fetchHistory();
+}
+
+function closeDetailModal() {
+  showDetailModal.value = false;
+  selectedIndex.value = null;
+  historyData.value = [];
+  historyError.value = null;
+}
+
+async function selectPeriod(period: string) {
+  selectedPeriod.value = period;
+  await fetchHistory();
+}
+
+async function fetchHistory() {
+  if (!selectedIndex.value) return;
+  
+  historyLoading.value = true;
+  historyError.value = null;
+  
+  try {
+    const response = await indexApi.getIndexHistory(selectedIndex.value.index, selectedPeriod.value);
+    historyData.value = response.data;
+  } catch (error) {
+    historyError.value = error instanceof Error ? error.message : '加载失败';
+    historyData.value = [];
+  } finally {
+    historyLoading.value = false;
+  }
+}
 
 // Empty index for loading skeleton
 // eslint-disable-next-line no-useless-assignment
@@ -111,11 +233,47 @@ const emptyIndex: MarketIndex = {
   marketTime: '',
 } as MarketIndex;
 
-onMounted(() => {
-  // 只在数据为空时强制加载
-  if (indexStore.indices.length === 0) {
-    indexStore.fetchIndices({ force: true });
+async function preloadIndexHistory() {
+  if (indexStore.indices.length === 0 || historyPreloadLoading.value) return;
+  
+  historyPreloadLoading.value = true;
+  
+  try {
+    const historyPromises = indexStore.indices.slice(0, 12).map(async (idx) => {
+      try {
+        const response = await indexApi.getIndexHistory(idx.index, '1mo');
+        return { indexType: idx.index, history: response.data || [] };
+      } catch {
+        return { indexType: idx.index, history: [] };
+      }
+    });
+    
+    const results = await Promise.all(historyPromises);
+    
+    // 替换整个数组以确保响应式更新
+    const updatedIndices = indexStore.indices.map(idx => {
+      const result = results.find(r => r.indexType === idx.index);
+      if (result) {
+        return { ...idx, history: result.history };
+      }
+      return idx;
+    });
+    
+    indexStore.indices.splice(0, indexStore.indices.length, ...updatedIndices);
+  } catch (error) {
+    console.error('[IndicesView] preloadIndexHistory error:', error);
+  } finally {
+    historyPreloadLoading.value = false;
   }
+}
+
+onMounted(async () => {
+  // 先获取指数列表
+  if (indexStore.indices.length === 0) {
+    await indexStore.fetchIndices({ force: true });
+  }
+  // 再预加载历史数据（无论是否已有数据）
+  await preloadIndexHistory();
 });
 </script>
 
@@ -273,5 +431,125 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: var(--spacing-md);
   width: 100%;
+}
+
+// Modal Styles
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn var(--transition-fast);
+}
+
+.modal-content {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: auto;
+  animation: slideUp var(--transition-normal);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-divider);
+
+  h3 {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+  }
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  padding: var(--spacing-xs);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+
+  &:hover {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+  }
+
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.period-selector {
+  display: flex;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-divider);
+
+  button {
+    padding: var(--spacing-xs) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+
+    &:hover {
+      border-color: var(--color-border-light);
+      color: var(--color-text-primary);
+    }
+
+    &.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: white;
+    }
+  }
+}
+
+.modal-chart {
+  padding: var(--spacing-lg);
+  min-height: 250px;
+}
+
+.chart-loading,
+.chart-error,
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 250px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+.chart-error {
+  color: var(--color-fall);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 </style>

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { indexApi } from '@/api';
-import type { MarketIndex } from '@/types';
+import type { MarketIndex, IndexHistory } from '@/types';
 import { ApiError } from '@/api';
 import { formatTime } from '@/utils/time';
 
@@ -151,6 +151,16 @@ export const useIndexStore = defineStore('indices', () => {
     loading.value = false;
   }
 
+  async function fetchIndexHistory(indexType: string, period: string = '1mo'): Promise<IndexHistory[]> {
+    try {
+      const response = await indexApi.getIndexHistory(indexType, period);
+      return response.data || [];
+    } catch (err) {
+      console.error(`[IndexStore] fetchIndexHistory error for ${indexType}:`, err);
+      return [];
+    }
+  }
+
   function clearError() {
     error.value = null;
   }
@@ -177,6 +187,7 @@ export const useIndexStore = defineStore('indices', () => {
     sortedIndices,
     // Actions
     fetchIndices,
+    fetchIndexHistory,
     clearError,
     retry,
   };
