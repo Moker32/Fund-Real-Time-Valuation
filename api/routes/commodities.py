@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing_extensions import TypedDict
 
-from src.config.commodities_config import CommoditiesConfig
+from src.config.commodities_config import CommoditiesConfig, WatchedCommodityDict
 from src.datasources.base import DataSourceType
 from src.datasources.commodity_source import (
     YFinanceCommoditySource,
@@ -560,7 +560,9 @@ class WatchedCommodityResponse(TypedDict):
     addedAt: str
 
 
-def _convert_to_watched_commodity_response(item: dict) -> WatchedCommodityResponse:
+def _convert_to_watched_commodity_response(
+    item: dict[str, Any] | WatchedCommodityDict,
+) -> WatchedCommodityResponse:
     """将 snake_case 字段名转换为 camelCase 响应格式
 
     Args:

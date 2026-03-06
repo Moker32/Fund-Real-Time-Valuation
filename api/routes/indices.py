@@ -5,7 +5,7 @@
 
 from datetime import datetime, time
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytz
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +14,9 @@ from typing_extensions import TypedDict
 from src.datasources.base import DataSourceType
 from src.datasources.index_source import INDEX_NAMES, INDEX_REGIONS, MARKET_HOURS
 from src.datasources.manager import DataSourceManager
+
+if TYPE_CHECKING:
+    from src.datasources.index_source import HybridIndexSource
 
 from ..dependencies import DataSourceDependency
 from ..models import ErrorResponse
@@ -410,6 +413,7 @@ def _get_index_history_source() -> "HybridIndexSource":
     """获取指数历史数据源实例（缓存）"""
     global _index_history_source
     if _index_history_source is None:
+        # 延迟导入避免循环依赖
         from src.datasources.index_source import HybridIndexSource
 
         _index_history_source = HybridIndexSource()
