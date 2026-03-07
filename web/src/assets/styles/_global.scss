@@ -169,3 +169,99 @@ select {
 .bg-secondary {
   background-color: var(--color-bg-secondary);
 }
+
+// Element Plus 下拉框样式覆盖
+// 这些样式需要全局生效，因为 popper 是动态创建在 body 下的
+// 使用 !important 和更高优先级选择器覆盖 Element Plus 默认样式
+
+// 使用 ID 选择器提高优先级
+#app ~ div[class*="el-popper"],
+#app ~ div[class*="el-autocomplete__popper"],
+body > div[class*="el-popper"],
+body > div[class*="el-autocomplete__popper"] {
+  background-color: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+  color: #fff !important;
+
+  // 覆盖内联样式
+  &[style*="background"] {
+    background-color: #2a2a2a !important;
+  }
+
+  // 下拉框内容区域
+  .el-autocomplete-suggestion__wrap {
+    background-color: #2a2a2a !important;
+  }
+
+  // 列表
+  .el-autocomplete-suggestion__list {
+    background-color: #2a2a2a !important;
+
+    li {
+      color: #fff !important;
+      background-color: #2a2a2a !important;
+
+      &:hover,
+      &.highlighted {
+        background-color: #3a3a3a !important;
+      }
+
+      // 基金项目样式
+      .fund-item {
+        color: #fff !important;
+
+        .fund-name {
+          color: #fff !important;
+        }
+
+        .fund-code {
+          color: #999 !important;
+        }
+
+        .fund-type {
+          color: #666 !important;
+        }
+      }
+    }
+  }
+
+  // 箭头
+  .el-popper__arrow::before {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+  }
+}
+
+// 针对 is-light 类的 popper
+#app ~ div.el-popper.is-light,
+body > div.el-popper.is-light {
+  background-color: #2a2a2a !important;
+  border: 1px solid #3a3a3a !important;
+
+  .el-popper__arrow::before {
+    background-color: #2a2a2a !important;
+    border-color: #3a3a3a !important;
+  }
+}
+
+// 确保所有 el-autocomplete-suggestion 都有深色背景
+.el-autocomplete-suggestion {
+  background-color: #2a2a2a !important;
+
+  .el-autocomplete-suggestion__wrap {
+    background-color: #2a2a2a !important;
+  }
+
+  .el-autocomplete-suggestion__list {
+    background-color: #2a2a2a !important;
+
+    li {
+      color: #fff !important;
+
+      &:hover,
+      &.highlighted {
+        background-color: #3a3a3a !important;
+      }
+    }
+  }
+}

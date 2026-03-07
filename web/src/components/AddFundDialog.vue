@@ -55,10 +55,65 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { fundApi } from '@/api';
 import type { Fund } from '@/types';
 import { ElMessage } from 'element-plus';
+
+// eslint-disable-next-line no-undef
+let popperObserver: MutationObserver | null = null;
+
+function applyDarkThemeToPopper() {
+  const poppers = document.querySelectorAll('.el-popper');
+  poppers.forEach((popper) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const el = popper as any;
+    el.style.backgroundColor = '#2a2a2a';
+    el.style.borderColor = '#3a3a3a';
+    el.style.color = '#fff';
+
+    const wrap = el.querySelector('.el-autocomplete-suggestion__wrap');
+    if (wrap) wrap.style.backgroundColor = '#2a2a2a';
+
+    const list = el.querySelector('.el-autocomplete-suggestion__list');
+    if (list) list.style.backgroundColor = '#2a2a2a';
+
+    const items = el.querySelectorAll('li');
+    items.forEach((item: { style: { color: string; backgroundColor: string } }) => {
+      item.style.color = '#fff';
+      item.style.backgroundColor = '#2a2a2a';
+    });
+  });
+}
+
+function initPopperObserver() {
+  // eslint-disable-next-line no-undef
+  popperObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node instanceof Element && node.classList.contains('el-popper')) {
+          applyDarkThemeToPopper();
+        }
+      });
+    });
+  });
+
+  popperObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+}
+
+onMounted(() => {
+  initPopperObserver();
+});
+
+onUnmounted(() => {
+  if (popperObserver) {
+    popperObserver.disconnect();
+    popperObserver = null;
+  }
+});
 
 interface Props {
   visible: boolean;
@@ -343,11 +398,53 @@ watch(() => props.visible, async (visible) => {
   border: 1px solid #3a3a3a !important;
 }
 
+:deep(.el-autocomplete__popper .el-autocomplete-suggestion__list) {
+  background: #2a2a2a !important;
+}
+
 :deep(.el-autocomplete__popper li) {
-  color: #fff;
+  color: #fff !important;
+  background: #2a2a2a !important;
 }
 
 :deep(.el-autocomplete__popper li:hover) {
-  background: #3a3a3a;
+  background: #3a3a3a !important;
+}
+
+:deep(.el-autocomplete__popper li.highlighted) {
+  background: #3a3a3a !important;
+}
+
+:deep(.el-autocomplete__popper .fund-item) {
+  color: #fff !important;
+}
+
+:deep(.el-autocomplete__popper .fund-item .fund-name) {
+  color: #fff !important;
+}
+
+:deep(.el-autocomplete__popper .fund-item .fund-code) {
+  color: #999 !important;
+}
+
+:deep(.el-autocomplete__popper .fund-item .fund-type) {
+  color: #666 !important;
+}
+
+/* 确保下拉框内的所有文本都可见 */
+:deep(.el-autocomplete-suggestion) {
+  background: #2a2a2a !important;
+}
+
+:deep(.el-autocomplete-suggestion__wrap) {
+  background: #2a2a2a !important;
+}
+
+:deep(.el-autocomplete-suggestion__list li) {
+  color: #fff !important;
+}
+
+:deep(.el-autocomplete-suggestion__list li .fund-name) {
+  color: #fff !important;
 }
 </style>
