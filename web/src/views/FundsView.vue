@@ -58,13 +58,11 @@
       </div>
 
       <div class="funds-grid">
-        <TransitionGroup name="fund-card">
+        <TransitionGroup name="fund-card" tag="div" class="fund-list-container">
           <FundCard
-            v-for="(fund, index) in fundStore.holdingFirstFunds"
+            v-for="fund in fundStore.holdingFirstFunds"
             :key="fund.code"
             :fund="fund"
-            :style="{ animationDelay: `${index * 50}ms` }"
-            class="fund-item"
             @remove="handleRemoveFund"
           />
         </TransitionGroup>
@@ -153,8 +151,34 @@ async function handleRemoveFund(code: string) {
   }
 }
 
-function handleFundAdded() {
-  fundStore.fetchFunds();
+async function handleFundAdded() {
+  await fundStore.fetchFunds();
+  
+  // 为新添加的基金获取分时数据
+  for (const fund of fundStore.funds) {
+    // 跳过无实时估值的基金（如 QDII），不请求分时数据
+    if (fund.hasRealTimeEstimate === false) {
+      continue;
+    }
+    
+    // 如果基金已有分时数据，跳过
+    if (fund.intraday && fund.intraday.length > 0) {
+      continue;
+    }
+    
+    // 尝试获取当天的日内数据
+    const intraday = await fundStore.fetchIntraday(fund.code, true);
+    
+    // 如果当天没有数据，使用基金卡片上显示的更新时间对应的日期
+    if (!intraday || intraday.length === 0) {
+      const updateTime = fund.estimateTime || fund.netValueDate || '';
+      const match = updateTime.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) {
+        const dateStr = `${match[1]}-${match[2]}-${match[3]}`;
+        await fundStore.fetchIntradayByDate(fund.code, dateStr);
+      }
+    }
+  }
 }
 
 onMounted(async () => {
@@ -419,42 +443,48 @@ onUnmounted(() => {
   }
 }
 
-// 基金卡片 stagger 入场动画
-.fund-item {
-  animation: slideInUp 0.4s ease-out both;
-}
-
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+// 基金列表容器样式
+.fund-list-container {
+  display: contents;
 }
 
 // 基金卡片过渡动画（用于添加/删除）
-.fund-card-enter-active,
-.fund-card-leave-active {
-  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+.fund-card-enter-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.fund-card-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute;
+  width: 100%;
+}
+
+// 添加动画：从上方滑入 + 淡入
 .fund-card-enter-from {
   opacity: 0;
-  transform: translateY(-20px) scale(0.95);
+  transform: translateY(-20px);
+}
+
+.fund-card-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+// 删除动画：淡出 + 缩小
+.fund-card-leave-from {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .fund-card-leave-to {
   opacity: 0;
-  transform: translateX(100%) scale(0.9);
+  transform: scale(0.9);
 }
 
-/* 移除 move 动画避免自动刷新时页面抖动 */
-/* .fund-card-move {
-  transition: transform 0.3s ease;
-} */
+// 列表移动动画（用于重新排序）
+.fund-card-move {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
 .error-state,
 .loading-state,
@@ -552,12 +582,9 @@ onUnmounted(() => {
     animation: none;
   }
 
-  .fund-item {
-    animation: none;
-  }
-
   .fund-card-enter-active,
-  .fund-card-leave-active {
+  .fund-card-leave-active,
+  .fund-card-move {
     transition: none;
   }
 }
