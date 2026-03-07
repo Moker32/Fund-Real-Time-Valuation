@@ -829,6 +829,10 @@ async def remove_from_watchlist(
     # 从自选列表中移除
     config_manager.remove_watchlist(code)
 
+    # 如果该基金也在持有列表中，同时从持有列表中移除
+    if fund_list.is_holding(code):
+        config_manager.remove_holding(code)
+
     # 移除成功后，清理相关缓存
     asyncio.create_task(_cleanup_removed_fund(code))
 
