@@ -3,6 +3,7 @@
 实现混合数据源策略：
 - A股/港股/美股: 腾讯财经 (实时)
 - 日经/欧洲: yfinance (有延迟)
+- AKShare 实时接口: 带优化配置的备用数据源
 """
 
 import asyncio
@@ -17,6 +18,11 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+from .akshare_config import (
+    DEFAULT_RATE_LIMIT,
+    MAX_RETRIES,
+    call_akshare_with_retry,
+)
 from .base import DataSource, DataSourceResult, DataSourceType
 
 # 腾讯财经代码映射 (A股、港股、美股)
@@ -30,7 +36,7 @@ TENCENT_CODES = {
     "csi500": "sh000905",
     "csi1000": "sh000852",
     "hs300": "sh000300",
-    "csiall": "sh000001",  # 暂用上证指数
+    "csiall": "sh000985",  # 中证全指
     # 港股 (hk 前缀)
     "hang_seng": "hkHSI",
     "hang_seng_tech": "hkHSTECH",  # 恒生科技
@@ -51,11 +57,28 @@ YAHOO_TICKERS = {
     # 港股
     "hang_seng": "^HSI",
     "hang_seng_tech": "HSTECH.HK",
+    # 美股 (作为腾讯财经的回退)
+    "dow_jones": "^DJI",
+    "nasdaq": "^IXIC",
+    "sp500": "^GSPC",
 }
 
 # 合并所有 ticker 映射
 INDEX_TICKERS = {**TENCENT_CODES, **YAHOO_TICKERS}
 
+
+# AKShare A股指数代码映射 (用于历史数据)
+AKSHARE_INDEX_CODES = {
+    "shanghai": "sh000001",      # 上证指数
+    "shenzhen": "sz399001",      # 深证成指
+    "shanghai50": "sh000016",    # 上证50
+    "chi_next": "sz399006",      # 创业板指
+    "star50": "sh000688",        # 科创50
+    "csi500": "sh000905",        # 中证500
+    "csi1000": "sh000852",       # 中证1000
+    "hs300": "sh000300",         # 沪深300
+    "csiall": "sh000985",        # 中证全指
+}
 
 # 判断是否使用腾讯财经
 def uses_tencent(index_type: str) -> bool:
@@ -634,17 +657,388 @@ class TencentIndexSource(IndexDataSource):
         return status
 
 
+class AKShareIndexSource(IndexDataSource):
+    """AKShare A股指数数据源（支持实时和历史数据）
+
+    使用优化配置：
+    - 浏览器请求头模拟
+    - 请求限流和重试机制
+    - 支持实时数据接口
+    """
+
+    # 并发控制：最多 3 个并发请求
+    _semaphore: asyncio.Semaphore | None = None
+
+    # AKShare 调用超时时间（秒）
+    AKSHARE_TIMEOUT = 30.0
+
+    # 限流配置：每秒请求数
+    RATE_LIMIT_CPS = DEFAULT_RATE_LIMIT
+
+    # 重试次数
+    MAX_RETRIES = MAX_RETRIES
+
+    def __init__(
+        self,
+        timeout: float = 30.0,
+        rate_limit_cps: float = DEFAULT_RATE_LIMIT,
+        max_retries: int = MAX_RETRIES,
+    ):
+        super().__init__(name="akshare_index", timeout=timeout)
+        self.rate_limit_cps = rate_limit_cps
+        self.max_retries = max_retries
+
+    @classmethod
+    def _get_semaphore(cls) -> asyncio.Semaphore:
+        """获取并发控制信号量（懒加载）"""
+        if cls._semaphore is None:
+            cls._semaphore = asyncio.Semaphore(3)
+        return cls._semaphore
+
+    async def fetch(self, index_type: str) -> DataSourceResult:
+        """
+        获取单个A股指数实时数据（使用优化配置）
+
+        使用 stock_zh_index_spot_em 接口获取A股指数实时行情
+
+        Args:
+            index_type: 指数类型 (如 shanghai, shenzhen, shanghai50 等)
+
+        Returns:
+            DataSourceResult: 指数数据结果
+        """
+        # 检查是否支持该指数
+        if index_type not in AKSHARE_INDEX_CODES:
+            return DataSourceResult(
+                success=False,
+                error=f"AKShare不支持的指数类型: {index_type}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+
+        symbol = AKSHARE_INDEX_CODES[index_type]
+
+        try:
+            import akshare as ak
+
+            async with self._get_semaphore():
+                # 使用带限流和重试的调用方式
+                df = await call_akshare_with_retry(
+                    ak.stock_zh_index_spot_em,
+                    max_retries=self.max_retries,
+                    rate_limit_cps=self.rate_limit_cps,
+                )
+
+                if df is None or df.empty:
+                    return DataSourceResult(
+                        success=False,
+                        error="无法获取实时指数数据",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"index_type": index_type},
+                    )
+
+                # 查找对应指数的数据
+                # stock_zh_index_spot_em 返回的代码格式为 "sh000001"
+                index_row = df[df["代码"] == symbol]
+
+                if index_row.empty:
+                    return DataSourceResult(
+                        success=False,
+                        error=f"未找到指数数据: {symbol}",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"index_type": index_type, "symbol": symbol},
+                    )
+
+                # 提取数据（取第一行）
+                row = index_row.iloc[0]
+
+                # 解析数据
+                price = float(row.get("最新价", 0)) if pd.notna(row.get("最新价")) else 0.0
+                open_price = float(row.get("开盘", 0)) if pd.notna(row.get("开盘")) else 0.0
+                prev_close = float(row.get("昨收", 0)) if pd.notna(row.get("昨收")) else 0.0
+                high = float(row.get("最高", 0)) if pd.notna(row.get("最高")) else 0.0
+                low = float(row.get("最低", 0)) if pd.notna(row.get("最低")) else 0.0
+                change = float(row.get("涨跌额", 0)) if pd.notna(row.get("涨跌额")) else 0.0
+                change_percent = float(row.get("涨跌幅", 0)) if pd.notna(row.get("涨跌幅")) else 0.0
+
+                # 获取时间戳
+                time_str = row.get("时间", "")
+                if not time_str or pd.isna(time_str):
+                    time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                data = {
+                    "index": index_type,
+                    "symbol": symbol,
+                    "name": INDEX_NAMES.get(index_type, index_type),
+                    "price": price,
+                    "change": change,
+                    "change_percent": change_percent,
+                    "currency": "CNY",
+                    "exchange": "SSE" if symbol.startswith("sh") else "SZSE",
+                    "time": time_str,
+                    "data_timestamp": datetime.now().isoformat(),
+                    "high": high,
+                    "low": low,
+                    "open": open_price,
+                    "prev_close": prev_close,
+                    "region": INDEX_REGIONS.get(index_type, "china"),
+                    "market_hours": MARKET_HOURS.get(index_type, {}),
+                }
+
+                self._record_success()
+                logger.info(f"[AKShareIndexSource] 成功获取 {index_type} 实时数据")
+
+                return DataSourceResult(
+                    success=True,
+                    data=data,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type, "symbol": symbol},
+                )
+
+        except asyncio.TimeoutError:
+            logger.warning(f"[AKShareIndexSource] 获取 {index_type} 实时数据超时")
+            return DataSourceResult(
+                success=False,
+                error=f"获取实时数据超时 ({self.AKSHARE_TIMEOUT}s)",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 未安装，请运行: pip install akshare",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type, "error_type": "ImportError"},
+            )
+        except Exception as e:
+            logger.error(f"[AKShareIndexSource] 获取 {index_type} 实时数据失败: {e}")
+            return self._handle_error(e, self.name)
+
+    async def fetch_hk_spot(self) -> DataSourceResult:
+        """
+        获取港股实时行情（使用优化配置）
+
+        使用 stock_hk_spot_em 接口获取港股实时行情
+
+        Returns:
+            DataSourceResult: 港股实时数据结果
+        """
+        try:
+            import akshare as ak
+
+            async with self._get_semaphore():
+                df = await call_akshare_with_retry(
+                    ak.stock_hk_spot_em,
+                    max_retries=self.max_retries,
+                    rate_limit_cps=self.rate_limit_cps,
+                )
+
+                if df is None or df.empty:
+                    return DataSourceResult(
+                        success=False,
+                        error="无法获取港股实时数据",
+                        timestamp=time.time(),
+                        source=self.name,
+                    )
+
+                self._record_success()
+
+                return DataSourceResult(
+                    success=True,
+                    data={
+                        "count": len(df),
+                        "columns": list(df.columns),
+                        "sample": df.head(5).to_dict("records"),
+                    },
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"source": "stock_hk_spot_em"},
+                )
+
+        except Exception as e:
+            logger.error(f"[AKShareIndexSource] 获取港股实时数据失败: {e}")
+            return self._handle_error(e, self.name)
+
+    async def fetch_us_spot(self) -> DataSourceResult:
+        """
+        获取美股实时行情（使用优化配置）
+
+        使用 stock_us_spot_em 接口获取美股实时行情
+
+        Returns:
+            DataSourceResult: 美股实时数据结果
+        """
+        try:
+            import akshare as ak
+
+            async with self._get_semaphore():
+                df = await call_akshare_with_retry(
+                    ak.stock_us_spot_em,
+                    max_retries=self.max_retries,
+                    rate_limit_cps=self.rate_limit_cps,
+                )
+
+                if df is None or df.empty:
+                    return DataSourceResult(
+                        success=False,
+                        error="无法获取美股实时数据",
+                        timestamp=time.time(),
+                        source=self.name,
+                    )
+
+                self._record_success()
+
+                return DataSourceResult(
+                    success=True,
+                    data={
+                        "count": len(df),
+                        "columns": list(df.columns),
+                        "sample": df.head(5).to_dict("records"),
+                    },
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"source": "stock_us_spot_em"},
+                )
+
+        except Exception as e:
+            logger.error(f"[AKShareIndexSource] 获取美股实时数据失败: {e}")
+            return self._handle_error(e, self.name)
+
+    async def fetch_history(self, index_type: str, period: str = "1y") -> DataSourceResult:
+        """获取A股指数历史数据（使用优化配置）
+
+        Args:
+            index_type: 指数类型
+            period: 时间周期 (1w, 1mo, 3mo, 6mo, 1y, 2y, 5y, max)
+
+        Returns:
+            DataSourceResult: 包含历史数据的结果
+        """
+        try:
+            symbol = AKSHARE_INDEX_CODES.get(index_type)
+            if not symbol:
+                return DataSourceResult(
+                    success=False,
+                    error=f"AKShare不支持的指数类型: {index_type}",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            import akshare as ak
+
+            async with self._get_semaphore():
+                try:
+                    # 使用带限流和重试的调用方式获取历史数据
+                    df = await call_akshare_with_retry(
+                        ak.stock_zh_index_daily,
+                        symbol=symbol,
+                        max_retries=self.max_retries,
+                        rate_limit_cps=self.rate_limit_cps,
+                    )
+
+                    if df is None or df.empty:
+                        return DataSourceResult(
+                            success=False,
+                            error="无法获取历史数据",
+                            timestamp=time.time(),
+                            source=self.name,
+                            metadata={"index_type": index_type, "period": period},
+                        )
+
+                    # 根据period过滤数据
+                    period_days = {
+                        "1w": 7,
+                        "1mo": 30,
+                        "3mo": 90,
+                        "6mo": 180,
+                        "1y": 365,
+                        "2y": 730,
+                        "5y": 1825,
+                        "max": None,
+                    }
+                    
+                    days = period_days.get(period, 365)
+                    if days:
+                        df = df.tail(days)
+
+                    # 转换数据格式
+                    data = []
+                    for _, row in df.iterrows():
+                        data.append({
+                            "time": str(row["date"]) if "date" in row else str(row.name),
+                            "open": float(row["open"]) if pd.notna(row.get("open")) else None,
+                            "high": float(row["high"]) if pd.notna(row.get("high")) else None,
+                            "low": float(row["low"]) if pd.notna(row.get("low")) else None,
+                            "close": float(row["close"]) if pd.notna(row.get("close")) else None,
+                            "volume": int(row["volume"]) if pd.notna(row.get("volume")) else None,
+                        })
+
+                    result_data = {
+                        "index": index_type,
+                        "symbol": symbol,
+                        "name": INDEX_NAMES.get(index_type, index_type),
+                        "period": period,
+                        "data": data,
+                        "count": len(data),
+                        "currency": "CNY",
+                    }
+
+                    self._record_success()
+                    return DataSourceResult(
+                        success=True,
+                        data=result_data,
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"index_type": index_type, "period": period},
+                    )
+
+                except asyncio.TimeoutError:
+                    return DataSourceResult(
+                        success=False,
+                        error=f"获取历史数据超时 ({self.AKSHARE_TIMEOUT}s)",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"index_type": index_type, "period": period},
+                    )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 未安装，请运行: pip install akshare",
+                timestamp=time.time(),
+                source=self.name,
+            )
+        except Exception as e:
+            logger.error(f"[AKShare Index] 获取 {index_type} 历史数据失败: {e}")
+            return self._handle_error(e, self.name)
+
+    def get_status(self) -> dict[str, Any]:
+        """获取数据源状态"""
+        status = super().get_status()
+        status["supported_indices"] = list(AKSHARE_INDEX_CODES.keys())
+        return status
+
+
 class HybridIndexSource(IndexDataSource):
     """混合指数数据源
     根据指数类型自动选择最佳数据源:
     - A股/港股/美股 -> 腾讯财经 (实时)
     - 日经/欧洲 -> yfinance (有延迟)
+    - A股历史数据 -> AKShare
     """
 
     def __init__(self, timeout: float = 10.0):
         super().__init__(name="hybrid_index", timeout=timeout)
         self._tencent = TencentIndexSource(timeout=10.0)
         self._yahoo = YahooIndexSource(timeout=10.0)
+        self._akshare = AKShareIndexSource(timeout=15.0)
 
     async def fetch(self, index_type: str) -> DataSourceResult:
         """获取指数数据，自动选择数据源"""
@@ -658,6 +1052,7 @@ class HybridIndexSource(IndexDataSource):
         """关闭数据源"""
         await self._tencent.close()
         await self._yahoo.close()
+        # AKShare数据源没有需要关闭的资源
 
     async def health_check(self) -> bool:
         """
@@ -678,22 +1073,654 @@ class HybridIndexSource(IndexDataSource):
         status = super().get_status()
         status["tencent_status"] = self._tencent.get_status()
         status["yahoo_status"] = self._yahoo.get_status()
+        status["akshare_status"] = self._akshare.get_status()
         return status
 
     async def fetch_history(self, index_type: str, period: str = "1y") -> DataSourceResult:
         """获取指数历史数据，根据指数类型选择数据源
 
+        - A股指数 -> AKShare
         - 日经/欧洲/港股 -> Yahoo Finance
-        - A股 -> 不支持历史数据（需要使用其他数据源）
         """
-        # 检查是否支持历史数据
-        if index_type not in YAHOO_TICKERS:
+        # A股指数使用AKShare获取历史数据
+        if index_type in AKSHARE_INDEX_CODES:
+            return await self._akshare.fetch_history(index_type, period)
+        
+        # 其他指数使用Yahoo Finance
+        if index_type in YAHOO_TICKERS:
+            return await self._yahoo.fetch_history(index_type, period)
+        
+        # 不支持的指数
+        return DataSourceResult(
+            success=False,
+            error=f"指数 {INDEX_NAMES.get(index_type, index_type)} 暂不支持历史数据查询",
+            timestamp=time.time(),
+            source=self.name,
+            metadata={"index_type": index_type, "period": period},
+        )
+
+    async def fetch_intraday(self, index_type: str) -> DataSourceResult:
+        """获取指数日内分时数据
+
+        根据指数类型自动选择数据源:
+        - A股/港股 -> 腾讯财经 (实时)
+        - 美股/日经/欧洲 -> yfinance (有延迟)
+
+        Args:
+            index_type: 指数类型
+
+        Returns:
+            DataSourceResult: 包含日内分时数据的结果
+        """
+        try:
+            # 验证指数类型
+            if index_type not in INDEX_NAMES:
+                return DataSourceResult(
+                    success=False,
+                    error=f"不支持的指数类型: {index_type}",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            # 根据指数类型选择数据源
+            # A股和港股使用腾讯财经，美股/日经/欧洲使用yfinance
+            if index_type in A_SHARE_INDICES or index_type in HK_INDICES:
+                result = await self._fetch_tencent_intraday(index_type)
+                # 如果腾讯财经失败，尝试使用yfinance
+                if not result.success and index_type in YAHOO_TICKERS:
+                    logger.warning(f"[HybridIndexSource] 腾讯财经获取 {index_type} 失败，回退到yfinance")
+                    return await self._fetch_yahoo_intraday(index_type)
+                return result
+            else:
+                return await self._fetch_yahoo_intraday(index_type)
+
+        except Exception as e:
+            logger.error(f"[HybridIndexSource] 获取 {index_type} 日内分时数据失败: {e}")
             return DataSourceResult(
                 success=False,
-                error=f"指数 {INDEX_NAMES.get(index_type, index_type)} 暂不支持历史数据查询（仅支持: nikkei225, dax, ftse, cac40, hang_seng, hang_seng_tech）",
+                error=str(e),
                 timestamp=time.time(),
                 source=self.name,
-                metadata={"index_type": index_type, "period": period},
+                metadata={"index_type": index_type},
             )
 
-        return await self._yahoo.fetch_history(index_type, period)
+    async def _fetch_tencent_intraday(self, index_type: str) -> DataSourceResult:
+        """从腾讯财经获取日内分时数据
+
+        使用腾讯财经的分钟线接口获取A股/港股/美股的分钟级数据
+        对于A股指数，优先使用akshare获取真实分钟级数据
+        """
+        tencent_code = TENCENT_CODES.get(index_type)
+        if not tencent_code:
+            return DataSourceResult(
+                success=False,
+                error=f"腾讯财经不支持的指数类型: {index_type}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+
+        # 对于A股指数，优先使用akshare获取真实分钟级数据
+        if tencent_code.startswith(("sh", "sz")):
+            akshare_result = await self._fetch_akshare_intraday(index_type)
+            if akshare_result.success:
+                return akshare_result
+            # 如果akshare失败，回退到腾讯财经日线接口
+            logger.warning(f"[HybridIndexSource] akshare分钟数据获取失败，回退到腾讯日线接口: {index_type}")
+        
+        # 港股使用腾讯财经分钟线接口
+        if tencent_code.startswith("hk"):
+            minute_result = await self._fetch_tencent_minute_intraday(index_type, tencent_code)
+            if minute_result.success:
+                return minute_result
+            # 如果分钟线失败，回退到日线接口
+            logger.warning(f"[HybridIndexSource] 腾讯分钟线接口失败，回退到日线接口: {index_type}")
+        
+        # 使用日线接口（适用于美股或分钟线失败的情况）
+        try:
+            url = (
+                f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+                f"?param={tencent_code},day,,,1,qfq"
+            )
+
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                data = response.json()
+
+            # 解析数据
+            data_section = data.get("data", {})
+            
+            if isinstance(data_section, list):
+                return DataSourceResult(
+                    success=False,
+                    error="数据格式错误",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+            
+            stock_data = data_section.get(tencent_code, {})
+            if isinstance(stock_data, list):
+                return DataSourceResult(
+                    success=False,
+                    error="股票数据格式错误",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+                
+            day_data = stock_data.get("day", []) if isinstance(stock_data, dict) else []
+
+            if not day_data:
+                return DataSourceResult(
+                    success=False,
+                    error="无法获取今日数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            # 获取今天的数据
+            today_data = day_data[-1] if day_data else None
+            if not today_data:
+                return DataSourceResult(
+                    success=False,
+                    error="无法获取今日分时数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            # 解析日线数据
+            # 腾讯财经格式: ["日期", "开盘", "收盘", "最低", "最高", "成交量"]
+            open_price = float(today_data[1]) if len(today_data) > 1 else 0.0
+            close_price = float(today_data[2]) if len(today_data) > 2 else 0.0
+            
+            # 注意：有些情况下腾讯返回的数据中最低和最高可能放反了
+            # 我们取两个值中的较小值作为最低，较大值作为最高
+            raw_low = float(today_data[3]) if len(today_data) > 3 else 0.0
+            raw_high = float(today_data[4]) if len(today_data) > 4 else 0.0
+            
+            low_price = min(raw_low, raw_high)
+            high_price = max(raw_low, raw_high)
+            
+            # 确保高低价格至少有一定差异，否则使用开盘收盘价格
+            if high_price - low_price < 0.01:
+                low_price = min(open_price, close_price) * 0.995
+                high_price = max(open_price, close_price) * 1.005
+
+            # 对于A股指数，如果走到这里说明akshare获取失败
+            # 返回错误而不是生成模拟数据
+            if tencent_code.startswith(("sh", "sz")):
+                return DataSourceResult(
+                    success=False,
+                    error="无法获取A股指数分钟级数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            # 对于其他市场（如美股），返回日线数据点（单个数据点）
+            # 注意：不再生成模拟数据
+            intraday_points = [{
+                "time": "15:00",
+                "price": close_price,
+                "change": 0.0,
+            }]
+
+            result_data = {
+                "index": index_type,
+                "symbol": tencent_code,
+                "name": INDEX_NAMES.get(index_type, index_type),
+                "data": intraday_points,
+                "timestamp": datetime.now().isoformat() + "Z",
+                "open": open_price,
+                "high": high_price,
+                "low": low_price,
+                "close": close_price,
+            }
+
+            return DataSourceResult(
+                success=True,
+                data=result_data,
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type, "source": "tencent"},
+            )
+
+        except httpx.HTTPError as e:
+            logger.warning(f"[HybridIndexSource] 腾讯财经请求失败: {e}")
+            return DataSourceResult(
+                success=False,
+                error=f"请求失败: {e}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+        except Exception as e:
+            logger.error(f"[HybridIndexSource] 解析腾讯财经数据失败: {e}")
+            return DataSourceResult(
+                success=False,
+                error=f"数据解析失败: {e}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+
+    async def _fetch_akshare_intraday(self, index_type: str) -> DataSourceResult:
+        """从akshare获取A股指数分钟级分时数据（使用优化配置）
+
+        使用akshare的stock_zh_a_minute接口获取A股指数的真实分钟级数据。
+        返回约240个数据点（1分钟间隔，4小时交易时间）。
+
+        Args:
+            index_type: 指数类型（如 shanghai, shenzhen 等）
+
+        Returns:
+            DataSourceResult: 包含分钟级分时数据的结果
+        """
+        symbol = AKSHARE_INDEX_CODES.get(index_type)
+        if not symbol:
+            return DataSourceResult(
+                success=False,
+                error=f"akshare不支持的指数类型: {index_type}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+
+        try:
+            import akshare as ak
+
+            # 使用带限流和重试的调用方式获取分钟级数据
+            # period="1" 表示1分钟线，adjust="qfq" 表示前复权
+            df = await call_akshare_with_retry(
+                ak.stock_zh_a_minute,
+                symbol=symbol,
+                period="1",
+                adjust="qfq",
+                max_retries=self._akshare.max_retries if hasattr(self, "_akshare") else MAX_RETRIES,
+                rate_limit_cps=self._akshare.rate_limit_cps if hasattr(self, "_akshare") else DEFAULT_RATE_LIMIT,
+            )
+
+            if df is None or df.empty:
+                return DataSourceResult(
+                    success=False,
+                    error="无法获取分钟级数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            # 只保留最近一个交易日的数据
+            # akshare返回的数据包含多天的分钟数据，我们需要过滤出最近交易日的
+            df["day"] = pd.to_datetime(df["day"])
+            latest_date = df["day"].dt.date.max()
+            df_today = df[df["day"].dt.date == latest_date]
+            
+            if df_today.empty:
+                return DataSourceResult(
+                    success=False,
+                    error="无法获取交易日数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            # 解析分钟数据
+            # akshare返回格式: day, open, high, low, close, volume, amount
+            intraday_points = []
+            open_price = None
+            high_price = float("-inf")
+            low_price = float("inf")
+
+            for _, row in df_today.iterrows():
+                time_str = str(row["day"])
+                # 提取 HH:MM 格式
+                if " " in time_str:
+                    hhmm = time_str.split(" ")[1][:5]  # "2026-03-07 09:30:00" -> "09:30"
+                else:
+                    continue
+
+                price = float(row["close"]) if pd.notna(row.get("close")) else 0.0
+                volume = int(row["volume"]) if pd.notna(row.get("volume")) else 0
+                amount = float(row["amount"]) if pd.notna(row.get("amount")) else 0.0
+
+                # 记录开盘价（第一个数据点）
+                if open_price is None:
+                    open_price = float(row["open"]) if pd.notna(row.get("open")) else price
+
+                # 更新最高最低价
+                high = float(row["high"]) if pd.notna(row.get("high")) else price
+                low = float(row["low"]) if pd.notna(row.get("low")) else price
+                high_price = max(high_price, high)
+                low_price = min(low_price, low)
+
+                # 计算涨跌幅（相对于开盘价）
+                if open_price > 0:
+                    change = ((price - open_price) / open_price * 100)
+                else:
+                    change = 0.0
+
+                intraday_points.append({
+                    "time": hhmm,
+                    "price": round(price, 2),
+                    "change": round(change, 2),
+                    "volume": volume,
+                    "amount": round(amount, 2),
+                })
+
+            if not intraday_points:
+                return DataSourceResult(
+                    success=False,
+                    error="解析分钟数据失败",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            # 获取最终统计数据
+            close_price = float(df["close"].iloc[-1]) if not df.empty else 0.0
+            if high_price == float("-inf"):
+                high_price = close_price
+            if low_price == float("inf"):
+                low_price = close_price
+
+            result_data = {
+                "index": index_type,
+                "symbol": symbol,
+                "name": INDEX_NAMES.get(index_type, index_type),
+                "data": intraday_points,
+                "timestamp": datetime.now().isoformat() + "Z",
+                "open": open_price if open_price else close_price,
+                "high": high_price,
+                "low": low_price,
+                "close": close_price,
+            }
+
+            logger.info(f"[HybridIndexSource] akshare获取 {index_type} 分钟数据成功，共 {len(intraday_points)} 个点")
+
+            return DataSourceResult(
+                success=True,
+                data=result_data,
+                timestamp=time.time(),
+                source=self.name,
+                metadata={
+                    "index_type": index_type,
+                    "source": "akshare_minute",
+                    "count": len(intraday_points)
+                },
+            )
+
+        except asyncio.TimeoutError:
+            logger.warning(f"[HybridIndexSource] akshare获取 {index_type} 分钟数据超时")
+            return DataSourceResult(
+                success=False,
+                error="获取分钟数据超时",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 未安装",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+        except Exception as e:
+            logger.error(f"[HybridIndexSource] akshare获取 {index_type} 分钟数据失败: {e}")
+            return DataSourceResult(
+                success=False,
+                error=f"获取分钟数据失败: {e}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+
+    async def _fetch_tencent_minute_intraday(self, index_type: str, tencent_code: str) -> DataSourceResult:
+        """从腾讯财经获取分钟级分时数据
+
+        使用腾讯财经的分钟线接口。注意：腾讯财经的分钟线接口对指数支持有限，
+        通常只支持个股。对于指数，此方法会返回失败，调用方应回退到日线接口。
+        对于A股指数，应使用 _fetch_akshare_intraday 方法获取真实分钟数据。
+        """
+        try:
+            # 腾讯财经分钟线接口（主要用于个股，指数可能不支持）
+            url = (
+                f"https://ifzq.gtimg.cn/appstock/app/fqkline/get"
+                f"?param={tencent_code},m1,,,240,qfq"
+            )
+
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                data = response.json()
+
+            # 检查接口返回的错误
+            if data.get("code") != 0:
+                error_msg = data.get("msg", "未知错误")
+                logger.debug(f"[HybridIndexSource] 腾讯分钟线接口不支持 {index_type}: {error_msg}")
+                return DataSourceResult(
+                    success=False,
+                    error=f"分钟线接口不支持指数: {error_msg}",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            # 解析分钟数据
+            data_section = data.get("data", {})
+            
+            # 处理数据可能是列表的情况
+            if isinstance(data_section, list):
+                return DataSourceResult(
+                    success=False,
+                    error="无法获取分钟级分时数据（数据格式错误）",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+            
+            stock_data = data_section.get(tencent_code, {})
+            if isinstance(stock_data, list):
+                return DataSourceResult(
+                    success=False,
+                    error="无法获取分钟级分时数据（股票数据格式错误）",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+                
+            minute_data = stock_data.get("m1", []) if isinstance(stock_data, dict) else []
+
+            if not minute_data:
+                return DataSourceResult(
+                    success=False,
+                    error="无法获取分钟级分时数据",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"index_type": index_type},
+                )
+
+            # 解析分钟数据
+            # 格式: ["时间", "开盘", "收盘", "最低", "最高", "成交量"]
+            intraday_points = []
+            prev_price = None
+
+            for item in minute_data:
+                time_str = item[0]  # 格式: "2026-03-06 09:30:00"
+                # 提取 HH:MM
+                time_parts = time_str.split(" ")
+                if len(time_parts) == 2:
+                    hhmm = time_parts[1][:5]  # 取前5个字符 "09:30"
+                else:
+                    continue
+
+                price = float(item[2]) if len(item) > 2 else 0.0  # 使用收盘价
+
+                # 计算涨跌幅（相对于第一个数据点）
+                if prev_price is None:
+                    change = 0.0
+                    prev_price = price
+                else:
+                    change = ((price - prev_price) / prev_price * 100) if prev_price > 0 else 0.0
+
+                intraday_points.append({
+                    "time": hhmm,
+                    "price": price,
+                    "change": round(change, 2),
+                })
+
+            # 获取今日开盘价（第一个数据点的开盘价）
+            open_price = float(minute_data[0][1]) if minute_data else 0.0
+            high_price = max([float(item[4]) for item in minute_data if len(item) > 4], default=0.0)
+            low_price = min([float(item[3]) for item in minute_data if len(item) > 3], default=0.0)
+            close_price = float(minute_data[-1][2]) if minute_data else 0.0
+
+            result_data = {
+                "index": index_type,
+                "symbol": tencent_code,
+                "name": INDEX_NAMES.get(index_type, index_type),
+                "data": intraday_points,
+                "timestamp": datetime.now().isoformat() + "Z",
+                "open": open_price,
+                "high": high_price,
+                "low": low_price,
+                "close": close_price,
+            }
+
+            return DataSourceResult(
+                success=True,
+                data=result_data,
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type, "source": "tencent_minute", "count": len(intraday_points)},
+            )
+
+        except Exception as e:
+            logger.error(f"[HybridIndexSource] 获取腾讯分钟数据失败: {e}")
+            return DataSourceResult(
+                success=False,
+                error=f"获取分钟数据失败: {e}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+
+
+    async def _fetch_yahoo_intraday(self, index_type: str) -> DataSourceResult:
+        """从Yahoo Finance获取日内分时数据
+
+        使用yfinance获取分钟级数据（适用于日经/欧洲指数）
+        """
+        ticker = YAHOO_TICKERS.get(index_type)
+        if not ticker:
+            return DataSourceResult(
+                success=False,
+                error=f"Yahoo Finance不支持的指数类型: {index_type}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+
+        try:
+            import yfinance as yf
+
+            loop = asyncio.get_event_loop()
+
+            async with self._yahoo._get_semaphore():
+                try:
+                    ticker_obj = yf.Ticker(ticker)
+                    # 获取1天的1分钟数据
+                    hist = await asyncio.wait_for(
+                        loop.run_in_executor(None, lambda: ticker_obj.history(period="1d", interval="1m")),
+                        timeout=self._yahoo.YFINANCE_TIMEOUT * 2,
+                    )
+
+                    if hist is None or hist.empty:
+                        return DataSourceResult(
+                            success=False,
+                            error="无法获取日内数据",
+                            timestamp=time.time(),
+                            source=self.name,
+                            metadata={"index_type": index_type},
+                        )
+
+                    # 解析分钟数据
+                    intraday_points = []
+                    prev_price = None
+
+                    for idx, row in hist.iterrows():
+                        # 转换时间为本地时间字符串
+                        time_str = idx.strftime("%H:%M")
+                        price = float(row["Close"]) if pd.notna(row["Close"]) else 0.0
+
+                        # 计算涨跌幅
+                        if prev_price is None:
+                            change = 0.0
+                            prev_price = price
+                        else:
+                            change = ((price - prev_price) / prev_price * 100) if prev_price > 0 else 0.0
+
+                        intraday_points.append({
+                            "time": time_str,
+                            "price": round(price, 2),
+                            "change": round(change, 2),
+                        })
+
+                    # 获取统计数据
+                    open_price = float(hist["Open"].iloc[0]) if not hist.empty else 0.0
+                    high_price = float(hist["High"].max()) if not hist.empty else 0.0
+                    low_price = float(hist["Low"].min()) if not hist.empty else 0.0
+                    close_price = float(hist["Close"].iloc[-1]) if not hist.empty else 0.0
+
+                    result_data = {
+                        "index": index_type,
+                        "symbol": ticker,
+                        "name": INDEX_NAMES.get(index_type, index_type),
+                        "data": intraday_points,
+                        "timestamp": datetime.now().isoformat() + "Z",
+                        "open": open_price,
+                        "high": high_price,
+                        "low": low_price,
+                        "close": close_price,
+                    }
+
+                    return DataSourceResult(
+                        success=True,
+                        data=result_data,
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"index_type": index_type, "source": "yahoo", "count": len(intraday_points)},
+                    )
+
+                except asyncio.TimeoutError:
+                    return DataSourceResult(
+                        success=False,
+                        error=f"获取日内数据超时 ({self._yahoo.YFINANCE_TIMEOUT * 2}s)",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"index_type": index_type},
+                    )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="yfinance 未安装，请运行: pip install yfinance",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )
+        except Exception as e:
+            logger.error(f"[HybridIndexSource] 获取Yahoo日内数据失败: {e}")
+            return DataSourceResult(
+                success=False,
+                error=f"获取数据失败: {e}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"index_type": index_type},
+            )

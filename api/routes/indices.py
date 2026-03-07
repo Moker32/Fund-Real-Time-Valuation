@@ -468,3 +468,72 @@ async def get_index_history(
         raise HTTPException(status_code=400, detail=error_msg)
 
     return result.data
+
+
+# 指数日内分时数据源单例（缓存）
+_index_intraday_source: "HybridIndexSource | None" = None
+
+
+def _get_index_intraday_source() -> "HybridIndexSource":
+    """获取指数日内分时数据源实例（缓存）"""
+    global _index_intraday_source
+    if _index_intraday_source is None:
+        # 延迟导入避免循环依赖
+        from src.datasources.index_source import HybridIndexSource
+
+        _index_intraday_source = HybridIndexSource()
+    return _index_intraday_source
+
+
+@router.get(
+    "/{index_type}/intraday",
+    response_model=dict,
+    summary="获取指数日内分时数据",
+    description="根据指数类型获取日内分时行情数据，支持A股、港股、美股、日经、欧洲等全球主要指数",
+    responses={
+        200: {"description": "成功获取指数日内分时数据"},
+        400: {"model": ErrorResponse, "description": "不支持的指数类型"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_index_intraday(
+    index_type: str,
+) -> dict:
+    """
+    获取指数日内分时数据
+
+    Args:
+        index_type: 指数类型 (shanghai, shenzhen, hang_seng, nikkei225, dow_jones, nasdaq, sp500, dax, ftse, cac40)
+
+    Returns:
+        dict: 包含日内分时数据的字典，格式如下:
+        {
+            "index": "shanghai",
+            "symbol": "sh000001",
+            "name": "上证指数",
+            "data": [
+                {"time": "09:30", "price": 3050.12, "change": 0.0},
+                {"time": "09:31", "price": 3051.23, "change": 0.04},
+                ...
+            ],
+            "timestamp": "2026-03-06T16:30:00Z",
+            "open": 3050.12,
+            "high": 3060.45,
+            "low": 3045.67,
+            "close": 3055.89
+        }
+    """
+    if index_type not in SUPPORTED_INDICES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的指数类型: {index_type}，支持类型: {', '.join(SUPPORTED_INDICES)}"
+        )
+
+    intraday_source = _get_index_intraday_source()
+    result = await intraday_source.fetch_intraday(index_type)
+
+    if not result.success or result.data is None:
+        error_msg = result.error or "获取日内分时数据失败"
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    return result.data
