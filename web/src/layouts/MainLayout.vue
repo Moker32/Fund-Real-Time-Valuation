@@ -356,7 +356,7 @@ onUnmounted(() => {
   background: var(--color-bg-primary);
 }
 
-/* Sidebar - 使用 transform 动画优化性能 */
+/* Sidebar - 使用 width 动画 */
 .sidebar {
   width: var(--sidebar-width);
   background: var(--color-bg-secondary);
@@ -368,14 +368,15 @@ onUnmounted(() => {
   top: 0;
   bottom: 0;
   z-index: 100;
-  /* 使用 transform 替代 width 过渡，避免重排 */
-  transition: transform var(--transition-normal);
-  will-change: transform;
+  /* 使用 width 过渡，确保图标区域始终可见 */
+  transition: width var(--transition-normal);
+  will-change: width;
+  overflow: hidden;
 }
 
-/* 收起状态：向左平移，只显示图标区域 (72px) */
+/* 收起状态：缩小宽度到 72px，只显示图标区域 */
 .sidebar-collapsed .sidebar {
-  transform: translateX(calc(-1 * (var(--sidebar-width) - 72px)));
+  width: 72px;
 }
 
 .sidebar-header {
