@@ -233,35 +233,36 @@ const emptyIndex: MarketIndex = {
   marketTime: '',
 } as MarketIndex;
 
-async function preloadIndexHistory() {
+async function preloadIndexIntraday() {
   if (indexStore.indices.length === 0 || historyPreloadLoading.value) return;
   
   historyPreloadLoading.value = true;
   
   try {
-    const historyPromises = indexStore.indices.slice(0, 12).map(async (idx) => {
+    // 使用 store 中的 fetchIndexIntraday 方法获取日内数据（带缓存）
+    const intradayPromises = indexStore.indices.slice(0, 12).map(async (idx) => {
       try {
-        const response = await indexApi.getIndexHistory(idx.index, '1mo');
-        return { indexType: idx.index, history: response.data || [] };
+        const intraday = await indexStore.fetchIndexIntraday(idx.index);
+        return { indexType: idx.index, intraday: intraday || [] };
       } catch {
-        return { indexType: idx.index, history: [] };
+        return { indexType: idx.index, intraday: [] };
       }
     });
     
-    const results = await Promise.all(historyPromises);
+    const results = await Promise.all(intradayPromises);
     
     // 替换整个数组以确保响应式更新
     const updatedIndices = indexStore.indices.map(idx => {
       const result = results.find(r => r.indexType === idx.index);
       if (result) {
-        return { ...idx, history: result.history };
+        return { ...idx, intraday: result.intraday };
       }
       return idx;
     });
     
     indexStore.indices.splice(0, indexStore.indices.length, ...updatedIndices);
   } catch (error) {
-    console.error('[IndicesView] preloadIndexHistory error:', error);
+    console.error('[IndicesView] preloadIndexIntraday error:', error);
   } finally {
     historyPreloadLoading.value = false;
   }
@@ -272,8 +273,8 @@ onMounted(async () => {
   if (indexStore.indices.length === 0) {
     await indexStore.fetchIndices({ force: true });
   }
-  // 再预加载历史数据（无论是否已有数据）
-  await preloadIndexHistory();
+  // 再预加载日内分时数据（无论是否已有数据）
+  await preloadIndexIntraday();
 });
 </script>
 

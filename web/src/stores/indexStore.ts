@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { indexApi } from '@/api';
-import type { MarketIndex, IndexHistory } from '@/types';
+import type { MarketIndex, IndexHistory, IndexIntraday } from '@/types';
 import { ApiError } from '@/api';
 import { formatTime } from '@/utils/time';
 
@@ -32,6 +32,10 @@ export const useIndexStore = defineStore('indices', () => {
   const lastUpdated = ref<string | null>(null);
   const retryCount = ref(0);
   const maxRetries = 2;
+
+  // 日内数据缓存（避免重复请求）
+  const intradayCache = new Map<string, { data: IndexIntraday[]; timestamp: number }>();
+  const INTRADAY_CACHE_DURATION = 60 * 1000; // 缓存 60 秒
 
   // Region order for sorting (A-shares first)
   const regionOrder: Record<string, number> = {
@@ -161,6 +165,59 @@ export const useIndexStore = defineStore('indices', () => {
     }
   }
 
+  // 获取指数日内分时数据（带缓存）
+  async function fetchIndexIntraday(indexType: string, forceRefresh = false): Promise<IndexIntraday[]> {
+    // 检查缓存
+    const cached = intradayCache.get(indexType);
+    if (!forceRefresh && cached && Date.now() - cached.timestamp < INTRADAY_CACHE_DURATION) {
+      // 更新对应指数的日内数据
+      const index = indices.value.findIndex((i) => i.index === indexType);
+      if (index !== -1) {
+        const currentIndex = indices.value[index];
+        if (currentIndex) {
+          indices.value[index] = { ...currentIndex, intraday: cached.data };
+        }
+      }
+      return cached.data;
+    }
+
+    try {
+      // 调用后端 API 获取完整的日内分时数据
+      const response = await indexApi.getIndexIntraday(indexType);
+
+      if (response.data && response.data.length > 0) {
+        // 转换数据格式为 IndexIntraday
+        const intraday: IndexIntraday[] = response.data.map((item: { time: string; price: number; change?: number }) => ({
+          time: item.time,
+          price: item.price,
+          change: item.change,
+        }));
+
+        // 更新对应指数的分时数据
+        const index = indices.value.findIndex((i) => i.index === indexType);
+        if (index !== -1) {
+          const currentIndex = indices.value[index];
+          if (currentIndex) {
+            indices.value[index] = {
+              ...currentIndex,
+              intraday,
+            };
+          }
+        }
+
+        // 更新缓存
+        intradayCache.set(indexType, { data: intraday, timestamp: Date.now() });
+
+        return intraday;
+      }
+
+      return [];
+    } catch (err) {
+      console.error(`[IndexStore] fetchIndexIntraday error for ${indexType}:`, err);
+      return [];
+    }
+  }
+
   function clearError() {
     error.value = null;
   }
@@ -188,6 +245,7 @@ export const useIndexStore = defineStore('indices', () => {
     // Actions
     fetchIndices,
     fetchIndexHistory,
+    fetchIndexIntraday,
     clearError,
     retry,
   };

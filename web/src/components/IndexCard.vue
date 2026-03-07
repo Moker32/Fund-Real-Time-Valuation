@@ -154,12 +154,19 @@ const changeClass = computed(() => {
   return 'neutral';
 });
 
-const showChart = computed(() => {
-  return props.index.history && props.index.history.length > 0;
+// 图表数据：优先使用日内分时数据，如果没有则使用历史数据
+const chartData = computed(() => {
+  if (props.index.intraday && props.index.intraday.length > 0) {
+    return props.index.intraday;
+  }
+  if (props.index.history && props.index.history.length > 0) {
+    return props.index.history;
+  }
+  return [];
 });
 
-const chartData = computed(() => {
-  return props.index.history || [];
+const showChart = computed(() => {
+  return chartData.value.length > 0;
 });
 
 const baseline = computed(() => {

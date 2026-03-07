@@ -152,6 +152,25 @@ export interface AddWatchedCommodityResponse {
   message: string;
 }
 
+// Index Intraday Types
+export interface IndexIntraday {
+  time: string;       // 时间 (HH:mm 格式)
+  price: number;      // 实时价格
+  change?: number;    // 涨跌幅 (%)
+}
+
+export interface IndexIntradayResponse {
+  index: string;
+  symbol: string;
+  name: string;
+  data: IndexIntraday[];
+  timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
 // Market Index Types
 export interface MarketIndex {
   index: string;
@@ -175,6 +194,7 @@ export interface MarketIndex {
   marketTime?: string;     // 市场当前时间（用于判断状态）
   isDelayed?: boolean;     // 是否为延时数据
   history?: IndexHistory[];  // 历史K线数据（用于图表展示）
+  intraday?: IndexIntraday[];  // 日内分时数据
 }
 
 export interface IndexListResponse {
