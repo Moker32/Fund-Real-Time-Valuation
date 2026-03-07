@@ -69,3 +69,11 @@ web/e2e/playwright-report/
 web/e2e/test-results/
 web/e2e/screenshots/
 web/test-results/
+
+# 脚本输出目录
+scripts/output/
+
+# 调试和测试脚本
+scripts/research_*.py
+scripts/test_*.py
+web/e2e/ui-debug*.ts
