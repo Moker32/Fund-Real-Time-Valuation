@@ -95,21 +95,29 @@ const isIntradayData = (data: FundHistory[] | FundIntraday[]): boolean => {
 };
 
 // 计算日内分时数据的x轴范围
-// x轴始终显示完整市场时间 09:30-15:00，让用户知道当前显示的是部分数据
+// 根据数据自动适应X轴范围，不再固定为A股时间
 const getIntradayXRange = (data: FundHistory[] | FundIntraday[]): { min: number; max: number } | null => {
-  if (!isIntradayData(data)) return null;
+  if (!isIntradayData(data) || data.length === 0) return null;
 
-  // x轴始终显示完整市场时间范围
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const day = now.getDate();
+  // 从数据中提取时间戳
+  const timestamps: number[] = [];
+  for (const item of data) {
+    if (item && item.time) {
+      const ts = parseTimeToTimestamp(item.time);
+      timestamps.push(ts);
+    }
+  }
 
-  // 固定范围：09:30 - 15:00（完整市场时间）
-  const minTs = Math.floor(new Date(year, month, day, 9, 30, 0).getTime() / 1000);
-  const maxTs = Math.floor(new Date(year, month, day, 15, 0, 0).getTime() / 1000);
+  if (timestamps.length === 0) return null;
 
-  return { min: minTs, max: maxTs };
+  // 根据实际数据范围设置X轴，添加少量边距
+  const minTs = Math.min(...timestamps);
+  const maxTs = Math.max(...timestamps);
+  
+  // 添加5分钟的边距
+  const padding = 5 * 60;
+  
+  return { min: minTs - padding, max: maxTs + padding };
 };
 
 // 计算 Y 轴范围，确保始终包含 baseline 值
