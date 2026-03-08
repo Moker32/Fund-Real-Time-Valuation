@@ -10,15 +10,21 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
-import type { FundHistory, FundIntraday } from '@/types';
 
 // 扩展 uPlot 接口以支持自定义属性
 interface uPlotWithBaseline extends uPlot {
   _baselineColor?: string;
 }
 
+// 通用图表数据类型 - 支持 Fund 和 Index 的数据类型
+interface ChartDataItem {
+  time: string;
+  price?: number;
+  close?: number | null;
+}
+
 const props = withDefaults(defineProps<{
-  data: FundHistory[] | FundIntraday[];
+  data: ChartDataItem[];
   height?: number;
   baseline?: number;
   trend?: 'rising' | 'falling' | 'neutral';
@@ -27,7 +33,8 @@ const props = withDefaults(defineProps<{
   trend: 'neutral',
 });
 
-const chartContainer = ref<Element | null>(null);
+// eslint-disable-next-line no-undef
+const chartContainer = ref<HTMLElement | null>(null);
 let uplotInstance: uPlot | null = null;
 
 // 响应式获取趋势颜色 - 当数据变化时自动重新计算
@@ -57,7 +64,7 @@ const getTrendColor = (): string => {
 const parseTimeToTimestamp = (timeStr: string): number => {
   // 格式: "HH:mm" (日内分时数据，如 "14:30")
   const timeOnlyMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
-  if (timeOnlyMatch) {
+  if (timeOnlyMatch && timeOnlyMatch[1] && timeOnlyMatch[2]) {
     const hour = parseInt(timeOnlyMatch[1], 10);
     const minute = parseInt(timeOnlyMatch[2], 10);
     const now = new Date();
@@ -88,15 +95,15 @@ const parseTimeToTimestamp = (timeStr: string): number => {
 
 // 判断是否为日内分时数据 (FundIntraday)
 // FundIntraday 有 price 字段，FundHistory 有 close 字段
-const isIntradayData = (data: FundHistory[] | FundIntraday[]): boolean => {
+const isIntradayData = (data: ChartDataItem[]): boolean => {
   if (!data || data.length === 0) return false;
-  const firstItem = data[0];
+  const firstItem = data[0]!;
   return 'price' in firstItem && !('close' in firstItem);
 };
 
 // 计算日内分时数据的x轴范围
 // 根据数据自动适应X轴范围，不再固定为A股时间
-const getIntradayXRange = (data: FundHistory[] | FundIntraday[]): { min: number; max: number } | null => {
+const getIntradayXRange = (data: ChartDataItem[]): { min: number; max: number } | null => {
   if (!isIntradayData(data) || data.length === 0) return null;
 
   // 从数据中提取时间戳
@@ -121,7 +128,7 @@ const getIntradayXRange = (data: FundHistory[] | FundIntraday[]): { min: number;
 };
 
 // 计算 Y 轴范围，确保始终包含 baseline 值
-const getYScaleRange = (data: [number[], number[]] | null, baseline: number | undefined): { min: number; max: number } | undefined => {
+const getYScaleRange = (data: [number[], (number | null)[]] | null, baseline: number | undefined): { min: number; max: number } | undefined => {
   if (!data || data[0].length === 0) return undefined;
 
   const values = data[1];
@@ -234,7 +241,7 @@ const updateData = () => {
   if (!props.data || props.data.length === 0) return;
 
   // 过滤无效数据
-  const validData = props.data.filter((item): item is { time: string; price: number; close?: number } => {
+  const validData = props.data.filter((item): item is { time: string; price: number; close?: number | null } => {
     if (!item) return false;
     const price = 'close' in item ? item.close : item.price;
     return typeof price === 'number' && typeof item.time === 'string' && item.time.length > 0;
@@ -269,7 +276,7 @@ const updateData = () => {
   });
 
   const sortedTimestamps: number[] = [];
-  const sortedValues: number[] = [];
+  const sortedValues: (number | null)[] = [];
 
   // 获取当前时间和市场结束时间
   const now = new Date();
@@ -286,7 +293,7 @@ const updateData = () => {
 
     // 从时间字符串提取小时
     const hourMatch = item.time.match(/^(\d{1,2}):/);
-    const hour = hourMatch ? parseInt(hourMatch[1], 10) : -1;
+    const hour = hourMatch && hourMatch[1] ? parseInt(hourMatch[1], 10) : -1;
 
     // 如果从上午跳到下午 (hour < 11:59 -> hour >= 13)，插入 null 断点
     if (prevHour >= 0 && prevHour <= 11 && hour >= 13) {
@@ -321,7 +328,7 @@ const updateData = () => {
     sortedValues.push(null);
   }
 
-  const newData: [number[], number[]] = [sortedTimestamps, sortedValues];
+  const newData: [number[], (number | null)[]] = [sortedTimestamps, sortedValues];
 
   try {
     uplotInstance.setData(newData);
@@ -333,7 +340,7 @@ const updateData = () => {
 };
 
 // 更新 Y 轴范围，确保始终包含 baseline
-const updateYScaleRange = (data: [number[], number[]]) => {
+const updateYScaleRange = (data: [number[], (number | null)[]]) => {
   if (!uplotInstance) return;
 
   const range = getYScaleRange(data, props.baseline);
@@ -351,8 +358,9 @@ const updateColor = () => {
 
   const newColor = getTrendColor();
   try {
-    // uPlot setSeries API requires series options
-    uplotInstance.setSeries(1, { stroke: newColor });
+    // uPlot setSeries API - use type assertion for stroke property
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    uplotInstance.setSeries(1, { stroke: newColor } as any);
     // 存储基准线颜色并强制重绘，以更新基准线颜色
     (uplotInstance as uPlotWithBaseline)._baselineColor = newColor;
     uplotInstance.redraw();
@@ -408,7 +416,7 @@ watch(() => props.baseline, () => {
     // 获取当前数据并更新 Y 轴范围
     const data = uplotInstance.data;
     if (data && data[0].length > 0) {
-      updateYScaleRange(data as [number[], number[]]);
+      updateYScaleRange(data as [number[], (number | null)[]]);
     }
     uplotInstance.redraw();
   }

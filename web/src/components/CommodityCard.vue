@@ -107,7 +107,7 @@ const sourceName = computed(() => {
 });
 
 // 缓存各市场交易日结果
-const tradingDayCache = ref<Record<string, boolean>>({});
+const tradingDayCache = ref<Record<string, boolean | null>>({});
 
 // 获取对应市场的交易日状态
 async function fetchTradingDayStatus(market: string) {

@@ -1,6 +1,6 @@
 <template>
   <div class="capital-flow-chart" ref="chartContainer">
-    <div v-if="!data || data.length === 0" class="chart-empty">
+    <div v-if="!chartData || chartData.length === 0" class="chart-empty">
       <span class="chart-empty-text">暂无资金流向数据</span>
     </div>
   </div>
@@ -32,7 +32,8 @@ const props = withDefaults(defineProps<{
   showDetail: false,
 });
 
-const chartContainer = ref<Element | null>(null);
+// eslint-disable-next-line no-undef
+const chartContainer = ref<HTMLElement | null>(null);
 let uplotInstance: uPlot | null = null;
 
 // 准备图表数据
@@ -88,7 +89,7 @@ const initChart = () => {
   const series: uPlot.Series[] = [
     {
       label: '板块',
-      value: (u: uPlot, v: number) => names[v] || '',
+      value: (_u: uPlot, v: number) => names[v] || '',
     },
   ];
 
@@ -148,7 +149,7 @@ const initChart = () => {
         stroke: COLORS.text,
         grid: { show: false },
         ticks: { show: false },
-        values: (u: uPlot, splits: number[]) => {
+        values: (_u: uPlot, splits: number[]) => {
           return splits.map(i => names[Math.floor(i)] || '');
         },
       },
@@ -161,10 +162,9 @@ const initChart = () => {
           width: 1,
         },
         ticks: { show: true, stroke: COLORS.grid },
-        values: (u: uPlot, splits: number[]) => {
+        values: (_u: uPlot, splits: number[]) => {
           return splits.map(v => `${v >= 0 ? '+' : ''}${v.toFixed(1)}亿`);
         },
-        range: () => [-yRange, yRange],
       },
     ],
     scales: {
@@ -186,10 +186,6 @@ const initChart = () => {
     legend: {
       show: true,
       live: true,
-      marker: {
-        width: 12,
-        height: 12,
-      },
     },
   }, [
     Array.from({ length: data.length }, (_, i) => i),

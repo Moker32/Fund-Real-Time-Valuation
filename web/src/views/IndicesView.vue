@@ -136,7 +136,7 @@ import { useIndexStore } from '@/stores/indexStore';
 import { indexApi } from '@/api';
 import IndexCard from '@/components/IndexCard.vue';
 import LineChart from '@/components/LineChart.vue';
-import type { MarketIndex, IndexHistory } from '@/types';
+import type { MarketIndex, IndexHistory, FundHistory } from '@/types';
 
 const indexStore = useIndexStore();
 
@@ -162,10 +162,14 @@ const periods = [
 
 // Transform history data for FundChart
 // eslint-disable-next-line no-useless-assignment
-const chartData = computed(() => {
+const chartData = computed((): FundHistory[] => {
   return historyData.value.map(item => ({
     time: item.time,
-    close: item.close ?? item.price ?? 0,
+    open: item.open ?? 0,
+    high: item.high ?? 0,
+    low: item.low ?? 0,
+    close: item.close ?? 0,
+    volume: item.volume ?? 0,
   }));
 });
 
@@ -173,8 +177,12 @@ const chartData = computed(() => {
 // eslint-disable-next-line no-useless-assignment
 const chartTrend = computed((): 'rising' | 'falling' | 'neutral' => {
   if (historyData.value.length < 2) return 'neutral';
-  const first = historyData.value[0].close;
-  const last = historyData.value[historyData.value.length - 1].close;
+  const firstItem = historyData.value[0];
+  const lastItem = historyData.value[historyData.value.length - 1];
+  if (!firstItem || !lastItem) return 'neutral';
+  const first = firstItem.close;
+  const last = lastItem.close;
+  if (first === null || last === null) return 'neutral';
   if (last > first) return 'rising';
   if (last < first) return 'falling';
   return 'neutral';
