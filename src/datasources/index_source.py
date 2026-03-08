@@ -34,10 +34,11 @@ TENCENT_CODES = {
     # 港股 (hk 前缀)
     "hang_seng": "hkHSI",
     "hang_seng_tech": "hkHSTECH",  # 恒生科技
-    # 美股 (us 前缀)
-    "dow_jones": "^DJI",
-    "nasdaq": "^IXIC",
-    "sp500": "^GSPC",
+    # 美股 (us 前缀，腾讯财经格式)
+    # 注意：腾讯财经支持道琼斯和纳斯达克，但不支持标普500
+    "dow_jones": "usDJI",
+    "nasdaq": "usIXIC",
+    # "sp500": "usGSPC",  # 腾讯财经不支持，使用Yahoo Finance
 }
 
 # Yahoo Finance ticker 映射 (只包含有历史数据的指数)
