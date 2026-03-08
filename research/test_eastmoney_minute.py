@@ -4,7 +4,6 @@
 """
 
 import asyncio
-import json
 from datetime import datetime
 
 import httpx
@@ -55,8 +54,8 @@ async def test_eastmoney_with_headers():
                 if data.get("data") and data["data"].get("klines"):
                     klines = data["data"]["klines"]
                     print(f"  ✅ 成功获取分钟线数据，共 {len(klines)} 条")
-                    print(f"  数据格式: 时间,开盘,收盘,最高,最低,成交量,成交额,振幅,涨跌幅,涨跌额,换手率")
-                    print(f"  最新5条:")
+                    print("  数据格式: 时间,开盘,收盘,最高,最低,成交量,成交额,振幅,涨跌幅,涨跌额,换手率")
+                    print("  最新5条:")
                     for line in klines[-5:]:
                         parts = line.split(",")
                         print(f"    时间:{parts[0]} 开盘:{parts[1]} 收盘:{parts[2]} 最高:{parts[4]} 最低:{parts[3]} 成交量:{parts[5]}")
@@ -90,13 +89,13 @@ async def test_eastmoney_with_headers():
                 if data.get("data") and data["data"].get("klines"):
                     klines = data["data"]["klines"]
                     print(f"  ✅ 成功获取分钟线数据，共 {len(klines)} 条")
-                    print(f"  最新3条:")
+                    print("  最新3条:")
                     for line in klines[-3:]:
                         print(f"    {line}")
                 else:
-                    print(f"  ❌ 数据为空")
+                    print("  ❌ 数据为空")
             else:
-                print(f"  ❌ 请求失败")
+                print("  ❌ 请求失败")
     except Exception as e:
         print(f"  ❌ 错误: {type(e).__name__}: {e}")
 
@@ -123,11 +122,11 @@ async def test_eastmoney_with_headers():
                 if data.get("data") and data["data"].get("klines"):
                     klines = data["data"]["klines"]
                     print(f"  ✅ 成功获取分钟线数据，共 {len(klines)} 条")
-                    print(f"  最新3条:")
+                    print("  最新3条:")
                     for line in klines[-3:]:
                         print(f"    {line}")
                 else:
-                    print(f"  ❌ 数据为空")
+                    print("  ❌ 数据为空")
     except Exception as e:
         print(f"  ❌ 错误: {type(e).__name__}: {e}")
 
@@ -155,7 +154,7 @@ async def test_eastmoney_with_headers():
                     klines = data["data"]["klines"]
                     print(f"  ✅ 成功获取分钟线数据，共 {len(klines)} 条")
                 else:
-                    print(f"  ❌ 数据为空")
+                    print("  ❌ 数据为空")
     except Exception as e:
         print(f"  ❌ 错误: {type(e).__name__}: {e}")
 
@@ -183,7 +182,7 @@ async def test_eastmoney_with_headers():
                     klines = data["data"]["klines"]
                     print(f"  ✅ 成功获取分钟线数据，共 {len(klines)} 条")
                 else:
-                    print(f"  ❌ 数据为空")
+                    print("  ❌ 数据为空")
     except Exception as e:
         print(f"  ❌ 错误: {type(e).__name__}: {e}")
 
@@ -210,11 +209,11 @@ async def test_eastmoney_with_headers():
                 if data.get("data") and data["data"].get("klines"):
                     klines = data["data"]["klines"]
                     print(f"  ✅ 成功获取5分钟线数据，共 {len(klines)} 条")
-                    print(f"  最新3条:")
+                    print("  最新3条:")
                     for line in klines[-3:]:
                         print(f"    {line}")
                 else:
-                    print(f"  ❌ 数据为空")
+                    print("  ❌ 数据为空")
     except Exception as e:
         print(f"  ❌ 错误: {type(e).__name__}: {e}")
 

@@ -3,7 +3,7 @@
  * 运行: pnpm exec playwright test screenshot-tests/take-screenshots.spec.ts --config=e2e/playwright.screenshot.config.ts
  */
 
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 import { mockAllApis, mockFundsApi, mockCommoditiesApi, mockIndicesApi, mockSectorsApi } from '../utils/api-mock';
 
 // 相对路径：从 web/e2e/screenshot-tests 到 docs/screenshots

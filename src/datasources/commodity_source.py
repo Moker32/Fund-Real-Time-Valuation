@@ -14,6 +14,7 @@ import asyncio
 import logging
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
@@ -99,7 +100,7 @@ class CommodityDataSource(DataSource):
 
     async def _fetch_with_retry(
         self,
-        fetch_func: callable,
+        fetch_func: Callable,
         *args,
         **kwargs
     ) -> Any:

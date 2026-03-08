@@ -14,7 +14,6 @@ import logging
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any
 
 # 配置日志
 logging.basicConfig(
@@ -27,9 +26,9 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, ".")
 
 from src.datasources.akshare_config import (
-    call_akshare_with_retry,
     DEFAULT_RATE_LIMIT,
     MAX_RETRIES,
+    call_akshare_with_retry,
 )
 from src.datasources.index_source import AKShareIndexSource
 
@@ -139,11 +138,11 @@ async def test_stock_zh_index_spot_em() -> TestResult:
         duration = time.time() - start_time
 
         if df is not None and not df.empty:
-            logger.info(f"  ✓ 成功获取数据")
+            logger.info("  ✓ 成功获取数据")
             logger.info(f"  - 数据条数: {len(df)}")
             logger.info(f"  - 响应时间: {duration:.2f}s")
             logger.info(f"  - 列名: {list(df.columns)}")
-            logger.info(f"  - 前3条数据:")
+            logger.info("  - 前3条数据:")
             for idx, row in df.head(3).iterrows():
                 logger.info(f"    {row.get('名称', 'N/A')}: {row.get('最新价', 'N/A')}")
 
@@ -196,11 +195,11 @@ async def test_stock_hk_spot_em() -> TestResult:
         duration = time.time() - start_time
 
         if df is not None and not df.empty:
-            logger.info(f"  ✓ 成功获取数据")
+            logger.info("  ✓ 成功获取数据")
             logger.info(f"  - 数据条数: {len(df)}")
             logger.info(f"  - 响应时间: {duration:.2f}s")
             logger.info(f"  - 列名: {list(df.columns)}")
-            logger.info(f"  - 前3条数据:")
+            logger.info("  - 前3条数据:")
             for idx, row in df.head(3).iterrows():
                 logger.info(f"    {row.get('名称', 'N/A')}: {row.get('最新价', 'N/A')}")
 
@@ -253,11 +252,11 @@ async def test_stock_us_spot_em() -> TestResult:
         duration = time.time() - start_time
 
         if df is not None and not df.empty:
-            logger.info(f"  ✓ 成功获取数据")
+            logger.info("  ✓ 成功获取数据")
             logger.info(f"  - 数据条数: {len(df)}")
             logger.info(f"  - 响应时间: {duration:.2f}s")
             logger.info(f"  - 列名: {list(df.columns)}")
-            logger.info(f"  - 前3条数据:")
+            logger.info("  - 前3条数据:")
             for idx, row in df.head(3).iterrows():
                 logger.info(f"    {row.get('名称', 'N/A')}: {row.get('最新价', 'N/A')}")
 
@@ -306,7 +305,7 @@ async def test_akshare_index_source() -> list[TestResult]:
     duration = time.time() - start_time
 
     if result.success:
-        logger.info(f"    ✓ 成功")
+        logger.info("    ✓ 成功")
         logger.info(f"    - 响应时间: {duration:.2f}s")
         logger.info(f"    - 数据: {result.data}")
     else:
@@ -329,7 +328,7 @@ async def test_akshare_index_source() -> list[TestResult]:
     duration = time.time() - start_time
 
     if result.success:
-        logger.info(f"    ✓ 成功")
+        logger.info("    ✓ 成功")
         logger.info(f"    - 响应时间: {duration:.2f}s")
     else:
         logger.error(f"    ✗ 失败: {result.error}")
@@ -350,7 +349,7 @@ async def test_akshare_index_source() -> list[TestResult]:
     duration = time.time() - start_time
 
     if result.success:
-        logger.info(f"    ✓ 成功")
+        logger.info("    ✓ 成功")
         logger.info(f"    - 响应时间: {duration:.2f}s")
         logger.info(f"    - 数据条数: {result.data.get('count', 0)}")
     else:
@@ -372,7 +371,7 @@ async def test_akshare_index_source() -> list[TestResult]:
     duration = time.time() - start_time
 
     if result.success:
-        logger.info(f"    ✓ 成功")
+        logger.info("    ✓ 成功")
         logger.info(f"    - 响应时间: {duration:.2f}s")
         logger.info(f"    - 数据条数: {result.data.get('count', 0)}")
     else:

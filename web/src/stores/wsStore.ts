@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useWebSocket, type SubscriptionType, type WSMessage } from '@/composables/useWebSocket'
 
 export const useWSStore = defineStore('websocket', () => {

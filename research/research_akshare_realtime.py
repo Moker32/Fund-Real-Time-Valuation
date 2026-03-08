@@ -13,15 +13,15 @@ Akshare 实时数据接口研究脚本
     uv run python scripts/research_akshare_realtime.py
 """
 
+import inspect
+import json
 import re
 import time
-import json
-import inspect
+from collections import defaultdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
-from dataclasses import dataclass, field, asdict
-from collections import defaultdict
+from typing import Any
 
 import akshare as ak
 
@@ -308,7 +308,7 @@ class AkshareResearcher:
         # 标题
         lines.append("# Akshare 实时数据接口研究报告")
         lines.append(f"\n生成时间: {self.report.timestamp}")
-        lines.append(f"\n---\n")
+        lines.append("\n---\n")
 
         # 概览
         lines.append("## 📊 概览")
@@ -397,7 +397,7 @@ class AkshareResearcher:
                         lines.append(f"  - ... 还有 {len(r.data_fields) - 10} 个字段")
 
                 if r.sample_data and r.test_status == "success":
-                    lines.append(f"- **样例数据**:")
+                    lines.append("- **样例数据**:")
                     lines.append("```json")
                     lines.append(json.dumps(r.sample_data, ensure_ascii=False, indent=2, default=str)[:800])
                     lines.append("```")
@@ -420,7 +420,7 @@ class AkshareResearcher:
         # 附录：所有函数列表
         lines.append("\n---\n")
         lines.append("## 📋 附录：所有函数列表")
-        lines.append(f"\n<details>")
+        lines.append("\n<details>")
         lines.append(f"<summary>点击展开 ({len(self.all_functions)} 个函数)</summary>")
         lines.append("")
         lines.append("```")

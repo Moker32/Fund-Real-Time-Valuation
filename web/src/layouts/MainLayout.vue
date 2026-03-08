@@ -149,6 +149,23 @@ import { useWSStore } from '@/stores/wsStore';
 import { healthApi } from '@/api';
 import type { Fund, Commodity, MarketIndex } from '@/types';
 
+// WebSocket 推送的基金更新数据类型
+interface FundUpdateData {
+  fundCode?: string;
+  code?: string;
+  name?: string;
+  unitNetValue?: number;
+  netValue?: number;
+  netValueDate?: string;
+  estimatedNetValue?: number;
+  estimateValue?: number;
+  estimatedGrowthRate?: number;
+  estimateChangePercent?: number;
+  estimateTime?: string;
+  type?: string;
+  hasRealTimeEstimate?: boolean;
+}
+
 const route = useRoute();
 const fundStore = useFundStore();
 const commodityStore = useCommodityStore();
@@ -233,7 +250,7 @@ async function refresh() {
 
 function setupWebSocketHandlers() {
   wsStore.on('fund_update', (data) => {
-    const payload = data as { funds?: any[] };
+    const payload = data as { funds?: FundUpdateData[] };
     const funds = payload?.funds;
     if (funds && funds.length > 0) {
       funds.forEach((updatedFund) => {

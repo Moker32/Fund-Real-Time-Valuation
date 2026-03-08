@@ -11,7 +11,6 @@ A股指数分钟级数据源调研脚本
 
 import asyncio
 import json
-import time
 from datetime import datetime
 
 import httpx
@@ -130,8 +129,8 @@ async def test_eastmoney_minute():
         if data.get("data") and data["data"].get("klines"):
             klines = data["data"]["klines"]
             print(f"  ✅ 成功获取分钟线数据，共 {len(klines)} 条")
-            print(f"  数据格式: 时间,开盘,收盘,最高,最低,成交量,成交额,振幅,涨跌幅,涨跌额,换手率")
-            print(f"  最新5条:")
+            print("  数据格式: 时间,开盘,收盘,最高,最低,成交量,成交额,振幅,涨跌幅,涨跌额,换手率")
+            print("  最新5条:")
             for line in klines[-5:]:
                 print(f"    {line}")
         else:
@@ -157,7 +156,7 @@ async def test_eastmoney_minute():
         if data.get("data") and data["data"].get("klines"):
             klines = data["data"]["klines"]
             print(f"  ✅ 成功获取分钟线数据，共 {len(klines)} 条")
-            print(f"  最新5条:")
+            print("  最新5条:")
             for line in klines[-5:]:
                 print(f"    {line}")
         else:
@@ -183,7 +182,7 @@ async def test_eastmoney_minute():
         if data.get("data") and data["data"].get("klines"):
             klines = data["data"]["klines"]
             print(f"  ✅ 成功获取分钟线数据，共 {len(klines)} 条")
-            print(f"  最新5条:")
+            print("  最新5条:")
             for line in klines[-5:]:
                 print(f"    {line}")
         else:
@@ -209,11 +208,11 @@ async def test_eastmoney_minute():
         if data.get("data") and data["data"].get("klines"):
             klines = data["data"]["klines"]
             print(f"  ✅ 成功获取5分钟线数据，共 {len(klines)} 条")
-            print(f"  最新3条:")
+            print("  最新3条:")
             for line in klines[-3:]:
                 print(f"    {line}")
         else:
-            print(f"  ❌ 返回数据为空")
+            print("  ❌ 返回数据为空")
     except Exception as e:
         print(f"  ❌ 错误: {type(e).__name__}: {e}")
 
@@ -299,12 +298,12 @@ async def test_tencent_minute():
                 minute_data = stock_data.get("m1", [])
                 if minute_data:
                     print(f"  ✅ 成功获取分钟线数据，共 {len(minute_data)} 条")
-                    print(f"  数据格式: [时间,开盘,收盘,最低,最高,成交量]")
-                    print(f"  最新5条:")
+                    print("  数据格式: [时间,开盘,收盘,最低,最高,成交量]")
+                    print("  最新5条:")
                     for item in minute_data[-5:]:
                         print(f"    {item}")
                 else:
-                    print(f"  ❌ 分钟数据为空（指数可能不支持分钟线接口）")
+                    print("  ❌ 分钟数据为空（指数可能不支持分钟线接口）")
                     print(f"  返回数据: {stock_data.keys() if isinstance(stock_data, dict) else stock_data}")
             else:
                 print(f"  ❌ 数据格式错误: {type(stock_data)}")
@@ -333,11 +332,11 @@ async def test_tencent_minute():
                     print(f"  ✅ 成功获取日线数据，共 {len(day_data)} 条")
                     print(f"  最新数据: {day_data[-1]}")
                 else:
-                    print(f"  ❌ 日线数据为空")
+                    print("  ❌ 日线数据为空")
             else:
-                print(f"  ❌ 数据格式错误")
+                print("  ❌ 数据格式错误")
         else:
-            print(f"  ❌ 接口返回错误")
+            print("  ❌ 接口返回错误")
     except Exception as e:
         print(f"  ❌ 错误: {type(e).__name__}: {e}")
 
@@ -350,8 +349,8 @@ async def test_tencent_minute():
             response = await client.get(url)
             text = response.text
 
-        print(f"  ✅ 成功获取实时行情")
-        print(f"  响应内容:")
+        print("  ✅ 成功获取实时行情")
+        print("  响应内容:")
         for line in text.strip().split(';'):
             if line.strip():
                 print(f"    {line[:100]}...")

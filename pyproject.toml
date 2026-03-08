@@ -58,6 +58,10 @@ packages = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+exclude = [
+    "research/",
+    "scripts/",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]

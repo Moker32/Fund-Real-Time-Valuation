@@ -180,12 +180,15 @@ const maxRetries = 2;
 
 // 离线数据缓存（用于网络错误时）
 const offlineData = ref<CommoditySearchResult[]>([]);
+// eslint-disable-next-line no-useless-assignment
 const canUseOfflineData = computed(() => offlineData.value.length > 0);
 
 // 计算是否有结果
+// eslint-disable-next-line no-useless-assignment
 const hasResults = computed(() => results.value.length > 0);
 
 // 计算显示的错误信息（优先显示本地错误，其次是 store 错误）
+// eslint-disable-next-line no-useless-assignment
 const displayError = computed(() => {
   if (localError.value) return localError.value;
   if (store.searchError) return store.searchError;

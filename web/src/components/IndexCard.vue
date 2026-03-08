@@ -165,10 +165,12 @@ const chartData = computed(() => {
   return [];
 });
 
+// eslint-disable-next-line no-useless-assignment
 const showChart = computed(() => {
   return chartData.value.length > 0;
 });
 
+// eslint-disable-next-line no-useless-assignment
 const baseline = computed(() => {
   return props.index.prevClose;
 });
