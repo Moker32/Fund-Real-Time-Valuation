@@ -151,15 +151,18 @@ const changeClass = computed(() => {
   return 'neutral';
 });
 
-// 基准线 - 昨日净值
-// 只有当 prevNetValue 有效时才返回，否则返回 undefined（不显示基准线）
+// 基准线 - 使用最新净值（与涨跌幅计算基准一致）
+// fund123.cn 的涨跌幅是基于最新净值计算的，所以基准线也应该使用最新净值
 // eslint-disable-next-line no-useless-assignment
 const baseline = computed(() => {
+  // 优先使用最新净值作为基准线（与API涨跌幅计算基准一致）
+  if (props.fund.netValue && props.fund.netValue > 0) {
+    return props.fund.netValue;
+  }
+  // 回退到前日净值（兼容旧数据）
   if (props.fund.prevNetValue && props.fund.prevNetValue > 0) {
     return props.fund.prevNetValue;
   }
-  // 当没有前日净值时，返回 undefined，让图表不显示基准线
-  // 而不是回退到当前净值（那样会失去基准线的意义）
   return undefined;
 });
 

@@ -2414,13 +2414,14 @@ class Fund123DataSource(DataSource):
         if intraday_list:
             latest = intraday_list[-1]
             estimate_value = float(latest.get("forecastNetValue", 0))
-            growth_rate = float(latest.get("forecastGrowth", 0)) * 100
+            # 暂时使用 API 提供的涨跌幅，后面会根据净值重新计算
+            api_growth_rate = float(latest.get("forecastGrowth", 0)) * 100
             estimate_time = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(latest.get("time", 0) / 1000)
             )
         else:
             estimate_value = None
-            growth_rate = 0.0
+            api_growth_rate = 0.0
             estimate_time = ""
 
         # 4. 如果日内数据为空，尝试从 search 结果中获取 dayOfGrowth（QDII 基金会有这个字段）
@@ -2536,6 +2537,27 @@ class Fund123DataSource(DataSource):
 
         # 获取上一交易日净值（用于折线图基准线）
         prev_net_value, prev_net_value_date = await self._get_prev_net_value(fund_code)
+
+        # [DIAGNOSTIC LOG] 验证涨跌幅数据一致性
+        # 注意：fund123.cn 的涨跌幅是基于最新净值（net_value）计算的
+        # 而不是前日净值（prev_net_value）
+        if estimate_value and net_value and net_value > 0:
+            calculated_growth_rate = (estimate_value - net_value) / net_value * 100
+            logger.info(
+                f"[FUND_DIAGNOSTIC] {fund_code}: "
+                f"API_growth_rate={api_growth_rate:.4f}%, "
+                f"calculated_rate={calculated_growth_rate:.4f}%, "
+                f"estimate_value={estimate_value}, "
+                f"net_value={net_value}, "
+                f"diff={abs(api_growth_rate - calculated_growth_rate):.4f}%"
+            )
+            # 如果差异超过 0.1%，记录警告
+            if abs(api_growth_rate - calculated_growth_rate) > 0.1:
+                logger.warning(
+                    f"[FUND_DIAGNOSTIC] {fund_code}: 涨跌幅不一致! "
+                    f"API={api_growth_rate:.4f}%, 计算={calculated_growth_rate:.4f}%, "
+                    f"差异={api_growth_rate - calculated_growth_rate:.4f}%"
+                )
 
         result_data = {
             "fund_code": fund_code,
