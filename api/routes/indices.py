@@ -74,11 +74,19 @@ def get_trading_status(index_type: str, data_timestamp: str | None = None) -> di
 
     if data_timestamp:
         try:
-            # 解析数据时间戳
+            # 解析数据时间戳（转换为带时区的datetime）
             data_dt = datetime.fromisoformat(data_timestamp.replace("Z", "+00:00"))
-            # 计算数据时间与当前时间的差距（分钟）
+            
+            # 确保数据时间戳有时区信息（如果是naive，假设为UTC）
+            if data_dt.tzinfo is None:
+                data_dt = pytz.UTC.localize(data_dt)
+            
+            # 将数据时间转换为市场本地时间
+            data_dt_local = data_dt.astimezone(tz)
+            
+            # 计算数据时间与当前市场时间的差距（分钟）
             data_age_minutes = (
-                local_now.replace(tzinfo=None) - data_dt.replace(tzinfo=None)
+                local_now.replace(tzinfo=None) - data_dt_local.replace(tzinfo=None)
             ).total_seconds() / 60
 
             # 如果数据超过 15 分钟未更新，认为数据不新鲜
