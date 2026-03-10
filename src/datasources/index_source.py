@@ -1151,6 +1151,7 @@ class HybridIndexSource(IndexDataSource):
 
         使用腾讯财经的分钟线接口获取A股/港股/美股的分钟级数据
         对于A股指数，优先使用akshare获取真实分钟级数据
+        对于港股指数，优先使用yfinance获取真实分钟级数据（腾讯只返回日线数据）
         """
         tencent_code = TENCENT_CODES.get(index_type)
         if not tencent_code:
@@ -1170,13 +1171,13 @@ class HybridIndexSource(IndexDataSource):
             # 如果akshare失败，回退到腾讯财经日线接口
             logger.warning(f"[HybridIndexSource] akshare分钟数据获取失败，回退到腾讯日线接口: {index_type}")
         
-        # 港股使用腾讯财经分钟线接口
+        # 港股使用yfinance获取分钟级数据（腾讯分钟线接口对指数只返回日线数据）
         if tencent_code.startswith("hk"):
-            minute_result = await self._fetch_tencent_minute_intraday(index_type, tencent_code)
-            if minute_result.success:
-                return minute_result
-            # 如果分钟线失败，回退到日线接口
-            logger.warning(f"[HybridIndexSource] 腾讯分钟线接口失败，回退到日线接口: {index_type}")
+            yahoo_result = await self._fetch_yahoo_intraday(index_type)
+            if yahoo_result.success:
+                return yahoo_result
+            # 如果yfinance失败，回退到腾讯财经日线接口
+            logger.warning(f"[HybridIndexSource] yfinance港股分钟数据获取失败，回退到腾讯日线接口: {index_type}")
         
         # 使用日线接口（适用于美股或分钟线失败的情况）
         try:
@@ -1616,7 +1617,8 @@ class HybridIndexSource(IndexDataSource):
     async def _fetch_yahoo_intraday(self, index_type: str) -> DataSourceResult:
         """从Yahoo Finance获取日内分时数据
 
-        使用yfinance获取分钟级数据（适用于日经/欧洲指数）
+        使用yfinance获取分钟级数据（适用于港股/日经/欧洲指数）
+        对于港股指数，使用5天数据获取最近交易日的分钟数据
         """
         ticker = YAHOO_TICKERS.get(index_type)
         if not ticker:
@@ -1636,9 +1638,13 @@ class HybridIndexSource(IndexDataSource):
             async with self._yahoo._get_semaphore():
                 try:
                     ticker_obj = yf.Ticker(ticker)
-                    # 获取1天的1分钟数据
+                    
+                    # 港股指数需要使用5天数据才能获取分钟级数据
+                    # 其他指数可以使用1天数据
+                    period = "5d" if index_type in HK_INDICES else "1d"
+                    
                     hist = await asyncio.wait_for(
-                        loop.run_in_executor(None, lambda: ticker_obj.history(period="1d", interval="1m")),
+                        loop.run_in_executor(None, lambda: ticker_obj.history(period=period, interval="1m")),
                         timeout=self._yahoo.YFINANCE_TIMEOUT * 2,
                     )
 
@@ -1650,6 +1656,12 @@ class HybridIndexSource(IndexDataSource):
                             source=self.name,
                             metadata={"index_type": index_type},
                         )
+                    
+                    # 对于港股指数，只保留最近一个交易日的数据
+                    if index_type in HK_INDICES and not hist.empty:
+                        # 获取最近日期
+                        latest_date = hist.index[-1].date()
+                        hist = hist[hist.index.date == latest_date]
 
                     # 解析分钟数据
                     intraday_points = []
