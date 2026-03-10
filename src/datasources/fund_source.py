@@ -2411,11 +2411,13 @@ class Fund123DataSource(DataSource):
         intraday_list = intraday_data.get("list", [])
 
         # 解析数据
+        growth_rate = None  # 初始化 growth_rate
         if intraday_list:
             latest = intraday_list[-1]
             estimate_value = float(latest.get("forecastNetValue", 0))
             # 暂时使用 API 提供的涨跌幅，后面会根据净值重新计算
             api_growth_rate = float(latest.get("forecastGrowth", 0)) * 100
+            growth_rate = api_growth_rate  # 有日内数据时使用 api_growth_rate
             estimate_time = time.strftime(
                 "%Y-%m-%d %H:%M:%S", time.localtime(latest.get("time", 0) / 1000)
             )
@@ -2926,121 +2928,6 @@ class Fund123DataSource(DataSource):
             type(self)._tiantian_client = None
 
 
-class TushareFundSource(DataSource):
-    """Tushare 基金数据源
-
-    提供国内基金净值数据，需要 Tushare Token。
-    API: https://tushare.pro/
-
-    Token 获取: https://tushare.pro/register
-    免费版有一定调用限制
-    """
-
-    def __init__(self, token: str | None = None, timeout: float = 10.0):
-        super().__init__(name="tushare_fund", source_type=DataSourceType.FUND, timeout=timeout)
-        self._token = token or os.environ.get("TUSHARE_TOKEN")
-        self._pro = None
-        if self._token:
-            self._init_pro()
-
-    def _init_pro(self):
-        if not self._token:
-            return
-        try:
-            import tushare as ts
-
-            ts.set_token(self._token)
-            self._pro = ts.pro_api()
-        except ImportError:
-            raise ImportError("请安装 tushare 库: pip install tushare")
-
-    async def fetch(self, fund_code: str) -> DataSourceResult:
-        self._request_count += 1
-        if not self._token or not self._pro:
-            self._error_count += 1
-            return DataSourceResult(
-                success=False,
-                error="Tushare Token 未配置。请设置 TUSHARE_TOKEN 环境变量或传入 token 参数。访问 https://tushare.pro/register 注册获取 Token。",
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-
-        try:
-            loop = asyncio.get_running_loop()
-            result = await loop.run_in_executor(None, lambda: self._fetch_fund_nav(fund_code))
-            return result
-        except Exception as e:
-            self._error_count += 1
-            return DataSourceResult(
-                success=False,
-                error=str(e),
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-
-    def _fetch_fund_nav(self, fund_code: str) -> DataSourceResult:
-        try:
-            df = self._pro.fund_nav(fund_code=fund_code)
-            if df is None or df.empty:
-                return DataSourceResult(
-                    success=False,
-                    error=f"未找到基金数据: {fund_code}",
-                    timestamp=time.time(),
-                    source=self.name,
-                    metadata={"fund_code": fund_code},
-                )
-
-            latest = df.iloc[-1]
-            result_data = {
-                "fund_code": fund_code,
-                "nav": float(latest.get("nav", 0)),
-                "acc_nav": float(latest.get("acc_nav", 0)),
-                "date": latest.get("nav_date", ""),
-            }
-
-            return DataSourceResult(
-                success=True,
-                data=result_data,
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-        except Exception as e:
-            return DataSourceResult(
-                success=False,
-                error=str(e),
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-
-    async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
-        async def fetch_one(code: str) -> DataSourceResult:
-            return await self.fetch(code)
-
-        tasks = [fetch_one(code) for code in fund_codes]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        processed_results = []
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                processed_results.append(
-                    DataSourceResult(
-                        success=False,
-                        error=str(result),
-                        timestamp=time.time(),
-                        source=self.name,
-                        metadata={"fund_code": fund_codes[i]},
-                    )
-                )
-            else:
-                processed_results.append(result)
-
-        return processed_results
-
-
 # 导入缓存策略模块
 from src.datasources.fund.cache_strategy import (
     CacheLockManager,
@@ -3075,7 +2962,6 @@ __all__ = [
     "FundHistorySource",
     "FundHistoryYFinanceSource",
     "Fund123DataSource",
-    "TushareFundSource",
     "get_fund_cache",
     "get_fund_cache_stats",
     "get_intraday_cache_dao",

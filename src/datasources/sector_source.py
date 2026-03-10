@@ -1429,6 +1429,36 @@ class EastMoneyIndustryDetailSource(DataSource):
                 processed_results.append(result)
         return processed_results
 
+    async def health_check(self) -> bool:
+        """
+        健康检查 - 行业板块详情接口
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            import akshare as ak
+
+            loop = asyncio.get_event_loop()
+
+            # 尝试获取行业板块列表，验证接口可用性
+            try:
+                df = await asyncio.wait_for(
+                    loop.run_in_executor(None, ak.stock_board_industry_name_em),
+                    timeout=10.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("行业板块详情健康检查超时（10秒）")
+                return False
+
+            # 验证返回数据
+            if df is not None and not df.empty:
+                return True
+            return False
+        except Exception as e:
+            logger.warning(f"行业板块详情健康检查失败: {e}")
+            return False
+
     def _is_cache_valid(self, cache_key: str) -> bool:
         if cache_key not in self._cache:
             return False
@@ -1547,6 +1577,36 @@ class EastMoneyConceptDetailSource(DataSource):
             else:
                 processed_results.append(result)
         return processed_results
+
+    async def health_check(self) -> bool:
+        """
+        健康检查 - 概念板块详情接口
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            import akshare as ak
+
+            loop = asyncio.get_event_loop()
+
+            # 尝试获取概念板块列表，验证接口可用性
+            try:
+                df = await asyncio.wait_for(
+                    loop.run_in_executor(None, ak.stock_board_concept_name_em),
+                    timeout=10.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("概念板块详情健康检查超时（10秒）")
+                return False
+
+            # 验证返回数据
+            if df is not None and not df.empty:
+                return True
+            return False
+        except Exception as e:
+            logger.warning(f"概念板块详情健康检查失败: {e}")
+            return False
 
     def _is_cache_valid(self, cache_key: str) -> bool:
         if cache_key not in self._cache:

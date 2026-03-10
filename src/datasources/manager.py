@@ -796,11 +796,6 @@ def create_default_manager(
 
     manager.register(HybridIndexSource())
 
-    # === 新增 Tushare 基金数据源 ===
-    from .fund_source import TushareFundSource
-
-    manager.register(TushareFundSource())
-
     return manager
 
 
