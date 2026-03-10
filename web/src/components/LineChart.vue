@@ -127,7 +127,7 @@ const getIntradayXRange = (data: ChartDataItem[]): { min: number; max: number } 
   return { min: minTs - padding, max: maxTs + padding };
 };
 
-// 计算 Y 轴范围，确保始终包含 baseline 值
+// 计算 Y 轴范围，确保始终包含 baseline 值，并且 baseline 不在边界上
 const getYScaleRange = (data: [number[], (number | null)[]] | null, baseline: number | undefined): { min: number; max: number } | undefined => {
   if (!data || data[0].length === 0) return undefined;
 
@@ -149,8 +149,17 @@ const getYScaleRange = (data: [number[], (number | null)[]] | null, baseline: nu
   min -= padding;
   max += padding;
 
-  // 确保 baseline 包含在范围内
+  // 确保 baseline 包含在范围内，并且不在边界上
   if (baseline !== undefined && baseline > 0) {
+    // 如果 baseline 等于或接近 min，向下扩展范围
+    if (baseline <= min + padding * 0.5) {
+      min = baseline - (max - baseline) * 0.1; // 添加 10% 的额外边距
+    }
+    // 如果 baseline 等于或接近 max，向上扩展范围
+    if (baseline >= max - padding * 0.5) {
+      max = baseline + (baseline - min) * 0.1; // 添加 10% 的额外边距
+    }
+    // 确保 baseline 在范围内
     min = Math.min(min, baseline);
     max = Math.max(max, baseline);
   }
