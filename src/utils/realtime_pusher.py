@@ -236,17 +236,23 @@ class RealtimePusher:
             await asyncio.sleep(commodity_interval)
 
     # 支持的指数类型列表
+    # 注意：这里使用的是内部指数类型标识符，不是数据源特定的代码
     SUPPORTED_INDICES = [
-        "sh000001",  # 上证指数
-        "sz399001",  # 深证成指
-        "sz399006",  # 创业板指
-        "sh000300",  # 沪深300
-        "sh000016",  # 上证50
-        "sh000905",  # 中证500
-        "hkHSI",     # 恒生指数
-        "usDJI",     # 道琼斯
-        "usIXIC",    # 纳斯达克
-        "usSPX",     # 标普500
+        "shanghai",      # 上证指数
+        "shenzhen",      # 深证成指
+        "chi_next",      # 创业板指
+        "hs300",         # 沪深300
+        "shanghai50",    # 上证50
+        "csi500",        # 中证500
+        "hang_seng",     # 恒生指数
+        "hang_seng_tech", # 恒生科技
+        "nikkei225",     # 日经225 - 新增
+        "dow_jones",     # 道琼斯
+        "nasdaq",        # 纳斯达克
+        "sp500",         # 标普500
+        "dax",           # 德国DAX - 新增
+        "ftse",          # 富时100 - 新增
+        "cac40",         # CAC40 - 新增
     ]
 
     async def _push_indices_loop(self):
