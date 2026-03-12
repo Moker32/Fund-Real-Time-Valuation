@@ -98,12 +98,7 @@ class CommodityDataSource(DataSource):
         self._cache[cache_key] = data
         return data
 
-    async def _fetch_with_retry(
-        self,
-        fetch_func: Callable,
-        *args,
-        **kwargs
-    ) -> Any:
+    async def _fetch_with_retry(self, fetch_func: Callable, *args, **kwargs) -> Any:
         """
         带指数退避重试的获取方法
 
@@ -126,7 +121,7 @@ class CommodityDataSource(DataSource):
                 last_exception = e
                 # 超时错误需要重试
                 if attempt < MAX_RETRIES - 1:
-                    delay = INITIAL_RETRY_DELAY * (RETRY_BACKOFF_FACTOR ** attempt)
+                    delay = INITIAL_RETRY_DELAY * (RETRY_BACKOFF_FACTOR**attempt)
                     logger.warning(
                         f"[{self.name}] 请求超时 (尝试 {attempt + 1}/{MAX_RETRIES}), "
                         f"{delay:.1f}秒后重试..."
@@ -141,14 +136,22 @@ class CommodityDataSource(DataSource):
                 is_network_error = any(
                     keyword in error_str
                     for keyword in [
-                        "network", "connection", "timeout", "dns",
-                        "unreachable", "refused", "reset", "abort",
-                        "ssl", "certificate", "handshake"
+                        "network",
+                        "connection",
+                        "timeout",
+                        "dns",
+                        "unreachable",
+                        "refused",
+                        "reset",
+                        "abort",
+                        "ssl",
+                        "certificate",
+                        "handshake",
                     ]
                 )
 
                 if is_network_error and attempt < MAX_RETRIES - 1:
-                    delay = INITIAL_RETRY_DELAY * (RETRY_BACKOFF_FACTOR ** attempt)
+                    delay = INITIAL_RETRY_DELAY * (RETRY_BACKOFF_FACTOR**attempt)
                     logger.warning(
                         f"[{self.name}] 网络错误 (尝试 {attempt + 1}/{MAX_RETRIES}): {e}, "
                         f"{delay:.1f}秒后重试..."
@@ -192,9 +195,9 @@ class YFinanceCommoditySource(CommodityDataSource):
         "natural_gas": "NG=F",  # 天然气
         # 基本金属
         "copper": "HG=F",  # 铜
-        "aluminum": "AL=F",  # 铝
+        "aluminum": "ALI=F",  # 铝 (LME Aluminum Futures)
         "zinc": "ZN=F",  # 锌
-        "nickel": "NI=F",  # 镍
+        # "nickel": "NI=F",  # 镍 - YFinance 已不支持，需要使用 AKShareForeignFuturesSource
         # 农产品
         "soybean": "ZS=F",  # 大豆
         "corn": "ZC=F",  # 玉米
@@ -249,7 +252,7 @@ class YFinanceCommoditySource(CommodityDataSource):
                 ticker_obj = yf.Ticker(ticker)
                 info = await asyncio.wait_for(
                     loop.run_in_executor(None, lambda: ticker_obj.info),
-                    timeout=self.YFINANCE_TIMEOUT
+                    timeout=self.YFINANCE_TIMEOUT,
                 )
                 return info
 
@@ -311,7 +314,7 @@ class YFinanceCommoditySource(CommodityDataSource):
         try:
             ticker = self.COMMODITY_TICKERS.get(commodity_type)
             if not ticker:
-                logger.warning(f"[YFinance] 不支持的商品类型: {commodity_type}")
+                logger.debug(f"[YFinance] 不支持的商品类型: {commodity_type}")
                 return DataSourceResult(
                     success=False,
                     error=f"不支持的商品类型: {commodity_type}",
@@ -322,11 +325,10 @@ class YFinanceCommoditySource(CommodityDataSource):
 
             logger.debug(f"[YFinance] fetching {commodity_type} -> ticker={ticker}")
 
-            # 使用异步方法获取数据（带超时控制、并发控制和重试机制）
             info = await self._fetch_yfinance_info(ticker)
 
             if not info or info.get("symbol") is None:
-                logger.warning(f"[YFinance] ticker {ticker} 返回空数据或 404")
+                logger.debug(f"[YFinance] ticker {ticker} 返回空数据或 404")
 
             price = info.get("currentPrice", info.get("regularMarketPrice"))
             change = info.get("regularMarketChange", info.get("change", 0))
@@ -666,7 +668,7 @@ class AKShareCommoditySource(CommodityDataSource):
             if commodity_type == "gold_cny":
                 data = await self._fetch_gold_cny()
             else:
-                logger.warning(f"[AKShare] 不支持的商品类型: {commodity_type}")
+                logger.debug(f"[AKShare] 不支持的商品类型: {commodity_type}，仅支持 gold_cny")
                 return DataSourceResult(
                     success=False,
                     error=f"不支持的商品类型: {commodity_type}",
@@ -946,7 +948,7 @@ class AKShareForeignFuturesSource(CommodityDataSource):
 
             akshare_symbol = FOREIGN_FUTURES_REVERSE.get(commodity_type)
             if not akshare_symbol:
-                logger.warning(f"[AKShare Foreign] 不支持的商品类型: {commodity_type}")
+                logger.debug(f"[AKShare Foreign] 不支持的商品类型: {commodity_type}")
                 return DataSourceResult(
                     success=False,
                     error=f"不支持的商品类型: {commodity_type}",

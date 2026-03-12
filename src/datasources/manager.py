@@ -753,7 +753,9 @@ def create_default_manager(
         ),
     )
 
-    # Sina 板块数据源（作为最后备用）
+    # Sina 板块数据源（已禁用：API 被代理软件拦截导致 SSL 连接失败）
+    # 原因：quote.sina.com.cn 被代理软件 DNS 拦截，导致 SSL 握手失败
+    # 替代方案：sector_eastmoney_direct (70ms) 作为主数据源
     sector_source = SinaSectorDataSource()
     manager.register(
         sector_source,
@@ -761,7 +763,7 @@ def create_default_manager(
             source_class=type(sector_source),
             name=sector_source.name,
             source_type=DataSourceType.SECTOR,
-            enabled=True,
+            enabled=False,  # 禁用：网络层不可用
             priority=5,
         ),
     )

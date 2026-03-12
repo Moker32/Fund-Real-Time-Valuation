@@ -1360,7 +1360,22 @@ class EastMoneyIndustryDetailSource(DataSource):
         try:
             import akshare as ak
 
-            df = ak.stock_board_industry_cons_em(symbol=sector_name)
+            loop = asyncio.get_event_loop()
+
+            try:
+                df = await asyncio.wait_for(
+                    loop.run_in_executor(None, ak.stock_board_industry_cons_em, sector_name),
+                    timeout=self.timeout,
+                )
+            except asyncio.TimeoutError:
+                return DataSourceResult(
+                    success=False,
+                    error=f"获取行业板块详情超时（{self.timeout}秒）",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"sector_name": sector_name, "error_type": "TimeoutError"},
+                )
+
             if df is not None and not df.empty:
                 stocks = []
                 for _, row in df.iterrows():
@@ -1509,7 +1524,22 @@ class EastMoneyConceptDetailSource(DataSource):
         try:
             import akshare as ak
 
-            df = ak.stock_board_concept_cons_em(symbol=sector_name)
+            loop = asyncio.get_event_loop()
+
+            try:
+                df = await asyncio.wait_for(
+                    loop.run_in_executor(None, ak.stock_board_concept_cons_em, sector_name),
+                    timeout=self.timeout,
+                )
+            except asyncio.TimeoutError:
+                return DataSourceResult(
+                    success=False,
+                    error=f"获取概念板块详情超时（{self.timeout}秒）",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"sector_name": sector_name, "error_type": "TimeoutError"},
+                )
+
             if df is not None and not df.empty:
                 stocks = []
                 for _, row in df.iterrows():

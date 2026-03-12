@@ -6,7 +6,6 @@
 import asyncio
 import json
 import logging
-import os
 import re
 import time
 from pathlib import Path
