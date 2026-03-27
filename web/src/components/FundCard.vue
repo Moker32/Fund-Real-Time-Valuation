@@ -2,6 +2,7 @@
   <div
     class="fund-card"
     :class="{ loading: loading, 'has-chart': shouldShowChart }"
+    @click="handleCardClick"
   >
     <template v-if="loading">
       <div class="skeleton-content">
@@ -106,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onUnmounted } from 'vue';
 import { useFundStore } from '@/stores/fundStore';
 import type { Fund } from '@/types';
 import LineChart from './LineChart.vue';
@@ -122,9 +123,28 @@ const props = withDefaults(defineProps<Props>(), {
 
 const fundStore = useFundStore();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'remove', code: string): void;
+  (e: 'show-history', fund: { code: string; name: string }): void;
 }>();
+
+function handleCardClick(event: Event) {
+  // 检查点击目标是否是交互元素或其子元素
+  const target = event.target as Element;
+  const interactiveSelectors = ['button', '.action-btn', '.fund-type'];
+
+  // 检查点击的是否是交互元素
+  const isInteractive = interactiveSelectors.some(selector =>
+    target.matches(selector) || target.closest(selector)
+  );
+
+  if (isInteractive) {
+    return;
+  }
+
+  // 触发显示历史记录事件
+  emit('show-history', { code: props.fund.code, name: props.fund.name });
+}
 
 // 图表数据：优先使用日内分时数据，如果没有则使用历史数据
 const chartData = computed(() => {
@@ -138,13 +158,11 @@ const chartData = computed(() => {
 });
 
 // 是否显示图表
-// eslint-disable-next-line no-useless-assignment
 const shouldShowChart = computed(() => {
   return fundStore.showChart && chartData.value.length > 0;
 });
 
 // 涨跌样式
-// eslint-disable-next-line no-useless-assignment
 const changeClass = computed(() => {
   if (props.fund.estimateChangePercent > 0) return 'rising';
   if (props.fund.estimateChangePercent < 0) return 'falling';
@@ -153,7 +171,6 @@ const changeClass = computed(() => {
 
 // 基准线 - 使用最新净值（与涨跌幅计算基准一致）
 // fund123.cn 的涨跌幅是基于最新净值计算的，所以基准线也应该使用最新净值
-// eslint-disable-next-line no-useless-assignment
 const baseline = computed(() => {
   // 优先使用最新净值作为基准线（与API涨跌幅计算基准一致）
   if (props.fund.netValue && props.fund.netValue > 0) {
@@ -170,6 +187,10 @@ const baseline = computed(() => {
 const valueAnimating = ref(false);
 const changeAnimating = ref(false);
 
+// Track timeout IDs for cleanup
+let valueAnimationTimeout: ReturnType<typeof setTimeout> | null = null;
+let changeAnimationTimeout: ReturnType<typeof setTimeout> | null = null;
+
 // 监听价格变化触发动画
 watch(() => props.fund.estimateValue, (newVal, oldVal) => {
   if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) {
@@ -184,14 +205,38 @@ watch(() => props.fund.estimateChangePercent, (newVal, oldVal) => {
 });
 
 function triggerValueAnimation() {
+  // Clear existing timeout to prevent memory leak
+  if (valueAnimationTimeout) {
+    window.clearTimeout(valueAnimationTimeout);
+  }
   valueAnimating.value = true;
-  setTimeout(() => valueAnimating.value = false, 500);
+  valueAnimationTimeout = window.setTimeout(() => {
+    valueAnimating.value = false;
+    valueAnimationTimeout = null;
+  }, 500);
 }
 
 function triggerChangeAnimation() {
+  // Clear existing timeout to prevent memory leak
+  if (changeAnimationTimeout) {
+    window.clearTimeout(changeAnimationTimeout);
+  }
   changeAnimating.value = true;
-  setTimeout(() => changeAnimating.value = false, 500);
+  changeAnimationTimeout = window.setTimeout(() => {
+    changeAnimating.value = false;
+    changeAnimationTimeout = null;
+  }, 500);
 }
+
+// Cleanup timeouts on unmount to prevent memory leaks
+onUnmounted(() => {
+  if (valueAnimationTimeout) {
+    window.clearTimeout(valueAnimationTimeout);
+  }
+  if (changeAnimationTimeout) {
+    window.clearTimeout(changeAnimationTimeout);
+  }
+});
 
 async function toggleHolding() {
   await fundStore.toggleHolding(props.fund.code, !props.fund.isHolding);

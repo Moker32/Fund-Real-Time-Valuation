@@ -188,7 +188,7 @@ REST API specification for the Fund Real-Time Valuation application. Base URL: `
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| period | string | No | Time period: "近一周", "近一月", "近三月", "近六月", "近一年", "近三年", "近五年", "成立以来" (default: "近一年") |
+| days | integer | No | Time period in days: 7 (近一周), 30 (近一月), 90 (近三月), 180 (近六月), 365 (近一年), 1095 (近三年), 1825 (近五年). Range: 7-1825 (default: 365) |
 
 **Response**
 

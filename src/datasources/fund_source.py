@@ -1488,10 +1488,13 @@ class FundHistorySource(DataSource):
             # 按日期升序排序
             ohlcv_data.sort(key=lambda x: x["time"])
 
+            # 根据 period 过滤数据
+            filtered_data = self._filter_by_period(ohlcv_data, period)
+
             self._record_success()
             return DataSourceResult(
                 success=True,
-                data={"fund_code": fund_code, "data": ohlcv_data, "count": len(ohlcv_data)},
+                data={"fund_code": fund_code, "data": filtered_data, "count": len(filtered_data)},
                 timestamp=time.time(),
                 source=self.name,
                 metadata={"fund_code": fund_code, "period": period},
@@ -1534,6 +1537,53 @@ class FundHistorySource(DataSource):
     def _validate_fund_code(self, fund_code: str) -> bool:
         """验证基金代码格式"""
         return bool(re.match(r"^\d{6}$", str(fund_code)))
+
+    def _filter_by_period(self, data: list[dict], period: str) -> list[dict]:
+        """
+        根据时间周期过滤数据
+
+        Args:
+            data: OHLCV 数据列表，按日期升序排列
+            period: 时间周期，可选值: "近一周", "近一月", "近三月", "近六月", "近一年", "近三年", "近五年", "成立以来"
+
+        Returns:
+            list[dict]: 过滤后的数据
+        """
+        if not data:
+            return []
+
+        # 定义周期到天数的映射
+        period_to_days = {
+            "近一周": 7,
+            "近一月": 30,
+            "近三月": 90,
+            "近六月": 180,
+            "近一年": 365,
+            "近三年": 1095,
+            "近五年": 1825,
+        }
+
+        # 如果是"成立以来"或无效周期，返回全部数据
+        if period == "成立以来" or period not in period_to_days:
+            return data
+
+        from datetime import datetime, timedelta
+
+        days = period_to_days[period]
+        cutoff_date = datetime.now() - timedelta(days=days)
+
+        # 过滤数据，只保留 cutoff_date 之后的数据
+        filtered = []
+        for item in data:
+            try:
+                item_date = datetime.strptime(item["time"], "%Y-%m-%d")
+                if item_date >= cutoff_date:
+                    filtered.append(item)
+            except (ValueError, KeyError):
+                # 日期解析失败，保留该数据
+                filtered.append(item)
+
+        return filtered
 
     async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
         """

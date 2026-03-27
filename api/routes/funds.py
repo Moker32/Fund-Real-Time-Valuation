@@ -106,9 +106,19 @@ def _get_trading_calendar_source() -> TradingCalendarSource:
 
 
 def _is_trading_hours() -> bool:
-    """检查当前是否为交易时段"""
+    """检查当前是否为交易时段
+    
+    先检查是否是交易日（节假日检查），再检查是否在交易时段内。
+    如果获取交易日历失败，默认返回 False（非交易时段）。
+    """
     try:
         calendar = _get_trading_calendar_source()
+        
+        # 首先检查是否是交易日
+        if not calendar.is_trading_day(Market.CHINA):
+            return False
+        
+        # 再检查是否在交易时段内
         result = calendar.is_within_trading_hours(Market.CHINA)
         return result.get("status") == "open"
     except Exception as e:
@@ -488,7 +498,7 @@ async def get_fund_estimate(
 )
 async def get_fund_history(
     code: str,
-    period: str = "近一年",
+    days: int = Query(365, ge=7, le=1825, description="时间周期（天数），可选值: 7, 30, 90, 180, 365, 1095, 1825"),
     manager: DataSourceManager = Depends(DataSourceDependency()),
 ) -> dict:
     """
@@ -496,12 +506,25 @@ async def get_fund_history(
 
     Args:
         code: 基金代码 (6位数字)
-        period: 时间周期，可选值: "近一周", "近一月", "近三月", "近六月", "近一年", "近三年", "近五年", "成立以来"
+        days: 时间周期（天数），可选值: 7, 30, 90, 180, 365, 1095(近三年), 1825(近五年)
         manager: 数据源管理器依赖
 
     Returns:
         dict: 包含历史净值数据的字典
     """
+    # Map days to period string
+    days_to_period = {
+        7: "近一周",
+        30: "近一月",
+        90: "近三月",
+        180: "近六月",
+        365: "近一年",
+        1095: "近三年",
+        1825: "近五年",
+    }
+    
+    period = days_to_period.get(days, "近一年")
+    
     history_source = _get_fund_history_source()
     result = await history_source.fetch(code, period)
 

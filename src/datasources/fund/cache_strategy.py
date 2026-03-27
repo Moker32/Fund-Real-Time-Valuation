@@ -105,6 +105,25 @@ class FundCacheStrategy:
     MID_FIELDS = {"fund_scale", "scale_date"}
     HIGH_FIELDS = {"net_value", "net_value_date", "fund_key"}
 
+    # 按数据类型定义TTL配置（包含过期容忍度）
+    TTL_CONFIG = {
+        "static": {
+            "fields": STATIC_FIELDS,
+            "ttl": timedelta(days=30),
+            "stale_threshold": timedelta(days=90),  # 静态数据可容忍更长的过期时间
+        },
+        "mid": {
+            "fields": MID_FIELDS,
+            "ttl": timedelta(days=7),
+            "stale_threshold": timedelta(days=30),
+        },
+        "high": {
+            "fields": HIGH_FIELDS,
+            "ttl": timedelta(days=1),
+            "stale_threshold": timedelta(days=7),  # 高频数据过期容忍度较低
+        },
+    }
+
     def __init__(self, db_manager: DatabaseManager):
         """
         初始化缓存策略
@@ -149,6 +168,47 @@ class FundCacheStrategy:
             return self.MID_TTL
         return max(self._get_ttl_for_field(f) for f in fields)
 
+    def _get_field_category(self, field: str) -> str:
+        """
+        获取字段所属的类别
+
+        Args:
+            field: 字段名
+
+        Returns:
+            str: 类别名称 ("static", "mid", "high")
+        """
+        if field in self.STATIC_FIELDS:
+            return "static"
+        elif field in self.MID_FIELDS:
+            return "mid"
+        elif field in self.HIGH_FIELDS:
+            return "high"
+        else:
+            return "mid"  # 默认中频
+
+    def _get_stale_threshold(self, fields: list[str] | None = None) -> timedelta:
+        """
+        获取字段列表的最大过期容忍度
+
+        Args:
+            fields: 字段列表，None则返回默认容忍度
+
+        Returns:
+            timedelta: 最大过期容忍度
+        """
+        if not fields:
+            # 默认使用mid的stale_threshold
+            return self.TTL_CONFIG["mid"]["stale_threshold"]
+
+        # 获取所有字段对应的stale_threshold，取最大值
+        thresholds = []
+        for field in fields:
+            category = self._get_field_category(field)
+            thresholds.append(self.TTL_CONFIG[category]["stale_threshold"])
+
+        return max(thresholds) if thresholds else self.TTL_CONFIG["mid"]["stale_threshold"]
+
     def _is_cache_valid(self, metadata: CacheMetadata | None) -> bool:
         """
         检查缓存是否有效
@@ -175,12 +235,15 @@ class FundCacheStrategy:
         except (ValueError, TypeError):
             return False
 
-    def _is_cache_stale(self, metadata: CacheMetadata | None) -> bool:
+    def _is_cache_stale(
+        self, metadata: CacheMetadata | None, fields: list[str] | None = None
+    ) -> bool:
         """
         检查缓存是否过期但可用（降级）
 
         Args:
             metadata: 缓存元数据
+            fields: 字段列表，用于计算过期容忍度，None则使用默认容忍度
 
         Returns:
             bool: 是否过期但可用
@@ -197,8 +260,8 @@ class FundCacheStrategy:
 
         try:
             expires_at = datetime.fromisoformat(metadata.expires_at.replace("Z", ""))
-            # 过期但在7天内仍可用
-            stale_threshold = timedelta(days=7)
+            # 根据字段类型获取过期容忍度
+            stale_threshold = self._get_stale_threshold(fields)
             return datetime.now() < expires_at + stale_threshold
         except (ValueError, TypeError):
             return False
@@ -247,7 +310,7 @@ class FundCacheStrategy:
             )
 
         # Step 3: 如果缓存过期但数据存在，尝试后台刷新
-        if basic_info and self._is_cache_stale(cache_metadata):
+        if basic_info and self._is_cache_stale(cache_metadata, fields):
             # 触发后台刷新
             asyncio.create_task(self._background_refresh(fund_code, fetch_func, ttl))
 

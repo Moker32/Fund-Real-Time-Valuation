@@ -64,6 +64,7 @@
             :key="fund.code"
             :fund="fund"
             @remove="handleRemoveFund"
+            @show-history="handleShowHistory"
           />
         </TransitionGroup>
       </div>
@@ -75,18 +76,26 @@
       @close="showAddDialog = false"
       @added="handleFundAdded"
     />
+
+    <!-- Fund History Dialog -->
+    <FundHistoryDialog
+      :visible="showHistoryDialog"
+      :fund-code="selectedFundCode || ''"
+      :fund-name="selectedFundName"
+      @close="showHistoryDialog = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useFundStore } from '@/stores/fundStore';
 import FundCard from '@/components/FundCard.vue';
 import AddFundDialog from '@/components/AddFundDialog.vue';
+import FundHistoryDialog from '@/components/FundHistoryDialog.vue';
 import { confirm } from '@/utils/confirm';
 
 // 加载骨架屏数量常量
-// eslint-disable-next-line no-useless-assignment
 const LOADING_SKELETON_COUNT = 6;
 
 // 空基金状态类型（用于骨架屏显示）
@@ -101,12 +110,14 @@ interface EmptyFundState {
 }
 
 const fundStore = useFundStore();
-// eslint-disable-next-line no-useless-assignment
 const showAddDialog = ref(false);
-const isMounted = ref(true);
+
+// Fund History Dialog state
+const showHistoryDialog = ref(false);
+const selectedFundCode = ref<string | null>(null);
+const selectedFundName = ref('');
 
 // 空基金数据用于加载骨架屏
-// eslint-disable-next-line no-useless-assignment
 const emptyFund: EmptyFundState = {
   code: '---',
   name: '加载中...',
@@ -125,17 +136,20 @@ const hasFunds = computed(() => fundStore.holdingFirstFunds.length > 0);
 const hasError = computed(() => !!fundStore.error);
 
 // 模板条件简化：显示骨架屏
-// eslint-disable-next-line no-useless-assignment
 const showSkeleton = computed(() => isLoading.value && !hasFunds.value);
 // 模板条件简化：显示基金列表
-// eslint-disable-next-line no-useless-assignment
 const showFundList = computed(() => hasFunds.value && !hasError.value);
 
 // 是否显示脉冲提示（当基金数量较少时）
-// eslint-disable-next-line no-useless-assignment
 const shouldShowPulseHint = computed(() => {
   return fundStore.holdingFirstFunds.length > 0 && fundStore.holdingFirstFunds.length < 3;
 });
+
+function handleShowHistory(fund: { code: string; name: string }) {
+  selectedFundCode.value = fund.code;
+  selectedFundName.value = fund.name;
+  showHistoryDialog.value = true;
+}
 
 async function handleRemoveFund(code: string) {
   const confirmed = await confirm({
@@ -182,7 +196,6 @@ async function handleFundAdded() {
 }
 
 onMounted(async () => {
-  isMounted.value = true;
   // 只在数据为空时加载基金列表
   if (fundStore.funds.length === 0) {
     await fundStore.fetchFunds();
@@ -208,10 +221,6 @@ onMounted(async () => {
       }
     }
   }
-});
-
-onUnmounted(() => {
-  isMounted.value = false;
 });
 </script>
 

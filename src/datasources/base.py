@@ -4,11 +4,24 @@
 """
 
 import asyncio
+import json
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+
+
+class DataSourceErrorType(Enum):
+    """统一的错误类型枚举"""
+
+    NETWORK_ERROR = "network_error"
+    TIMEOUT_ERROR = "timeout_error"
+    PARSE_ERROR = "parse_error"
+    AUTH_ERROR = "auth_error"
+    RATE_LIMIT_ERROR = "rate_limit_error"
+    DATA_NOT_FOUND = "data_not_found"
+    UNKNOWN_ERROR = "unknown_error"
 
 
 class DataSourceType(Enum):
@@ -66,10 +79,59 @@ class DataSourceResult:
     timestamp: float = 0.0
     source: str = ""
     metadata: dict | None = None
+    error_type: DataSourceErrorType | None = None
+    retryable: bool = True
 
     def __post_init__(self):
         if self.timestamp == 0.0:
             self.timestamp = time.time()
+
+    @classmethod
+    def from_exception(cls, e: Exception, source: str, data: Any = None) -> "DataSourceResult":
+        """
+        从异常创建失败结果
+
+        Args:
+            e: 捕获的异常
+            source: 数据源标识
+            data: 可选的附加数据
+
+        Returns:
+            DataSourceResult: 包含错误信息的失败结果
+        """
+        error_type = cls._infer_error_type(e)
+        retryable = error_type != DataSourceErrorType.AUTH_ERROR
+
+        return cls(
+            success=False,
+            data=data,
+            error=str(e),
+            timestamp=time.time(),
+            source=source,
+            metadata={"error_type": type(e).__name__},
+            error_type=error_type,
+            retryable=retryable,
+        )
+
+    @staticmethod
+    def _infer_error_type(e: Exception) -> DataSourceErrorType:
+        """
+        推断异常对应的错误类型
+
+        Args:
+            e: 捕获的异常
+
+        Returns:
+            DataSourceErrorType: 推断的错误类型
+        """
+        if isinstance(e, asyncio.TimeoutError):
+            return DataSourceErrorType.TIMEOUT_ERROR
+        elif isinstance(e, ConnectionError):
+            return DataSourceErrorType.NETWORK_ERROR
+        elif isinstance(e, json.JSONDecodeError):
+            return DataSourceErrorType.PARSE_ERROR
+        else:
+            return DataSourceErrorType.UNKNOWN_ERROR
 
 
 class DataSource(ABC):
