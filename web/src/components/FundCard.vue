@@ -93,7 +93,7 @@
         </div>
 
         <!-- 折线图：显示在估值下方 -->
-        <LineChart v-if="shouldShowChart" :data="chartData" :height="60" chart-type="line" :baseline="baseline" :trend="changeClass" class="fund-chart" />
+        <LineChart v-if="shouldShowChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" class="fund-chart" />
       </div>
 
       <div class="card-footer">

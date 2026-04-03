@@ -50,7 +50,7 @@
         </div>
 
         <Transition name="chart-expand">
-          <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" class="index-chart" />
+          <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" class="index-chart" />
         </Transition>
       </div>
 

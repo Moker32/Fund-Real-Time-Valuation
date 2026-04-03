@@ -3,6 +3,10 @@
     <div v-if="!hasData" class="chart-empty">
       <span class="chart-empty-text">暂无数据</span>
     </div>
+    <div v-if="showTooltip" class="chart-tooltip" :style="tooltipStyle">
+      <div class="tooltip-time">{{ tooltipTime }}</div>
+      <div class="tooltip-value">{{ tooltipValue }}</div>
+    </div>
   </div>
 </template>
 
@@ -11,12 +15,10 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 
-// 扩展 uPlot 接口以支持自定义属性
 interface uPlotWithBaseline extends uPlot {
   _baselineColor?: string;
 }
 
-// 通用图表数据类型 - 支持 Fund 和 Index 的数据类型
 interface ChartDataItem {
   time: string;
   price?: number;
@@ -28,41 +30,39 @@ const props = withDefaults(defineProps<{
   height?: number;
   baseline?: number;
   trend?: 'rising' | 'falling' | 'neutral';
+  showAxes?: boolean;
+  showTooltip?: boolean;
 }>(), {
   height: 100,
   trend: 'neutral',
+  showAxes: true,
+  showTooltip: true,
 });
 
-// eslint-disable-next-line no-undef
 const chartContainer = ref<HTMLElement | null>(null);
 let uplotInstance: uPlot | null = null;
 
-// 响应式获取趋势颜色 - 当数据变化时自动重新计算
 const color = computed(() => getTrendColor());
 
-// 判断是否有有效数据用于显示空状态
-// eslint-disable-next-line no-useless-assignment
 const hasData = computed(() => {
-  // 如果没有图表实例且没有数据，显示空状态
   if (!uplotInstance && (!props.data || props.data.length === 0)) return false;
-  // 其他情况（图表已初始化，或者正在等待数据）
   return true;
 });
 
-// 缓存上次数据，用于比较
-let lastDataJson: string = '';
+let lastDataJson = '';
+let processedTimestamps: number[] = [];
+let processedValues: (number | null)[] = [];
+let realTimestamps: number[] = [];
+let rawDataItems: ChartDataItem[] = [];
+let lunchBreakX: number | null = null;
 
 const getTrendColor = (): string => {
-  // 优先使用传入的 trend 属性
   if (props.trend === 'rising') return '#ef4444';
   if (props.trend === 'falling') return '#22c55e';
   return '#71717a';
 };
 
-// 解析时间字符串为秒级 Unix 时间戳
-// 支持格式: "YYYY-MM-DD", "YYYY-MM-DD HH:mm:ss", "HH:mm"
 const parseTimeToTimestamp = (timeStr: string): number => {
-  // 格式: "HH:mm" (日内分时数据，如 "14:30")
   const timeOnlyMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
   if (timeOnlyMatch && timeOnlyMatch[1] && timeOnlyMatch[2]) {
     const hour = parseInt(timeOnlyMatch[1], 10);
@@ -71,13 +71,11 @@ const parseTimeToTimestamp = (timeStr: string): number => {
     return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0).getTime() / 1000);
   }
 
-  // 格式: "YYYY-MM-DD" 或 "YYYY-MM-DD HH:mm:ss" 或 ISO 格式
   const date = new Date(timeStr);
   if (!isNaN(date.getTime())) {
     return Math.floor(date.getTime() / 1000);
   }
 
-  // 尝试解析其他格式
   const match = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})(?:[\sT](\d{2}):(\d{2}):?(\d{2})?)?$/);
   if (match) {
     const year = parseInt(match[1] ?? '0', 10);
@@ -89,24 +87,18 @@ const parseTimeToTimestamp = (timeStr: string): number => {
     return Math.floor(new Date(year, month, day, hour, minute, second).getTime() / 1000);
   }
 
-  // 返回当前时间戳作为回退
   return Math.floor(Date.now() / 1000);
 };
 
-// 判断是否为日内分时数据 (FundIntraday)
-// FundIntraday 有 price 字段，FundHistory 有 close 字段
 const isIntradayData = (data: ChartDataItem[]): boolean => {
   if (!data || data.length === 0) return false;
   const firstItem = data[0]!;
   return 'price' in firstItem && !('close' in firstItem);
 };
 
-// 计算日内分时数据的x轴范围
-// 根据数据自动适应X轴范围，不再固定为A股时间
 const getIntradayXRange = (data: ChartDataItem[]): { min: number; max: number } | null => {
   if (!isIntradayData(data) || data.length === 0) return null;
 
-  // 从数据中提取时间戳
   const timestamps: number[] = [];
   for (const item of data) {
     if (item && item.time) {
@@ -117,17 +109,13 @@ const getIntradayXRange = (data: ChartDataItem[]): { min: number; max: number } 
 
   if (timestamps.length === 0) return null;
 
-  // 根据实际数据范围设置X轴，添加少量边距
   const minTs = Math.min(...timestamps);
   const maxTs = Math.max(...timestamps);
-  
-  // 添加5分钟的边距
   const padding = 5 * 60;
-  
+
   return { min: minTs - padding, max: maxTs + padding };
 };
 
-// 计算 Y 轴范围，确保始终包含 baseline 值，并且 baseline 不在边界上
 const getYScaleRange = (data: [number[], (number | null)[]] | null, baseline: number | undefined): { min: number; max: number } | undefined => {
   if (!data || data[0].length === 0) return undefined;
 
@@ -144,22 +132,17 @@ const getYScaleRange = (data: [number[], (number | null)[]] | null, baseline: nu
 
   if (min === Infinity || max === -Infinity) return undefined;
 
-  // 添加 2% 边距
   const padding = (max - min) * 0.02;
   min -= padding;
   max += padding;
 
-  // 确保 baseline 包含在范围内，并且不在边界上
   if (baseline !== undefined && baseline > 0) {
-    // 如果 baseline 等于或接近 min，向下扩展范围
     if (baseline <= min + padding * 0.5) {
-      min = baseline - (max - baseline) * 0.1; // 添加 10% 的额外边距
+      min = baseline - (max - baseline) * 0.1;
     }
-    // 如果 baseline 等于或接近 max，向上扩展范围
     if (baseline >= max - padding * 0.5) {
-      max = baseline + (baseline - min) * 0.1; // 添加 10% 的额外边距
+      max = baseline + (baseline - min) * 0.1;
     }
-    // 确保 baseline 在范围内
     min = Math.min(min, baseline);
     max = Math.max(max, baseline);
   }
@@ -167,73 +150,193 @@ const getYScaleRange = (data: [number[], (number | null)[]] | null, baseline: nu
   return { min, max };
 };
 
+const formatXAxisLabel = (timestamp: number): string => {
+  if (isIntradayData(props.data) && realTimestamps.length > 0) {
+    const idx = processedTimestamps.indexOf(timestamp);
+    if (idx >= 0 && realTimestamps[idx]) {
+      const date = new Date(realTimestamps[idx] * 1000);
+      const h = date.getHours();
+      const m = date.getMinutes();
+      return `${h}:${m.toString().padStart(2, '0')}`;
+    }
+    const h = timestamp >= 40000 ? Math.floor(timestamp / 3600) % 24 : new Date(timestamp * 1000).getHours();
+    const m = timestamp >= 40000 ? Math.floor((timestamp % 3600) / 60) : new Date(timestamp * 1000).getMinutes();
+    return `${h}:${m.toString().padStart(2, '0')}`;
+  }
+  const date = new Date(timestamp * 1000);
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  return `${month}/${day}`;
+};
+
+const showTooltip = ref(false);
+const tooltipStyle = ref<Record<string, string>>({});
+const tooltipTime = ref('');
+const tooltipValue = ref('');
+
+const onCursorMove = (u: uPlot) => {
+  const idx = u.cursor.idx;
+  if (idx == null || idx < 0 || !rawDataItems.length) {
+    showTooltip.value = false;
+    return;
+  }
+
+  const rawItem = rawDataItems[idx];
+  if (!rawItem) {
+    showTooltip.value = false;
+    return;
+  }
+
+  const val = processedValues[idx];
+  if (val == null) {
+    showTooltip.value = false;
+    return;
+  }
+
+  const ts = realTimestamps.length > 0 ? realTimestamps[idx] : processedTimestamps[idx];
+  const date = new Date(ts * 1000);
+
+  if (isIntradayData(props.data)) {
+    tooltipTime.value = rawItem.time;
+  } else {
+    tooltipTime.value = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+  }
+
+  tooltipValue.value = val.toFixed(4);
+
+  const displayTs = processedTimestamps[idx];
+  const xPos = u.valToPos(displayTs, 'x', true);
+  const yPos = u.valToPos(val, 'y', true);
+  const containerWidth = chartContainer.value?.clientWidth ?? 300;
+
+  let left = xPos + 12;
+  if (left + 120 > containerWidth) {
+    left = xPos - 130;
+  }
+
+  tooltipStyle.value = {
+    left: `${left}px`,
+    top: `${yPos - 40}px`,
+  };
+  showTooltip.value = true;
+};
+
 const initChart = () => {
   if (!chartContainer.value) return;
-
   if (uplotInstance) return;
-  
-  chartContainer.value.innerHTML = '';
 
-  // 计算日内分时数据的x轴范围 (09:30 - 15:00)
+  chartContainer.value.innerHTML = '';
   const xRange = getIntradayXRange(props.data);
 
   try {
     uplotInstance = new uPlot({
       width: chartContainer.value.clientWidth || 300,
       height: props.height,
-      legend: {
-        show: false,
-      },
+      legend: { show: false },
       series: [
         {},
         {
           stroke: color.value,
           width: 2,
-          fill: undefined,
+          fill: (u: uPlot) => {
+            const ctx = u.ctx;
+            const gradient = ctx.createLinearGradient(0, 0, 0, u.bbox.height);
+            const c = color.value;
+            gradient.addColorStop(0, c + '30');
+            gradient.addColorStop(1, c + '05');
+            return gradient;
+          },
           points: { show: false },
           spanGaps: false,
         },
       ],
       axes: [
-        { show: false },
-        { show: false },
+        props.showAxes
+          ? {
+              show: true,
+              space: 60,
+              size: 24,
+              stroke: '#444',
+              grid: { show: false },
+              ticks: { show: false },
+              font: '11px -apple-system, sans-serif',
+              values: (_u: uPlot, vals: number[]) => vals.map(v => formatXAxisLabel(v)),
+            }
+          : { show: false },
+        props.showAxes
+          ? {
+              show: true,
+              space: 30,
+              size: 50,
+              stroke: '#444',
+              grid: { show: true, stroke: '#2a2a2a', width: 1 },
+              ticks: { show: false },
+              font: '11px -apple-system, sans-serif',
+              values: (_u: uPlot, vals: number[]) => vals.map(v => v.toFixed(4)),
+            }
+          : { show: false },
       ],
       scales: {
         x: {
           time: true,
           ...(xRange && { min: xRange.min, max: xRange.max }),
         },
-        y: {
-          auto: true,
-        },
+        y: { auto: true },
       },
       cursor: {
         drag: { x: false, y: false },
-        show: false,
+        show: props.showTooltip,
+        x: props.showTooltip,
+        y: false,
+        lock: props.showTooltip,
+        points: props.showTooltip
+          ? {
+              show: true,
+              size: 6,
+              width: 2,
+              stroke: (_u: uPlot) => color.value,
+              fill: '#1e1e1e',
+            }
+          : { show: false },
       },
       hooks: {
+        ...(props.showTooltip ? { setCursor: [onCursorMove] } : {}),
         draw: [
           (u: uPlot) => {
-            if (props.baseline === undefined) return;
-            const baseline = props.baseline;
-            const yScale = u.scales.y;
-            if (!yScale) return;
-
-            // 计算基准线在图表中的 Y 坐标
-            const yPos = u.valToPos(baseline, 'y', true);
-            if (yPos < 0 || yPos > u.bbox.height) return; // 如果在图表外则不绘制
-
             const ctx = u.ctx;
             ctx.save();
-            // 优先使用存储的基准线颜色，否则回退到动态获取
-            const uWithBaseline = u as uPlotWithBaseline;
-            ctx.strokeStyle = uWithBaseline._baselineColor ?? getTrendColor();
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 4]); // 虚线
-            ctx.beginPath();
-            ctx.moveTo(0, yPos);
-            ctx.lineTo(u.bbox.width, yPos);
-            ctx.stroke();
+
+            if (lunchBreakX !== null) {
+              const xPos = u.valToPos(lunchBreakX, 'x', true);
+              if (xPos > u.bbox.left + 2 && xPos < u.bbox.left + u.bbox.width - 2) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 2]);
+                ctx.beginPath();
+                ctx.moveTo(xPos, u.bbox.top);
+                ctx.lineTo(xPos, u.bbox.top + u.bbox.height);
+                ctx.stroke();
+              }
+            }
+
+            if (props.baseline !== undefined) {
+              const baseline = props.baseline;
+              const yScale = u.scales.y;
+              if (yScale) {
+                const yPos = u.valToPos(baseline, 'y', true);
+                if (yPos >= 0 && yPos <= u.bbox.height) {
+                  const uWithBaseline = u as uPlotWithBaseline;
+                  ctx.strokeStyle = uWithBaseline._baselineColor ?? getTrendColor();
+                  ctx.lineWidth = 1;
+                  ctx.setLineDash([4, 4]);
+                  ctx.beginPath();
+                  ctx.moveTo(u.bbox.left, yPos);
+                  ctx.lineTo(u.bbox.left + u.bbox.width, yPos);
+                  ctx.stroke();
+                }
+              }
+            }
+
             ctx.restore();
           },
         ],
@@ -246,10 +349,8 @@ const initChart = () => {
 
 const updateData = () => {
   if (!uplotInstance) return;
-  
   if (!props.data || props.data.length === 0) return;
 
-  // 过滤无效数据
   const validData = props.data.filter((item): item is { time: string; price: number; close?: number | null } => {
     if (!item) return false;
     const price = 'close' in item ? item.close : item.price;
@@ -258,97 +359,149 @@ const updateData = () => {
 
   if (validData.length === 0) return;
 
-  // 比较数据是否变化
   const currentDataJson = JSON.stringify(validData.map(d => d.time + (d.close ?? d.price)));
   if (currentDataJson === lastDataJson) return;
   lastDataJson = currentDataJson;
 
-  // 构建 uPlot 数据格式: [timestamps, values]
-  const timestamps: number[] = [];
-  const values: number[] = [];
+  rawDataItems = [...validData];
 
-  for (const item of validData) {
-    const ts = parseTimeToTimestamp(item.time);
-    const price = 'close' in item ? (item.close ?? item.price) : item.price;
-    if (price !== undefined) {
-      timestamps.push(ts);
-      values.push(price);
-    }
-  }
-
-  // 按时间排序并检测午间休市断点
-  // 原始数据格式: "HH:mm" (如 "09:30", "13:00")
   const sortedData = [...validData].sort((a, b) => {
     const tsA = parseTimeToTimestamp(a.time);
     const tsB = parseTimeToTimestamp(b.time);
     return tsA - tsB;
   });
 
-  const sortedTimestamps: number[] = [];
-  const sortedValues: (number | null)[] = [];
+  const isAStockIntraday = isIntradayData(props.data) && hasLunchBreak(sortedData);
 
-  // 获取当前时间和市场结束时间
-  const now = new Date();
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
-  const currentTimeInMinutes = currentHour * 60 + currentMinute;
-
-  // 检测午间休市断点 (A股: 11:30-13:00 休市)
-  let prevHour = -1;
-  for (const item of sortedData) {
-    const ts = parseTimeToTimestamp(item.time);
-    const price = 'close' in item ? (item.close ?? item.price) : item.price;
-    if (price === undefined) continue;
-
-    // 从时间字符串提取小时
-    const hourMatch = item.time.match(/^(\d{1,2}):/);
-    const hour = hourMatch && hourMatch[1] ? parseInt(hourMatch[1], 10) : -1;
-
-    // 如果从上午跳到下午 (hour < 11:59 -> hour >= 13)，插入 null 断点
-    if (prevHour >= 0 && prevHour <= 11 && hour >= 13) {
-      sortedTimestamps.push(ts - 60); // 提前1分钟作为断点
-      sortedValues.push(null);
-    }
-
-    sortedTimestamps.push(ts);
-    sortedValues.push(price);
-    prevHour = hour;
+  if (isAStockIntraday) {
+    buildCompressedIntradayData(sortedData);
+  } else {
+    buildRegularData(sortedData);
   }
 
-  // 如果当前时间在交易时间内（09:30-15:00），在最后一个数据点之后插入 null 断点
-  // 这样线条不会拉伸到 15:00
-  const lastTs = sortedTimestamps[sortedTimestamps.length - 1];
-  const marketEndInMinutes = 15 * 60; // 15:00
-  const marketStartInMinutes = 9 * 60 + 30; // 09:30
-
-  if (lastTs && currentTimeInMinutes > marketStartInMinutes && currentTimeInMinutes < marketEndInMinutes) {
-    // 计算市场结束时间戳
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const day = now.getDate();
-    const marketEndTs = Math.floor(new Date(year, month, day, 15, 0, 0).getTime() / 1000);
-
-    // 插入断点在最后一个数据点之后
-    sortedTimestamps.push(lastTs + 60); // 延后1分钟
-    sortedValues.push(null);
-
-    // 延后到市场结束时间（作为占位，保持轴范围）
-    sortedTimestamps.push(marketEndTs);
-    sortedValues.push(null);
-  }
-
-  const newData: [number[], (number | null)[]] = [sortedTimestamps, sortedValues];
+  const newData: [number[], (number | null)[]] = [processedTimestamps, processedValues];
 
   try {
     uplotInstance.setData(newData);
-    // 更新 Y 轴范围，确保包含 baseline
     updateYScaleRange(newData);
   } catch (e) {
     console.warn('[FundChart] setData error:', e);
   }
 };
 
-// 更新 Y 轴范围，确保始终包含 baseline
+const LUNCH_BREAK_START = 11 * 60 + 30;
+const LUNCH_BREAK_END = 13 * 60;
+
+const hasLunchBreak = (data: { time: string }[]): boolean => {
+  let hasMorning = false;
+  let hasAfternoon = false;
+  let hasLunchGap = true;
+
+  for (const item of data) {
+    const m = item.time.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m || !m[1] || !m[2]) continue;
+    const minutes = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    if (minutes <= LUNCH_BREAK_START) hasMorning = true;
+    if (minutes >= LUNCH_BREAK_END) hasAfternoon = true;
+    if (minutes > LUNCH_BREAK_START && minutes < LUNCH_BREAK_END) hasLunchGap = false;
+  }
+  return hasMorning && hasAfternoon && hasLunchGap;
+};
+
+const timeToMinutes = (timeStr: string): number => {
+  const m = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m || !m[1] || !m[2]) return -1;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+};
+
+const minutesToTimestamp = (minutes: number): number => {
+  const now = new Date();
+  return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate(), Math.floor(minutes / 60), minutes % 60, 0).getTime() / 1000);
+};
+
+const buildCompressedIntradayData = (sortedData: { time: string; price?: number; close?: number | null }[]) => {
+  const displayTimestamps: number[] = [];
+  const values: (number | null)[] = [];
+  const reals: number[] = [];
+
+  let lunchIdx = -1;
+
+  for (const item of sortedData) {
+    const minutes = timeToMinutes(item.time);
+    if (minutes < 0) continue;
+
+    const price = 'close' in item ? (item.close ?? item.price) : item.price;
+    if (price === undefined) continue;
+
+    const realTs = parseTimeToTimestamp(item.time);
+
+    let displayMinutes: number;
+    if (minutes <= LUNCH_BREAK_START) {
+      displayMinutes = minutes;
+    } else {
+      displayMinutes = minutes - (LUNCH_BREAK_END - LUNCH_BREAK_START);
+    }
+
+    const displayTs = minutesToTimestamp(displayMinutes);
+
+    if (lunchIdx === -1 && minutes > LUNCH_BREAK_START && displayTimestamps.length > 0) {
+      lunchIdx = displayTimestamps.length;
+    }
+
+    displayTimestamps.push(displayTs);
+    values.push(price);
+    reals.push(realTs);
+  }
+
+  if (lunchIdx > 0) {
+    lunchBreakX = minutesToTimestamp(LUNCH_BREAK_START);
+  }
+
+  processedTimestamps = displayTimestamps;
+  processedValues = values;
+  realTimestamps = reals;
+};
+
+const buildRegularData = (sortedData: { time: string; price?: number; close?: number | null }[]) => {
+  const timestamps: number[] = [];
+  const values: (number | null)[] = [];
+  const reals: number[] = [];
+
+  for (const item of sortedData) {
+    const ts = parseTimeToTimestamp(item.time);
+    const price = 'close' in item ? (item.close ?? item.price) : item.price;
+    if (price === undefined) continue;
+
+    timestamps.push(ts);
+    values.push(price);
+    reals.push(ts);
+  }
+
+  const lastTs = timestamps[timestamps.length - 1];
+  const now = new Date();
+  const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+  const marketEndInMinutes = 15 * 60;
+  const marketStartInMinutes = 9 * 60 + 30;
+
+  if (lastTs && currentTimeInMinutes > marketStartInMinutes && currentTimeInMinutes < marketEndInMinutes) {
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const day = now.getDate();
+    const marketEndTs = Math.floor(new Date(year, month, day, 15, 0, 0).getTime() / 1000);
+
+    timestamps.push(lastTs + 60);
+    values.push(null);
+    reals.push(0);
+    timestamps.push(marketEndTs);
+    values.push(null);
+    reals.push(0);
+  }
+
+  processedTimestamps = timestamps;
+  processedValues = values;
+  realTimestamps = reals;
+};
+
 const updateYScaleRange = (data: [number[], (number | null)[]]) => {
   if (!uplotInstance) return;
 
@@ -367,10 +520,8 @@ const updateColor = () => {
 
   const newColor = getTrendColor();
   try {
-    // uPlot setSeries API - use type assertion for stroke property
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     uplotInstance.setSeries(1, { stroke: newColor } as any);
-    // 存储基准线颜色并强制重绘，以更新基准线颜色
     (uplotInstance as uPlotWithBaseline)._baselineColor = newColor;
     uplotInstance.redraw();
   } catch (e) {
@@ -378,26 +529,19 @@ const updateColor = () => {
   }
 };
 
-// 缓存数据类型，用于检测变化
 let lastDataType: 'history' | 'intraday' | null = null;
 
-// 监听数据变化
 watch(() => props.data, (newData) => {
-  // 如果没有图表实例但有数据，先初始化图表
   if (!uplotInstance && chartContainer.value && newData && newData.length > 0) {
     initChart();
-    // 记录初始数据类型
     lastDataType = isIntradayData(newData) ? 'intraday' : 'history';
   }
 
   if (!uplotInstance) return;
-
   if (!newData || newData.length === 0) return;
 
-  // 检测数据类型是否变化，如果变化则需要重新初始化图表
   const currentDataType = isIntradayData(newData) ? 'intraday' : 'history';
   if (lastDataType !== null && lastDataType !== currentDataType) {
-    // 数据类型变化，销毁并重新创建图表
     uplotInstance.destroy();
     uplotInstance = null;
     lastDataType = null;
@@ -405,24 +549,18 @@ watch(() => props.data, (newData) => {
     lastDataType = currentDataType;
   }
 
-  // 更新颜色
   updateColor();
-
-  // 更新数据
   updateData();
 }, { deep: true, flush: 'post' });
 
-// 监听 trend 变化以更新颜色
 watch(() => props.trend, () => {
   if (uplotInstance) {
     updateColor();
   }
 });
 
-// 监听 baseline 变化以重绘基准线并更新 Y 轴范围
 watch(() => props.baseline, () => {
   if (uplotInstance) {
-    // 获取当前数据并更新 Y 轴范围
     const data = uplotInstance.data;
     if (data && data[0].length > 0) {
       updateYScaleRange(data as [number[], (number | null)[]]);
@@ -432,10 +570,9 @@ watch(() => props.baseline, () => {
 });
 
 onMounted(() => {
-  // 如果挂载时数据已存在，先初始化图表再更新数据
   if (props.data && props.data.length > 0) {
     initChart();
-    updateColor(); // 确保初始化时颜色和基准线都正确
+    updateColor();
     updateData();
   }
   window.addEventListener('resize', handleResize);
@@ -474,7 +611,40 @@ const handleResize = () => {
 }
 
 .fund-chart :deep(.uplot .u-over) {
-  cursor: default !important;
+  cursor: crosshair !important;
+}
+
+.fund-chart :deep(.uplot .u-cursor-x) {
+  stroke: #555 !important;
+  stroke-width: 1 !important;
+  stroke-dasharray: 3 3 !important;
+}
+
+.chart-tooltip {
+  position: absolute;
+  z-index: 10;
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 6px 10px;
+  pointer-events: none;
+  font-size: 12px;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.15s ease;
+}
+
+.tooltip-time {
+  color: #888;
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+.tooltip-value {
+  color: #fff;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
 }
 
 .chart-empty {

@@ -117,6 +117,9 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 const historyData = ref<FundHistory[]>([]);
 
+// Cache data by period to avoid refetching
+const dataCache = new Map<number, FundHistory[]>();
+
 // Track the latest request timestamp to handle race conditions
 let latestRequestTimestamp = 0;
 
@@ -169,6 +172,12 @@ function selectPeriod(period: number) {
 async function fetchHistory() {
   if (!props.fundCode) return;
 
+  // Check cache first
+  if (dataCache.has(selectedPeriod.value)) {
+    historyData.value = dataCache.get(selectedPeriod.value)!;
+    return;
+  }
+
   // Generate timestamp for this request
   const requestTimestamp = Date.now();
   latestRequestTimestamp = requestTimestamp;
@@ -181,6 +190,7 @@ async function fetchHistory() {
     // Only update state if this is still the latest request
     if (requestTimestamp === latestRequestTimestamp) {
       historyData.value = response.data;
+      dataCache.set(selectedPeriod.value, response.data);
     }
   } catch (err) {
     // Only show error if this is still the latest request
@@ -229,11 +239,18 @@ function formatPercent(value: number): string {
 watch(() => props.visible, (visible) => {
   if (visible) {
     fetchHistory();
-  } else {
-    // Reset state when closed
+  }
+  // Don't reset on close — keep cached data for instant re-open
+});
+
+// Watch for fund code changes (different fund opened)
+watch(() => props.fundCode, () => {
+  if (props.visible) {
+    // Clear cache when switching funds
+    dataCache.clear();
     historyData.value = [];
-    error.value = null;
-    selectedPeriod.value = 30; // Reset to default period
+    selectedPeriod.value = 30;
+    fetchHistory();
   }
 });
 </script>

@@ -17,6 +17,23 @@ export default defineConfig({
       }
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vue 核心
+          'vue-vendor': ['vue', 'pinia', 'pinia-plugin-persistedstate', 'vue-router'],
+          // Element Plus UI 库
+          'element-plus': ['element-plus', '@element-plus/icons-vue'],
+          // 图表库
+          'charts': ['lightweight-charts', 'uplot'],
+          // HTTP 请求
+          'utils': ['axios'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  },
   server: {
     port: 3000,
     open: true,
