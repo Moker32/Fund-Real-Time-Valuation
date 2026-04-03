@@ -50,6 +50,11 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "types-PyYAML>=6.0",
+    "types-requests>=2.0",
+    "types-pytz>=2024.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -77,6 +82,11 @@ python_version = "3.10"
 warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true
+exclude = [
+    "research/",
+    "scripts/",
+    "tests/",
+]
 
 # 忽略第三方库的类型存根问题
 [[tool.mypy.overrides]]

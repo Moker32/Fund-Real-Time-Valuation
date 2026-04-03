@@ -101,7 +101,15 @@ class FundCacheStrategy:
     HIGH_TTL = timedelta(days=1)  # 高频数据：net_value, net_value_date
 
     # 字段分类
-    STATIC_FIELDS = {"name", "short_name", "type", "establishment_date", "manager", "custodian", "risk_level"}
+    STATIC_FIELDS = {
+        "name",
+        "short_name",
+        "type",
+        "establishment_date",
+        "manager",
+        "custodian",
+        "risk_level",
+    }
     MID_FIELDS = {"fund_scale", "scale_date"}
     HIGH_FIELDS = {"net_value", "net_value_date", "fund_key"}
 
@@ -202,7 +210,7 @@ class FundCacheStrategy:
             return self.TTL_CONFIG["mid"]["stale_threshold"]
 
         # 获取所有字段对应的stale_threshold，取最大值
-        thresholds = []
+        thresholds: list[timedelta] = []
         for field in fields:
             category = self._get_field_category(field)
             thresholds.append(self.TTL_CONFIG[category]["stale_threshold"])
@@ -490,10 +498,7 @@ class FundCacheStrategy:
             dict: 字典形式的数据
         """
         if hasattr(basic_info, "__dataclass_fields__"):
-            return {
-                field: getattr(basic_info, field)
-                for field in basic_info.__dataclass_fields__
-            }
+            return {field: getattr(basic_info, field) for field in basic_info.__dataclass_fields__}
         elif hasattr(basic_info, "_asdict"):
             return basic_info._asdict()
         else:
