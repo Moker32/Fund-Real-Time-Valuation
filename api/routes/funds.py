@@ -107,17 +107,17 @@ def _get_trading_calendar_source() -> TradingCalendarSource:
 
 def _is_trading_hours() -> bool:
     """检查当前是否为交易时段
-    
+
     先检查是否是交易日（节假日检查），再检查是否在交易时段内。
     如果获取交易日历失败，默认返回 False（非交易时段）。
     """
     try:
         calendar = _get_trading_calendar_source()
-        
+
         # 首先检查是否是交易日
         if not calendar.is_trading_day(Market.CHINA):
             return False
-        
+
         # 再检查是否在交易时段内
         result = calendar.is_within_trading_hours(Market.CHINA)
         return result.get("status") == "open"
@@ -342,6 +342,149 @@ async def get_funds_list(
     return {"funds": funds, "total": len(funds), "timestamp": current_time, "progress": 100}
 
 
+# ==================== 自选相关路由 ====================
+# 注意：这些路由必须在 /{code} 之前定义，否则会被 /{code} 路由匹配
+
+
+@router.get(
+    "/watchlist",
+    response_model=WatchlistResponse,
+    summary="获取自选基金列表",
+    description="获取当前用户的自选基金列表",
+    responses={
+        200: {"description": "获取成功"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_watchlist(
+    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
+) -> WatchlistResponse:
+    """
+    获取自选基金列表
+
+    Returns:
+        WatchlistResponse: 自选基金列表
+    """
+    fund_list = config_manager.load_funds()
+
+    watchlist_data = [
+        WatchlistItem(code=f.code, name=f.name, isHolding=fund_list.is_holding(f.code))
+        for f in fund_list.watchlist
+    ]
+
+    return WatchlistResponse(
+        success=True,
+        watchlist=watchlist_data,
+        total=len(watchlist_data),
+    )
+
+
+@router.post(
+    "/watchlist",
+    response_model=OperationResponse,
+    summary="添加自选基金",
+    description="将基金添加到自选列表",
+    responses={
+        200: {"description": "添加成功"},
+        400: {"model": ErrorResponse, "description": "请求参数错误"},
+        404: {"model": ErrorResponse, "description": "基金不存在"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def add_to_watchlist(
+    request: AddFundRequest,
+    manager: DataSourceManager = Depends(DataSourceDependency()),
+    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
+) -> OperationResponse:
+    """
+    添加基金到自选列表
+
+    Args:
+        request: 添加基金请求
+        manager: 数据源管理器依赖
+
+    Returns:
+        OperationResponse: 添加结果
+    """
+    # 验证基金是否存在
+    result = await manager.fetch(DataSourceType.FUND, request.code)
+    if not result.success:
+        error_msg = result.error or "未知错误"
+        raise HTTPException(
+            status_code=404 if "不存在" in error_msg else 400,
+            detail=error_msg,
+        )
+
+    # 获取基金名称（如果请求中没有提供）
+    fund_name = request.name
+    if not fund_name and result.data:
+        fund_name = result.data.get("name", "")
+
+    # 添加到自选列表
+    fund = Fund(code=request.code, name=fund_name)
+    config_manager.add_watchlist(fund)
+
+    # 添加成功后，触发新基金数据预热（非阻塞）
+    asyncio.create_task(_prewarm_added_fund(request.code))
+
+    return OperationResponse(
+        success=True,
+        message=f"基金 {request.code} 已添加到自选",
+    )
+
+
+@router.delete(
+    "/watchlist/{code}",
+    response_model=OperationResponse,
+    summary="删除自选基金",
+    description="从自选列表中移除基金",
+    responses={
+        200: {"description": "删除成功"},
+        404: {"model": ErrorResponse, "description": "基金不在自选列表中"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def remove_from_watchlist(
+    code: str, config_manager: ConfigManager = Depends(ConfigManagerDependency())
+) -> OperationResponse:
+    """
+    从自选列表中移除基金
+
+    Args:
+        code: 基金代码 (6位数字)
+
+    Returns:
+        OperationResponse: 删除结果
+    """
+    # config_manager provided via DI
+
+    # 检查是否在自选列表中
+    fund_list = config_manager.load_funds()
+    if not fund_list.is_watching(code):
+        raise HTTPException(
+            status_code=404,
+            detail=f"基金 {code} 不在自选列表中",
+        )
+
+    # 从自选列表中移除
+    config_manager.remove_watchlist(code)
+
+    # 如果该基金也在持有列表中，同时从持有列表中移除
+    if fund_list.is_holding(code):
+        config_manager.remove_holding(code)
+
+    # 移除成功后，清理相关缓存
+    asyncio.create_task(_cleanup_removed_fund(code))
+
+    return OperationResponse(
+        success=True,
+        message=f"基金 {code} 已从自选移除",
+    )
+
+
+# ==================== 基金详情路由 ====================
+
+
 @router.get(
     "/{code}",
     # response_model=FundDetailResponse,  # 移除 response_model，使用手动序列化
@@ -498,7 +641,9 @@ async def get_fund_estimate(
 )
 async def get_fund_history(
     code: str,
-    days: int = Query(365, ge=7, le=1825, description="时间周期（天数），可选值: 7, 30, 90, 180, 365, 1095, 1825"),
+    days: int = Query(
+        365, ge=7, le=1825, description="时间周期（天数），可选值: 7, 30, 90, 180, 365, 1095, 1825"
+    ),
     manager: DataSourceManager = Depends(DataSourceDependency()),
 ) -> dict:
     """
@@ -522,9 +667,9 @@ async def get_fund_history(
         1095: "近三年",
         1825: "近五年",
     }
-    
+
     period = days_to_period.get(days, "近一年")
-    
+
     history_source = _get_fund_history_source()
     result = await history_source.fetch(code, period)
 
@@ -643,93 +788,6 @@ async def get_fund_intraday_by_date(
     ).model_dump()
 
 
-@router.get(
-    "/watchlist",
-    response_model=WatchlistResponse,
-    summary="获取自选基金列表",
-    description="获取当前用户的自选基金列表",
-    responses={
-        200: {"description": "获取成功"},
-        500: {"model": ErrorResponse, "description": "服务器错误"},
-    },
-)
-async def get_watchlist(
-    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
-) -> WatchlistResponse:
-    """
-    获取自选基金列表
-
-    Returns:
-        WatchlistResponse: 自选基金列表
-    """
-    fund_list = config_manager.load_funds()
-
-    watchlist_data = [
-        WatchlistItem(code=f.code, name=f.name, isHolding=fund_list.is_holding(f.code))
-        for f in fund_list.watchlist
-    ]
-
-    return WatchlistResponse(
-        success=True,
-        watchlist=watchlist_data,
-        total=len(watchlist_data),
-    )
-
-
-@router.post(
-    "/watchlist",
-    response_model=OperationResponse,
-    summary="添加自选基金",
-    description="将基金添加到自选列表",
-    responses={
-        200: {"description": "添加成功"},
-        400: {"model": ErrorResponse, "description": "请求参数错误"},
-        404: {"model": ErrorResponse, "description": "基金不存在"},
-        500: {"model": ErrorResponse, "description": "服务器错误"},
-    },
-)
-async def add_to_watchlist(
-    request: AddFundRequest,
-    manager: DataSourceManager = Depends(DataSourceDependency()),
-    config_manager: ConfigManager = Depends(ConfigManagerDependency()),
-) -> OperationResponse:
-    """
-    添加基金到自选列表
-
-    Args:
-        request: 添加基金请求
-        manager: 数据源管理器依赖
-
-    Returns:
-        OperationResponse: 添加结果
-    """
-    # 验证基金是否存在
-    result = await manager.fetch(DataSourceType.FUND, request.code)
-    if not result.success:
-        error_msg = result.error or "未知错误"
-        raise HTTPException(
-            status_code=404 if "不存在" in error_msg else 400,
-            detail=error_msg,
-        )
-
-    # 获取基金名称（如果请求中没有提供）
-    fund_name = request.name
-    if not fund_name and result.data:
-        fund_name = result.data.get("name", "")
-
-    # 添加到自选列表
-    fund = Fund(code=request.code, name=fund_name)
-    config_manager.add_watchlist(fund)
-
-    # 添加成功后，触发新基金数据预热（非阻塞）
-    asyncio.create_task(_prewarm_added_fund(request.code))
-
-    return OperationResponse(
-        success=True,
-        message=f"基金 {request.code} 已添加到自选",
-    )
-
-
 @router.put(
     "/{code}/holding",
     response_model=OperationResponse,
@@ -814,55 +872,6 @@ async def toggle_holding(
             success=True,
             message=f"基金 {code} 已取消持有",
         )
-
-
-@router.delete(
-    "/watchlist/{code}",
-    response_model=OperationResponse,
-    summary="删除自选基金",
-    description="从自选列表中移除基金",
-    responses={
-        200: {"description": "删除成功"},
-        404: {"model": ErrorResponse, "description": "基金不在自选列表中"},
-        500: {"model": ErrorResponse, "description": "服务器错误"},
-    },
-)
-async def remove_from_watchlist(
-    code: str, config_manager: ConfigManager = Depends(ConfigManagerDependency())
-) -> OperationResponse:
-    """
-    从自选列表中移除基金
-
-    Args:
-        code: 基金代码 (6位数字)
-
-    Returns:
-        OperationResponse: 删除结果
-    """
-    # config_manager provided via DI
-
-    # 检查是否在自选列表中
-    fund_list = config_manager.load_funds()
-    if not fund_list.is_watching(code):
-        raise HTTPException(
-            status_code=404,
-            detail=f"基金 {code} 不在自选列表中",
-        )
-
-    # 从自选列表中移除
-    config_manager.remove_watchlist(code)
-
-    # 如果该基金也在持有列表中，同时从持有列表中移除
-    if fund_list.is_holding(code):
-        config_manager.remove_holding(code)
-
-    # 移除成功后，清理相关缓存
-    asyncio.create_task(_cleanup_removed_fund(code))
-
-    return OperationResponse(
-        success=True,
-        message=f"基金 {code} 已从自选移除",
-    )
 
 
 async def _prewarm_added_fund(fund_code: str):
