@@ -68,7 +68,7 @@ test.describe('导航测试', () => {
 
   test('URL 直接访问各页面', async ({ page }) => {
     // 测试直接访问各页面
-    const routes = ['/funds', '/commodities', '/indices', '/sectors', '/bonds'];
+    const routes = ['/funds', '/commodities', '/indices', '/sectors'];
 
     for (const route of routes) {
       await page.goto(route);

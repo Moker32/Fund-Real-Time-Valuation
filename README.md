@@ -57,8 +57,6 @@
 - **🌍 全球指数行情** - 美股、港股、A股、日经、英国富时等主要市场指数
 - **🥇 大宗商品** - 黄金、白银、原油、铜等商品实时价格
 - **📊 板块轮动** - A股行业板块涨跌排行与资金流向
-- **📉 股票行情** - 个股实时价格与盘口数据
-- **💰 债券市场** - 国债、企业债收益率曲线
 - **📅 财经日历** - 全球经济事件与数据发布
 - **🔥 舆情分析** - 市场情绪指标与热点追踪
 
@@ -167,9 +165,6 @@ Fund-Real-Time-Valuation/
 │       ├── commodities.py   # 商品 API
 │       ├── indices.py        # 指数 API
 │       ├── sectors.py        # 板块 API
-│       ├── stocks.py         # 股票 API
-│       ├── bonds.py          # 债券 API
-│       ├── news.py           # 新闻 API
 │       ├── sentiment.py      # 舆情 API
 │       ├── trading_calendar.py  # 交易日历
 │       ├── holidays.py       # 节假日
@@ -186,8 +181,6 @@ Fund-Real-Time-Valuation/
 │   │   ├── commodity_source.py # 商品数据源
 │   │   ├── index_source.py   # 指数数据源
 │   │   ├── sector_source.py  # 板块数据源
-│   │   ├── stock_source.py   # 股票数据源
-│   │   ├── bond_source.py    # 债券数据源
 │   │   ├── trading_calendar_source.py # 交易日历
 │   │   ├── cache.py          # 缓存模块
 │   │   ├── gateway.py        # 数据网关
@@ -272,29 +265,6 @@ DELETE /api/funds/watchlist/{code}  # 删除自选
 
 # 持仓管理
 PUT /api/funds/{code}/holding?holding=true  # 标记/取消持有
-```
-
-### 债券
-
-```bash
-# 债券列表
-GET /api/bonds?bond_type=cbond
-
-# 单个债券详情
-GET /api/bonds/{code}?market=sh
-
-# 可转债搜索
-GET /api/bonds/search/cbonds?keyword=110
-```
-
-### 股票
-
-```bash
-# 股票行情（批量）
-GET /api/stocks?codes=sh600000,sz000001,AAPL
-
-# 单个股票详情
-GET /api/stocks/{code}
 ```
 
 ### 商品

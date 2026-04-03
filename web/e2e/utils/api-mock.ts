@@ -115,25 +115,6 @@ export async function mockSectorsApi(
 }
 
 /**
- * Mock 债券 API
- */
-export async function mockBondsApi(
-  page: Page,
-  options: MockApiOptions = {}
-): Promise<void> {
-  const { delay = 0, status = 200 } = options;
-
-  await page.route('**/api/bonds*', async (route: Route) => {
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    await route.fulfill({
-      status,
-      contentType: 'application/json',
-      body: JSON.stringify(mockApiResponses.bonds),
-    });
-  });
-}
-
-/**
  * Mock 健康检查 API
  */
 export async function mockHealthApi(
@@ -176,25 +157,6 @@ export async function mockOverviewApi(
 }
 
 /**
- * Mock 股票 API
- */
-export async function mockStocksApi(
-  page: Page,
-  options: MockApiOptions = {}
-): Promise<void> {
-  const { delay = 0, status = 200 } = options;
-
-  await page.route('**/api/stocks*', async (route: Route) => {
-    await new Promise((resolve) => setTimeout(resolve, delay));
-    await route.fulfill({
-      status,
-      contentType: 'application/json',
-      body: JSON.stringify({ stocks: [] }),
-    });
-  });
-}
-
-/**
  * Mock 舆情 API
  */
 export async function mockSentimentApi(
@@ -229,10 +191,8 @@ export async function mockAllApis(
     mockIndicesApi(page, options),
     mockCommoditiesApi(page, options),
     mockSectorsApi(page, options),
-    mockBondsApi(page, options),
     mockHealthApi(page, options),
     mockOverviewApi(page, options),
-    mockStocksApi(page, options),
     mockSentimentApi(page, options),
   ]);
 }

@@ -147,26 +147,6 @@ export const mockSectors = [
   },
 ];
 
-// 债券 Mock 数据
-export const mockBonds = [
-  {
-    code: '019740',
-    name: '24国债09',
-    price: 102.35,
-    change: 0.15,
-    changePercent: 0.15,
-    yield: 2.15,
-  },
-  {
-    code: '110000',
-    name: '24国债ETF',
-    price: 125.67,
-    change: 0.23,
-    changePercent: 0.18,
-    yield: 2.08,
-  },
-];
-
 // 搜索基金 Mock 数据
 export const mockSearchResults = [
   {
@@ -201,9 +181,6 @@ export const mockApiResponses = {
   },
   sectors: {
     sectors: mockSectors,
-  },
-  bonds: {
-    bonds: mockBonds,
   },
   searchFunds: {
     results: mockSearchResults,
