@@ -27,7 +27,7 @@ class CacheCleaner:
     def __init__(
         self,
         cleanup_interval: int = 3600,  # 默认每小时清理一次
-        days_before_expired: int = 7,   # 默认清理 7 天前的数据
+        days_before_expired: int = 7,  # 默认清理 7 天前的数据
     ):
         """
         初始化缓存清理器
@@ -42,10 +42,10 @@ class CacheCleaner:
         self._running = False
 
         # 缓存目录路径 (从环境变量或默认路径)
-        config_dir = Path.home() / '.fund-tui'
-        self._fund_cache_dir = config_dir / 'cache' / 'fund'
-        self._commodity_cache_dir = config_dir / 'cache' / 'commodity'
-        self._news_cache_dir = config_dir / 'cache' / 'news'
+        config_dir = Path.home() / ".fund-tui"
+        self._fund_cache_dir = config_dir / "cache" / "fund"
+        self._commodity_cache_dir = config_dir / "cache" / "commodity"
+        self._news_cache_dir = config_dir / "cache" / "news"
 
     async def cleanup_on_startup(self) -> dict[str, Any]:
         """
@@ -63,7 +63,7 @@ class CacheCleaner:
             "file_cache_cleaned": 0,
             "intraday_cache_cleaned": 0,
             "total_files_deleted": 0,
-            "errors": []
+            "errors": [],
         }
 
         try:
@@ -111,7 +111,7 @@ class CacheCleaner:
 
         return results
 
-    async def start_background_cleanup(self):
+    async def start_background_cleanup(self) -> None:
         """启动后台定时清理任务"""
         if self._running:
             logger.warning("清理任务已在运行中")
@@ -120,7 +120,7 @@ class CacheCleaner:
         self._running = True
         logger.info(f"启动后台清理任务，间隔: {self.cleanup_interval}秒")
 
-        async def periodic_cleanup():
+        async def periodic_cleanup() -> None:
             """定期执行清理任务"""
             while self._running:
                 try:
@@ -136,7 +136,7 @@ class CacheCleaner:
         # 启动后台任务
         self._cleanup_task = asyncio.create_task(periodic_cleanup())
 
-    def stop(self):
+    def stop(self) -> None:
         """停止后台清理任务"""
         self._running = False
 
@@ -199,7 +199,7 @@ class CacheCleaner:
                 continue
 
             try:
-                for cache_file in cache_dir.glob('*.json'):
+                for cache_file in cache_dir.glob("*.json"):
                     try:
                         # 检查文件是否过期（超过 7 天）
                         file_mtime = cache_file.stat().st_mtime
@@ -256,7 +256,7 @@ class CacheCleaner:
                 "fund": str(self._fund_cache_dir),
                 "commodity": str(self._commodity_cache_dir),
                 "news": str(self._news_cache_dir),
-            }
+            },
         }
 
 
@@ -283,7 +283,7 @@ async def startup_cleanup() -> dict[str, Any]:
     return await cleaner.cleanup_on_startup()
 
 
-def start_background_cleanup_task(interval: int = 3600):
+def start_background_cleanup_task(interval: int = 3600) -> None:
     """
     启动后台清理任务
 

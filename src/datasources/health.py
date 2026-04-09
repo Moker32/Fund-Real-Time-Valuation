@@ -51,7 +51,6 @@ def get_mini_racer_status() -> dict[str, Any]:
             status["installed"] = True
             status["version"] = "mini_racer"
             try:
-
                 status["working"] = True
             except Exception as e:
                 status["error"] = f"mini_racer import failed: {type(e).__name__}: {str(e)}"
@@ -377,7 +376,7 @@ class DataSourceHealthChecker:
                 healthy.append(source_name)
         return healthy
 
-    async def start_background_check(self, sources: list[DataSource]):
+    async def start_background_check(self, sources: list[DataSource]) -> None:
         """
         启动后台健康检查任务
 

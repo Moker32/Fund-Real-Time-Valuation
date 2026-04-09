@@ -48,7 +48,7 @@ class CircuitBreaker:
             return self._half_open_calls < self.config.half_open_max_calls
         return False
 
-    async def record_success(self):
+    async def record_success(self) -> None:
         async with self._lock:
             if self._state == CircuitState.HALF_OPEN:
                 self._success_count += 1
@@ -60,7 +60,7 @@ class CircuitBreaker:
             elif self._state == CircuitState.CLOSED:
                 self._failure_count = 0
 
-    async def record_failure(self):
+    async def record_failure(self) -> None:
         async with self._lock:
             self._failure_count += 1
             self._last_failure_time = time.time()
@@ -73,7 +73,7 @@ class CircuitBreaker:
                 self._half_open_calls = 0
                 self._success_count = 0
 
-    async def record_half_open(self):
+    async def record_half_open(self) -> None:
         async with self._lock:
             if self._state == CircuitState.OPEN:
                 if time.time() - self._last_failure_time >= self.config.timeout_seconds:
@@ -81,7 +81,9 @@ class CircuitBreaker:
                     self._half_open_calls = 0
                     self._success_count = 0
 
-    async def execute(self, func: Callable[..., Any], *args, **kwargs) -> tuple[bool, Any]:
+    async def execute(
+        self, func: Callable[..., Any], *args: Any, **kwargs: Any
+    ) -> tuple[bool, Any]:
         await self.record_half_open()
 
         if not self.can_execute():
@@ -146,8 +148,8 @@ class HotBackupManager:
         self,
         primary_func: Callable[..., Any],
         backup_funcs: list[Callable[..., Any]],
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> HotBackupResult:
         result = HotBackupResult()
 

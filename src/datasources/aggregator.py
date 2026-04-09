@@ -17,6 +17,7 @@ from .base import DataSource, DataSourceResult
 @dataclass
 class AggregatorSourceInfo:
     """聚合器中的数据源信息"""
+
     source: DataSource
     is_primary: bool = False
     weight: float = 1.0  # 负载均衡权重
@@ -42,7 +43,7 @@ class DataAggregator(ABC):
         self._success_count = 0
         self._failover_count = 0
 
-    def add_source(self, source: DataSource, is_primary: bool = False, weight: float = 1.0):
+    def add_source(self, source: DataSource, is_primary: bool = False, weight: float = 1.0) -> None:
         """
         添加数据源到聚合器
 
@@ -51,11 +52,9 @@ class DataAggregator(ABC):
             is_primary: 是否为主要数据源
             weight: 负载均衡权重
         """
-        self._sources.append(AggregatorSourceInfo(
-            source=source,
-            is_primary=is_primary,
-            weight=weight
-        ))
+        self._sources.append(
+            AggregatorSourceInfo(source=source, is_primary=is_primary, weight=weight)
+        )
 
     def remove_source(self, source_name: str) -> bool:
         """
@@ -95,7 +94,7 @@ class DataAggregator(ABC):
         return self._sources[0].source if self._sources else None
 
     @abstractmethod
-    async def fetch(self, *args, **kwargs) -> DataSourceResult:
+    async def fetch(self, *args: Any, **kwargs: Any) -> DataSourceResult:
         """
         获取数据（抽象方法，子类必须实现）
 
@@ -109,7 +108,7 @@ class DataAggregator(ABC):
         pass
 
     @abstractmethod
-    async def fetch_all(self, *args, **kwargs) -> list[DataSourceResult]:
+    async def fetch_all(self, *args: Any, **kwargs: Any) -> list[DataSourceResult]:
         """
         获取所有数据源的数据
 
@@ -136,16 +135,18 @@ class DataAggregator(ABC):
             "request_count": self._request_count,
             "success_count": self._success_count,
             "failover_count": self._failover_count,
-            "success_rate": self._success_count / self._request_count if self._request_count > 0 else 0.0,
+            "success_rate": self._success_count / self._request_count
+            if self._request_count > 0
+            else 0.0,
             "sources": [
                 {
                     "name": info.source.name,
                     "is_primary": info.is_primary,
                     "weight": info.weight,
-                    "status": info.source.get_status()
+                    "status": info.source.get_status(),
                 }
                 for info in self._sources
-            ]
+            ],
         }
 
 
@@ -166,7 +167,7 @@ class SameSourceAggregator(DataAggregator):
         super().__init__(name)
         self._last_successful_source: str | None = None
 
-    async def fetch(self, *args, **kwargs) -> DataSourceResult:
+    async def fetch(self, *args: Any, **kwargs: Any) -> DataSourceResult:
         """
         获取数据（故障切换策略）
 
@@ -184,10 +185,7 @@ class SameSourceAggregator(DataAggregator):
         """
         if not self._sources:
             return DataSourceResult(
-                success=False,
-                error="聚合器中没有数据源",
-                timestamp=time.time(),
-                source=self.name
+                success=False, error="聚合器中没有数据源", timestamp=time.time(), source=self.name
             )
 
         self._request_count += 1
@@ -232,7 +230,7 @@ class SameSourceAggregator(DataAggregator):
             error=f"所有数据源均失败: {'; '.join(errors)}",
             timestamp=time.time(),
             source=self.name,
-            metadata={"failover_count": self._failover_count, "errors": errors}
+            metadata={"failover_count": self._failover_count, "errors": errors},
         )
 
     async def fetch_all(self, *args, **kwargs) -> list[DataSourceResult]:
@@ -252,7 +250,7 @@ class SameSourceAggregator(DataAggregator):
                     success=False,
                     error="聚合器中没有数据源",
                     timestamp=time.time(),
-                    source=self.name
+                    source=self.name,
                 )
             ]
 
@@ -262,12 +260,11 @@ class SameSourceAggregator(DataAggregator):
                 result = await info.source.fetch(*args, **kwargs)
                 results.append(result)
             except Exception as e:
-                results.append(DataSourceResult(
-                    success=False,
-                    error=str(e),
-                    timestamp=time.time(),
-                    source=info.source.name
-                ))
+                results.append(
+                    DataSourceResult(
+                        success=False, error=str(e), timestamp=time.time(), source=info.source.name
+                    )
+                )
         return results
 
 
@@ -289,7 +286,7 @@ class LoadBalancedAggregator(DataAggregator):
         self._current_index = 0
         self._source_usage: dict[str, int] = {}
 
-    def add_source(self, source: DataSource, is_primary: bool = False, weight: float = 1.0):
+    def add_source(self, source: DataSource, is_primary: bool = False, weight: float = 1.0) -> None:
         """
         添加数据源到聚合器
 
@@ -301,7 +298,7 @@ class LoadBalancedAggregator(DataAggregator):
         super().add_source(source, is_primary, weight)
         self._source_usage[source.name] = 0
 
-    async def fetch(self, *args, **kwargs) -> DataSourceResult:
+    async def fetch(self, *args: Any, **kwargs: Any) -> DataSourceResult:
         """
         获取数据（负载均衡策略）
 
@@ -316,18 +313,14 @@ class LoadBalancedAggregator(DataAggregator):
         """
         if not self._sources:
             return DataSourceResult(
-                success=False,
-                error="聚合器中没有数据源",
-                timestamp=time.time(),
-                source=self.name
+                success=False, error="聚合器中没有数据源", timestamp=time.time(), source=self.name
             )
 
         self._request_count += 1
 
         # 按使用次数排序，选择使用次数最少的数据源
         sorted_sources = sorted(
-            self._sources,
-            key=lambda x: self._source_usage.get(x.source.name, 0)
+            self._sources, key=lambda x: self._source_usage.get(x.source.name, 0)
         )
 
         for info in sorted_sources:
@@ -343,13 +336,10 @@ class LoadBalancedAggregator(DataAggregator):
                 self._source_usage[source.name] += 1
 
         return DataSourceResult(
-            success=False,
-            error="所有数据源均失败",
-            timestamp=time.time(),
-            source=self.name
+            success=False, error="所有数据源均失败", timestamp=time.time(), source=self.name
         )
 
-    async def fetch_all(self, *args, **kwargs) -> list[DataSourceResult]:
+    async def fetch_all(self, *args: Any, **kwargs: Any) -> list[DataSourceResult]:
         """
         获取所有数据源的数据
 
@@ -366,7 +356,7 @@ class LoadBalancedAggregator(DataAggregator):
                     success=False,
                     error="聚合器中没有数据源",
                     timestamp=time.time(),
-                    source=self.name
+                    source=self.name,
                 )
             ]
 
@@ -376,12 +366,11 @@ class LoadBalancedAggregator(DataAggregator):
                 result = await info.source.fetch(*args, **kwargs)
                 results.append(result)
             except Exception as e:
-                results.append(DataSourceResult(
-                    success=False,
-                    error=str(e),
-                    timestamp=time.time(),
-                    source=info.source.name
-                ))
+                results.append(
+                    DataSourceResult(
+                        success=False, error=str(e), timestamp=time.time(), source=info.source.name
+                    )
+                )
         return results
 
     def get_statistics(self) -> dict[str, Any]:
@@ -401,5 +390,5 @@ __all__ = [
     "DataAggregator",
     "SameSourceAggregator",
     "LoadBalancedAggregator",
-    "AggregatorSourceInfo"
+    "AggregatorSourceInfo",
 ]

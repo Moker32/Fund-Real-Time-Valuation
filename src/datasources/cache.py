@@ -32,7 +32,7 @@ class DataCache:
         self.cache_dir = Path(cache_dir)
         self._ensure_cache_dir()
 
-    def _ensure_cache_dir(self):
+    def _ensure_cache_dir(self) -> None:
         """确保缓存目录存在"""
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -40,6 +40,7 @@ class DataCache:
         """获取缓存文件路径"""
         # 使用 key 的哈希值作为文件名，避免文件名过长或包含非法字符
         import hashlib
+
         key_hash = hashlib.md5(key.encode()).hexdigest()
         return self.cache_dir / f"{key_hash}.json"
 
@@ -59,9 +60,9 @@ class DataCache:
 
         # 读取缓存创建时间
         try:
-            with open(cache_path, encoding='utf-8') as f:
+            with open(cache_path, encoding="utf-8") as f:
                 cache_data = json.load(f)
-                created_at = datetime.fromisoformat(cache_data.get('created_at', ''))
+                created_at = datetime.fromisoformat(cache_data.get("created_at", ""))
                 expires_at = created_at + timedelta(seconds=ttl_seconds)
                 return datetime.now() >= expires_at
         except (json.JSONDecodeError, KeyError, ValueError):
@@ -84,12 +85,12 @@ class DataCache:
             return None
 
         try:
-            with open(cache_path, encoding='utf-8') as f:
+            with open(cache_path, encoding="utf-8") as f:
                 cache_data = json.load(f)
 
                 # 检查是否过期
-                ttl_seconds = cache_data.get('ttl', self.DEFAULT_TTL)
-                created_at = datetime.fromisoformat(cache_data.get('created_at', ''))
+                ttl_seconds = cache_data.get("ttl", self.DEFAULT_TTL)
+                created_at = datetime.fromisoformat(cache_data.get("created_at", ""))
                 expires_at = created_at + timedelta(seconds=ttl_seconds)
 
                 if datetime.now() >= expires_at:
@@ -97,13 +98,13 @@ class DataCache:
                     self._remove_cache(cache_path)
                     return None
 
-                return cache_data.get('value')
+                return cache_data.get("value")
 
         except (json.JSONDecodeError, KeyError, ValueError, OSError):
             # 读取失败，返回 None
             return None
 
-    def set(self, key: str, value: Any, ttl_seconds: int | None = None):
+    def set(self, key: str, value: Any, ttl_seconds: int | None = None) -> None:
         """
         设置缓存数据
 
@@ -118,20 +119,20 @@ class DataCache:
         cache_path = self._get_cache_path(key)
 
         cache_data = {
-            'key': key,
-            'value': value,
-            'ttl': ttl_seconds,
-            'created_at': datetime.now().isoformat(),
-            'expires_at': (datetime.now() + timedelta(seconds=ttl_seconds)).isoformat()
+            "key": key,
+            "value": value,
+            "ttl": ttl_seconds,
+            "created_at": datetime.now().isoformat(),
+            "expires_at": (datetime.now() + timedelta(seconds=ttl_seconds)).isoformat(),
         }
 
         try:
-            with open(cache_path, 'w', encoding='utf-8') as f:
+            with open(cache_path, "w", encoding="utf-8") as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
         except (OSError, TypeError) as e:
             logger.warning(f"缓存写入失败 (key={key}): {e}")
 
-    def clear(self, key: str | None = None):
+    def clear(self, key: str | None = None) -> None:
         """
         清除缓存
 
@@ -146,18 +147,18 @@ class DataCache:
             cache_path = self._get_cache_path(key)
             self._remove_cache(cache_path)
 
-    def _remove_cache(self, cache_path: Path):
+    def _remove_cache(self, cache_path: Path) -> None:
         """删除缓存文件"""
         try:
             cache_path.unlink(missing_ok=True)
         except OSError as e:
             logger.warning(f"缓存删除失败 (path={cache_path}): {e}")
 
-    def _clear_all(self):
+    def _clear_all(self) -> None:
         """清除所有缓存文件"""
         try:
             # 删除缓存目录中的所有 .json 文件
-            for cache_file in self.cache_dir.glob('*.json'):
+            for cache_file in self.cache_dir.glob("*.json"):
                 try:
                     cache_file.unlink()
                 except OSError as e:
@@ -173,32 +174,32 @@ class DataCache:
             dict: 包含统计信息的字典
         """
         stats = {
-            'cache_dir': str(self.cache_dir),
-            'total_files': 0,
-            'valid_files': 0,
-            'expired_files': 0,
-            'total_size_bytes': 0
+            "cache_dir": str(self.cache_dir),
+            "total_files": 0,
+            "valid_files": 0,
+            "expired_files": 0,
+            "total_size_bytes": 0,
         }
 
         try:
-            for cache_file in self.cache_dir.glob('*.json'):
-                stats['total_files'] += 1
-                stats['total_size_bytes'] += cache_file.stat().st_size
+            for cache_file in self.cache_dir.glob("*.json"):
+                stats["total_files"] += 1
+                stats["total_size_bytes"] += cache_file.stat().st_size
 
                 # 检查是否过期
                 try:
-                    with open(cache_file, encoding='utf-8') as f:
+                    with open(cache_file, encoding="utf-8") as f:
                         cache_data = json.load(f)
-                        ttl_seconds = cache_data.get('ttl', self.DEFAULT_TTL)
-                        created_at = datetime.fromisoformat(cache_data.get('created_at', ''))
+                        ttl_seconds = cache_data.get("ttl", self.DEFAULT_TTL)
+                        created_at = datetime.fromisoformat(cache_data.get("created_at", ""))
                         expires_at = created_at + timedelta(seconds=ttl_seconds)
 
                         if datetime.now() >= expires_at:
-                            stats['expired_files'] += 1
+                            stats["expired_files"] += 1
                         else:
-                            stats['valid_files'] += 1
+                            stats["valid_files"] += 1
                 except (json.JSONDecodeError, KeyError, ValueError):
-                    stats['expired_files'] += 1
+                    stats["expired_files"] += 1
 
         except OSError:
             pass
@@ -215,12 +216,12 @@ class DataCache:
         cleaned = 0
 
         try:
-            for cache_file in self.cache_dir.glob('*.json'):
+            for cache_file in self.cache_dir.glob("*.json"):
                 try:
-                    with open(cache_file, encoding='utf-8') as f:
+                    with open(cache_file, encoding="utf-8") as f:
                         cache_data = json.load(f)
-                        ttl_seconds = cache_data.get('ttl', self.DEFAULT_TTL)
-                        created_at = datetime.fromisoformat(cache_data.get('created_at', ''))
+                        ttl_seconds = cache_data.get("ttl", self.DEFAULT_TTL)
+                        created_at = datetime.fromisoformat(cache_data.get("created_at", ""))
                         expires_at = created_at + timedelta(seconds=ttl_seconds)
 
                         if datetime.now() >= expires_at:

@@ -54,7 +54,7 @@ class MemoryCache:
 
             return entry["value"]
 
-    async def set(self, key: str, value: Any, ttl_seconds: int | None = None):
+    async def set(self, key: str, value: Any, ttl_seconds: int | None = None) -> None:
         """设置缓存"""
         ttl = ttl_seconds if ttl_seconds is not None else self.ttl_seconds
 
@@ -70,7 +70,7 @@ class MemoryCache:
             # 添加新值
             self._cache[key] = {
                 "value": value,
-                "expires_at": datetime.now() + timedelta(seconds=ttl)
+                "expires_at": datetime.now() + timedelta(seconds=ttl),
             }
 
             # 更新访问顺序
@@ -78,13 +78,13 @@ class MemoryCache:
                 self._access_order.remove(key)
             self._access_order.append(key)
 
-    def _remove(self, key: str):
+    def _remove(self, key: str) -> None:
         """移除缓存"""
         self._cache.pop(key, None)
         if key in self._access_order:
             self._access_order.remove(key)
 
-    def clear(self):
+    def clear(self) -> None:
         """清空缓存"""
         self._cache.clear()
         self._access_order.clear()
@@ -111,7 +111,7 @@ class DualLayerCache:
         cache_dir: Path,
         memory_ttl: int = 60,
         file_ttl: int = 300,
-        max_memory_items: int = 1000
+        max_memory_items: int = 1000,
     ):
         """
         Args:
@@ -128,7 +128,7 @@ class DualLayerCache:
         self._hit_count = 0
         self._miss_count = 0
 
-    def _ensure_cache_dir(self):
+    def _ensure_cache_dir(self) -> None:
         """确保缓存目录存在"""
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -158,9 +158,9 @@ class DualLayerCache:
             return None, None
 
         try:
-            with open(file_path, encoding='utf-8') as f:
+            with open(file_path, encoding="utf-8") as f:
                 cache_data = json.load(f)
-                created_at = datetime.fromisoformat(cache_data.get('created_at', ''))
+                created_at = datetime.fromisoformat(cache_data.get("created_at", ""))
                 expires_at = created_at + timedelta(seconds=self.file_ttl)
 
                 if datetime.now() >= expires_at:
@@ -169,7 +169,7 @@ class DualLayerCache:
                     self._miss_count += 1
                     return None, None
 
-                value = cache_data.get('value')
+                value = cache_data.get("value")
                 # 回填 L1 缓存
                 await self.memory_cache.set(key, value, self.file_ttl)
                 self._hit_count += 1
@@ -179,7 +179,7 @@ class DualLayerCache:
             self._miss_count += 1
             return None, None
 
-    async def set(self, key: str, value: Any, ttl_seconds: int | None = None):
+    async def set(self, key: str, value: Any, ttl_seconds: int | None = None) -> None:
         """设置缓存"""
         ttl = ttl_seconds if ttl_seconds is not None else self.file_ttl
 
@@ -191,20 +191,20 @@ class DualLayerCache:
         file_path = self.cache_dir / f"{file_key}.json"
 
         cache_data = {
-            'key': key,
-            'value': value,
-            'ttl': ttl,
-            'created_at': datetime.now().isoformat(),
-            'expires_at': (datetime.now() + timedelta(seconds=ttl)).isoformat()
+            "key": key,
+            "value": value,
+            "ttl": ttl,
+            "created_at": datetime.now().isoformat(),
+            "expires_at": (datetime.now() + timedelta(seconds=ttl)).isoformat(),
         }
 
         try:
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
         except (OSError, TypeError) as e:
             logger.warning(f"缓存写入失败 (key={key}): {e}")
 
-    async def delete(self, key: str):
+    async def delete(self, key: str) -> None:
         """删除缓存"""
         # L1 - 删除单个 key
         self.memory_cache._remove(key)
@@ -214,11 +214,11 @@ class DualLayerCache:
         file_path = self.cache_dir / f"{file_key}.json"
         file_path.unlink(missing_ok=True)
 
-    async def clear(self):
+    async def clear(self) -> None:
         """清空所有缓存"""
         self.memory_cache.clear()
 
-        for cache_file in self.cache_dir.glob('*.json'):
+        for cache_file in self.cache_dir.glob("*.json"):
             try:
                 cache_file.unlink()
             except OSError:
@@ -230,15 +230,15 @@ class DualLayerCache:
         valid_files = 0
         total_size = 0
 
-        for cache_file in self.cache_dir.glob('*.json'):
+        for cache_file in self.cache_dir.glob("*.json"):
             total_files += 1
             total_size += cache_file.stat().st_size
 
             try:
-                with open(cache_file, encoding='utf-8') as f:
+                with open(cache_file, encoding="utf-8") as f:
                     cache_data = json.load(f)
-                    ttl = cache_data.get('ttl', self.file_ttl)
-                    created_at = datetime.fromisoformat(cache_data.get('created_at', ''))
+                    ttl = cache_data.get("ttl", self.file_ttl)
+                    created_at = datetime.fromisoformat(cache_data.get("created_at", ""))
                     expires_at = created_at + timedelta(seconds=ttl)
 
                     if datetime.now() < expires_at:
@@ -258,5 +258,5 @@ class DualLayerCache:
             "memory_cache": self.memory_cache.get_stats(),
             "file_cache_total": total_files,
             "file_cache_valid": valid_files,
-            "file_cache_size_bytes": total_size
+            "file_cache_size_bytes": total_size,
         }

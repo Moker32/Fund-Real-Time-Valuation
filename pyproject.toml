@@ -93,15 +93,13 @@ exclude = [
 module = [
     "akshare",
     "yfinance",
-    "matplotlib",
     "pandas",
-    "numpy",
     "py_mini_racer",
-    "mini_racer",
 ]
 ignore_errors = true
 
-# 忽略 src.datasources 模块中的类型问题
+# src.datasources 模块依赖 akshare 等返回 Any 的库
+# 只禁用由第三方库类型问题导致的错误代码
 [[tool.mypy.overrides]]
 module = "src.datasources.*"
 disable_error_code = [

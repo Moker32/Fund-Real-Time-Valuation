@@ -32,7 +32,7 @@ class CacheWarmer:
         self._running = False
         self._cache_loaded = False  # 标记缓存是否已加载
 
-    async def preload_all_cache(self, timeout: float = 10.0):
+    async def preload_all_cache(self, timeout: float = 10.0) -> None:
         """
         预加载所有文件缓存到内存（同步读取，不触发数据源请求）
 
@@ -80,7 +80,7 @@ class CacheWarmer:
             logger.error(f"缓存预加载失败: {e}")
             self._cache_loaded = True  # 标记已尝试加载，避免重复
 
-    async def preload_fund_info_cache(self, timeout: float = 60.0):
+    async def preload_fund_info_cache(self, timeout: float = 60.0) -> None:
         """
         预热基金信息缓存（名称、类型等）
 
@@ -110,7 +110,7 @@ class CacheWarmer:
             logger.info(f"开始预热基金信息缓存，共 {len(fund_codes)} 个基金...")
 
             # 并行获取所有基金的名称和类型
-            async def fetch_fund_info(code: str):
+            async def fetch_fund_info(code: str) -> tuple[str, bool]:
                 try:
                     get_fund_basic_info(code)
                     return code, True
@@ -121,7 +121,7 @@ class CacheWarmer:
             # 使用 semaphore 限制并发数
             semaphore = asyncio.Semaphore(10)
 
-            async def fetch_with_limit(code: str):
+            async def fetch_with_limit(code: str) -> tuple[str, bool]:
                 async with semaphore:
                     return await fetch_fund_info(code)
 
@@ -134,7 +134,7 @@ class CacheWarmer:
         except Exception as e:
             logger.error(f"基金信息缓存预热失败: {e}")
 
-    async def warmup(self, timeout: float = 120.0):
+    async def warmup(self, timeout: float = 120.0) -> None:
         """
         预热缓存 - 获取所有自选基金数据
 
@@ -175,7 +175,7 @@ class CacheWarmer:
         except Exception as e:
             logger.error(f"缓存预热失败: {e}")
 
-    async def start_background_warmup(self, interval: int = 300):
+    async def start_background_warmup(self, interval: int = 300) -> None:
         """
         启动后台定时预热任务
 
@@ -187,7 +187,7 @@ class CacheWarmer:
 
         self._running = True
 
-        async def periodic_warmup():
+        async def periodic_warmup() -> None:
             """定期刷新缓存"""
             while self._running:
                 try:
@@ -204,7 +204,7 @@ class CacheWarmer:
         self._refresh_task = asyncio.create_task(periodic_warmup())
         logger.info("后台缓存预热任务已启动")
 
-    def stop(self):
+    def stop(self) -> None:
         """停止后台预热任务"""
         self._running = False
 

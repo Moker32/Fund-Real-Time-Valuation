@@ -82,7 +82,7 @@ class DataSourceResult:
     error_type: DataSourceErrorType | None = None
     retryable: bool = True
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.timestamp == 0.0:
             self.timestamp = time.time()
 
@@ -161,7 +161,7 @@ class DataSource(ABC):
         return self._error_count / self._request_count
 
     @abstractmethod
-    async def fetch(self, *args, **kwargs) -> DataSourceResult:
+    async def fetch(self, *args: Any, **kwargs: Any) -> DataSourceResult:
         """
         获取数据（抽象方法，子类必须实现）
 
@@ -184,6 +184,7 @@ class DataSource(ABC):
         Returns:
             List[DataSourceResult]: 返回结果列表
         """
+
         async def fetch_one(key: str) -> DataSourceResult:
             return await self.fetch(key)
 
@@ -216,7 +217,7 @@ class DataSource(ABC):
         Returns:
             bool: 缓存是否有效
         """
-        if not hasattr(self, '_cache') or cache_key not in self._cache:
+        if not hasattr(self, "_cache") or cache_key not in self._cache:
             return False
         cache_time = self._cache[cache_key].get("_cache_time", 0)
         return (time.time() - cache_time) < self._cache_timeout

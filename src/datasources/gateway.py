@@ -40,7 +40,7 @@ class GatewayStats:
     request_latencies: list[float] = field(default_factory=list)
     max_latencies: int = 1000  # 最多记录1000条延迟
 
-    def record_request(self, latency_ms: float, success: bool, fallback: bool = False):
+    def record_request(self, latency_ms: float, success: bool, fallback: bool = False) -> None:
         """记录请求结果"""
         self.total_requests += 1
         if success:

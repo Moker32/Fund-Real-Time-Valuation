@@ -82,13 +82,13 @@ class DataSourceManager:
             self._semaphore = asyncio.Semaphore(self._max_concurrent)
         return self._semaphore
 
-    def register(self, source: DataSource, config: DataSourceConfig | None = None):
+    def register(self, source: DataSource, config: DataSourceConfig | None = None) -> None:
         """
         注册数据源
 
         Args:
             source: 数据源实例
-            config: 可选的数据源配置
+            config: 可选的配置
         """
         source_id = source.name
 
@@ -109,7 +109,7 @@ class DataSourceManager:
                 priority=len(self._type_sources[source.source_type]),
             )
 
-    def unregister(self, source_name: str):
+    def unregister(self, source_name: str) -> None:
         """
         注销数据源
 
@@ -150,10 +150,10 @@ class DataSourceManager:
     async def fetch(
         self,
         source_type: DataSourceType,
-        *args,
+        *args: Any,
         failover: bool = True,
         health_aware: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ) -> DataSourceResult:
         """
         获取数据（自动选择数据源）
@@ -231,7 +231,9 @@ class DataSourceManager:
                 metadata={"source_type": source_type.value},
             )
 
-    async def fetch_with_source(self, source_name: str, *args, **kwargs) -> DataSourceResult:
+    async def fetch_with_source(
+        self, source_name: str, *args: Any, **kwargs: Any
+    ) -> DataSourceResult:
         """
         使用指定数据源获取数据
 
@@ -265,10 +267,10 @@ class DataSourceManager:
         self,
         source_type: DataSourceType,
         params_list: list[dict[str, Any]],
-        *args,
+        *args: Any,
         parallel: bool = True,
         failover: bool = True,
-        **kwargs,
+        **kwargs: Any,
     ) -> list[DataSourceResult]:
         """
         批量获取数据
@@ -490,7 +492,7 @@ class DataSourceManager:
         """停止后台健康检查任务"""
         self._health_checker.stop_background_check()
 
-    def set_source_enabled(self, source_name: str, enabled: bool):
+    def set_source_enabled(self, source_name: str, enabled: bool) -> None:
         """
         设置数据源启用/禁用状态
 
@@ -504,7 +506,7 @@ class DataSourceManager:
         config = self._source_configs[source_name]
         config.enabled = enabled
 
-    def set_source_priority(self, source_name: str, priority: int):
+    def set_source_priority(self, source_name: str, priority: int) -> None:
         """
         设置数据源优先级
 
@@ -523,7 +525,7 @@ class DataSourceManager:
         source_type: DataSourceType,
         result: DataSourceResult | None,
         error: str | None = None,
-    ):
+    ) -> None:
         """
         记录请求历史
 
