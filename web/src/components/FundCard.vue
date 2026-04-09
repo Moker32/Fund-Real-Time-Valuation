@@ -53,54 +53,75 @@
       </div>
 
       <div class="card-body">
-        <!-- 左侧：净值+估值 | 右侧：涨跌幅 | 下方：折线图 -->
-        <div class="info-section" :class="{ 'has-chart': shouldShowChart }">
+        <!-- 涨跌幅视觉焦点（左侧大色块） | 净值+估值（右侧辅助信息） -->
+        <div class="info-section">
+          <div class="change-block" :class="[changeClass, { 'value-updated': changeAnimating }]">
+            <div class="change-main">
+              <span class="change-percent font-mono">{{ displayChangePercent }}</span>
+              <span class="change-value font-mono">{{ displayChangeValueStr }}</span>
+            </div>
+          </div>
+
           <div class="value-section">
             <div class="value-row">
               <span class="label">净值</span>
               <span class="value font-mono">{{ formatNumber(fund.netValue, 4) }}</span>
               <span class="value-date">{{ fund.netValueDate ? formatNetValueDate(fund.netValueDate) : '--' }}</span>
             </div>
-            <!-- 非 QDII 基金显示估值 -->
             <div v-if="fund.hasRealTimeEstimate !== false" class="value-row">
               <span class="label">估值</span>
               <span class="value font-mono" :class="{ 'value-updated': valueAnimating }">{{ formatNumber(fund.estimateValue, 4) }}</span>
               <span class="value-date">{{ fund.estimateTime ? formatNetValueDate(fund.estimateTime) : '--' }}</span>
             </div>
-            <!-- QDII 基金显示前日净值 -->
+            <div v-else-if="fund.qdiiEstimateChangePercent != null" class="value-row qdii-estimate-row">
+              <span class="label">估算</span>
+              <span class="value font-mono" :class="{ 'value-updated': valueAnimating }">{{ formatNumber(fund.estimateValue, 4) }}</span>
+              <span class="value-date">{{ fund.estimateTime ? formatNetValueDate(fund.estimateTime) : '--' }}</span>
+            </div>
             <div v-else-if="fund.prevNetValue" class="value-row qdii-prev-row">
               <span class="label">前日</span>
               <span class="value font-mono">{{ formatNumber(fund.prevNetValue, 4) }}</span>
               <span class="value-date">{{ formatNetValueDate(fund.prevNetValueDate) }}</span>
             </div>
-          </div>
 
-          <div class="change-section" :class="[changeClass, { 'value-updated': changeAnimating }]">
-            <div class="change-info">
-              <span class="change-percent font-mono">{{ formatPercent(fund.estimateChangePercent) }}</span>
-              <span class="change-indicator-value">
-                <svg v-if="fund.estimateChangePercent > 0" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 19V5M5 12L12 5L19 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                <svg v-else-if="fund.estimateChangePercent < 0" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 5V19M19 12L12 19L5 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                <span v-else>—</span>
+            <!-- 区间收益率标签 -->
+            <div v-if="fund.intervalReturns" class="interval-returns">
+              <span
+                v-for="[label, pct] in Object.entries(fund.intervalReturns)"
+                :key="label"
+                class="return-tag"
+                :class="pct >= 0 ? 'return-up' : 'return-down'"
+              >
+                {{ intervalLabel(label) }} {{ pct >= 0 ? '+' : '' }}{{ pct }}%
               </span>
-              <span class="change-value font-mono">{{ formatChange(fund.estimateChange) }}</span>
             </div>
           </div>
         </div>
 
-        <!-- 折线图：显示在估值下方 -->
         <LineChart v-if="shouldShowChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" class="fund-chart" />
       </div>
 
       <div class="card-footer">
-        <span v-if="fund.hasRealTimeEstimate !== false" class="update-time">
-          更新: {{ formatTime(fund.estimateTime) }}
-        </span>
-        <span class="source" v-if="fund.source">{{ fund.source }}</span>
+        <div class="footer-left">
+          <span v-if="fund.hasRealTimeEstimate !== false" class="update-time">
+            更新: {{ formatTime(fund.estimateTime) }}
+          </span>
+          <span v-else-if="fund.qdiiEstimateChangePercent != null" class="update-time qdii-footer">
+            <span class="market-status-dot" :class="marketStatusClass"></span>
+            <span>{{ marketStatusLabel }}</span>
+            <span class="footer-sep">·</span>
+            <span>{{ formatTime(fund.estimateTime) }}</span>
+          </span>
+          <span class="source" v-if="fund.source">{{ sourceLabel(fund.source) }}</span>
+        </div>
+        <div class="footer-right">
+          <span v-if="fund.peerRank" class="peer-rank" :title="`同类排名: ${fund.peerRank.rank}/${fund.peerRank.total}`">
+            {{ fund.peerRank.category }} {{ fund.peerRank.rank }}/{{ fund.peerRank.total }}
+          </span>
+          <span v-if="fund.underlyingIndices && fund.underlyingIndices.length > 0" class="underlying-indices">
+            {{ fund.underlyingIndices.map(idx => idx.name).join(' / ') }}
+          </span>
+        </div>
       </div>
     </template>
   </div>
@@ -129,113 +150,92 @@ const emit = defineEmits<{
 }>();
 
 function handleCardClick(event: Event) {
-  // 检查点击目标是否是交互元素或其子元素
   const target = event.target as Element;
   const interactiveSelectors = ['button', '.action-btn', '.fund-type'];
-
-  // 检查点击的是否是交互元素
   const isInteractive = interactiveSelectors.some(selector =>
     target.matches(selector) || target.closest(selector)
   );
-
-  if (isInteractive) {
-    return;
-  }
-
-  // 触发显示历史记录事件
+  if (isInteractive) return;
   emit('show-history', { code: props.fund.code, name: props.fund.name });
 }
 
-// 图表数据：优先使用日内分时数据，如果没有则使用历史数据
 const chartData = computed(() => {
-  if (props.fund.intraday && props.fund.intraday.length > 0) {
-    return props.fund.intraday;
-  }
-  if (props.fund.history && props.fund.history.length > 0) {
-    return props.fund.history;
-  }
+  if (props.fund.intraday && props.fund.intraday.length > 0) return props.fund.intraday;
+  if (props.fund.history && props.fund.history.length > 0) return props.fund.history;
   return [];
 });
 
-// 是否显示图表
-const shouldShowChart = computed(() => {
-  return fundStore.showChart && chartData.value.length > 0;
-});
+const shouldShowChart = computed(() => fundStore.showChart && chartData.value.length > 0);
 
-// 涨跌样式
 const changeClass = computed(() => {
   if (props.fund.estimateChangePercent > 0) return 'rising';
   if (props.fund.estimateChangePercent < 0) return 'falling';
   return 'neutral';
 });
 
-// 基准线 - 使用最新净值（与涨跌幅计算基准一致）
-// fund123.cn 的涨跌幅是基于最新净值计算的，所以基准线也应该使用最新净值
 const baseline = computed(() => {
-  // 优先使用最新净值作为基准线（与API涨跌幅计算基准一致）
-  if (props.fund.netValue && props.fund.netValue > 0) {
-    return props.fund.netValue;
-  }
-  // 回退到前日净值（兼容旧数据）
-  if (props.fund.prevNetValue && props.fund.prevNetValue > 0) {
-    return props.fund.prevNetValue;
-  }
+  if (props.fund.netValue && props.fund.netValue > 0) return props.fund.netValue;
+  if (props.fund.prevNetValue && props.fund.prevNetValue > 0) return props.fund.prevNetValue;
   return undefined;
 });
 
-// 价格动画状态
+const displayChangePercent = computed(() => {
+  if (props.fund.qdiiEstimateChangePercent != null) return formatPercent(props.fund.qdiiEstimateChangePercent);
+  return formatPercent(props.fund.estimateChangePercent);
+});
+
+const displayChangeValue = computed(() => {
+  if (props.fund.qdiiEstimateChangePercent != null && props.fund.prevNetValue) {
+    return props.fund.prevNetValue * props.fund.qdiiEstimateChangePercent / 100;
+  }
+  return props.fund.estimateChange ?? 0;
+});
+
+const displayChangeValueStr = computed(() => formatChange(displayChangeValue.value));
+
+const marketStatusClass = computed(() => {
+  const s = props.fund.marketStatus;
+  if (s === 'open') return 'dot-open';
+  if (s === 'pre_market' || s === 'pre') return 'dot-pre';
+  return 'dot-closed';
+});
+
+const marketStatusLabel = computed(() => {
+  const s = props.fund.marketStatus;
+  if (s === 'open') return '交易中';
+  if (s === 'pre_market' || s === 'pre') return '盘前';
+  if (s === 'after_hours') return '盘后';
+  return '已收盘';
+});
+
 const valueAnimating = ref(false);
 const changeAnimating = ref(false);
-
-// Track timeout IDs for cleanup
 let valueAnimationTimeout: ReturnType<typeof setTimeout> | null = null;
 let changeAnimationTimeout: ReturnType<typeof setTimeout> | null = null;
 
-// 监听价格变化触发动画
 watch(() => props.fund.estimateValue, (newVal, oldVal) => {
-  if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) {
-    triggerValueAnimation();
-  }
+  if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) triggerValueAnimation();
 });
 
 watch(() => props.fund.estimateChangePercent, (newVal, oldVal) => {
-  if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) {
-    triggerChangeAnimation();
-  }
+  if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) triggerChangeAnimation();
 });
 
 function triggerValueAnimation() {
-  // Clear existing timeout to prevent memory leak
-  if (valueAnimationTimeout) {
-    window.clearTimeout(valueAnimationTimeout);
-  }
+  if (valueAnimationTimeout) window.clearTimeout(valueAnimationTimeout);
   valueAnimating.value = true;
-  valueAnimationTimeout = window.setTimeout(() => {
-    valueAnimating.value = false;
-    valueAnimationTimeout = null;
-  }, 500);
+  valueAnimationTimeout = window.setTimeout(() => { valueAnimating.value = false; valueAnimationTimeout = null; }, 500);
 }
 
 function triggerChangeAnimation() {
-  // Clear existing timeout to prevent memory leak
-  if (changeAnimationTimeout) {
-    window.clearTimeout(changeAnimationTimeout);
-  }
+  if (changeAnimationTimeout) window.clearTimeout(changeAnimationTimeout);
   changeAnimating.value = true;
-  changeAnimationTimeout = window.setTimeout(() => {
-    changeAnimating.value = false;
-    changeAnimationTimeout = null;
-  }, 500);
+  changeAnimationTimeout = window.setTimeout(() => { changeAnimating.value = false; changeAnimationTimeout = null; }, 500);
 }
 
-// Cleanup timeouts on unmount to prevent memory leaks
 onUnmounted(() => {
-  if (valueAnimationTimeout) {
-    window.clearTimeout(valueAnimationTimeout);
-  }
-  if (changeAnimationTimeout) {
-    window.clearTimeout(changeAnimationTimeout);
-  }
+  if (valueAnimationTimeout) window.clearTimeout(valueAnimationTimeout);
+  if (changeAnimationTimeout) window.clearTimeout(changeAnimationTimeout);
 });
 
 async function toggleHolding() {
@@ -263,23 +263,11 @@ function formatTime(dateStr: string | undefined): string {
   if (!dateStr) return '--';
   try {
     const date = new Date(dateStr);
-    // 如果没有时间部分（00:00），只显示日期
     const hours = parseInt(date.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, hour: '2-digit' }), 10);
     const minutes = parseInt(date.toLocaleTimeString('zh-CN', { timeZone: 'Asia/Shanghai', minute: '2-digit' }), 10);
-    if (hours === 0 && minutes === 0) {
-      return date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' });
-    }
-    return date.toLocaleString('zh-CN', {
-      timeZone: 'Asia/Shanghai',
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
-  } catch {
-    return dateStr;
-  }
+    if (hours === 0 && minutes === 0) return date.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' });
+    return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+  } catch { return dateStr; }
 }
 
 function formatNetValueDate(dateStr: string | undefined): string {
@@ -287,9 +275,23 @@ function formatNetValueDate(dateStr: string | undefined): string {
   try {
     const date = new Date(dateStr);
     return `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
-  } catch {
-    return '';
-  }
+  } catch { return ''; }
+}
+
+function intervalLabel(key: string): string {
+  const map: Record<string, string> = { '1w': '近1周', '1m': '近1月', '3m': '近3月', '6m': '近6月', '1y': '近1年' };
+  return map[key] || key;
+}
+
+function sourceLabel(source: string): string {
+  const map: Record<string, string> = {
+    'fund123': '天天基金',
+    'fund_tiantian': '天天基金',
+    'fund_sina': '新浪财经',
+    'fund_eastmoney': '东方财富',
+    'qdii_estimator': '指数估算',
+  };
+  return map[source] || source;
 }
 </script>
 
@@ -337,18 +339,9 @@ function formatNetValueDate(dateStr: string | undefined): string {
   height: 16px;
   border-radius: var(--radius-sm);
 
-  &.skeleton-title {
-    width: 60%;
-    height: 18px;
-  }
-
-  &.skeleton-value {
-    width: 80%;
-  }
-
-  &.skeleton-change {
-    width: 40%;
-  }
+  &.skeleton-title { width: 60%; height: 18px; }
+  &.skeleton-value { width: 80%; }
+  &.skeleton-change { width: 40%; }
 }
 
 .card-header {
@@ -429,10 +422,7 @@ function formatNetValueDate(dateStr: string | undefined): string {
   transition: all var(--transition-fast);
   opacity: 0;
 
-  svg {
-    width: 16px;
-    height: 16px;
-  }
+  svg { width: 16px; height: 16px; }
 
   &:hover {
     background: var(--color-bg-tertiary);
@@ -446,9 +436,7 @@ function formatNetValueDate(dateStr: string | undefined): string {
 }
 
 .holding-btn {
-  svg {
-    stroke-width: 2.5;
-  }
+  svg { stroke-width: 2.5; }
 
   &:hover {
     background: var(--color-rise-alpha);
@@ -459,15 +447,11 @@ function formatNetValueDate(dateStr: string | undefined): string {
     opacity: 1;
     color: var(--color-rise);
 
-    &:hover {
-      background: var(--color-rise-alpha);
-    }
+    &:hover { background: var(--color-rise-alpha); }
   }
 }
 
-.fund-card:hover .action-btn {
-  opacity: 1;
-}
+.fund-card:hover .action-btn { opacity: 1; }
 
 .card-body {
   display: flex;
@@ -480,10 +464,66 @@ function formatNetValueDate(dateStr: string | undefined): string {
 
 .info-section {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  align-items: stretch;
   min-width: 0;
   gap: var(--spacing-md);
+}
+
+// 涨跌幅视觉焦点 — 左侧大色块
+.change-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-xs);
+  transition: all var(--transition-fast);
+  width: 110px;
+  min-width: 110px;
+  max-width: 110px;
+  box-sizing: border-box;
+  align-self: stretch;
+
+  .change-main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: 100%;
+  }
+
+  .change-percent {
+    font-size: 26px;
+    font-weight: var(--font-weight-bold);
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .change-value {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+  }
+
+  &.rising {
+    background: var(--color-rise-bg);
+    color: var(--color-rise);
+  }
+
+  &.falling {
+    background: var(--color-fall-bg);
+    color: var(--color-fall);
+  }
+
+  &.neutral { color: var(--color-neutral); }
+
+  &.value-updated { animation: change-pulse 0.5s ease-out; }
+}
+
+@keyframes change-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
 .value-section {
@@ -492,7 +532,6 @@ function formatNetValueDate(dateStr: string | undefined): string {
   gap: var(--spacing-xs);
   min-width: 0;
   flex: 1 1 auto;
-  /* 移除 max-width，让 flex 布局自然分配空间 */
   overflow: hidden;
 }
 
@@ -518,7 +557,6 @@ function formatNetValueDate(dateStr: string | undefined): string {
     flex: 0 1 auto;
     min-width: 45px;
     text-align: right;
-    /* 允许数值收缩但保持可读性 */
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -527,11 +565,17 @@ function formatNetValueDate(dateStr: string | undefined): string {
     flex-shrink: 0;
     min-width: 36px;
     text-align: right;
-    margin-left: auto; /* 将日期推到右侧 */
+    margin-left: auto;
   }
 
-  &.qdii-prev-row {
-    opacity: 0.7;
+  &.qdii-prev-row { opacity: 0.7; }
+
+  &.qdii-estimate-row {
+    .label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
   }
 }
 
@@ -548,128 +592,70 @@ function formatNetValueDate(dateStr: string | undefined): string {
 }
 
 .value {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
   transition: all 0.3s ease;
 
-  &.value-updated {
-    animation: value-pulse 0.5s ease-out;
-  }
+  &.value-updated { animation: value-pulse 0.5s ease-out; }
 }
 
 @keyframes value-pulse {
-  0% {
-    transform: scale(1);
-    color: var(--color-text-primary);
-    background: transparent;
-  }
-  25% {
-    background: var(--color-rise-bg);
-  }
-  50% {
-    transform: scale(1.1);
-    color: var(--color-rise);
-  }
-  75% {
-    background: var(--color-rise-bg);
-  }
-  100% {
-    transform: scale(1);
-    color: var(--color-text-primary);
-    background: transparent;
-  }
+  0% { transform: scale(1); color: var(--color-text-primary); background: transparent; }
+  25% { background: var(--color-rise-bg); }
+  50% { transform: scale(1.1); color: var(--color-rise); }
+  75% { background: var(--color-rise-bg); }
+  100% { transform: scale(1); color: var(--color-text-primary); background: transparent; }
 }
 
-.change-section {
+// 区间收益率标签
+.interval-returns {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-md);
-  transition: all var(--transition-fast);
-  /* 固定宽度，防止压缩 */
-  width: 90px;
-  min-width: 90px;
-  max-width: 90px;
-  flex: 0 0 auto;
-  box-sizing: border-box;
-
-  .change-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    flex-shrink: 0;
-    gap: 2px;
-    justify-content: center;
-  }
-
-  .change-percent,
-  .change-value {
-    white-space: nowrap;
-  }
-
-  &.rising {
-    background: var(--color-rise-bg);
-    color: var(--color-rise);
-
-    .change-indicator-value svg {
-      color: var(--color-rise);
-    }
-  }
-
-  &.falling {
-    background: var(--color-fall-bg);
-    color: var(--color-fall);
-
-    .change-indicator-value svg {
-      color: var(--color-fall);
-    }
-  }
-
-  &.neutral {
-    color: var(--color-neutral);
-  }
-
-  &.value-updated {
-    animation: change-pulse 0.5s ease-out;
-  }
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
 }
 
-@keyframes change-pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.15);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.change-value {
-  font-size: var(--font-size-sm);
+.return-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
   font-weight: var(--font-weight-medium);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+
+  &.return-up {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+  }
+
+  &.return-down {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
 }
 
-.change-percent {
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-bold);
-  line-height: 1;
+.market-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  &.dot-open { background: #22c55e; }
+  &.dot-pre { background: #ca8a04; }
+  &.dot-closed { background: #6b7280; }
 }
 
-.change-indicator-value {
+.qdii-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin: 2px 0;
+  gap: 4px;
+}
 
-  svg {
-    width: 14px;
-    height: 14px;
-  }
+.footer-sep {
+  color: var(--color-text-tertiary);
+  opacity: 0.5;
 }
 
 .card-footer {
@@ -679,10 +665,24 @@ function formatNetValueDate(dateStr: string | undefined): string {
   padding-top: var(--spacing-sm);
   border-top: 1px solid var(--color-divider);
   gap: var(--spacing-xs);
+  min-width: 0;
 }
 
-.update-time,
-.source {
+.footer-left, .footer-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.footer-left { flex-shrink: 0; }
+.footer-right {
+  justify-content: flex-end;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.update-time, .source, .peer-rank, .underlying-indices {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
   white-space: nowrap;
@@ -690,364 +690,169 @@ function formatNetValueDate(dateStr: string | undefined): string {
   text-overflow: ellipsis;
 }
 
+.peer-rank {
+  font-family: var(--font-mono);
+}
+
+.underlying-indices {
+  font-size: 10px;
+}
+
 // ==================== 响应式布局优化 ====================
 
-// 平板及以下 (< 1024px)
 @media (max-width: 1024px) {
-  .fund-card {
-    padding: var(--spacing-md);
-  }
+  .fund-card { padding: var(--spacing-md); }
 
-  .change-section {
-    width: 85px;
-    min-width: 85px;
-    max-width: 85px;
-    padding: var(--spacing-xs);
-  }
+  .change-block {
+    width: 100px;
+    min-width: 100px;
+    max-width: 100px;
+    padding: var(--spacing-xs) 8px;
 
-  .change-percent {
-    font-size: var(--font-size-lg);
+    .change-percent { font-size: 24px; }
   }
 }
 
-// 手机横屏/大手机 (< 768px)
 @media (max-width: 768px) {
-  .fund-card {
-    padding: var(--spacing-md);
-  }
+  .fund-card { padding: var(--spacing-md); }
 
-  .card-header {
-    margin-bottom: var(--spacing-sm);
-  }
+  .card-header { margin-bottom: var(--spacing-sm); }
+  .card-body { margin-bottom: var(--spacing-sm); }
 
-  .card-body {
-    margin-bottom: var(--spacing-sm);
-  }
+  .info-section { gap: var(--spacing-sm); }
 
-  .info-section {
-    align-items: center;
-    gap: var(--spacing-sm);
-  }
+  .change-block {
+    width: 90px;
+    min-width: 90px;
+    max-width: 90px;
+    padding: var(--spacing-xs) 6px;
 
-  .value-section {
-    /* 移除 max-width，让 flex 布局自然分配 */
-    overflow: hidden;
+    .change-percent { font-size: 22px; }
+    .change-value { font-size: var(--font-size-xs); }
   }
 
   .value-row {
     gap: 6px;
-
-    .value {
-      font-size: var(--font-size-md);
-      min-width: 40px;
-    }
-
-    .value-date {
-      min-width: 32px;
-    }
+    .value { font-size: var(--font-size-md); min-width: 40px; }
+    .value-date { min-width: 32px; }
   }
 
-  .change-section {
-    width: 80px;
-    min-width: 80px;
-    max-width: 80px;
-    padding: var(--spacing-xs) 6px;
-
-    .change-info {
-      gap: 1px;
-    }
-  }
-
-  .change-percent {
-    font-size: var(--font-size-md);
-  }
-
-  .change-value {
-    font-size: var(--font-size-xs);
-  }
-
-  .change-indicator-value {
-    margin: 1px 0;
-
-    svg {
-      width: 12px;
-      height: 12px;
-    }
-  }
-
-  .card-footer {
-    flex-wrap: wrap;
-    gap: var(--spacing-xs);
-  }
+  .card-footer { flex-wrap: wrap; gap: var(--spacing-xs); }
 }
 
-// 标准小屏手机 (< 640px)
 @media (max-width: 640px) {
   .fund-card {
     padding: var(--spacing-sm);
     min-width: 0;
     width: 100%;
 
-    &.has-chart {
-      min-width: 0;
-      width: 100%;
-    }
+    &.has-chart { min-width: 0; width: 100%; }
   }
 
-  // 移动端始终显示操作按钮（触摸设备无法 hover）
   .action-btn {
     opacity: 1;
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
-    min-height: 36px;
-
-    svg {
-      width: 18px;
-      height: 18px;
-    }
+    width: 36px; height: 36px;
+    min-width: 36px; min-height: 36px;
+    svg { width: 18px; height: 18px; }
   }
 
-  .header-row {
-    min-height: 36px;
-  }
+  .header-row { min-height: 36px; }
+  .fund-name { font-size: var(--font-size-sm); }
+  .info-section { gap: var(--spacing-xs); }
 
-  .fund-name {
-    font-size: var(--font-size-sm);
-  }
+  .change-block {
+    width: 80px;
+    min-width: 80px;
+    max-width: 80px;
+    padding: 6px 4px;
 
-  .info-section {
-    gap: var(--spacing-xs);
-  }
-
-  .value-section {
-    /* 移除 max-width，让 flex 布局自然分配 */
-    overflow: hidden;
+    .change-percent { font-size: 20px; }
+    .change-value { font-size: 10px; }
   }
 
   .value-row {
     gap: 4px;
-
-    .label {
-      min-width: 26px;
-    }
-
-    .value {
-      font-size: var(--font-size-md);
-      min-width: 38px;
-    }
-
-    .value-date {
-      min-width: 30px;
-      font-size: 10px;
-    }
+    .label { min-width: 26px; }
+    .value { font-size: var(--font-size-md); min-width: 38px; }
+    .value-date { min-width: 30px; font-size: 10px; }
   }
 
-  .change-section {
+  .card-footer { padding-top: var(--spacing-xs); }
+  .update-time, .source, .peer-rank { font-size: 10px; }
+}
+
+@media (max-width: 480px) {
+  .fund-card { padding: var(--spacing-sm); }
+
+  .card-header { margin-bottom: var(--spacing-xs); gap: 2px; }
+  .header-row { min-height: 32px; }
+  .fund-name { font-size: var(--font-size-xs); line-height: 1.2; }
+  .fund-code { font-size: 10px; }
+  .fund-type { font-size: 10px; padding: 1px 6px; }
+
+  .action-btn {
+    width: 32px; height: 32px;
+    min-width: 32px; min-height: 32px;
+    svg { width: 16px; height: 16px; }
+  }
+
+  .card-body { margin-bottom: var(--spacing-xs); gap: var(--spacing-xs); }
+  .info-section { gap: 6px; }
+
+  .change-block {
     width: 72px;
     min-width: 72px;
     max-width: 72px;
-    padding: 4px 6px;
+    padding: 4px 3px;
+
+    .change-percent { font-size: 18px; }
+    .change-value { font-size: 9px; }
   }
 
-  .change-percent {
-    font-size: var(--font-size-md);
-  }
-
-  .change-value {
-    font-size: 10px;
-  }
-
-  .card-footer {
-    padding-top: var(--spacing-xs);
-  }
-
-  .update-time,
-  .source {
-    font-size: 10px;
-  }
-}
-
-// 超小屏手机 (< 480px)
-@media (max-width: 480px) {
-  .fund-card {
-    padding: var(--spacing-sm);
-  }
-
-  .card-header {
-    margin-bottom: var(--spacing-xs);
-    gap: 2px;
-  }
-
-  .header-row {
-    min-height: 32px;
-  }
-
-  .fund-name {
-    font-size: var(--font-size-xs);
-    line-height: 1.2;
-  }
-
-  .fund-code {
-    font-size: 10px;
-  }
-
-  .fund-type {
-    font-size: 10px;
-    padding: 1px 6px;
-  }
-
-  .action-btn {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
-
-    svg {
-      width: 16px;
-      height: 16px;
-    }
-  }
-
-  .card-body {
-    margin-bottom: var(--spacing-xs);
-    gap: var(--spacing-xs);
-  }
-
-  .info-section {
-    gap: 6px;
-  }
-
-  .value-section {
-    gap: 2px;
-    /* 移除 max-width，让 flex 布局自然分配 */
-    overflow: hidden;
-  }
+  .value-section { gap: 2px; overflow: hidden; }
 
   .value-row {
     gap: 4px;
-
-    .label {
-      min-width: 24px;
-      font-size: 10px;
-    }
-
-    .value {
-      font-size: var(--font-size-sm);
-      min-width: 35px;
-    }
-
-    .value-date {
-      min-width: 28px;
-      font-size: 9px;
-    }
+    .label { min-width: 24px; font-size: 10px; }
+    .value { font-size: var(--font-size-sm); min-width: 35px; }
+    .value-date { min-width: 28px; font-size: 9px; }
   }
 
-  .change-section {
+  .card-footer { padding-top: var(--spacing-xs); gap: 4px; }
+  .update-time, .source, .peer-rank { font-size: 9px; }
+  .fund-chart { min-height: 50px; }
+}
+
+@media (max-width: 360px) {
+  .fund-card { padding: 8px; }
+  .fund-name { font-size: 10px; }
+
+  .change-block {
     width: 64px;
     min-width: 64px;
     max-width: 64px;
-    padding: 3px 5px;
+    padding: 3px 2px;
 
-    .change-info {
-      gap: 0;
-    }
-  }
-
-  .change-percent {
-    font-size: var(--font-size-sm);
-  }
-
-  .change-value {
-    font-size: 9px;
-  }
-
-  .change-indicator-value {
-    margin: 0;
-
-    svg {
-      width: 10px;
-      height: 10px;
-    }
-  }
-
-  .card-footer {
-    padding-top: var(--spacing-xs);
-    gap: 4px;
-  }
-
-  .update-time,
-  .source {
-    font-size: 9px;
-  }
-
-  .fund-chart {
-    min-height: 50px;
-  }
-}
-
-// 极小屏 (< 360px)
-@media (max-width: 360px) {
-  .fund-card {
-    padding: 8px;
-  }
-
-  .fund-name {
-    font-size: 10px;
-  }
-
-  .value-section {
-    /* 移除 max-width，让 flex 布局自然分配 */
-    overflow: hidden;
+    .change-percent { font-size: 16px; }
+    .change-value { font-size: 8px; }
   }
 
   .value-row {
-    .value {
-      font-size: var(--font-size-xs);
-      min-width: 32px;
-    }
-
-    .value-date {
-      min-width: 26px;
-      font-size: 9px;
-    }
-  }
-
-  .change-section {
-    width: 58px;
-    min-width: 58px;
-    max-width: 58px;
-    padding: 2px 4px;
-  }
-
-  .change-percent {
-    font-size: var(--font-size-xs);
+    .value { font-size: var(--font-size-xs); min-width: 32px; }
+    .value-date { min-width: 26px; font-size: 9px; }
   }
 }
 
-// 减少动画偏好支持
 @media (prefers-reduced-motion: reduce) {
   .fund-card {
     transition: none;
-
-    &:hover {
-      transform: none;
-    }
+    &:hover { transform: none; }
   }
-
-  .value-updated {
-    animation: none !important;
-  }
-
-  .change-section.value-updated {
-    animation: none !important;
-  }
+  .value-updated { animation: none !important; }
+  .change-block.value-updated { animation: none !important; }
 }
 
-// 触摸设备优化：始终显示操作按钮
 @media (hover: none) and (pointer: coarse) {
-  .action-btn {
-    opacity: 1;
-  }
+  .action-btn { opacity: 1; }
 }
 </style>

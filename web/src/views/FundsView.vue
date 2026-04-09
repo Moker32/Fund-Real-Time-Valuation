@@ -82,6 +82,7 @@
       :visible="showHistoryDialog"
       :fund-code="selectedFundCode || ''"
       :fund-name="selectedFundName"
+      :fund="selectedFund"
       @close="showHistoryDialog = false"
     />
   </div>
@@ -116,6 +117,10 @@ const showAddDialog = ref(false);
 const showHistoryDialog = ref(false);
 const selectedFundCode = ref<string | null>(null);
 const selectedFundName = ref('');
+const selectedFund = computed(() => {
+  if (!selectedFundCode.value) return undefined;
+  return fundStore.funds.find(f => f.code === selectedFundCode.value);
+});
 
 // 空基金数据用于加载骨架屏
 const emptyFund: EmptyFundState = {
@@ -170,7 +175,7 @@ async function handleFundAdded() {
   
   // 为新添加的基金获取分时数据
   for (const fund of fundStore.funds) {
-    // 跳过无实时估值的基金（如 QDII），不请求分时数据
+    // 跳过无实时估值的基金（QDII 估值由后端基于海外指数推算）
     if (fund.hasRealTimeEstimate === false) {
       continue;
     }
@@ -203,7 +208,7 @@ onMounted(async () => {
 
   // 加载每个基金的分时数据
   for (const fund of fundStore.funds) {
-    // 跳过无实时估值的基金（如 QDII），不请求分时数据
+    // 跳过无实时估值的基金（QDII 估值由后端基于海外指数推算）
     if (fund.hasRealTimeEstimate === false) {
       continue;
     }

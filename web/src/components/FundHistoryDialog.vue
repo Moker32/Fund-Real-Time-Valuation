@@ -3,7 +3,19 @@
     <div v-if="visible" class="dialog-overlay" @click.self="close">
       <div class="dialog fund-history-dialog">
         <div class="dialog-header">
-          <h3>{{ fundName }} ({{ fundCode }})</h3>
+          <div class="header-info">
+            <h3>{{ fundName }} ({{ fundCode }})</h3>
+            <div v-if="fund?.manager" class="fund-meta">
+              <span class="meta-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+                {{ fund.manager.name }}
+              </span>
+              <span v-if="fund.manager.tenure" class="meta-item meta-sep">任职: {{ fund.manager.tenure }}</span>
+            </div>
+          </div>
           <button class="close-btn" @click="close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 6L6 18M6 6l12 12"/>
@@ -87,13 +99,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { fundApi } from '@/api';
-import type { FundHistory } from '@/types';
+import type { FundHistory, Fund } from '@/types';
 import LineChart from './LineChart.vue';
 
 interface Props {
   visible: boolean;
   fundCode: string;
   fundName: string;
+  fund?: Fund;
 }
 
 const props = defineProps<Props>();
@@ -286,6 +299,12 @@ watch(() => props.fundCode, () => {
   padding: 16px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
+  gap: 12px;
+}
+
+.header-info {
+  min-width: 0;
+  flex: 1;
 }
 
 .dialog-header h3 {
@@ -296,6 +315,27 @@ watch(() => props.fundCode, () => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fund-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #999;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.meta-sep::before {
+  content: '·';
+  margin-right: 8px;
+  opacity: 0.4;
 }
 
 .close-btn {

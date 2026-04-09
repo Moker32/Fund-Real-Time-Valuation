@@ -33,6 +33,12 @@ export interface Fund {
   source?: string;
   isHolding?: boolean;  // 是否持有
   hasRealTimeEstimate?: boolean;  // 是否有实时估值（QDII/FOF等为false）
+  qdiiEstimateChangePercent?: number;  // QDII 基金基于海外指数的估算涨跌幅(%)
+  marketStatus?: string;  // QDII 基金对应海外市场交易状态: 'open' | 'closed' | 'pre_market' | 'after_hours'
+  underlyingIndices?: Array<{ type: string; name: string; weight: number }>;  // QDII 基金跟踪的海外指数
+  intervalReturns?: Record<string, number>;
+  peerRank?: { category: string; rank: number; total: number; percentile: number };
+  manager?: { name: string; tenure: string };
   history?: FundHistory[];  // 可选的历史 K 线数据
   intraday?: FundIntraday[];  // 可选的日内分时数据
 }
