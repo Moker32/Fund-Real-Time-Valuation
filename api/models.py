@@ -38,6 +38,35 @@ class FundResponse(BaseModel):
         True, alias="has_real_time_estimate", description="是否有实时估值"
     )
 
+    qdiiEstimateChangePercent: float | None = Field(
+        None,
+        alias="qdii_estimate_change_percent",
+        description="QDII 基金基于海外指数的估算涨跌幅(%)",
+    )
+    marketStatus: str | None = Field(
+        None, alias="market_status", description="QDII 基金对应海外市场交易状态"
+    )
+    underlyingIndices: list[dict] = Field(
+        default_factory=list,
+        alias="underlying_indices",
+        description="QDII 基金跟踪的海外指数列表",
+    )
+
+    intervalReturns: dict | None = Field(
+        None,
+        alias="interval_returns",
+        description="区间收益率: {1w, 1m, 3m, 6m, 1y}",
+    )
+    peerRank: dict | None = Field(
+        None,
+        alias="peer_rank",
+        description="同类排名: {rank, total, percentile}",
+    )
+    manager: dict | None = Field(
+        None,
+        description="基金经理信息: {name, tenure, since_date}",
+    )
+
     model_config = {
         "populate_by_name": True,
     }
