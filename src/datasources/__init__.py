@@ -51,7 +51,7 @@ from .commodity_source import (
     CommodityDataSource,
     YFinanceCommoditySource,
 )
-from .fund_source import Fund123DataSource, TiantianFundDataSource, SinaFundDataSource
+from .fund import Fund123DataSource, TiantianFundDataSource, SinaFundDataSource, EastMoneyFundDataSource
 from .gateway import (
     BatchDataRequest,
     BatchDataResponse,

@@ -324,10 +324,10 @@ async def cleanup_fund_cache(fund_code: str):
 
     try:
         # 清理基金基本信息缓存
-        from src.datasources import fund_source
+        from src.datasources.fund.fund_info_utils import _fund_info_cache
 
-        if fund_code in fund_source._fund_info_cache:
-            del fund_source._fund_info_cache[fund_code]
+        if fund_code in _fund_info_cache:
+            del _fund_info_cache[fund_code]
             logger.info(f"已清理基金信息缓存: {fund_code}")
 
     except Exception as e:
