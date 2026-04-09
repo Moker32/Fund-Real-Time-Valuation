@@ -15,7 +15,7 @@ from typing_extensions import TypedDict
 from src.config.manager import ConfigManager
 from src.config.models import Fund, FundList, Holding
 from src.datasources.base import DataSourceType
-from src.datasources.fund_source import TiantianFundDataSource, get_basic_info_db
+from src.datasources.fund_source import Fund123DataSource, get_basic_info_db
 from src.datasources.manager import DataSourceManager
 from src.datasources.trading_calendar_source import Market, TradingCalendarSource
 
@@ -135,9 +135,9 @@ def _get_fund_history_source() -> "FundHistorySource":
 
 
 @lru_cache
-def _get_tiantian_source() -> TiantianFundDataSource:
-    """获取天天基金数据源实例（缓存）"""
-    return TiantianFundDataSource()
+def _get_fund123_source() -> Fund123DataSource:
+    """获取 Fund123 数据源实例（缓存）"""
+    return Fund123DataSource()
 
 
 def _is_qdii_fund(code: str) -> bool:
@@ -246,12 +246,6 @@ def build_fund_response(data: dict, source: str = "", is_holding: bool = False) 
             "estimated_growth_rate": data.get("estimated_growth_rate"),
             "estimate_time": data.get("estimate_time"),
             "has_real_time_estimate": data.get("has_real_time_estimate", True),
-            "qdii_estimate_change_percent": data.get("qdii_estimate_change_percent"),
-            "market_status": data.get("market_status"),
-            "underlying_index": data.get("underlying_index", []),
-            "interval_returns": data.get("interval_returns"),
-            "peer_rank": data.get("peer_rank"),
-            "manager": data.get("manager"),
         }
     )
 
@@ -693,7 +687,7 @@ async def get_fund_history(
     "/{code}/intraday",
     response_model=FundIntradayResponse,
     summary="获取基金日内分时数据",
-    description="根据基金代码获取天天基金接口的完整日内分时数据",
+    description="根据基金代码获取 fund123.cn 的完整日内分时数据",
     responses={
         200: {"description": "成功获取日内分时数据"},
         404: {"model": ErrorResponse, "description": "基金不存在"},
@@ -719,8 +713,8 @@ async def get_fund_intraday(
     """
     # 交易时段不使用缓存，确保获取实时数据
     use_cache = not _is_trading_hours()
-    tiantian_source = _get_tiantian_source()
-    result = await tiantian_source.fetch_intraday(code, use_cache=use_cache)
+    fund123_source = _get_fund123_source()
+    result = await fund123_source.fetch_intraday(code, use_cache=use_cache)
 
     if not result.success or result.data is None:
         error_msg = result.error or "未知错误"
@@ -774,7 +768,7 @@ async def get_fund_intraday_by_date(
             detail="QDII 基金不支持日内分时数据，因其投资海外市场，净值更新延迟",
         )
 
-    fund123_source = _get_tiantian_source()
+    fund123_source = _get_fund123_source()
     result = await fund123_source.fetch_intraday_by_date(code, date)
 
     if not result.success or result.data is None:

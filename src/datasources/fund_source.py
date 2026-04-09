@@ -8,7 +8,6 @@ import json
 import logging
 import re
 import time
-from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -29,13 +28,11 @@ from .base import (
     DataSourceType,
 )
 from .dual_cache import DualLayerCache
-from .qdii_estimator import QdiiEstimator
 
 logger = logging.getLogger(__name__)
 
 # 全局缓存实例（单例模式）
 _fund_cache: DualLayerCache | None = None
-_qdii_estimator: QdiiEstimator | None = None
 # 基金基本信息缓存（全局 akshare 调用结果）
 _fund_info_cache: dict[str, tuple[dict, float]] = {}  # {code: (info, timestamp)}
 _fund_info_cache_ttl = 3600  # 1小时缓存
@@ -597,7 +594,7 @@ def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
         # 获取基金类型（保留完整的 akshare 格式：主类型-子类型）
         # 优先级：fund_individual_basic_info_xq > fund_name_em > 名称推断
         fund_type = ""
-
+        
         # 方案1: fund_individual_basic_info_xq (最精确)
         try:
             info_df = ak.fund_individual_basic_info_xq(symbol=fund_code)
@@ -1372,7 +1369,7 @@ __all__ = [
     "SinaFundDataSource",
     "FundHistorySource",
     "FundHistoryYFinanceSource",
-    "TiantianFundDataSource",
+    "Fund123DataSource",
     "get_fund_cache",
     "get_fund_cache_stats",
     "get_intraday_cache_dao",
@@ -2053,11 +2050,14 @@ class EastMoneyFundDataSource(DataSource):
         return processed_results
 
 
-class TiantianFundDataSource(DataSource):
+class Fund123DataSource(DataSource):
     """
-    天天基金数据源
+    fund123.cn 基金数据源
 
-    聚合 fund123.cn（实时估值）+ akshare（净值/类型）+ 天天基金（净值兜底）
+    特点：
+    - 速度快（~0.1秒/请求）
+    - 需要 CSRF token 和 Cookie
+    - 支持日内估值、历史净值查询
     """
 
     BASE_URL = "https://www.fund123.cn"
@@ -2085,7 +2085,7 @@ class TiantianFundDataSource(DataSource):
             max_retries: 最大重试次数
             retry_delay: 重试间隔(秒)
         """
-        super().__init__(name="tiantian", source_type=DataSourceType.FUND, timeout=timeout)
+        super().__init__(name="fund123", source_type=DataSourceType.FUND, timeout=timeout)
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self._ensure_client()
@@ -2480,7 +2480,7 @@ class TiantianFundDataSource(DataSource):
         if not intraday_list and day_of_growth:
             # 解析 "5.59%" -> 5.59
             try:
-                growth_rate = float(day_of_growth.rstrip("%"))
+                growth_rate = float(day_of_growth.rstrip('%'))
             except (ValueError, AttributeError):
                 growth_rate = 0.0
 
@@ -2498,7 +2498,9 @@ class TiantianFundDataSource(DataSource):
             # 缓存有效，直接使用缓存的净值数据
             net_value = cached_value
             net_date = cached_date
-            logger.debug(f"使用净值缓存: {fund_code} -> {net_value}, 日期: {net_date}")
+            logger.debug(
+                f"使用净值缓存: {fund_code} -> {net_value}, 日期: {net_date}"
+            )
         else:
             # 缓存无效或不存在，从 akshare 获取最新净值并更新缓存
             try:
@@ -2511,9 +2513,7 @@ class TiantianFundDataSource(DataSource):
                     if ak_nav and ak_net_date:
                         net_value = ak_nav
                         net_date = ak_net_date
-                        logger.debug(
-                            f"从 akshare 获取净值: {fund_code} -> {net_value}, 日期: {net_date}"
-                        )
+                        logger.debug(f"从 akshare 获取净值: {fund_code} -> {net_value}, 日期: {net_date}")
                         # 更新数据库缓存
                         _update_net_value_cache(fund_code, net_value, net_date)
             except Exception as e:
@@ -2529,7 +2529,7 @@ class TiantianFundDataSource(DataSource):
                         text = response.text.strip()
                         # 检查空响应（基金不支持）
                         if text not in ("jsonpgz();", "jsonpgz()"):
-                            match = re.search(r"jsonpgz\((.+)\);?", text)
+                            match = re.search(r'jsonpgz\((.+)\);?', text)
                             if match:
                                 tiantian_data = json.loads(match.group(1))
                                 tiantian_net_date = tiantian_data.get("jzrq", "")
@@ -2561,9 +2561,7 @@ class TiantianFundDataSource(DataSource):
                             net_date = latest_record.date
                             if latest_record.unit_net_value:
                                 net_value = latest_record.unit_net_value
-                                logger.debug(
-                                    f"从数据库缓存获取净值（兜底）: {fund_code} -> {net_value}, 日期: {net_date}"
-                                )
+                                logger.debug(f"从数据库缓存获取净值（兜底）: {fund_code} -> {net_value}, 日期: {net_date}")
                     except Exception as e:
                         logger.warning(f"从数据库获取净值日期失败: {e}")
         # 获取基金类型（优先从 akshare 获取并缓存到数据库）
@@ -2588,31 +2586,8 @@ class TiantianFundDataSource(DataSource):
         # ETF-联接和普通 FOF 基金有实时估值，因为它们跟踪的底层资产是国内基金
         has_real_time = _has_real_time_estimate(fund_type, fund_name) and estimate_value is not None
 
+        # 获取上一交易日净值（用于折线图基准线）
         prev_net_value, prev_net_value_date = await self._get_prev_net_value(fund_code)
-
-        qdii_estimate_change_percent = None
-        qdii_market_status = None
-        underlying_indices = []
-        if not has_real_time and fund_type and fund_type.startswith("QDII"):
-            global _qdii_estimator
-            if _qdii_estimator is None:
-                _qdii_estimator = QdiiEstimator()
-            qdii_result = await _qdii_estimator.estimate(fund_code, prev_net_value)
-            if qdii_result.success:
-                qdii_estimate_change_percent = qdii_result.estimated_change_percent
-                qdii_market_status = qdii_result.market_status
-                underlying_indices = [
-                    {
-                        "type": idx["index_type"],
-                        "name": idx.get("name", ""),
-                        "weight": idx.get("weight", 0),
-                    }
-                    for idx in qdii_result.underlying_indices
-                ]
-                if qdii_result.estimated_net_value:
-                    estimate_value = qdii_result.estimated_net_value
-                    growth_rate = qdii_estimate_change_percent
-                    estimate_time = qdii_result.estimate_time or ""
 
         # [DIAGNOSTIC LOG] 验证涨跌幅数据一致性
         # 注意：fund123.cn 的涨跌幅是基于最新净值（net_value）计算的
@@ -2635,10 +2610,6 @@ class TiantianFundDataSource(DataSource):
                     f"差异={api_growth_rate - calculated_growth_rate:.4f}%"
                 )
 
-        interval_returns = await self._compute_interval_returns(fund_code, net_value)
-        peer_rank = self._compute_peer_rank(fund_code, fund_type, growth_rate)
-        manager_info = await self._get_manager_info(fund_code)
-
         result_data = {
             "fund_code": fund_code,
             "name": fund_name,
@@ -2651,12 +2622,6 @@ class TiantianFundDataSource(DataSource):
             "estimated_growth_rate": growth_rate if growth_rate else None,
             "estimate_time": estimate_time,
             "has_real_time_estimate": has_real_time,
-            "qdii_estimate_change_percent": qdii_estimate_change_percent,
-            "market_status": qdii_market_status,
-            "underlying_index": underlying_indices,
-            "interval_returns": interval_returns,
-            "peer_rank": peer_rank,
-            "manager": manager_info,
             "intraday": [
                 {
                     "time": time.strftime("%H:%M", time.localtime(item.get("time", 0) / 1000)),
@@ -3001,121 +2966,6 @@ class TiantianFundDataSource(DataSource):
         except (ValueError, TypeError):
             return None
 
-    async def _compute_interval_returns(
-        self, fund_code: str, current_net_value: float | None
-    ) -> dict | None:
-        """计算区间收益率"""
-        if not current_net_value or current_net_value <= 0:
-            return None
-
-        try:
-            history_source = FundHistorySource()
-            result = await history_source.fetch(fund_code, days=365)
-            if not result.success or not result.data:
-                return None
-
-            history = result.data if isinstance(result.data, list) else []
-            if len(history) < 2:
-                return None
-
-            now = datetime.now()
-            returns = {}
-
-            for label, days in [("1w", 7), ("1m", 30), ("3m", 90), ("6m", 180), ("1y", 365)]:
-                target_date = now - timedelta(days=days)
-                closest = None
-                min_diff = float("inf")
-                for item in history:
-                    try:
-                        item_date = datetime.strptime(item.get("date", ""), "%Y-%m-%d")
-                        diff = abs((item_date - target_date).days)
-                        if diff < min_diff:
-                            min_diff = diff
-                            closest = item
-                    except (ValueError, TypeError):
-                        continue
-
-                if closest:
-                    old_value = self._safe_float(closest.get("nav", 0))
-                    if old_value and old_value > 0:
-                        returns[label] = round((current_net_value - old_value) / old_value * 100, 2)
-
-            return returns if returns else None
-        except Exception as e:
-            logger.warning(f"计算区间收益率失败 {fund_code}: {e}")
-            return None
-
-    def _compute_peer_rank(
-        self, fund_code: str, fund_type: str | None, growth_rate: float | None
-    ) -> dict | None:
-        """
-        同类排名估算（基于基金类型 + 涨跌幅的简化方案）
-        完整方案需要调用 akshare.fund_open_fund_rank_em 获取全量排名
-        """
-        if not fund_type or growth_rate is None:
-            return None
-
-        type_map = {
-            "股票型": "股票型",
-            "混合型": "混合型",
-            "债券型": "债券型",
-            "指数型": "指数型",
-            "QDII": "QDII",
-            "FOF": "FOF",
-        }
-        category = None
-        for key, val in type_map.items():
-            if fund_type.startswith(key):
-                category = val
-                break
-        if not category:
-            category = "其他"
-
-        fund_type_counts = {
-            "股票型": 1200,
-            "混合型": 2800,
-            "债券型": 1500,
-            "指数型": 400,
-            "QDII": 150,
-            "FOF": 200,
-            "其他": 500,
-        }
-        total = fund_type_counts.get(category, 500)
-
-        rank_estimate = max(1, min(total, int(total * (1 - growth_rate / 10))))
-        percentile = round(rank_estimate / total * 100, 1)
-
-        return {
-            "category": category,
-            "rank": rank_estimate,
-            "total": total,
-            "percentile": percentile,
-        }
-
-    async def _get_manager_info(self, fund_code: str) -> dict | None:
-        """获取基金经理信息"""
-        try:
-            import akshare as ak
-
-            df = ak.fund_manager_em(symbol=fund_code)
-            if df is not None and not df.empty:
-                latest = df.iloc[-1]
-                return {
-                    "name": str(latest.get("基金经理名称", "")),
-                    "tenure": str(latest.get("任职日期", "")),
-                }
-        except Exception as e:
-            logger.warning(f"获取基金经理信息失败 {fund_code}: {e}")
-
-        try:
-            info = get_fund_basic_info(fund_code)
-            if info and info.get("manager"):
-                return {"name": info["manager"], "tenure": info.get("manager_tenure", "")}
-        except Exception:
-            pass
-
-        return None
-
     async def close(self):
         """关闭全局 AsyncClient"""
         if type(self)._client is not None:
@@ -3160,7 +3010,7 @@ __all__ = [
     "SinaFundDataSource",
     "FundHistorySource",
     "FundHistoryYFinanceSource",
-    "TiantianFundDataSource",
+    "Fund123DataSource",
     "get_fund_cache",
     "get_fund_cache_stats",
     "get_intraday_cache_dao",

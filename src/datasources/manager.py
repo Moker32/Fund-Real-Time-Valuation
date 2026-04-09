@@ -638,7 +638,7 @@ def create_default_manager(
         DataSourceManager: 配置好的管理器实例
     """
     from .commodity_source import AKShareCommoditySource, YFinanceCommoditySource
-    from .fund_source import TiantianFundDataSource
+    from .fund_source import Fund123DataSource
     from .sector_source import (
         EastMoneyConceptDetailSource,
         EastMoneyDirectSource,
@@ -656,13 +656,13 @@ def create_default_manager(
     # 注册基金数据源（按优先级排序）
     # 优先级数值越小优先级越高
 
-    # 天天基金接口（主数据源 - 最快 ~0.1秒/请求）
-    tiantian = TiantianFundDataSource()
+    # fund123.cn 接口（主数据源 - 最快 ~0.1秒/请求）
+    fund123 = Fund123DataSource()
     manager.register(
-        tiantian,
+        fund123,
         DataSourceConfig(
-            source_class=type(tiantian),
-            name=tiantian.name,
+            source_class=type(fund123),
+            name=fund123.name,
             source_type=DataSourceType.FUND,
             enabled=True,
             priority=1,  # 最高优先级
