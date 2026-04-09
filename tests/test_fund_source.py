@@ -346,8 +346,8 @@ class TestTiantianFundDataSourceFetch:
 
         # Mock 数据库缓存
         with (
-            patch("src.datasources.fund_source.get_daily_cache_dao") as mock_dao_class,
-            patch("src.datasources.fund_source.get_basic_info_db") as mock_get_basic_info,
+            patch("src.datasources.fund.fund_cache_helpers.get_daily_cache_dao") as mock_dao_class,
+            patch("src.datasources.fund.tiantian_source.get_basic_info_db") as mock_get_basic_info,
         ):
             mock_dao = MagicMock()
             mock_dao.is_expired.return_value = False
@@ -381,14 +381,11 @@ class TestTiantianFundDataSourceFetch:
 
         # Mock 所有外部依赖
         with (
-            patch("src.datasources.fund_source.get_daily_cache_dao") as mock_dao_class,
-            patch("src.datasources.fund_source.get_basic_info_db") as mock_get_basic_info,
-            patch("src.datasources.fund_source.save_basic_info_to_db"),
-            patch("src.datasources.fund_source.get_fund_cache") as mock_cache_class,
-            patch(
-                "src.datasources.fund_source.get_fund_basic_info",
-                return_value=("富国中证新能源汽车指数", "股票型"),
-            ),
+            patch("src.datasources.fund.fund_cache_helpers.get_daily_cache_dao") as mock_dao_class,
+            patch("src.datasources.fund.fund_info_utils.get_basic_info_db") as mock_get_basic_info,
+            patch("src.datasources.fund.fund_info_utils.save_basic_info_to_db"),
+            patch("src.datasources.fund.fund_cache_helpers.get_fund_cache") as mock_cache_class,
+            patch("src.datasources.fund.tiantian_source.get_fund_basic_info") as mock_get_fund_info,
         ):
             # 数据库缓存过期
             mock_dao = MagicMock()
@@ -398,6 +395,7 @@ class TestTiantianFundDataSourceFetch:
 
             # 基本信息
             mock_get_basic_info.return_value = None
+            mock_get_fund_info.return_value = ("富国中证新能源汽车指数", "股票型")
 
             # 缓存未命中
             mock_cache = MagicMock()

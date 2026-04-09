@@ -178,8 +178,37 @@ class FundHistorySource(DataSource):
 
         return bool(re.match(r"^\d{6}$", str(fund_code)))
 
-    async def fetch_batch(self, fund_codes: list[str]) -> list[DataSourceResult]:
-        """批量获取基金历史数据"""
+    async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
+        """
+        批量获取基金历史数据
+
+        Args:
+            *args: 位置参数（兼容旧接口）
+            **kwargs: 关键字参数，可选 fund_codes
+
+        Returns:
+            List[DataSourceResult]: 返回结果列表
+        """
+        # 支持多种调用方式: fetch_batch() / fetch_batch([]) / fetch_batch(fund_codes=[])
+        fund_codes: list[str] | None = None
+
+        if args:
+            fund_codes = list(args[0]) if args[0] else []
+        elif kwargs.get("fund_codes"):
+            fund_codes = kwargs.get("fund_codes")
+        elif kwargs.get("fund_code"):
+            # 单个 fund_code 兼容
+            fund_codes = [kwargs.get("fund_code")]
+
+        if not fund_codes:
+            return [
+                DataSourceResult(
+                    success=False,
+                    error="缺少 fund_code 参数",
+                    timestamp=time.time(),
+                    source=self.name,
+                )
+            ]
 
         async def fetch_one(code: str) -> DataSourceResult:
             return await self.fetch(code)
