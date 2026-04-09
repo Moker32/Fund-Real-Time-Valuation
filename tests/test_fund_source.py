@@ -3,7 +3,7 @@
 基金数据源模块测试
 
 测试覆盖:
-1. FundDataSource 类 - 主要基金数据获取
+1. TiantianFundDataSource 类 - 主要基金数据获取
 2. FundHistorySource 类 - 基金历史数据获取
 3. SinaFundDataSource 类 - 新浪基金数据源
 4. EastMoneyFundDataSource 类 - 东方财富基金数据源
@@ -52,33 +52,33 @@ class TestSafeFloat:
 
     def test_safe_float_with_valid_number(self):
         """测试有效数字转换"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         assert source._safe_float("1.23") == 1.23
         assert source._safe_float(1.23) == 1.23
         assert source._safe_float(100) == 100.0
 
     def test_safe_float_with_none(self):
         """测试 None 值"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         assert source._safe_float(None) is None
 
     def test_safe_float_with_invalid_string(self):
         """测试无效字符串"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         assert source._safe_float("abc") is None
         assert source._safe_float("") is None
 
     def test_safe_float_with_special_values(self):
         """测试特殊值"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         assert source._safe_float("0") == 0.0
         assert source._safe_float(0) == 0.0
         assert source._safe_float("-1.5") == -1.5
@@ -89,27 +89,27 @@ class TestValidateFundCode:
 
     def test_valid_fund_code_6_digits(self):
         """测试有效的6位基金代码"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         assert source._validate_fund_code("161039") is True
         assert source._validate_fund_code("000001") is True
         assert source._validate_fund_code("510300") is True
 
     def test_invalid_fund_code_wrong_length(self):
         """测试长度错误的基金代码"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         assert source._validate_fund_code("12345") is False
         assert source._validate_fund_code("1234567") is False
         assert source._validate_fund_code("") is False
 
     def test_invalid_fund_code_non_digits(self):
         """测试包含非数字的基金代码"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         assert source._validate_fund_code("abc123") is False
         assert source._validate_fund_code("16103a") is False
 
@@ -247,18 +247,18 @@ class TestHasRealTimeEstimate:
 
 
 # ============================================================================
-# FundDataSource 类测试
+# TiantianFundDataSource 类测试
 # ============================================================================
 
 
-class TestFundDataSourceInit:
-    """测试 FundDataSource 初始化"""
+class TestTiantianFundDataSourceInit:
+    """测试 TiantianFundDataSource 初始化"""
 
     def test_init_default_params(self):
         """测试默认参数初始化"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         assert source.name == "fund_tiantian"
         assert source.source_type == DataSourceType.FUND
         assert source.timeout == 30.0
@@ -267,22 +267,22 @@ class TestFundDataSourceInit:
 
     def test_init_custom_params(self):
         """测试自定义参数初始化"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource(timeout=60.0, max_retries=3, retry_delay=2.0)
+        source = TiantianFundDataSource(timeout=60.0, max_retries=3, retry_delay=2.0)
         assert source.timeout == 60.0
         assert source.max_retries == 3
         assert source.retry_delay == 2.0
 
 
-class TestFundDataSourceParseResponse:
-    """测试 FundDataSource._parse_response 方法"""
+class TestTiantianFundDataSourceParseResponse:
+    """测试 TiantianFundDataSource._parse_response 方法"""
 
     def test_parse_valid_response(self):
         """测试解析有效响应"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         response_text = 'jsonpgz({"fundcode":"161039","name":"富国中证新能源汽车指数","jzrq":"2024-01-10","dwjz":"2.0000","gsz":"2.0500","gszzl":"2.50","gztime":"2024-01-10 15:00"});'
 
         result = source._parse_response(response_text, "161039")
@@ -298,9 +298,9 @@ class TestFundDataSourceParseResponse:
 
     def test_parse_response_with_extra_spaces(self):
         """测试带额外空格的响应"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         response_text = 'jsonpgz(  {"fundcode":"161039","name":"测试基金"}  );'
 
         result = source._parse_response(response_text, "161039")
@@ -311,9 +311,9 @@ class TestFundDataSourceParseResponse:
 
     def test_parse_response_empty_gztime(self):
         """测试 gztime 为空的情况"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         response_text = 'jsonpgz({"fundcode":"161039","name":"测试基金","jzrq":"2024-01-10","dwjz":"2.0","gsz":"","gszzl":"","gztime":""});'
 
         result = source._parse_response(response_text, "161039")
@@ -323,15 +323,15 @@ class TestFundDataSourceParseResponse:
         assert result["estimated_growth_rate"] is None
 
 
-class TestFundDataSourceFetch:
-    """测试 FundDataSource.fetch 方法"""
+class TestTiantianFundDataSourceFetch:
+    """测试 TiantianFundDataSource.fetch 方法"""
 
     @pytest.mark.asyncio
     async def test_fetch_invalid_fund_code(self):
         """测试无效基金代码"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         result = await source.fetch("invalid")
 
         assert result.success is False
@@ -340,16 +340,15 @@ class TestFundDataSourceFetch:
     @pytest.mark.asyncio
     async def test_fetch_with_cache_hit(self):
         """测试缓存命中场景"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
 
         # Mock 数据库缓存
-        with patch(
-            "src.datasources.fund_source.get_daily_cache_dao"
-        ) as mock_dao_class, patch(
-            "src.datasources.fund_source.get_basic_info_db"
-        ) as mock_get_basic_info:
+        with (
+            patch("src.datasources.fund_source.get_daily_cache_dao") as mock_dao_class,
+            patch("src.datasources.fund_source.get_basic_info_db") as mock_get_basic_info,
+        ):
             mock_dao = MagicMock()
             mock_dao.is_expired.return_value = False
             mock_record = MagicMock()
@@ -376,22 +375,20 @@ class TestFundDataSourceFetch:
     @pytest.mark.asyncio
     async def test_fetch_api_success(self):
         """测试 API 成功获取"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
 
         # Mock 所有外部依赖
-        with patch(
-            "src.datasources.fund_source.get_daily_cache_dao"
-        ) as mock_dao_class, patch(
-            "src.datasources.fund_source.get_basic_info_db"
-        ) as mock_get_basic_info, patch(
-            "src.datasources.fund_source.save_basic_info_to_db"
-        ), patch(
-            "src.datasources.fund_source.get_fund_cache"
-        ) as mock_cache_class, patch(
-            "src.datasources.fund_source.get_fund_basic_info",
-            return_value=("富国中证新能源汽车指数", "股票型")
+        with (
+            patch("src.datasources.fund_source.get_daily_cache_dao") as mock_dao_class,
+            patch("src.datasources.fund_source.get_basic_info_db") as mock_get_basic_info,
+            patch("src.datasources.fund_source.save_basic_info_to_db"),
+            patch("src.datasources.fund_source.get_fund_cache") as mock_cache_class,
+            patch(
+                "src.datasources.fund_source.get_fund_basic_info",
+                return_value=("富国中证新能源汽车指数", "股票型"),
+            ),
         ):
             # 数据库缓存过期
             mock_dao = MagicMock()
@@ -423,21 +420,19 @@ class TestFundDataSourceFetch:
                 assert result.data["name"] == "富国中证新能源汽车指数"
 
 
-class TestFundDataSourceFetchBatch:
-    """测试 FundDataSource.fetch_batch 方法"""
+class TestTiantianFundDataSourceFetchBatch:
+    """测试 TiantianFundDataSource.fetch_batch 方法"""
 
     @pytest.mark.asyncio
     async def test_fetch_batch_success(self):
         """测试批量获取成功"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
 
         # Mock fetch 方法
         async def mock_fetch(code):
-            return DataSourceResult(
-                success=True, data={"fund_code": code}, source="test"
-            )
+            return DataSourceResult(success=True, data={"fund_code": code}, source="test")
 
         with patch.object(source, "fetch", side_effect=mock_fetch):
             results = await source.fetch_batch(["161039", "000001"])
@@ -449,9 +444,9 @@ class TestFundDataSourceFetchBatch:
     @pytest.mark.asyncio
     async def test_fetch_batch_with_exception(self):
         """测试批量获取时某项抛出异常"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
 
         # Mock fetch 方法，第一个成功，第二个抛异常
         call_count = 0
@@ -460,9 +455,7 @@ class TestFundDataSourceFetchBatch:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return DataSourceResult(
-                    success=True, data={"fund_code": code}, source="test"
-                )
+                return DataSourceResult(success=True, data={"fund_code": code}, source="test")
             else:
                 raise Exception("Network error")
 
@@ -475,32 +468,30 @@ class TestFundDataSourceFetchBatch:
             assert "Network error" in results[1].error
 
 
-class TestFundDataSourceHealthCheck:
-    """测试 FundDataSource.health_check 方法"""
+class TestTiantianFundDataSourceHealthCheck:
+    """测试 TiantianFundDataSource.health_check 方法"""
 
     @pytest.mark.asyncio
     async def test_health_check_success(self):
         """测试健康检查成功"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
 
         mock_response = MagicMock()
         mock_response.text = 'jsonpgz({"fundcode":"161039","name":"测试基金"});'
         mock_response.raise_for_status = MagicMock()
 
-        with patch.object(
-            source.client, "get", new_callable=AsyncMock, return_value=mock_response
-        ):
+        with patch.object(source.client, "get", new_callable=AsyncMock, return_value=mock_response):
             result = await source.health_check()
             assert result is True
 
     @pytest.mark.asyncio
     async def test_health_check_failure(self):
         """测试健康检查失败"""
-        from src.datasources.fund_source import FundDataSource
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
 
         with patch.object(
             source.client, "get", new_callable=AsyncMock, side_effect=Exception("Network error")
@@ -693,55 +684,6 @@ class TestFund123DataSourceCSRF:
 
 
 # ============================================================================
-# TushareFundSource 类测试
-# ============================================================================
-
-
-class TestTushareFundSource:
-    """测试 TushareFundSource 类"""
-
-    def test_init_without_token(self):
-        """测试无 Token 初始化"""
-        from src.datasources.fund_source import TushareFundSource
-
-        with patch.dict("os.environ", {}, clear=True):
-            source = TushareFundSource(token=None)
-            assert source.name == "tushare_fund"
-            assert source._token is None
-
-    def test_init_with_token(self):
-        """测试带 Token 初始化 - 需要 mock tushare 库"""
-        from src.datasources.fund_source import TushareFundSource
-
-        # Mock tushare 模块避免 ImportError
-        with patch.dict("sys.modules", {"tushare": MagicMock()}):
-            source = TushareFundSource(token="test_token")
-            assert source._token == "test_token"
-
-    @pytest.mark.asyncio
-    async def test_fetch_no_token(self):
-        """测试无 Token 时获取数据"""
-        from src.datasources.fund_source import TushareFundSource
-
-        source = TushareFundSource(token=None)
-        result = await source.fetch("161039")
-
-        assert result.success is False
-        assert "Tushare Token 未配置" in result.error
-
-    @pytest.mark.asyncio
-    async def test_fetch_batch_no_token(self):
-        """测试无 Token 时批量获取"""
-        from src.datasources.fund_source import TushareFundSource
-
-        source = TushareFundSource(token=None)
-        results = await source.fetch_batch(["161039"])
-
-        assert len(results) == 1
-        assert results[0].success is False
-
-
-# ============================================================================
 # FundHistoryYFinanceSource 类测试
 # ============================================================================
 
@@ -859,10 +801,10 @@ class TestCloseClient:
 
     @pytest.mark.asyncio
     async def test_fund_data_source_close(self):
-        """测试 FundDataSource 关闭客户端"""
-        from src.datasources.fund_source import FundDataSource
+        """测试 TiantianFundDataSource 关闭客户端"""
+        from src.datasources.fund_source import TiantianFundDataSource
 
-        source = FundDataSource()
+        source = TiantianFundDataSource()
         await source.close()
 
         assert source.client.is_closed is True

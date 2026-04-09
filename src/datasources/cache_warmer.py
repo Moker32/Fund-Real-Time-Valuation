@@ -55,17 +55,17 @@ class CacheWarmer:
             logger.info(f"开始预加载缓存目录: {cache_dir}")
 
             loaded_count = 0
-            cache_files = list(cache_dir.glob('*.json'))
+            cache_files = list(cache_dir.glob("*.json"))
 
             for cache_file in cache_files:
                 try:
-                    with open(cache_file, encoding='utf-8') as f:
+                    with open(cache_file, encoding="utf-8") as f:
                         cache_data = json.load(f)
-                        value = cache_data.get('value')
+                        value = cache_data.get("value")
 
                     if value is not None:
                         # 解析 key
-                        cache_key = cache_data.get('key', cache_file.stem)
+                        cache_key = cache_data.get("key", cache_file.stem)
                         # 直接设置到内存缓存
                         await cache.memory_cache.set(cache_key, value, cache.file_ttl)
                         loaded_count += 1
@@ -159,8 +159,7 @@ class CacheWarmer:
             # 使用较长的超时执行预热
             async def fetch_with_timeout():
                 return await asyncio.wait_for(
-                    self.manager.fetch_batch(DataSourceType.FUND, params_list),
-                    timeout=timeout
+                    self.manager.fetch_batch(DataSourceType.FUND, params_list), timeout=timeout
                 )
 
             results = await fetch_with_timeout()
@@ -235,13 +234,10 @@ async def prewarm_new_fund(fund_code: str, timeout: float = 30.0):
 
         # 1. 获取基金实时数据并写入缓存
         try:
-            from src.datasources.fund_source import FundDataSource
+            from src.datasources.fund_source import TiantianFundDataSource
 
-            source = FundDataSource()
-            result = await asyncio.wait_for(
-                source.fetch(fund_code),
-                timeout=timeout
-            )
+            source = TiantianFundDataSource()
+            result = await asyncio.wait_for(source.fetch(fund_code), timeout=timeout)
 
             if result.success:
                 logger.info(f"基金实时数据预热成功: {fund_code}")
@@ -260,8 +256,7 @@ async def prewarm_new_fund(fund_code: str, timeout: float = 30.0):
 
             history_source = FundHistorySource()
             history_result = await asyncio.wait_for(
-                history_source.fetch(fund_code, period="近一月"),
-                timeout=timeout
+                history_source.fetch(fund_code, period="近一月"), timeout=timeout
             )
 
             if history_result.success and history_result.data:
@@ -275,15 +270,18 @@ async def prewarm_new_fund(fund_code: str, timeout: float = 30.0):
                 for record in history_data:
                     try:
                         # 保存到每日缓存表
-                        daily_dao.save_daily_from_fund_data(fund_code, {
-                            "fund_code": fund_code,
-                            "name": "",
-                            "date": record["time"],
-                            "unit_net_value": record["close"],
-                            "estimated_value": None,
-                            "change_rate": 0,
-                            "estimate_time": None,
-                        })
+                        daily_dao.save_daily_from_fund_data(
+                            fund_code,
+                            {
+                                "fund_code": fund_code,
+                                "name": "",
+                                "date": record["time"],
+                                "unit_net_value": record["close"],
+                                "estimated_value": None,
+                                "change_rate": 0,
+                                "estimate_time": None,
+                            },
+                        )
                         cached_count += 1
                     except Exception as e:
                         logger.debug(f"保存历史记录失败: {fund_code} - {e}")

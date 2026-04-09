@@ -10,14 +10,14 @@
 
 使用示例:
     from src.datasources import (
-        FundDataSource,
+        TiantianFundDataSource,
         AKShareCommoditySource,
         DataSourceManager,
         DataGateway,
     )
 
     # 创建单个数据源
-    fund_source = FundDataSource()
+    fund_source = TiantianFundDataSource()
     result = await fund_source.fetch("161039")
 
     # 使用管理器
@@ -51,7 +51,7 @@ from .commodity_source import (
     CommodityDataSource,
     YFinanceCommoditySource,
 )
-from .fund_source import Fund123DataSource, FundDataSource, SinaFundDataSource
+from .fund_source import Fund123DataSource, TiantianFundDataSource, SinaFundDataSource
 from .gateway import (
     BatchDataRequest,
     BatchDataResponse,
@@ -100,7 +100,7 @@ __all__ = [
     "HotBackupManager",
     "HotBackupResult",
     # 基金数据源
-    "FundDataSource",
+    "TiantianFundDataSource",
     "SinaFundDataSource",
     "Fund123DataSource",
     # 商品数据源

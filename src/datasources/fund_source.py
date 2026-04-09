@@ -594,7 +594,7 @@ def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
         # 获取基金类型（保留完整的 akshare 格式：主类型-子类型）
         # 优先级：fund_individual_basic_info_xq > fund_name_em > 名称推断
         fund_type = ""
-        
+
         # 方案1: fund_individual_basic_info_xq (最精确)
         try:
             info_df = ak.fund_individual_basic_info_xq(symbol=fund_code)
@@ -635,12 +635,18 @@ def get_fund_basic_info(fund_code: str) -> tuple[str, str] | None:
         return None
 
 
-class FundDataSource(DataSource):
-    """基金数据源 - 从天天基金接口获取数据"""
+class TiantianFundDataSource(DataSource):
+    """天天基金数据源 - 从天天基金接口获取数据
+
+    主要数据来源:
+    - 天天基金 (fundgz.1234567.com.cn): 实时估值数据
+    - 东方财富 LOF 接口 (akshare fund_open_fund_info_em): QDII/FOF/LOF 等基金净值
+
+    注意: 对于 QDII 基金，天天基金返回的估值数据不准确，会跳过改用 akshare 数据源
+    """
 
     def __init__(self, timeout: float = 30.0, max_retries: int = 2, retry_delay: float = 1.0):
-        """
-        初始化基金数据源
+        """初始化基金数据源
 
         Args:
             timeout: 请求超时时间(秒)
@@ -848,21 +854,46 @@ class FundDataSource(DataSource):
                 if data:
                     # 获取基金类型
                     fund_type = await self._get_fund_type(fund_code)
-                    if fund_type:
-                        data["type"] = fund_type
-                    else:
+                    if not fund_type:
                         # Fallback: 从基金名称中识别 QDII/FOF
                         fund_name = data.get("name", "")
                         if "(QDII)" in fund_name or fund_name.endswith("QDII"):
-                            data["type"] = "QDII"
                             fund_type = "QDII"
                         elif fund_name.endswith("FOF") or "(FOF)" in fund_name:
-                            data["type"] = "FOF"
                             fund_type = "FOF"
 
-                    # 根据基金类型和名称判断是否有实时估值
+                    # QDII/FOF 基金不应该使用天天基金的数据（估值数据不准确）
+                    # 跳过天天基金，直接使用 akshare 东方财富接口
                     fund_name = data.get("name", "")
-                    data["has_real_time_estimate"] = _has_real_time_estimate(fund_type, fund_name)
+                    if fund_type and (fund_type.startswith("QDII") or fund_type == "FOF"):
+                        if fund_type == "FOF":
+                            name_upper = fund_name.upper()
+                            if (
+                                "QDII" not in name_upper
+                                and "海外" not in name_upper
+                                and "全球" not in name_upper
+                            ):
+                                # 非投资海外的 FOF 可以使用天天基金数据
+                                pass
+                            else:
+                                # QDII-FOF 或投资海外的 FOF，跳过天天基金
+                                result = await self._fetch_lof(
+                                    fund_code, has_real_time_estimate=False
+                                )
+                                if result.success:
+                                    return result
+                        else:
+                            # QDII 基金，跳过天天基金
+                            result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
+                            if result.success:
+                                return result
+
+                    data["type"] = fund_type
+
+                    # 根据基金类型和名称判断是否有实时估值
+                    data["has_real_time_estimate"] = _has_real_time_estimate(
+                        fund_type or "", fund_name
+                    )
 
                     # QDII 基金或投资海外的 FOF 需要获取上一交易日净值用于对比
                     if not data["has_real_time_estimate"]:
@@ -1365,7 +1396,7 @@ class FundDataSource(DataSource):
 
 # 导出类
 __all__ = [
-    "FundDataSource",
+    "TiantianFundDataSource",
     "SinaFundDataSource",
     "FundHistorySource",
     "FundHistoryYFinanceSource",
@@ -2051,13 +2082,13 @@ class EastMoneyFundDataSource(DataSource):
 
 
 class Fund123DataSource(DataSource):
-    """
-    fund123.cn 基金数据源
+    """fund123.cn 基金数据源
 
-    特点：
-    - 速度快（~0.1秒/请求）
-    - 需要 CSRF token 和 Cookie
-    - 支持日内估值、历史净值查询
+    主要数据来源:
+    - fund123.cn API: 日内实时估算数据（需要 CSRF token）
+    - akshare (fund_open_fund_info_em): 基金净值和净值日期
+
+    注意: fund123.cn 本身不提供基金净值，净值数据来自 akshare
     """
 
     BASE_URL = "https://www.fund123.cn"
@@ -2480,7 +2511,7 @@ class Fund123DataSource(DataSource):
         if not intraday_list and day_of_growth:
             # 解析 "5.59%" -> 5.59
             try:
-                growth_rate = float(day_of_growth.rstrip('%'))
+                growth_rate = float(day_of_growth.rstrip("%"))
             except (ValueError, AttributeError):
                 growth_rate = 0.0
 
@@ -2498,9 +2529,7 @@ class Fund123DataSource(DataSource):
             # 缓存有效，直接使用缓存的净值数据
             net_value = cached_value
             net_date = cached_date
-            logger.debug(
-                f"使用净值缓存: {fund_code} -> {net_value}, 日期: {net_date}"
-            )
+            logger.debug(f"使用净值缓存: {fund_code} -> {net_value}, 日期: {net_date}")
         else:
             # 缓存无效或不存在，从 akshare 获取最新净值并更新缓存
             try:
@@ -2513,7 +2542,9 @@ class Fund123DataSource(DataSource):
                     if ak_nav and ak_net_date:
                         net_value = ak_nav
                         net_date = ak_net_date
-                        logger.debug(f"从 akshare 获取净值: {fund_code} -> {net_value}, 日期: {net_date}")
+                        logger.debug(
+                            f"从 akshare 获取净值: {fund_code} -> {net_value}, 日期: {net_date}"
+                        )
                         # 更新数据库缓存
                         _update_net_value_cache(fund_code, net_value, net_date)
             except Exception as e:
@@ -2529,7 +2560,7 @@ class Fund123DataSource(DataSource):
                         text = response.text.strip()
                         # 检查空响应（基金不支持）
                         if text not in ("jsonpgz();", "jsonpgz()"):
-                            match = re.search(r'jsonpgz\((.+)\);?', text)
+                            match = re.search(r"jsonpgz\((.+)\);?", text)
                             if match:
                                 tiantian_data = json.loads(match.group(1))
                                 tiantian_net_date = tiantian_data.get("jzrq", "")
@@ -2561,7 +2592,9 @@ class Fund123DataSource(DataSource):
                             net_date = latest_record.date
                             if latest_record.unit_net_value:
                                 net_value = latest_record.unit_net_value
-                                logger.debug(f"从数据库缓存获取净值（兜底）: {fund_code} -> {net_value}, 日期: {net_date}")
+                                logger.debug(
+                                    f"从数据库缓存获取净值（兜底）: {fund_code} -> {net_value}, 日期: {net_date}"
+                                )
                     except Exception as e:
                         logger.warning(f"从数据库获取净值日期失败: {e}")
         # 获取基金类型（优先从 akshare 获取并缓存到数据库）
@@ -3006,7 +3039,7 @@ def get_cache_strategy() -> FundCacheStrategy:
 
 
 __all__ = [
-    "FundDataSource",
+    "TiantianFundDataSource",
     "SinaFundDataSource",
     "FundHistorySource",
     "FundHistoryYFinanceSource",
