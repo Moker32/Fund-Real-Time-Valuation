@@ -18,8 +18,8 @@ from src.datasources.sector import (
     EastMoneySectorSource,
     FundFlowConceptSource,
     FundFlowIndustrySource,
-    SinaSectorDataSource,
     SectorDataAggregator,
+    SinaSectorDataSource,
     get_last_trading_day,
     is_trading_day,
 )

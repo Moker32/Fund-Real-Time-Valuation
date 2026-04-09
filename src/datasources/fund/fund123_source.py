@@ -24,14 +24,14 @@ from .fund_cache_helpers import (
     get_intraday_cache_dao,
 )
 from .fund_info_utils import (
-    get_basic_info_db,
-    save_basic_info_to_db,
+    _get_net_value_date_from_akshare,
     _has_real_time_estimate,
     _infer_fund_type_from_name,
     _is_net_value_cache_valid,
-    _get_net_value_date_from_akshare,
     _update_net_value_cache,
+    get_basic_info_db,
     get_fund_basic_info,
+    save_basic_info_to_db,
 )
 
 logger = logging.getLogger(__name__)

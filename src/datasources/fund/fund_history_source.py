@@ -8,8 +8,6 @@ import logging
 import time
 from typing import Any
 
-import pandas as pd
-
 from ..base import DataSource, DataSourceResult, DataSourceType
 
 logger = logging.getLogger(__name__)

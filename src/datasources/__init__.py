@@ -51,7 +51,12 @@ from .commodity_source import (
     CommodityDataSource,
     YFinanceCommoditySource,
 )
-from .fund import Fund123DataSource, TiantianFundDataSource, SinaFundDataSource, EastMoneyFundDataSource
+from .fund import (
+    EastMoneyFundDataSource,
+    Fund123DataSource,
+    SinaFundDataSource,
+    TiantianFundDataSource,
+)
 from .gateway import (
     BatchDataRequest,
     BatchDataResponse,
@@ -102,6 +107,7 @@ __all__ = [
     # 基金数据源
     "TiantianFundDataSource",
     "SinaFundDataSource",
+    "EastMoneyFundDataSource",
     "Fund123DataSource",
     # 商品数据源
     "CommodityDataSource",

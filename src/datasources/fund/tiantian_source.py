@@ -22,10 +22,10 @@ from .fund_cache_helpers import (
     get_fund_cache,
 )
 from .fund_info_utils import (
-    get_basic_info_db,
-    save_basic_info_to_db,
     _has_real_time_estimate,
+    get_basic_info_db,
     get_fund_basic_info,
+    save_basic_info_to_db,
 )
 
 logger = logging.getLogger(__name__)
