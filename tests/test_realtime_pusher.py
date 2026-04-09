@@ -919,12 +919,12 @@ class TestRealtimePusherSupportedIndices:
 
     def test_supported_indices_contains_main_indices(self):
         """测试支持的指数包含主要指数"""
-        assert "sh000001" in RealtimePusher.SUPPORTED_INDICES  # 上证指数
-        assert "sz399001" in RealtimePusher.SUPPORTED_INDICES  # 深证成指
-        assert "sz399006" in RealtimePusher.SUPPORTED_INDICES  # 创业板指
+        assert "shanghai" in RealtimePusher.SUPPORTED_INDICES  # 上证指数
+        assert "shenzhen" in RealtimePusher.SUPPORTED_INDICES  # 深证成指
+        assert "chi_next" in RealtimePusher.SUPPORTED_INDICES  # 创业板指
 
     def test_supported_indices_contains_international(self):
         """测试支持的指数包含国际指数"""
-        assert "hkHSI" in RealtimePusher.SUPPORTED_INDICES  # 恒生指数
-        assert "usDJI" in RealtimePusher.SUPPORTED_INDICES  # 道琼斯
-        assert "usIXIC" in RealtimePusher.SUPPORTED_INDICES  # 纳斯达克
+        assert "hang_seng" in RealtimePusher.SUPPORTED_INDICES  # 恒生指数
+        assert "dow_jones" in RealtimePusher.SUPPORTED_INDICES  # 道琼斯
+        assert "nasdaq" in RealtimePusher.SUPPORTED_INDICES  # 纳斯达克
