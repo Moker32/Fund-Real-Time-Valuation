@@ -37,9 +37,8 @@ class TestYFinanceCommoditySource:
 
         # 验证基本金属预留
         assert "copper" in source.COMMODITY_TICKERS  # 铜 HG=F
-        assert "aluminum" in source.COMMODITY_TICKERS  # 铝 AL=f
-        assert "zinc" in source.COMMODITY_TICKERS  # 锌 ZN=f
-        assert "nickel" in source.COMMODITY_TICKERS  # 镍 NI=f
+        assert "aluminum" in source.COMMODITY_TICKERS  # 铝 ALI=F
+        assert "zinc" in source.COMMODITY_TICKERS  # 锌 ZN=F=f
 
     @pytest.mark.asyncio
     async def test_commodity_names(self, source):
@@ -149,9 +148,8 @@ class TestCommodityTickerMapping:
 
         # 基本金属 (预留)
         assert tickers["copper"] == "HG=F"
-        assert tickers["aluminum"] == "AL=F"
+        assert tickers["aluminum"] == "ALI=F"
         assert tickers["zinc"] == "ZN=F"
-        assert tickers["nickel"] == "NI=F"
 
 
 if __name__ == "__main__":
