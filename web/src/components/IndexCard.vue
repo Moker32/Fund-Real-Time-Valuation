@@ -50,7 +50,7 @@
         </div>
 
         <Transition name="chart-expand">
-          <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" class="index-chart" />
+          <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" :lunch-break="lunchBreak" class="index-chart" />
         </Transition>
       </div>
 
@@ -109,6 +109,14 @@ const emit = defineEmits<{
 // Use a computed property to handle potential undefined values
 // eslint-disable-next-line no-useless-assignment
 const indexData = computed(() => props.index);
+
+// 午休配置：A股 11:30-13:00，日经 12:30-13:30
+const lunchBreak = computed(() => {
+  if (props.index.index === 'nikkei225') {
+    return { start: 12 * 60 + 30, end: 13 * 60 + 30 }; // 12:30-13:30
+  }
+  return { start: 11 * 60 + 30, end: 13 * 60 }; // A 股 11:30-13:00
+});
 
 const prevPrice = ref<number | undefined>();
 const prevChangePercent = ref<number | undefined>();

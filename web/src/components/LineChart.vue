@@ -25,6 +25,11 @@ interface ChartDataItem {
   close?: number | null;
 }
 
+interface LunchBreak {
+  start: number;  // minutes from midnight, e.g., 11:30 -> 690
+  end: number;    // minutes from midnight, e.g., 13:00 -> 780
+}
+
 const props = withDefaults(defineProps<{
   data: ChartDataItem[];
   height?: number;
@@ -32,6 +37,7 @@ const props = withDefaults(defineProps<{
   trend?: 'rising' | 'falling' | 'neutral';
   showAxes?: boolean;
   showTooltip?: boolean;
+  lunchBreak?: LunchBreak;  // 午休时间段，如 { start: 690, end: 780 } 表示 11:30-13:00
 }>(), {
   height: 100,
   trend: 'neutral',
@@ -392,7 +398,16 @@ const updateData = () => {
 const LUNCH_BREAK_START = 11 * 60 + 30;
 const LUNCH_BREAK_END = 13 * 60;
 
+// 获取午休时间配置，优先使用 props.lunchBreak，否则使用默认值（A 股）
+const getLunchBreakConfig = (): { start: number; end: number } => {
+  if (props.lunchBreak) {
+    return { start: props.lunchBreak.start, end: props.lunchBreak.end };
+  }
+  return { start: LUNCH_BREAK_START, end: LUNCH_BREAK_END };
+};
+
 const hasLunchBreak = (data: { time: string }[]): boolean => {
+  const { start, end } = getLunchBreakConfig();
   let hasMorning = false;
   let hasAfternoon = false;
   let hasLunchGap = true;
@@ -401,9 +416,9 @@ const hasLunchBreak = (data: { time: string }[]): boolean => {
     const m = item.time.match(/^(\d{1,2}):(\d{2})$/);
     if (!m || !m[1] || !m[2]) continue;
     const minutes = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-    if (minutes <= LUNCH_BREAK_START) hasMorning = true;
-    if (minutes >= LUNCH_BREAK_END) hasAfternoon = true;
-    if (minutes > LUNCH_BREAK_START && minutes < LUNCH_BREAK_END) hasLunchGap = false;
+    if (minutes <= start) hasMorning = true;
+    if (minutes >= end) hasAfternoon = true;
+    if (minutes > start && minutes < end) hasLunchGap = false;
   }
   return hasMorning && hasAfternoon && hasLunchGap;
 };
@@ -420,6 +435,7 @@ const minutesToTimestamp = (minutes: number): number => {
 };
 
 const buildCompressedIntradayData = (sortedData: { time: string; price?: number; close?: number | null }[]) => {
+  const { start, end } = getLunchBreakConfig();
   const displayTimestamps: number[] = [];
   const values: (number | null)[] = [];
   const reals: number[] = [];
@@ -436,15 +452,15 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
     const realTs = parseTimeToTimestamp(item.time);
 
     let displayMinutes: number;
-    if (minutes <= LUNCH_BREAK_START) {
+    if (minutes <= start) {
       displayMinutes = minutes;
     } else {
-      displayMinutes = minutes - (LUNCH_BREAK_END - LUNCH_BREAK_START);
+      displayMinutes = minutes - (end - start);
     }
 
     const displayTs = minutesToTimestamp(displayMinutes);
 
-    if (lunchIdx === -1 && minutes > LUNCH_BREAK_START && displayTimestamps.length > 0) {
+    if (lunchIdx === -1 && minutes > start && displayTimestamps.length > 0) {
       lunchIdx = displayTimestamps.length;
     }
 
@@ -454,7 +470,7 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
   }
 
   if (lunchIdx > 0) {
-    lunchBreakX = minutesToTimestamp(LUNCH_BREAK_START);
+    lunchBreakX = minutesToTimestamp(start);
   }
 
   processedTimestamps = displayTimestamps;
