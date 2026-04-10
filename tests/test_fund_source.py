@@ -340,23 +340,25 @@ class TestTiantianFundDataSourceFetch:
     @pytest.mark.asyncio
     async def test_fetch_with_cache_hit(self):
         """测试缓存命中场景"""
+        from datetime import date
         from src.datasources.fund_source import TiantianFundDataSource
 
         source = TiantianFundDataSource()
 
-        # Mock 数据库缓存
+        # Mock 数据库缓存（使用今天的日期，确保缓存被认为是新鲜的）
+        today = date.today().isoformat()
         with (
-            patch("src.datasources.fund.fund_cache_helpers.get_daily_cache_dao") as mock_dao_class,
+            patch("src.datasources.fund.tiantian_source.get_daily_cache_dao") as mock_dao_class,
             patch("src.datasources.fund.tiantian_source.get_basic_info_db") as mock_get_basic_info,
         ):
             mock_dao = MagicMock()
             mock_dao.is_expired.return_value = False
             mock_record = MagicMock()
-            mock_record.date = "2024-01-10"
+            mock_record.date = today  # 使用今天的日期
             mock_record.unit_net_value = 2.0
             mock_record.estimated_value = 2.05
             mock_record.change_rate = 2.5
-            mock_record.estimate_time = "2024-01-10 15:00"
+            mock_record.estimate_time = f"{today} 15:00"
             mock_dao.get_latest.return_value = mock_record
             mock_dao_class.return_value = mock_dao
 

@@ -6,7 +6,10 @@
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from src.datasources.trading_calendar_source import TradingCalendarSource
 from zoneinfo import ZoneInfo
 
 from src.db.database import DatabaseManager
@@ -25,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 # 缓存策略单例
 _cache_strategy: FundCacheStrategy | None = None
+# 交易日历源单例
+_trading_calendar_source: "TradingCalendarSource | None" = None
 
 
 def get_cache_strategy() -> FundCacheStrategy:
@@ -438,8 +443,8 @@ def _is_net_value_cache_valid(fund_code: str) -> tuple[bool, str | None, float |
         # 获取最新交易日
         latest_trading_day = _get_latest_trading_day()
         if not latest_trading_day:
-            # 无法获取交易日，缓存可能有效
-            return (True, cached_date, cached_value)
+            # 无法获取交易日，无法验证缓存有效性，应该强制刷新
+            return (False, cached_date, cached_value)
 
         # 比较净值日期和最新交易日
         if cached_date == latest_trading_day:

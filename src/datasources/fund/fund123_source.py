@@ -24,6 +24,7 @@ from .fund_cache_helpers import (
     get_intraday_cache_dao,
 )
 from .fund_info_utils import (
+    _get_latest_trading_day,
     _get_net_value_date_from_akshare,
     _has_real_time_estimate,
     _infer_fund_type_from_name,
@@ -279,12 +280,31 @@ class Fund123DataSource(DataSource):
         today = time.strftime("%Y-%m-%d")
         cache_key = f"fund:{self.name}:{fund_code}"
 
-        # 1. 优先从数据库读取每日缓存（5分钟过期）
+        # 1. 优先从数据库读取每日缓存
         if use_cache:
             daily_dao = get_daily_cache_dao()
-            if not daily_dao.is_expired(fund_code):
-                cached_daily = daily_dao.get_latest(fund_code)
-                if cached_daily:
+            cached_daily = daily_dao.get_latest(fund_code)
+            if cached_daily:
+                from datetime import date
+
+                # 获取上一交易日（最新净值日期）
+                latest_trading_day = _get_latest_trading_day()
+                cached_date_str = cached_daily.date
+                use_cached = False
+
+                # 检查缓存的净值日期是否是上一交易日
+                if cached_date_str and latest_trading_day:
+                    try:
+                        cached_date = date.fromisoformat(cached_date_str)
+                        latest_date = date.fromisoformat(latest_trading_day)
+                        # 只有缓存净值日期是最新交易日，才使用缓存
+                        if cached_date == latest_date and not daily_dao.is_expired(fund_code):
+                            use_cached = True
+                    except ValueError:
+                        # 日期解析失败，不使用缓存
+                        use_cached = False
+
+                if use_cached:
                     # 获取基金类型（从基本信息表）
                     fund_type = ""
                     basic_info = get_basic_info_db(fund_code)

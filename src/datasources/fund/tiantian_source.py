@@ -89,12 +89,29 @@ class TiantianFundDataSource(DataSource):
 
         cache_key = f"fund:{self.name}:{fund_code}"
 
-        # 1. 优先从数据库读取每日缓存（5分钟过期）
+        # 1. 优先从数据库读取每日缓存
         if use_cache:
             daily_dao = get_daily_cache_dao()
-            if not daily_dao.is_expired(fund_code):
-                cached_daily = daily_dao.get_latest(fund_code)
-                if cached_daily:
+            cached_daily = daily_dao.get_latest(fund_code)
+            if cached_daily:
+                from datetime import date
+
+                today = date.today()
+                cached_date_str = cached_daily.date
+                use_cached = False
+
+                # 检查缓存的净值日期是否是今天
+                if cached_date_str:
+                    try:
+                        cached_date = date.fromisoformat(cached_date_str)
+                        # 只有缓存净值日期是今天，且缓存未过期，才使用缓存
+                        if cached_date == today and not daily_dao.is_expired(fund_code):
+                            use_cached = True
+                    except ValueError:
+                        # 日期解析失败，不使用缓存
+                        use_cached = False
+
+                if use_cached:
                     # 获取基金类型（从基本信息表）
                     fund_type = ""
                     basic_info = get_basic_info_db(fund_code)
@@ -277,11 +294,23 @@ class TiantianFundDataSource(DataSource):
                                     fund_code, has_real_time_estimate=False
                                 )
                                 if result.success:
+                                    # QDII-FOF 数据也需要保存到数据库缓存
+                                    daily_dao = get_daily_cache_dao()
+                                    daily_dao.save_daily_from_fund_data(fund_code, result.data)
+                                    # 写入内存/文件缓存
+                                    cache = get_fund_cache()
+                                    await cache.set(cache_key, result.data)
                                     return result
                         else:
                             # QDII 基金，跳过天天基金
                             result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
                             if result.success:
+                                # QDII 基金数据也需要保存到数据库缓存
+                                daily_dao = get_daily_cache_dao()
+                                daily_dao.save_daily_from_fund_data(fund_code, result.data)
+                                # 写入内存/文件缓存
+                                cache = get_fund_cache()
+                                await cache.set(cache_key, result.data)
                                 return result
 
                     data["type"] = fund_type
