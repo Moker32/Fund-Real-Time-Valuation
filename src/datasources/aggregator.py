@@ -9,7 +9,7 @@
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypedDict
 
 from .base import DataSource, DataSourceResult
 
@@ -21,6 +21,34 @@ class AggregatorSourceInfo:
     source: DataSource
     is_primary: bool = False
     weight: float = 1.0  # 负载均衡权重
+
+
+class AggregatorStatisticsSource(TypedDict):
+    """聚合器统计中单个数据源信息"""
+
+    name: str
+    is_primary: bool
+    weight: float
+    status: dict[str, Any]
+
+
+class AggregatorStatistics(TypedDict):
+    """聚合器统计信息"""
+
+    name: str
+    source_count: int
+    primary_source: str | None
+    request_count: int
+    success_count: int
+    failover_count: int
+    success_rate: float
+    sources: list[AggregatorStatisticsSource]
+
+
+class LoadBalancedAggregatorStatistics(AggregatorStatistics, total=False):
+    """负载均衡聚合器统计信息（包含额外负载均衡统计）"""
+
+    source_usage: dict[str, int]
 
 
 class DataAggregator(ABC):
@@ -121,12 +149,12 @@ class DataAggregator(ABC):
         """
         pass
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> AggregatorStatistics:
         """
         获取聚合器统计信息
 
         Returns:
-            Dict: 统计信息字典
+            AggregatorStatistics: 统计信息字典
         """
         return {
             "name": self.name,
@@ -233,7 +261,7 @@ class SameSourceAggregator(DataAggregator):
             metadata={"failover_count": self._failover_count, "errors": errors},
         )
 
-    async def fetch_all(self, *args, **kwargs) -> list[DataSourceResult]:
+    async def fetch_all(self, *args: Any, **kwargs: Any) -> list[DataSourceResult]:
         """
         获取所有数据源的数据
 
@@ -373,14 +401,14 @@ class LoadBalancedAggregator(DataAggregator):
                 )
         return results
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> LoadBalancedAggregatorStatistics:
         """
         获取聚合器统计信息
 
         Returns:
-            Dict: 统计信息字典，包含负载均衡统计
+            LoadBalancedAggregatorStatistics: 统计信息字典，包含负载均衡统计
         """
-        stats = super().get_statistics()
+        stats: LoadBalancedAggregatorStatistics = super().get_statistics()
         stats["source_usage"] = self._source_usage
         return stats
 

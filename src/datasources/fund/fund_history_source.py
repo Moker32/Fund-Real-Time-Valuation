@@ -6,7 +6,7 @@
 import asyncio
 import logging
 import time
-from typing import Any
+from typing import Any, cast
 
 from ..base import DataSource, DataSourceResult, DataSourceType
 
@@ -196,7 +196,7 @@ class FundHistorySource(DataSource):
             fund_codes = kwargs.get("fund_codes")
         elif kwargs.get("fund_code"):
             # 单个 fund_code 兼容
-            fund_codes = [kwargs.get("fund_code")]
+            fund_codes = [cast(str, kwargs["fund_code"])]
 
         if not fund_codes:
             return [

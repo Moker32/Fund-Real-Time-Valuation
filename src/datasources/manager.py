@@ -357,7 +357,7 @@ class DataSourceManager:
 
         if not self._enable_load_balancing or len(source_ids) <= 1:
             # 按优先级排序
-            def get_priority(sid):
+            def get_priority(sid: str) -> int:
                 config = self._source_configs.get(sid)
                 if config:
                     return config.priority
@@ -483,12 +483,12 @@ class DataSourceManager:
         """
         return self._health_checker.get_healthy_sources()
 
-    async def start_background_health_check(self):
+    async def start_background_health_check(self) -> None:
         """启动后台健康检查任务"""
         sources = list(self._sources.values())
         await self._health_checker.start_background_check(sources)
 
-    def stop_background_health_check(self):
+    def stop_background_health_check(self) -> None:
         """停止后台健康检查任务"""
         self._health_checker.stop_background_check()
 
@@ -616,7 +616,7 @@ class DataSourceManager:
             for name, source in self._sources.items()
         ]
 
-    async def close_all(self):
+    async def close_all(self) -> None:
         """关闭所有数据源的连接"""
         for source in self._sources.values():
             try:
