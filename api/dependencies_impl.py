@@ -3,12 +3,30 @@
 包含依赖项的具体实现
 """
 
+import uuid
+from contextvars import ContextVar
+from typing import Annotated
+
+from fastapi import Depends, Header
 from src.config import get_config_manager as get_config_manager_func
 from src.config.manager import ConfigManager
 from src.datasources.manager import DataSourceManager, create_default_manager
 
 # 全局数据源管理器实例
 _data_source_manager: DataSourceManager | None = None
+
+# 请求ID上下文变量
+_request_id_ctx: ContextVar[str] = ContextVar("request_id", default="")
+
+
+def get_request_id() -> str:
+    """获取当前请求的request_id"""
+    return _request_id_ctx.get()
+
+
+def set_request_id(request_id: str) -> None:
+    """设置当前请求的request_id"""
+    _request_id_ctx.set(request_id)
 
 
 def get_data_source_manager() -> DataSourceManager:
@@ -82,3 +100,29 @@ class ConfigManagerDependency:
 # 为向后兼容保留别名
 DataSourceDependencyCallable = DataSourceDependency
 ConfigManagerDependencyCallable = ConfigManagerDependency
+
+
+class RequestIdDependency:
+    """
+    FastAPI 依赖类：获取或生成请求ID
+
+    从 X-Request-ID header 提取，如果不存在则生成新的UUID
+
+    Usage:
+        @app.get("/items")
+        async def read_items(request_id: str = Depends(RequestIdDependency())):
+            logger.info("Processing request", extra={"request_id": request_id})
+    """
+
+    def __call__(self, x_request_id: str | None = Header(None)) -> str:
+        """获取请求ID"""
+        if x_request_id:
+            request_id = x_request_id
+        else:
+            request_id = str(uuid.uuid4())
+        set_request_id(request_id)
+        return request_id
+
+
+# 预定义类型别名，方便使用
+RequestId = Annotated[str, Depends(RequestIdDependency())]

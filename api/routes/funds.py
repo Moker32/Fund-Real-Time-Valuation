@@ -11,18 +11,18 @@
 
 # 重新导出所有内容，保持旧导入路径兼容
 from api.routes.funds import (
-    build_fund_response,
-    funds_data,
-    funds_holdings,
-    funds_watchlist,
-    get_basic_info_db,
-    router,
     _calculate_estimate_change,
     _check_is_holding,
     _get_fund123_source,
     _get_fund_history_source,
     _is_qdii_fund,
     _is_trading_hours,
+    build_fund_response,
+    funds_data,
+    funds_holdings,
+    funds_watchlist,
+    get_basic_info_db,
+    router,
 )
 
 __all__ = [

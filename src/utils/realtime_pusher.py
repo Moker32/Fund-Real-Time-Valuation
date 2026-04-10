@@ -130,7 +130,10 @@ class RealtimePusher:
 
     async def _push_funds_loop(self):
         fund_interval, _, _ = self._get_intervals()
-        logger.info(f"基金推送循环启动，间隔: {fund_interval}s")
+        logger.info(
+            "基金推送循环启动",
+            extra={"interval_seconds": fund_interval},
+        )
         while self._running:
             try:
                 if not self._has_subscribers("funds"):
@@ -166,7 +169,14 @@ class RealtimePusher:
                         failed_count += 1
                 
                 if failed_count > 0:
-                    logger.warning(f"基金推送: {failed_count}/{len(fund_codes)} 只获取失败")
+                    logger.warning(
+                        "基金推送部分失败",
+                        extra={
+                            "failed_count": failed_count,
+                            "total_count": len(fund_codes),
+                            "is_trading": is_trading,
+                        },
+                    )
                 
                 if new_data:
                     # 每次都推送完整数据（不使用差量更新）
@@ -176,10 +186,23 @@ class RealtimePusher:
                         message_type="fund_update",
                         data={"funds": camel_data},
                     )
-                    logger.info(f"推送 {len(new_data)} 条基金数据，发送到 {sent} 个客户端")
+                    logger.info(
+                        "基金数据推送完成",
+                        extra={
+                            "fund_count": len(new_data),
+                            "sent_count": sent,
+                            "is_trading": is_trading,
+                        },
+                    )
                     self._last_fund_data = new_data
                 else:
-                    logger.warning("基金推送: 所有基金数据获取失败")
+                    logger.warning(
+                        "基金推送全部失败",
+                        extra={
+                            "fund_count": len(fund_codes),
+                            "is_trading": is_trading,
+                        },
+                    )
 
             except Exception as e:
                 logger.error(f"基金推送循环异常: {e}")

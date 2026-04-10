@@ -4,12 +4,15 @@
 """
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any
 
 from .base import DataSource, DataSourceResult, DataSourceType
 from .health import DataSourceHealthChecker, HealthCheckInterceptor, HealthCheckResult, HealthStatus
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -109,6 +112,16 @@ class DataSourceManager:
                 priority=len(self._type_sources[source.source_type]),
             )
 
+        logger.info(
+            "数据源注册",
+            extra={
+                "source_id": source_id,
+                "source_type": source.source_type.value,
+                "priority": self._source_configs[source_id].priority,
+                "enabled": self._source_configs[source_id].enabled,
+            },
+        )
+
     def unregister(self, source_name: str) -> None:
         """
         注销数据源
@@ -122,6 +135,14 @@ class DataSourceManager:
         source = self._sources.pop(source_name)
         self._type_sources[source.source_type].remove(source_name)
         self._source_configs.pop(source_name, None)
+
+        logger.info(
+            "数据源注销",
+            extra={
+                "source_name": source_name,
+                "source_type": source.source_type.value,
+            },
+        )
 
     def get_source(self, source_name: str) -> DataSource | None:
         """
@@ -168,6 +189,7 @@ class DataSourceManager:
         Returns:
             DataSourceResult: 第一个成功的数据源结果
         """
+        start_time = time.time()
         async with await self._get_semaphore():
             sources = self._get_ordered_sources(source_type)
             errors = []
@@ -193,6 +215,13 @@ class DataSourceManager:
                 # 如果启用健康感知，跳过不健康的数据源
                 if health_aware and self._health_interceptor.should_skip_source(source.name):
                     errors.append(f"{source.name}: 数据源不健康")
+                    logger.warning(
+                        "跳过不健康的数据源",
+                        extra={
+                            "source_name": source.name,
+                            "source_type": source_type.value,
+                        },
+                    )
                     continue
 
                 try:
@@ -205,16 +234,54 @@ class DataSourceManager:
                         # 更新健康检查状态
                         if health_aware:
                             await self._health_checker.check_source(source)
+                        duration_ms = (time.time() - start_time) * 1000
+                        logger.info(
+                            "数据源获取成功",
+                            extra={
+                                "source_name": source.name,
+                                "source_type": source_type.value,
+                                "duration_ms": round(duration_ms, 2),
+                                "failover_count": len(errors),
+                            },
+                        )
                         return result
 
                     errors.append(f"{source.name}: {result.error}")
+                    logger.warning(
+                        "数据源获取失败",
+                        extra={
+                            "source_name": source.name,
+                            "source_type": source_type.value,
+                            "error": result.error,
+                        },
+                    )
 
                 except Exception as e:
                     errors.append(f"{source.name}: {str(e)}")
                     self._record_request(source.name, source_type, None, error=str(e))
+                    logger.error(
+                        "数据源请求异常",
+                        extra={
+                            "source_name": source.name,
+                            "source_type": source_type.value,
+                            "error": str(e),
+                            "error_type": type(e).__name__,
+                        },
+                        exc_info=True,
+                    )
 
             # 所有数据源都失败
+            duration_ms = (time.time() - start_time) * 1000
             if failover and errors:
+                logger.error(
+                    "所有数据源均失败",
+                    extra={
+                        "source_type": source_type.value,
+                        "duration_ms": round(duration_ms, 2),
+                        "source_count": len(sources),
+                        "errors": errors,
+                    },
+                )
                 return DataSourceResult(
                     success=False,
                     error=f"所有数据源均失败: {'; '.join(errors)}",
@@ -223,6 +290,13 @@ class DataSourceManager:
                     metadata={"source_type": source_type.value, "errors": errors},
                 )
 
+            logger.warning(
+                "没有可用的数据源",
+                extra={
+                    "source_type": source_type.value,
+                    "available_sources": len(sources),
+                },
+            )
             return DataSourceResult(
                 success=False,
                 error="没有可用的数据源",
@@ -247,6 +321,10 @@ class DataSourceManager:
         """
         source = self._sources.get(source_name)
         if not source:
+            logger.warning(
+                "数据源不存在",
+                extra={"source_name": source_name},
+            )
             return DataSourceResult(
                 success=False,
                 error=f"数据源不存在: {source_name}",
@@ -258,9 +336,36 @@ class DataSourceManager:
             try:
                 result = await source.fetch(*args, **kwargs)
                 self._record_request(source_name, source.source_type, result)
+                if result.success:
+                    logger.debug(
+                        "指定数据源获取成功",
+                        extra={
+                            "source_name": source_name,
+                            "source_type": source.source_type.value,
+                        },
+                    )
+                else:
+                    logger.warning(
+                        "指定数据源获取失败",
+                        extra={
+                            "source_name": source_name,
+                            "source_type": source.source_type.value,
+                            "error": result.error,
+                        },
+                    )
                 return result
             except Exception as e:
                 self._record_request(source_name, source.source_type, None, error=str(e))
+                logger.error(
+                    "指定数据源请求异常",
+                    extra={
+                        "source_name": source_name,
+                        "source_type": source.source_type.value,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                    },
+                    exc_info=True,
+                )
                 raise
 
     async def fetch_batch(
@@ -286,13 +391,31 @@ class DataSourceManager:
         Returns:
             List[DataSourceResult]: 结果列表
         """
+        start_time = time.time()
         sources = self._get_ordered_sources(source_type)
         if not sources:
+            logger.warning(
+                "批量获取失败: 没有可用的数据源",
+                extra={
+                    "source_type": source_type.value,
+                    "batch_size": len(params_list),
+                },
+            )
             return [
                 DataSourceResult(
                     success=False, error="没有可用的数据源", timestamp=time.time(), source="manager"
                 )
             ] * len(params_list)
+
+        logger.debug(
+            "批量获取开始",
+            extra={
+                "source_type": source_type.value,
+                "batch_size": len(params_list),
+                "available_sources": [s.name for s in sources],
+                "parallel": parallel,
+            },
+        )
 
         # 并行执行 - 使用信号量限制并发数
         async def fetch_one(params: dict[str, Any]) -> DataSourceResult:
@@ -334,6 +457,8 @@ class DataSourceManager:
 
         # 处理异常情况
         processed_results = []
+        success_count = 0
+        fail_count = 0
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append(
@@ -341,8 +466,25 @@ class DataSourceManager:
                         success=False, error=str(result), timestamp=time.time(), source="manager"
                     )
                 )
+                fail_count += 1
             else:
                 processed_results.append(result)
+                if result.success:
+                    success_count += 1
+                else:
+                    fail_count += 1
+
+        duration_ms = (time.time() - start_time) * 1000
+        logger.info(
+            "批量获取完成",
+            extra={
+                "source_type": source_type.value,
+                "batch_size": len(params_list),
+                "success_count": success_count,
+                "fail_count": fail_count,
+                "duration_ms": round(duration_ms, 2),
+            },
+        )
 
         return processed_results
 
@@ -506,6 +648,14 @@ class DataSourceManager:
         config = self._source_configs[source_name]
         config.enabled = enabled
 
+        logger.info(
+            "数据源启用/禁用状态变更",
+            extra={
+                "source_name": source_name,
+                "enabled": enabled,
+            },
+        )
+
     def set_source_priority(self, source_name: str, priority: int) -> None:
         """
         设置数据源优先级
@@ -517,7 +667,17 @@ class DataSourceManager:
         if source_name not in self._source_configs:
             raise ValueError(f"数据源 '{source_name}' 未注册")
 
+        old_priority = self._source_configs[source_name].priority
         self._source_configs[source_name].priority = priority
+
+        logger.info(
+            "数据源优先级变更",
+            extra={
+                "source_name": source_name,
+                "old_priority": old_priority,
+                "new_priority": priority,
+            },
+        )
 
     def _record_request(
         self,

@@ -5,11 +5,14 @@
 
 import asyncio
 import json
+import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class DataSourceErrorType(Enum):
@@ -184,6 +187,7 @@ class DataSource(ABC):
         Returns:
             List[DataSourceResult]: 返回结果列表
         """
+        start_time = time.time()
 
         async def fetch_one(key: str) -> DataSourceResult:
             return await self.fetch(key)
@@ -192,6 +196,8 @@ class DataSource(ABC):
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         processed_results = []
+        success_count = 0
+        fail_count = 0
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append(
@@ -203,8 +209,26 @@ class DataSource(ABC):
                         metadata={"key": keys[i]},
                     )
                 )
+                fail_count += 1
             else:
                 processed_results.append(result)
+                if result.success:
+                    success_count += 1
+                else:
+                    fail_count += 1
+
+        duration_ms = (time.time() - start_time) * 1000
+        logger.debug(
+            "批量获取完成",
+            extra={
+                "data_source_name": self.name,
+                "batch_size": len(keys),
+                "success_count": success_count,
+                "fail_count": fail_count,
+                "duration_ms": round(duration_ms, 2),
+            },
+        )
+
         return processed_results
 
     def _is_cache_valid(self, cache_key: str) -> bool:
@@ -238,6 +262,18 @@ class DataSource(ABC):
 
         if isinstance(error, DataSourceError):
             self._last_error = error
+            logger.warning(
+                "数据源错误",
+                extra={
+                    "source": source,
+                    "data_source_name": self.name,
+                    "error_type": error.source_type.value,
+                    "error_message": error.message,
+                    "details": error.details,
+                    "error_count": self._error_count,
+                    "error_rate": self.error_rate,
+                },
+            )
             return DataSourceResult(
                 success=False,
                 error=error.message,
@@ -250,6 +286,19 @@ class DataSource(ABC):
             message=str(error),
             source_type=self.source_type,
             details={"original_error": type(error).__name__},
+        )
+
+        logger.error(
+            "数据源请求异常",
+            extra={
+                "source": source,
+                "data_source_name": self.name,
+                "error": str(error),
+                "error_type": type(error).__name__,
+                "error_count": self._error_count,
+                "error_rate": self.error_rate,
+            },
+            exc_info=True,
         )
 
         return DataSourceResult(

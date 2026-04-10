@@ -18,8 +18,10 @@ from .dependencies_impl import (
     ConfigManagerDependency,
     ConfigManagerDependencyCallable,
     DataSourceDependency,
+    RequestIdDependency,
     close_data_source_manager,
     get_data_source_manager,
+    get_request_id,
     set_data_source_manager,
 )
 
@@ -38,4 +40,6 @@ __all__ = [
     "CloseDataSourceManager",
     "ConfigManagerDependency",
     "ConfigManagerDependencyCallable",
+    "RequestIdDependency",
+    "get_request_id",
 ]
