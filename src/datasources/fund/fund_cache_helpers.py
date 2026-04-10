@@ -12,6 +12,7 @@ from src.db.database import (
     FundBasicInfoDAO,
     FundDailyCacheDAO,
     FundIntradayCacheDAO,
+    IndexIntradayCacheDAO,
 )
 
 from ..dual_cache import DualLayerCache
@@ -35,6 +36,8 @@ _intraday_cache_dao: FundIntradayCacheDAO | None = None
 _daily_cache_dao: FundDailyCacheDAO | None = None
 # 基金基本信息缓存 DAO 单例
 _basic_info_dao: FundBasicInfoDAO | None = None
+# 指数日内分时缓存 DAO 单例
+_index_intraday_cache_dao: IndexIntradayCacheDAO | None = None
 # 交易日历源单例（用于净值缓存有效性判断）
 _trading_calendar_source: "TradingCalendarSource | None" = None
 
@@ -81,3 +84,12 @@ def get_basic_info_dao() -> FundBasicInfoDAO:
         db_manager = DatabaseManager()
         _basic_info_dao = FundBasicInfoDAO(db_manager)
     return _basic_info_dao
+
+
+def get_index_intraday_cache_dao() -> IndexIntradayCacheDAO:
+    """获取指数日内分时缓存 DAO 单例"""
+    global _index_intraday_cache_dao
+    if _index_intraday_cache_dao is None:
+        db_manager = DatabaseManager()
+        _index_intraday_cache_dao = IndexIntradayCacheDAO(db_manager, cache_ttl=60)
+    return _index_intraday_cache_dao

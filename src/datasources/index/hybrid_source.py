@@ -10,6 +10,7 @@ import httpx
 import pandas as pd
 
 from ..base import DataSourceResult
+from ..fund.fund_cache_helpers import get_index_intraday_cache_dao
 from .akshare_source import AKShareIndexSource
 from .base import (
     A_SHARE_INDICES,
@@ -651,6 +652,52 @@ class HybridIndexSource(IndexDataSource):
                 metadata={"index_type": index_type},
             )
 
+        # 尝试从缓存读取
+        cache_dao = get_index_intraday_cache_dao()
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        if not cache_dao.is_expired(index_type, today):
+            cached_records = cache_dao.get_intraday(index_type, today)
+            if cached_records:
+                logger.debug(f"[HybridIndexSource] Cache hit for {index_type}")
+                intraday_points = [
+                    {
+                        "time": r.time,
+                        "price": r.price,
+                        "change": r.change_rate,
+                    }
+                    for r in cached_records
+                ]
+                # 获取统计数据
+                prices = [r.price for r in cached_records if r.price > 0]
+                open_price = cached_records[0].price if cached_records else 0.0
+                close_price = cached_records[-1].price if cached_records else 0.0
+                high_price = max(prices) if prices else 0.0
+                low_price = min(prices) if prices else 0.0
+
+                return DataSourceResult(
+                    success=True,
+                    data={
+                        "index": index_type,
+                        "symbol": ticker,
+                        "name": INDEX_NAMES.get(index_type, index_type),
+                        "data": intraday_points,
+                        "timestamp": datetime.now().isoformat() + "Z",
+                        "open": open_price,
+                        "high": high_price,
+                        "low": low_price,
+                        "close": close_price,
+                    },
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={
+                        "index_type": index_type,
+                        "source": "cache",
+                        "count": len(intraday_points),
+                    },
+                )
+
+        # 缓存未命中，从 yfinance 获取
         try:
             import yfinance as yf
 
@@ -729,6 +776,10 @@ class HybridIndexSource(IndexDataSource):
                         "low": low_price,
                         "close": close_price,
                     }
+
+                    # 保存到缓存
+                    cache_dao.save_intraday(index_type, today, intraday_points)
+                    logger.debug(f"[HybridIndexSource] Saved {len(intraday_points)} points to cache for {index_type}")
 
                     return DataSourceResult(
                         success=True,
