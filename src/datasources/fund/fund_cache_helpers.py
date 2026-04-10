@@ -36,7 +36,6 @@ _intraday_cache_dao: FundIntradayCacheDAO | None = None
 _daily_cache_dao: FundDailyCacheDAO | None = None
 # 基金基本信息缓存 DAO 单例
 _basic_info_dao: FundBasicInfoDAO | None = None
-# 指数日内分时缓存 DAO 单例
 _index_intraday_cache_dao: IndexIntradayCacheDAO | None = None
 # 交易日历源单例（用于净值缓存有效性判断）
 _trading_calendar_source: "TradingCalendarSource | None" = None

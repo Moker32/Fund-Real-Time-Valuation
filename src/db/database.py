@@ -1132,44 +1132,24 @@ class FundIntradayCacheDAO:
         fetched_at = datetime.now().isoformat()
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            count = 0
+            # INSERT OR REPLACE 内部处理唯一约束冲突，无需 try/except
             for item in data:
-                try:
-                    cursor.execute(
-                        """
-                        INSERT OR REPLACE INTO fund_intraday_cache
-                        (fund_code, date, time, price, change_rate, fetched_at)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                        (
-                            fund_code,
-                            date,
-                            item.get("time", ""),
-                            item.get("price", 0.0),
-                            item.get("change"),
-                            fetched_at,
-                        ),
-                    )
-                    count += 1
-                except sqlite3.IntegrityError:
-                    # 如果插入失败（唯一约束），尝试更新
-                    cursor.execute(
-                        """
-                        UPDATE fund_intraday_cache
-                        SET price = ?, change_rate = ?, fetched_at = ?
-                        WHERE fund_code = ? AND date = ? AND time = ?
-                    """,
-                        (
-                            item.get("price", 0.0),
-                            item.get("change"),
-                            fetched_at,
-                            fund_code,
-                            date,
-                            item.get("time", ""),
-                        ),
-                    )
-                    count += 1
-            return count > 0
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO fund_intraday_cache
+                    (fund_code, date, time, price, change_rate, fetched_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        fund_code,
+                        date,
+                        item.get("time", ""),
+                        item.get("price", 0.0),
+                        item.get("change"),
+                        fetched_at,
+                    ),
+                )
+            return len(data) > 0
 
     def get_intraday(self, fund_code: str, date: str | None = None) -> list[FundIntradayRecord]:
         """
@@ -1339,12 +1319,21 @@ class FundIntradayCacheDAO:
                     "expired": True,
                 }
 
+            # 直接从 last_fetched 计算过期状态，避免二次查询
+            last_fetched = row["last_fetched"]
+            try:
+                fetched_time = datetime.fromisoformat(last_fetched.replace("Z", ""))
+                elapsed_seconds = (datetime.now() - fetched_time).total_seconds()
+                is_expired = elapsed_seconds > self.cache_ttl
+            except (ValueError, TypeError):
+                is_expired = True
+
             return {
                 "fund_code": fund_code,
                 "date": date,
                 "count": row["count"],
-                "last_fetched": row["last_fetched"],
-                "expired": self.is_expired(fund_code, date),
+                "last_fetched": last_fetched,
+                "expired": is_expired,
             }
 
 
@@ -1379,43 +1368,24 @@ class IndexIntradayCacheDAO:
         fetched_at = datetime.now().isoformat()
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
-            count = 0
+            # INSERT OR REPLACE 内部处理唯一约束冲突，无需 try/except
             for item in data:
-                try:
-                    cursor.execute(
-                        """
-                        INSERT OR REPLACE INTO index_intraday_cache
-                        (index_type, date, time, price, change_rate, fetched_at)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                        (
-                            index_type,
-                            date,
-                            item.get("time", ""),
-                            item.get("price", 0.0),
-                            item.get("change"),
-                            fetched_at,
-                        ),
-                    )
-                    count += 1
-                except sqlite3.IntegrityError:
-                    cursor.execute(
-                        """
-                        UPDATE index_intraday_cache
-                        SET price = ?, change_rate = ?, fetched_at = ?
-                        WHERE index_type = ? AND date = ? AND time = ?
-                    """,
-                        (
-                            item.get("price", 0.0),
-                            item.get("change"),
-                            fetched_at,
-                            index_type,
-                            date,
-                            item.get("time", ""),
-                        ),
-                    )
-                    count += 1
-            return count > 0
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO index_intraday_cache
+                    (index_type, date, time, price, change_rate, fetched_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        index_type,
+                        date,
+                        item.get("time", ""),
+                        item.get("price", 0.0),
+                        item.get("change"),
+                        fetched_at,
+                    ),
+                )
+            return len(data) > 0
 
     def get_intraday(self, index_type: str, date: str | None = None) -> list[IndexIntradayRecord]:
         """获取指数日内分时数据
