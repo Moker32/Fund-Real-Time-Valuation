@@ -146,7 +146,12 @@ const chartData = computed(() => {
 
 const baselineValue = computed(() => {
   if (historyData.value.length === 0) return 0;
-  // Use the first data point as baseline for calculating trend
+  // Use the second-to-last data point's close as baseline (yesterday's close)
+  // The last item is today's K-line, whose open is yesterday's close
+  if (historyData.value.length >= 2) {
+    const lastItem = historyData.value[historyData.value.length - 1];
+    return lastItem?.open ?? historyData.value[0]?.close ?? 0;
+  }
   return historyData.value[0]?.close ?? 0;
 });
 

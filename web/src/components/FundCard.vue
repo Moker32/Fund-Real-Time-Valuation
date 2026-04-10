@@ -174,8 +174,9 @@ const changeClass = computed(() => {
 });
 
 const baseline = computed(() => {
-  if (props.fund.netValue && props.fund.netValue > 0) return props.fund.netValue;
+  // Use prevNetValue (yesterday's close) as baseline, not today's netValue
   if (props.fund.prevNetValue && props.fund.prevNetValue > 0) return props.fund.prevNetValue;
+  if (props.fund.netValue && props.fund.netValue > 0) return props.fund.netValue;
   return undefined;
 });
 
