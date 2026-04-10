@@ -9,7 +9,7 @@ from typing import Any
 import httpx
 
 from ..base import DataSourceResult
-from .base import INDEX_NAMES, INDEX_REGIONS, MARKET_HOURS, TENCENT_CODES, IndexDataSource
+from .base import INDEX_NAMES, INDEX_REGIONS, TENCENT_CODES, IndexDataSource
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,6 @@ class TencentIndexSource(IndexDataSource):
                 "open": open_price,
                 "prev_close": prev_close,
                 "region": INDEX_REGIONS.get(index_type, "unknown"),
-                "market_hours": MARKET_HOURS.get(index_type, {}),
             }
 
             self._record_success()

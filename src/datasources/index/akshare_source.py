@@ -14,7 +14,6 @@ from .base import (
     AKSHARE_INDEX_CODES,
     INDEX_NAMES,
     INDEX_REGIONS,
-    MARKET_HOURS,
     IndexDataSource,
 )
 
@@ -149,7 +148,6 @@ class AKShareIndexSource(IndexDataSource):
                     "open": open_price,
                     "prev_close": prev_close,
                     "region": INDEX_REGIONS.get(index_type, "china"),
-                    "market_hours": MARKET_HOURS.get(index_type, {}),
                 }
 
                 self._record_success()

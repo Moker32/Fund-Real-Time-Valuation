@@ -13,7 +13,6 @@ from .base import (
     INDEX_NAMES,
     INDEX_REGIONS,
     INDEX_TICKERS,
-    MARKET_HOURS,
     IndexDataSource,
 )
 
@@ -136,7 +135,6 @@ class YahooIndexSource(IndexDataSource):
                 "open": info.get("regularMarketOpen"),
                 "prev_close": info.get("regularMarketPreviousClose"),
                 "region": INDEX_REGIONS.get(index_type, "unknown"),
-                "market_hours": MARKET_HOURS.get(index_type, {}),
                 "market_state": info.get("marketState"),  # yfinance 动态市场状态
             }
 

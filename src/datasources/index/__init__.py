@@ -9,7 +9,7 @@
 
 常量:
 - TENCENT_CODES, YAHOO_TICKERS, INDEX_TICKERS, AKSHARE_INDEX_CODES
-- INDEX_REGIONS, INDEX_NAMES, MARKET_HOURS
+- INDEX_REGIONS, INDEX_NAMES
 - uses_tencent()
 
 使用示例:
@@ -25,7 +25,6 @@ from .base import (
     INDEX_NAMES,
     INDEX_REGIONS,
     INDEX_TICKERS,
-    MARKET_HOURS,
     TENCENT_CODES,
     YAHOO_TICKERS,
     IndexDataSource,
@@ -50,6 +49,5 @@ __all__ = [
     "AKSHARE_INDEX_CODES",
     "INDEX_REGIONS",
     "INDEX_NAMES",
-    "MARKET_HOURS",
     "uses_tencent",
 ]

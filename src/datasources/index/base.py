@@ -46,21 +46,30 @@ TENCENT_CODES = {
     "sp500": "usINX",  # 腾讯财经代码是 usINX 不是 usGSPC
 }
 
-# Yahoo Finance ticker 映射 (只包含有历史数据的指数)
+# Yahoo Finance ticker 映射 (用于 marketState 和历史数据)
 YAHOO_TICKERS = {
+    # A股
+    "shanghai": "000001.SS",
+    "shenzhen": "399001.SZ",
+    "shanghai50": "000016.SS",
+    "chi_next": "399006.SZ",
+    "star50": "000688.SS",
+    "csi500": "000905.SS",
+    "csi1000": "000852.SS",
+    "hs300": "000300.SS",
+    # 港股
+    "hang_seng": "^HSI",
+    "hang_seng_tech": "HSTECH.HK",
     # 日经
     "nikkei225": "^N225",
+    # 美股
+    "dow_jones": "^DJI",
+    "nasdaq": "^IXIC",
+    "sp500": "^GSPC",
     # 欧洲
     "dax": "^GDAXI",
     "ftse": "^FTSE",
     "cac40": "^FCHI",
-    # 港股
-    "hang_seng": "^HSI",
-    "hang_seng_tech": "HSTECH.HK",
-    # 美股 (作为腾讯财经的回退)
-    "dow_jones": "^DJI",
-    "nasdaq": "^IXIC",
-    "sp500": "^GSPC",
 }
 
 # 合并所有 ticker 映射
@@ -130,15 +139,6 @@ INDEX_NAMES = {
 }
 
 
-# A股市场配置 (共享)
-A_SHARE_MARKET_HOURS = {
-    "open": "01:30",
-    "close": "08:00",
-    "tz": "Asia/Shanghai",
-    "lunch_start": "03:30",
-    "lunch_end": "05:00",
-}
-
 # A股指数列表
 A_SHARE_INDICES = [
     "shanghai",
@@ -151,43 +151,11 @@ A_SHARE_INDICES = [
     "hs300",
 ]
 
-# 港股市场配置 (无午休)
-HK_MARKET_HOURS = {
-    "open": "01:30",
-    "close": "08:00",
-    "tz": "Asia/Hong_Kong",
-}
-
 # 港股指数列表
 HK_INDICES = ["hang_seng", "hang_seng_tech"]
 
-# 美股市场配置
-US_MARKET_HOURS = {
-    "open": "14:30",
-    "close": "21:00",
-    "tz": "America/New_York",
-}
-
 # 美股指数列表
 US_INDICES = ["dow_jones", "nasdaq", "sp500"]
-
-
-# 各市场开盘时间段 (UTC 时间)
-MARKET_HOURS: dict[str, dict[str, str]] = {
-    # A股 (9:30-11:30, 13:00-15:00 UTC+8) - 使用字典推导式生成
-    **{idx: A_SHARE_MARKET_HOURS.copy() for idx in A_SHARE_INDICES},
-    # 港股 (9:30-16:00 UTC+8, 无午休)
-    **{idx: HK_MARKET_HOURS.copy() for idx in HK_INDICES},
-    # 日经 (9:00-15:00 JST, 午休 12:30-13:30 JST)
-    # 注意：lunch_start/lunch_end 是市场本地时间，不是 UTC
-    "nikkei225": {"open": "00:00", "close": "06:00", "tz": "Asia/Tokyo", "lunch_start": "12:30", "lunch_end": "13:30"},
-    # 欧洲 (9:00-17:30 CET, 无午休)
-    "dax": {"open": "08:00", "close": "16:30", "tz": "Europe/Berlin"},
-    "ftse": {"open": "08:00", "close": "16:30", "tz": "Europe/London"},
-    "cac40": {"open": "08:00", "close": "16:30", "tz": "Europe/Paris"},
-    # 美股 (9:30-16:00 EST, 无午休)
-    **{idx: US_MARKET_HOURS.copy() for idx in US_INDICES},
-}
 
 
 # ============================================================
