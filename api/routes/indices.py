@@ -85,7 +85,9 @@ async def fetch_yahoo_market_state(index_type: str) -> str | None:
         import yfinance as yf
 
         ticker_obj = yf.Ticker(ticker)
-        info = ticker_obj.info
+        # 使用 run_in_executor 避免阻塞事件循环
+        loop = asyncio.get_event_loop()
+        info = await loop.run_in_executor(None, lambda: ticker_obj.info)
         market_state = info.get("marketState")
 
         if market_state:
@@ -132,7 +134,8 @@ async def get_market_state_for_index(data: dict, index_type: str, source: str) -
     """
     获取指数的 marketState
 
-    优先使用数据源返回的 marketState，如果没有则从 yfinance 获取
+    优先使用数据源返回的 marketState，如果没有则从 yfinance 获取，
+    如果 yfinance 获取失败则回退到 TradingCalendarSource
 
     Args:
         data: 数据源返回的数据
@@ -148,7 +151,55 @@ async def get_market_state_for_index(data: dict, index_type: str, source: str) -
 
     # 如果是 tencent 数据源，尝试从 yfinance 获取
     if source == "tencent_index" and index_type in YAHOO_TICKERS:
-        return await fetch_yahoo_market_state(index_type)
+        yahoo_state = await fetch_yahoo_market_state(index_type)
+        if yahoo_state:
+            return yahoo_state
+
+    # 回退到使用 TradingCalendarSource 判断交易状态
+    try:
+        from src.datasources.trading_calendar_source import Market, TradingCalendarSource
+
+        calendar = TradingCalendarSource()
+
+        # 根据指数类型映射到市场
+        market_map = {
+            # A股指数
+            "shanghai": Market.CHINA,
+            "shenzhen": Market.CHINA,
+            "shanghai50": Market.CHINA,
+            "hs300": Market.CHINA,
+            "chi_next": Market.CHINA,
+            "star50": Market.CHINA,
+            "csi500": Market.CHINA,
+            "csi1000": Market.CHINA,
+            # 港股指数
+            "hang_seng": Market.HONG_KONG,
+            "hang_seng_tech": Market.HONG_KONG,
+            # 美股指数
+            "dow_jones": Market.USA,
+            "nasdaq": Market.USA,
+            "sp500": Market.USA,
+            # 其他市场指数
+            "nikkei225": Market.JAPAN,
+            "dax": Market.GERMANY,
+            "ftse": Market.UK,
+            "cac40": Market.FRANCE,
+        }
+
+        market = market_map.get(index_type)
+        if market:
+            result = calendar.is_within_trading_hours(market)
+            status = result.get("status")
+            if status == "open":
+                return "REGULAR"
+            elif status == "closed":
+                return "CLOSED"
+            elif status == "break":
+                return "CLOSED"  # 午休也算作关闭
+            elif status == "pre_market":
+                return "PRE"  # 盘前交易
+    except Exception as e:
+        logger.warning(f"[indices] TradingCalendarSource fallback failed: {e}")
 
     return None
 
