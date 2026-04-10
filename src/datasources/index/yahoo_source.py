@@ -137,6 +137,7 @@ class YahooIndexSource(IndexDataSource):
                 "prev_close": info.get("regularMarketPreviousClose"),
                 "region": INDEX_REGIONS.get(index_type, "unknown"),
                 "market_hours": MARKET_HOURS.get(index_type, {}),
+                "market_state": info.get("marketState"),  # yfinance 动态市场状态
             }
 
             self._record_success()

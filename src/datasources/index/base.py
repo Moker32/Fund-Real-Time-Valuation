@@ -178,8 +178,9 @@ MARKET_HOURS: dict[str, dict[str, str]] = {
     **{idx: A_SHARE_MARKET_HOURS.copy() for idx in A_SHARE_INDICES},
     # 港股 (9:30-16:00 UTC+8, 无午休)
     **{idx: HK_MARKET_HOURS.copy() for idx in HK_INDICES},
-    # 日经 (9:00-15:00 UTC+9, 无午休)
-    "nikkei225": {"open": "00:00", "close": "06:00", "tz": "Asia/Tokyo"},
+    # 日经 (9:00-15:00 JST, 午休 12:30-13:30 JST)
+    # 注意：lunch_start/lunch_end 是市场本地时间，不是 UTC
+    "nikkei225": {"open": "00:00", "close": "06:00", "tz": "Asia/Tokyo", "lunch_start": "12:30", "lunch_end": "13:30"},
     # 欧洲 (9:00-17:30 CET, 无午休)
     "dax": {"open": "08:00", "close": "16:30", "tz": "Europe/Berlin"},
     "ftse": {"open": "08:00", "close": "16:30", "tz": "Europe/London"},

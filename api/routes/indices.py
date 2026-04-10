@@ -39,8 +39,59 @@ SUPPORTED_INDICES = list(INDEX_NAMES.keys())
 # 美股数据延时15分钟，港股数据也有延时（几分钟）
 TENCENT_DELAYED_INDICES = {"dow_jones", "nasdaq", "sp500", "hang_seng", "hang_seng_tech"}
 
+# yfinance marketState 到交易状态的映射
+YAHOO_MARKET_STATE_MAP = {
+    "REGULAR": "open",      # 交易中
+    "CLOSED": "closed",     # 已收盘
+    "PRE": "pre",           # 盘前
+    "POST": "post",         # 盘后
+    "PREPRE": "pre",        # 欧洲盘前
+    "POSTPOST": "closed",   # 美股盘后（收盘）
+    "HALF": "closed",       # 半天交易
+    "REGULAR_RESTRICTED": "open",  # 限制性交易（可能涨跌幅受限）
+    "EXTENDED": "open",     # 延长交易
+}
 
-def get_trading_status(index_type: str, data_timestamp: str | None = None) -> dict:
+
+def get_trading_status(
+    index_type: str,
+    data_timestamp: str | None = None,
+    market_state: str | None = None,
+) -> dict:
+    """
+    获取指数的交易状态
+
+    优先使用 yfinance 的 marketState 判断市场状态，
+    如果没有则使用启发式逻辑根据市场时间判断。
+
+    Args:
+        index_type: 指数类型
+        data_timestamp: 数据源返回的数据时间戳 (ISO格式)
+        market_state: yfinance 返回的 marketState
+
+    Returns:
+        dict: 包含交易状态和市场时间信息的字典
+    """
+    # 优先使用 yfinance 的 marketState（动态获取，准确反映实际市场状态）
+    if market_state:
+        mapped_status = YAHOO_MARKET_STATE_MAP.get(market_state)
+        if mapped_status:
+            # 获取市场时区
+            market_info = MARKET_HOURS.get(index_type, {})
+            tz_str = market_info.get("tz", "UTC")
+            try:
+                tz = pytz.timezone(tz_str)
+            except pytz.exceptions.UnknownTimeZoneError:
+                tz = pytz.UTC
+
+            utc_now = datetime.now(pytz.UTC)
+            local_now = utc_now.astimezone(tz)
+
+            return {
+                "status": mapped_status,
+                "market_time": local_now.strftime("%Y-%m-%d %H:%M:%S"),
+                "is_stale": False,
+            }
     """
     获取指数的交易状态
 
@@ -271,7 +322,8 @@ async def get_indices(
         data = result.data
         index_type = data.get("index", "")
         data_timestamp = data.get("data_timestamp")
-        trading_status = get_trading_status(index_type, data_timestamp)
+        market_state = data.get("market_state")  # yfinance 动态市场状态
+        trading_status = get_trading_status(index_type, data_timestamp, market_state)
 
         # 计算显示用的时间戳（不超过收盘时间）
         display_timestamp = get_display_timestamp(index_type, data_timestamp)
@@ -376,7 +428,8 @@ async def get_index(
     data = result.data
     index_type = data.get("index", "")
     data_timestamp = data.get("data_timestamp")
-    trading_status = get_trading_status(index_type, data_timestamp)
+    market_state = data.get("market_state")  # yfinance 动态市场状态
+    trading_status = get_trading_status(index_type, data_timestamp, market_state)
 
     # 计算显示用的时间戳
     display_timestamp = get_display_timestamp(index_type, data_timestamp)

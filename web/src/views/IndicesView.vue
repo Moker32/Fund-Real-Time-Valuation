@@ -251,7 +251,8 @@ async function preloadIndexIntraday() {
   
   try {
     // 使用 store 中的 fetchIndexIntraday 方法获取日内数据（带缓存）
-    const intradayPromises = indexStore.indices.slice(0, 12).map(async (idx) => {
+    // 预加载所有指数的日内数据
+    const intradayPromises = indexStore.indices.map(async (idx) => {
       try {
         const intraday = await indexStore.fetchIndexIntraday(idx.index);
         return { indexType: idx.index, intraday: intraday || [] };
