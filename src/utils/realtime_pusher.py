@@ -71,10 +71,24 @@ class RealtimePusher:
         return subscriptions.get(subscription, 0) > 0
 
     def _is_trading_hours(self, market: Market = Market.CHINA) -> bool:
+        # 缓存检查结果，避免频繁调用阻塞的 is_within_trading_hours
+        # 缓存1分钟，避免阻塞事件循环
+        import time
+        now = time.time()
+        cache_key = f"_is_trading_hours_{market.value}"
+        if hasattr(self, '_trading_hours_cache') and cache_key in self._trading_hours_cache:
+            cached_result, cached_time = self._trading_hours_cache[cache_key]
+            if now - cached_time < 60:
+                return cached_result
+
         try:
             result = self._trading_calendar.is_within_trading_hours(market)
             is_open = result.get("status") == "open"
             logger.debug(f"交易时段检查: market={market.value}, result={result}, is_open={is_open}")
+            # 缓存结果
+            if not hasattr(self, '_trading_hours_cache'):
+                self._trading_hours_cache = {}
+            self._trading_hours_cache[cache_key] = (is_open, now)
             return is_open
         except Exception as e:
             logger.warning(f"检查交易时段失败: {e}")

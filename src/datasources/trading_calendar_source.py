@@ -180,7 +180,8 @@ class TradingCalendarSource(DataSource):
                 f"&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"
                 f"&klt=101&fqt=0&beg={year}0101&end={year}1231"
             )
-            resp = httpx.get(url, timeout=self.timeout)
+            # 使用短超时，避免阻塞事件循环
+            resp = httpx.get(url, timeout=5.0)
             data = resp.json()
 
             if data.get("data") and data["data"].get("klines"):

@@ -597,7 +597,9 @@ class Fund123DataSource(DataSource):
         # 如果数据库中没有类型，从 akshare 获取（首次获取时）
         if not fund_type:
             # get_fund_basic_info 会调用 akshare 获取类型并保存到数据库
-            fund_info_result = get_fund_basic_info(fund_code)
+            # 使用 run_in_executor 避免阻塞事件循环
+            loop = asyncio.get_running_loop()
+            fund_info_result = await loop.run_in_executor(None, get_fund_basic_info, fund_code)
             if fund_info_result:
                 _, fund_type = fund_info_result
 

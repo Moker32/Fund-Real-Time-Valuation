@@ -112,7 +112,8 @@ class CacheWarmer:
             # 并行获取所有基金的名称和类型
             async def fetch_fund_info(code: str) -> tuple[str, bool]:
                 try:
-                    get_fund_basic_info(code)
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(None, get_fund_basic_info, code)
                     return code, True
                 except Exception as e:
                     logger.debug(f"预热基金信息失败: {code}, error: {e}")

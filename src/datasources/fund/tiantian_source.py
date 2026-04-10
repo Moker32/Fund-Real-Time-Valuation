@@ -446,8 +446,8 @@ class TiantianFundDataSource(DataSource):
             # 获取最新一条数据
             latest = df.iloc[0]
 
-            # 使用缓存获取基金名称
-            fund_info = get_fund_basic_info(fund_code)
+            # 使用缓存获取基金名称（使用 run_in_executor 避免阻塞事件循环）
+            fund_info = await loop.run_in_executor(None, get_fund_basic_info, fund_code)
             if fund_info:
                 fund_name, fund_type = fund_info
             else:
@@ -563,8 +563,8 @@ class TiantianFundDataSource(DataSource):
                     metadata={"fund_code": fund_code},
                 )
 
-            # 使用缓存获取基金简称和类型
-            fund_info = get_fund_basic_info(fund_code)
+            # 使用缓存获取基金简称和类型（使用 run_in_executor 避免阻塞事件循环）
+            fund_info = await loop.run_in_executor(None, get_fund_basic_info, fund_code)
             if fund_info:
                 fund_name, fund_type = fund_info
             else:
@@ -704,8 +704,9 @@ class TiantianFundDataSource(DataSource):
         Returns:
             str: 基金类型（如：股票型、混合型、债券型、QDII、ETF等）
         """
-        # 使用缓存获取基金信息
-        fund_info = get_fund_basic_info(fund_code)
+        # 使用缓存获取基金信息（使用 run_in_executor 避免阻塞事件循环）
+        loop = asyncio.get_running_loop()
+        fund_info = await loop.run_in_executor(None, get_fund_basic_info, fund_code)
         if fund_info:
             _, fund_type = fund_info
             return fund_type

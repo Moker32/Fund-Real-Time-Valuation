@@ -58,8 +58,9 @@ def _get_trading_calendar_source() -> TradingCalendarSource:
     return _trading_calendar_source
 
 
-def _is_trading_hours() -> bool:
-    """检查当前是否为交易时段"""
+@lru_cache
+def _is_trading_hours_cached() -> bool:
+    """检查当前是否为交易时段（带缓存）"""
     try:
         calendar = _get_trading_calendar_source()
         if not calendar.is_trading_day(Market.CHINA):
@@ -69,6 +70,11 @@ def _is_trading_hours() -> bool:
     except Exception as e:
         logger.warning(f"检查交易时段失败: {e}")
         return False
+
+
+def _is_trading_hours() -> bool:
+    """检查当前是否为交易时段（使用缓存）"""
+    return _is_trading_hours_cached()
 
 
 @lru_cache
