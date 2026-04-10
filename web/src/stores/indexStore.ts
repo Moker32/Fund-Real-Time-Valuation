@@ -170,12 +170,12 @@ export const useIndexStore = defineStore('indices', () => {
     // 检查缓存
     const cached = intradayCache.get(indexType);
     if (!forceRefresh && cached && Date.now() - cached.timestamp < INTRADAY_CACHE_DURATION) {
-      // 更新对应指数的日内数据
+      // 更新对应指数的日内数据（使用 splice 确保 Vue 响应式更新）
       const index = indices.value.findIndex((i) => i.index === indexType);
       if (index !== -1) {
         const currentIndex = indices.value[index];
         if (currentIndex) {
-          indices.value[index] = { ...currentIndex, intraday: cached.data };
+          indices.value.splice(index, 1, { ...currentIndex, intraday: cached.data });
         }
       }
       return cached.data;
@@ -193,15 +193,15 @@ export const useIndexStore = defineStore('indices', () => {
           change: item.change,
         }));
 
-        // 更新对应指数的分时数据
+        // 更新对应指数的分时数据（使用 splice 确保 Vue 响应式更新）
         const index = indices.value.findIndex((i) => i.index === indexType);
         if (index !== -1) {
           const currentIndex = indices.value[index];
           if (currentIndex) {
-            indices.value[index] = {
+            indices.value.splice(index, 1, {
               ...currentIndex,
               intraday,
-            };
+            });
           }
         }
 

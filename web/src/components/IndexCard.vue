@@ -110,12 +110,17 @@ const emit = defineEmits<{
 // eslint-disable-next-line no-useless-assignment
 const indexData = computed(() => props.index);
 
-// 午休配置：A股 11:30-13:00，日经 12:30-13:30
+// 午休配置：A股 11:30-13:00，港股 12:00-13:00，日经 12:30-13:30
 const lunchBreak = computed(() => {
-  if (props.index.index === 'nikkei225') {
-    return { start: 12 * 60 + 30, end: 13 * 60 + 30 }; // 12:30-13:30
+  switch (props.index.index) {
+    case 'nikkei225':
+      return { start: 12 * 60 + 30, end: 13 * 60 + 30 }; // 12:30-13:30
+    case 'hang_seng':
+    case 'hang_seng_tech':
+      return { start: 12 * 60, end: 13 * 60 }; // 12:00-13:00
+    default:
+      return { start: 11 * 60 + 30, end: 13 * 60 }; // A 股 11:30-13:00
   }
-  return { start: 11 * 60 + 30, end: 13 * 60 }; // A 股 11:30-13:00
 });
 
 const prevPrice = ref<number | undefined>();
