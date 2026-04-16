@@ -147,23 +147,63 @@ def _calculate_estimate_change(unit_net: float | None, estimate_net: float | Non
     return None
 
 
-def build_fund_response(data: dict, source: str = "", is_holding: bool = False) -> dict:
+def _validate_estimate_change_percent(
+    unit_net: float | None,
+    estimate_net: float | None,
+    provided_percent: float | None,
+    fund_code: str = "",
+    logger=None,
+) -> float | None:
+    """
+    校验数据源提供的估算增长率是否与计算值一致
+    如果不一致，返回计算值（修正）
+    如果一致，返回原值
+    容许 0.01% 的浮点数误差
+    """
+    if unit_net is None or estimate_net is None or unit_net == 0 or provided_percent is None:
+        return provided_percent
+
+    calculated_percent = (estimate_net - unit_net) / unit_net * 100
+    diff = abs(calculated_percent - provided_percent)
+
+    if diff > 0.01:  # 误差超过 0.01% 认为有问题
+        if logger:
+            logger.warning(
+                f"基金 {fund_code} 估算增长率不一致: "
+                f"数据源={provided_percent:.4f}%, 计算值={calculated_percent:.4f}%, "
+                f"差异={diff:.4f}%"
+            )
+        return round(calculated_percent, 4)
+
+    return provided_percent
+
+
+def build_fund_response(
+    data: dict, source: str = "", is_holding: bool = False, logger=None
+) -> dict:
     """构建基金响应数据"""
     unit_net = data.get("unit_net_value")
     estimate_net = data.get("estimated_net_value")
     estimate_change = _calculate_estimate_change(unit_net, estimate_net)
 
+    # 校验估算增长率是否与计算值一致
+    provided_percent = data.get("estimated_growth_rate")
+    fund_code = data.get("fund_code", "")
+    validated_percent = _validate_estimate_change_percent(
+        unit_net, estimate_net, provided_percent, fund_code, logger
+    )
+
     validated = FundResponse.model_validate(
         {
-            "fund_code": data.get("fund_code", ""),
+            "fund_code": fund_code,
             "name": data.get("name", ""),
             "type": data.get("type"),
-            "unit_net_value": data.get("unit_net_value"),
+            "unit_net_value": unit_net,
             "net_value_date": data.get("net_value_date"),
             "prev_net_value": data.get("prev_net_value"),
             "prev_net_value_date": data.get("prev_net_value_date"),
-            "estimated_net_value": data.get("estimated_net_value"),
-            "estimated_growth_rate": data.get("estimated_growth_rate"),
+            "estimated_net_value": estimate_net,
+            "estimated_growth_rate": validated_percent,
             "estimate_time": data.get("estimate_time"),
             "has_real_time_estimate": data.get("has_real_time_estimate", True),
         }

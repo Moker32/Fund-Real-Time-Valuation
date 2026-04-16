@@ -93,3 +93,50 @@ class TestEstimateChangePercentConsistency:
         actual_percent = (estimate_net - unit_net) / unit_net * 100
 
         assert expected_percent == pytest.approx(actual_percent, rel=1e-6)
+
+
+class TestValidateEstimateChangePercent:
+    """测试 _validate_estimate_change_percent 函数"""
+
+    def test_valid_percent_returns_unchanged(self):
+        """提供的增长率与计算值一致，返回原值"""
+        from api.routes.funds.funds_data import _validate_estimate_change_percent
+
+        unit_net = 1.2233
+        estimate_net = 1.2304
+        provided_percent = 0.5838  # 接近计算值
+
+        result = _validate_estimate_change_percent(
+            unit_net, estimate_net, provided_percent, "023521"
+        )
+        assert result == pytest.approx(0.5838, rel=1e-4)
+
+    def test_invalid_percent_is_corrected(self):
+        """提供的增长率与计算值不一致，返回修正值"""
+        from api.routes.funds.funds_data import _validate_estimate_change_percent
+
+        unit_net = 1.2233
+        estimate_net = 1.2304
+        provided_percent = 99.0  # 错误值
+
+        result = _validate_estimate_change_percent(
+            unit_net, estimate_net, provided_percent, "023521"
+        )
+        # 计算值应该是 0.5838...
+        expected = (estimate_net - unit_net) / unit_net * 100
+        assert result == pytest.approx(expected, rel=1e-4)
+
+    def test_none_values_return_provided(self):
+        """当输入为 None 时，返回提供的值（不做校验）"""
+        from api.routes.funds.funds_data import _validate_estimate_change_percent
+
+        assert _validate_estimate_change_percent(None, 1.5, 5.0, "023521") == 5.0
+        assert _validate_estimate_change_percent(1.5, None, 5.0, "023521") == 5.0
+        assert _validate_estimate_change_percent(1.5, 1.5, None, "023521") is None
+
+    def test_zero_unit_net_returns_provided(self):
+        """当 unit_net 为 0 时，避免除零错误"""
+        from api.routes.funds.funds_data import _validate_estimate_change_percent
+
+        result = _validate_estimate_change_percent(0, 1.5, 5.0, "023521")
+        assert result == 5.0
