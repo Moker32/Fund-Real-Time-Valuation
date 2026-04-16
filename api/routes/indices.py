@@ -126,7 +126,7 @@ def get_trading_status(market_state: str | None) -> dict:
     # 无法确定状态时返回 unknown
     return {
         "status": "unknown",
-        "market_time": local_now.strftime("%Y-%m-%d %H:%M:%S"),
+        "market_time": None,
     }
 
 

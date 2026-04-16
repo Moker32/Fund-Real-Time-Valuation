@@ -341,6 +341,7 @@ class TestTiantianFundDataSourceFetch:
     async def test_fetch_with_cache_hit(self):
         """测试缓存命中场景"""
         from datetime import date
+
         from src.datasources.fund_source import TiantianFundDataSource
 
         source = TiantianFundDataSource()

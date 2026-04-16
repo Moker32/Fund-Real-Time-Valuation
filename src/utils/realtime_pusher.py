@@ -51,6 +51,7 @@ class RealtimePusher:
         self._last_index_data: list[dict] | None = None
 
         self._trading_calendar = TradingCalendarSource()
+        self._trading_hours_cache: dict[str, tuple[bool, float]] = {}
 
     @property
     def data_manager(self) -> DataSourceManager:

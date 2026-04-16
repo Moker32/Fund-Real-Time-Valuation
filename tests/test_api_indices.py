@@ -147,62 +147,30 @@ class TestGetTradingStatus:
     def test_get_trading_status_unknown_index(self):
         """测试未知指数的交易状态"""
         from api.routes.indices import get_trading_status
-        
-        result = get_trading_status("unknown_index")
-        
+
+        result = get_trading_status(None)
+
         assert result["status"] == "unknown"
         assert result["market_time"] is None
 
-    def test_get_trading_status_with_valid_index(self):
-        """测试有效指数的交易状态"""
+    def test_get_trading_status_with_valid_state(self):
+        """测试有效的 market_state"""
         from api.routes.indices import get_trading_status
-        
-        result = get_trading_status("shanghai")
-        
+
+        result = get_trading_status("CLOSED")
+
         assert "status" in result
         assert "market_time" in result
-        assert result["status"] in ["open", "closed", "pre", "stalled"]
+        assert result["status"] == "closed"
 
-    def test_get_trading_status_with_stale_data(self):
-        """测试数据过期的情况"""
+    def test_get_trading_status_with_pre_state(self):
+        """测试 pre market_state"""
         from api.routes.indices import get_trading_status
-        
-        # 使用一个过去的时间戳来模拟过期数据
-        old_timestamp = "2020-01-01T00:00:00Z"
-        result = get_trading_status("shanghai", old_timestamp)
-        
-        assert "is_stale" in result
-        assert result["is_stale"] is True
 
+        result = get_trading_status("PRE")
 
-class TestGetDisplayTimestamp:
-    """测试 get_display_timestamp 辅助函数"""
-
-    def test_get_display_timestamp_none_input(self):
-        """测试输入为 None"""
-        from api.routes.indices import get_display_timestamp
-        
-        result = get_display_timestamp("shanghai", None)
-        
-        assert result is None
-
-    def test_get_display_timestamp_unknown_index(self):
-        """测试未知指数"""
-        from api.routes.indices import get_display_timestamp
-        
-        result = get_display_timestamp("unknown_index", "2024-01-15T07:00:00Z")
-        
-        assert result == "2024-01-15T07:00:00Z"
-
-    def test_get_display_timestamp_valid_index(self):
-        """测试有效指数的时间戳处理"""
-        from api.routes.indices import get_display_timestamp
-        
-        # 使用收盘前的时间
-        result = get_display_timestamp("shanghai", "2024-01-15T07:00:00Z")
-        
-        # 应该返回处理后的时间戳
-        assert result is not None
+        assert "status" in result
+        assert result["status"] == "pre"
 
 
 class TestValidatePeriod:
