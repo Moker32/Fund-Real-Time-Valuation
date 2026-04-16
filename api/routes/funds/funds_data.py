@@ -169,9 +169,18 @@ def _validate_estimate_change_percent(
     if diff > 0.01:  # 误差超过 0.01% 认为有问题
         if logger:
             logger.warning(
-                f"基金 {fund_code} 估算增长率不一致: "
-                f"数据源={provided_percent:.4f}%, 计算值={calculated_percent:.4f}%, "
-                f"差异={diff:.4f}%"
+                "基金 %s 估算增长率不一致: 数据源=%.4f%%, 计算值=%.4f%%, 差异=%.4f%%",
+                fund_code,
+                provided_percent,
+                calculated_percent,
+                diff,
+                extra={
+                    "fund_code": fund_code,
+                    "provided_percent": provided_percent,
+                    "calculated_percent": calculated_percent,
+                    "diff_percent": diff,
+                    "event": "estimate_change_mismatch",
+                },
             )
         return round(calculated_percent, 4)
 
