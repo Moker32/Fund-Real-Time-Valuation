@@ -174,6 +174,11 @@ const changeClass = computed(() => {
 });
 
 const baseline = computed(() => {
+  // QDII funds use qdiiEstimateChangePercent which is based on prevNetValue
+  // Normal funds use estimateChangePercent which is based on netValue
+  if (props.fund.qdiiEstimateChangePercent != null) {
+    if (props.fund.prevNetValue && props.fund.prevNetValue > 0) return props.fund.prevNetValue;
+  }
   // Use netValue (yesterday's close / today's baseline) as baseline
   // This aligns with estimateChangePercent which is calculated from netValue
   if (props.fund.netValue && props.fund.netValue > 0) return props.fund.netValue;
