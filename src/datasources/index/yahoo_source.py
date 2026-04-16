@@ -111,7 +111,7 @@ class YahooIndexSource(IndexDataSource):
             if market_time:
                 try:
                     time_str = datetime.fromtimestamp(market_time).strftime("%Y-%m-%d %H:%M:%S")
-                    data_timestamp = datetime.utcfromtimestamp(market_time).strftime(
+                    data_timestamp = datetime.fromtimestamp(market_time, datetime.UTC).strftime(
                         "%Y-%m-%dT%H:%M:%SZ"
                     )
                 except (ValueError, TypeError, OSError):
