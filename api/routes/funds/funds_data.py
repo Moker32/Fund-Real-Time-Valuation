@@ -152,6 +152,7 @@ def _validate_estimate_change_percent(
     estimate_net: float | None,
     provided_percent: float | None,
     fund_code: str = "",
+    fund_type: str | None = None,
     logger=None,
 ) -> float | None:
     """
@@ -159,7 +160,14 @@ def _validate_estimate_change_percent(
     如果不一致，返回计算值（修正）
     如果一致，返回原值
     容许 0.01% 的浮点数误差
+
+    注意：QDII 基金使用 prev_net_value 而非 unit_net_value 计算，
+    校验时需要跳过。
     """
+    # QDII 基金使用 prev_net_value 估算，校验时跳过
+    if fund_type == "QDII":
+        return provided_percent
+
     if unit_net is None or estimate_net is None or unit_net == 0 or provided_percent is None:
         return provided_percent
 
@@ -199,7 +207,7 @@ def build_fund_response(
     provided_percent = data.get("estimated_growth_rate")
     fund_code = data.get("fund_code", "")
     validated_percent = _validate_estimate_change_percent(
-        unit_net, estimate_net, provided_percent, fund_code, logger
+        unit_net, estimate_net, provided_percent, fund_code, data.get("type"), logger
     )
 
     validated = FundResponse.model_validate(
