@@ -18,13 +18,10 @@ import pytest
 # 添加 src 目录到路径
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.db.database import (
-    CommodityConfig,
-    ConfigDAO,
-    DatabaseManager,
-    FundConfig,
-    FundHistoryDAO,
-)
+from src.db.config_dao import ConfigDAO
+from src.db.database import DatabaseManager
+from src.db.fund import FundHistoryDAO
+from src.db.models import CommodityConfig, FundConfig
 
 
 @pytest.fixture
@@ -247,7 +244,7 @@ class TestFundHistoryDAO:
 
     def test_add_history_batch(self, history_dao):
         """测试批量添加历史记录"""
-        from src.db.database import FundHistoryRecord
+        from src.db.models import FundHistoryRecord
 
         records = [
             FundHistoryRecord(

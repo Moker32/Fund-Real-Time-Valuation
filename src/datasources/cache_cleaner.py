@@ -152,7 +152,8 @@ class CacheCleaner:
     async def _cleanup_database_history(self) -> int:
         """清理数据库中的旧历史数据"""
         try:
-            from src.db.database import DatabaseManager, FundHistoryDAO
+            from src.db.database import DatabaseManager
+            from src.db.fund import FundHistoryDAO
 
             db = DatabaseManager()
             dao = FundHistoryDAO(db)
@@ -171,7 +172,8 @@ class CacheCleaner:
     async def _cleanup_news(self) -> int:
         """清理过期新闻（24小时前）"""
         try:
-            from src.db.database import DatabaseManager, NewsDAO
+            from src.db.database import DatabaseManager
+            from src.db.news_dao import NewsDAO
 
             db = DatabaseManager()
             dao = NewsDAO(db)
@@ -219,7 +221,8 @@ class CacheCleaner:
     async def _cleanup_intraday_cache(self) -> int:
         """清理过期的日内缓存"""
         try:
-            from src.db.database import DatabaseManager, FundIntradayCacheDAO
+            from src.db.database import DatabaseManager
+            from src.db.fund import FundIntradayCacheDAO
 
             db = DatabaseManager()
             dao = FundIntradayCacheDAO(db)

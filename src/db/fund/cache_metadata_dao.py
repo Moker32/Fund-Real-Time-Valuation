@@ -6,7 +6,8 @@
 
 from datetime import datetime
 
-from src.db.database import CacheMetadata, DatabaseManager
+from src.db.database import DatabaseManager
+from src.db.models import CacheMetadata
 
 
 class CacheMetadataDAO:

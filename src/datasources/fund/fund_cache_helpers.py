@@ -7,13 +7,9 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from src.db.database import (
-    DatabaseManager,
-    FundBasicInfoDAO,
-    FundDailyCacheDAO,
-    FundIntradayCacheDAO,
-    IndexIntradayCacheDAO,
-)
+from src.db.database import DatabaseManager
+from src.db.fund import FundBasicInfoDAO, FundDailyCacheDAO, FundIntradayCacheDAO
+from src.db.index_intraday_dao import IndexIntradayCacheDAO
 
 from ..dual_cache import DualLayerCache
 

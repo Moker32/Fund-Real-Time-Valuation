@@ -193,7 +193,8 @@ async def search_funds(
     if not q:
         return {"funds": [], "total": 0, "source": "local"}
 
-    from src.db.database import DatabaseManager, FundBasicInfoDAO
+    from src.db.database import DatabaseManager
+    from src.db.fund import FundBasicInfoDAO
 
     dao = FundBasicInfoDAO(DatabaseManager())
     results = dao.search(q, limit=limit)

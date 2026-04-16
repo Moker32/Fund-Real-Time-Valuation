@@ -15,7 +15,8 @@ import time
 # 添加项目根目录到路径
 sys.path.insert(0, str(__file__).replace("scripts/sync_fund_info.py", ""))
 
-from src.db.database import DatabaseManager, FundBasicInfoDAO
+from src.db.database import DatabaseManager
+from src.db.fund import FundBasicInfoDAO
 
 
 def sync_fund_info(batch_size: int = 500, limit: int | None = None):

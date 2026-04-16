@@ -25,7 +25,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.datasources.fund_source import get_basic_info_db, get_full_fund_info
-from src.db.database import ConfigDAO, DatabaseManager
+from src.db.database import DatabaseManager
+from src.db.config_dao import ConfigDAO
 
 # 配置日志
 logging.basicConfig(

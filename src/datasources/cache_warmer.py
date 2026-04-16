@@ -253,7 +253,8 @@ async def prewarm_new_fund(fund_code: str, timeout: float = 30.0):
         # 2. 获取基金历史数据（用于前日净值计算和折线图基准线）
         try:
             from src.datasources.fund_source import FundHistorySource
-            from src.db.database import DatabaseManager, FundDailyCacheDAO
+            from src.db.database import DatabaseManager
+            from src.db.fund import FundDailyCacheDAO
 
             history_source = FundHistorySource()
             history_result = await asyncio.wait_for(
