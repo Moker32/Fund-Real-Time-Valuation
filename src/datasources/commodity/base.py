@@ -179,7 +179,7 @@ class CommodityDataSource(DataSource):
         # 所有重试都失败了
         if last_exception:
             raise last_exception
-        raise Exception("未知错误")
+        raise RuntimeError("未知错误")
 
     async def close(self):
         """关闭数据源（子类应重写此方法）"""

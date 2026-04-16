@@ -39,7 +39,7 @@ class TestSearchFunds:
 
     def test_search_funds_with_query(self):
         """测试搜索基金"""
-        with patch("src.db.database.FundBasicInfoDAO") as mock_dao_class:
+        with patch("src.db.fund.FundBasicInfoDAO") as mock_dao_class:
             mock_dao = MagicMock()
             mock_fund = MagicMock()
             mock_fund.code = "000001"
