@@ -5,7 +5,7 @@ from enum import Enum
 from zoneinfo import ZoneInfo
 
 import httpx
-from holidays import CountryHoliday
+from holidays import country_holidays
 
 from src.datasources.base import DataSource, DataSourceResult, DataSourceType
 
@@ -204,11 +204,11 @@ class TradingCalendarSource(DataSource):
         country_code, _ = MARKET_COUNTRY_MAP.get(market, ("US", ["US"]))
 
         try:
-            holidays = CountryHoliday(country_code, years=year)
+            holidays = country_holidays(country_code, years=year)
             holiday_dates = set(holidays.keys())
 
             if market == Market.CHINA:
-                hk_holidays = CountryHoliday("HK", years=year)
+                hk_holidays = country_holidays("HK", years=year)
                 holiday_dates.update(hk_holidays.keys())
 
             return holiday_dates
@@ -417,7 +417,7 @@ class TradingCalendarSource(DataSource):
                     if is_holiday:
                         try:
                             country_code, _ = MARKET_COUNTRY_MAP.get(market, ("US", ["US"]))
-                            ch = CountryHoliday(country_code, years=year)
+                            ch = country_holidays(country_code, years=year)
                             holiday_name = ch.get(current)
                         except Exception:
                             holiday_name = "Holiday"
