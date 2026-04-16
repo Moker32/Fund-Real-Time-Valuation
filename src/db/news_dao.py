@@ -1,4 +1,6 @@
 # -*- coding: UTF-8 -*-
+from __future__ import annotations
+
 """新闻缓存数据访问对象
 
 提供新闻缓存的存储和查询功能。
@@ -12,7 +14,7 @@ from src.db.models import NewsRecord
 class NewsDAO:
     """新闻缓存数据访问对象"""
 
-    def __init__(self, db_manager: "DatabaseManager"):
+    def __init__(self, db_manager: DatabaseManager):  # noqa: F821
         self.db = db_manager
 
     def add_news(

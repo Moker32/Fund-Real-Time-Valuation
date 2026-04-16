@@ -1,4 +1,6 @@
 # -*- coding: UTF-8 -*-
+from __future__ import annotations
+
 """基金基本信息数据访问对象
 
 提供基金基本信息的存储和查询功能。
@@ -17,7 +19,7 @@ class FundBasicInfoDAO:
     提供基金基本信息的存储和查询功能。
     """
 
-    def __init__(self, db_manager: "DatabaseManager"):
+    def __init__(self, db_manager: DatabaseManager):  # noqa: F821
         self.db = db_manager
 
     def save(

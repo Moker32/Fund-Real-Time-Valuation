@@ -6,7 +6,6 @@
 """
 
 from datetime import datetime
-from typing import Any
 
 from src.db.models import IndexIntradayRecord
 
@@ -21,7 +20,7 @@ class IndexIntradayCacheDAO:
     # 默认缓存过期时间（秒）
     DEFAULT_CACHE_TTL = 60
 
-    def __init__(self, db_manager: "DatabaseManager", cache_ttl: int = DEFAULT_CACHE_TTL):
+    def __init__(self, db_manager: DatabaseManager, cache_ttl: int = DEFAULT_CACHE_TTL):  # noqa: F821
         self.db = db_manager
         self.cache_ttl = cache_ttl
 

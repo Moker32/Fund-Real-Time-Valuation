@@ -17,9 +17,9 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from src.db.database import DatabaseManager
-from src.db.models import CacheMetadata
 from src.db.fund import FundBasicInfoDAO
 from src.db.fund.cache_metadata_dao import CacheMetadataDAO
+from src.db.models import CacheMetadata
 
 logger = logging.getLogger(__name__)
 

@@ -26,7 +26,6 @@ from src.db.fund import (
     FundHistoryDAO,
     FundIntradayCacheDAO,
 )
-from src.db.fund.cache_metadata_dao import CacheMetadataDAO as CacheMetadataDAODirect
 from src.db.index_intraday_dao import IndexIntradayCacheDAO
 from src.db.models import (
     ApiCallStats,

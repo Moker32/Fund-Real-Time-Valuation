@@ -1,4 +1,6 @@
 # -*- coding: UTF-8 -*-
+from __future__ import annotations
+
 """基金历史数据访问对象
 
 提供基金净值历史数据的存储和查询功能。
@@ -17,7 +19,7 @@ class FundHistoryDAO:
     提供基金净值历史数据的存储和查询功能。
     """
 
-    def __init__(self, db_manager: "DatabaseManager"):
+    def __init__(self, db_manager: DatabaseManager):  # noqa: F821
         self.db = db_manager
 
     def add_history(

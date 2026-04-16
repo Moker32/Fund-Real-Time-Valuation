@@ -1,4 +1,6 @@
 # -*- coding: UTF-8 -*-
+from __future__ import annotations
+
 """交易所节假日数据访问对象
 
 提供交易所节假日的存储和查询功能。
@@ -12,7 +14,7 @@ from src.db.models import ExchangeHoliday
 class ExchangeHolidayDAO:
     """交易所节假日数据访问对象"""
 
-    def __init__(self, db: "DatabaseManager"):
+    def __init__(self, db: DatabaseManager):  # noqa: F821
         self.db = db
 
     def add_holiday(self, market: str, holiday_date: str, holiday_name: str | None = None) -> bool:

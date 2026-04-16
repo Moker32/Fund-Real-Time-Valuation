@@ -50,14 +50,14 @@ class DatabaseManager:
         self._init_database()
 
     @property
-    def trading_calendar_dao(self) -> "TradingCalendarDAO":
+    def trading_calendar_dao(self) -> "TradingCalendarDAO":  # noqa: F821
         """获取交易日历 DAO"""
         from src.db.calendar.trading_calendar_dao import TradingCalendarDAO
 
         return TradingCalendarDAO(self)
 
     @property
-    def holiday_dao(self) -> "ExchangeHolidayDAO":
+    def holiday_dao(self) -> "ExchangeHolidayDAO":  # noqa: F821
         """获取节假日 DAO"""
         from src.db.calendar.exchange_holiday_dao import ExchangeHolidayDAO
 

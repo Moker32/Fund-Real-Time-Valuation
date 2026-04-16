@@ -1,4 +1,6 @@
 # -*- coding: UTF-8 -*-
+from __future__ import annotations
+
 """交易日历数据访问对象
 
 提供交易日历的存储和查询功能。
@@ -12,7 +14,7 @@ from src.db.models import TradingCalendarRecord
 class TradingCalendarDAO:
     """交易日历数据访问对象"""
 
-    def __init__(self, db: "DatabaseManager"):
+    def __init__(self, db: DatabaseManager):  # noqa: F821
         self.db = db
 
     def save_calendar(self, market: str, year: int, days: list[TradingCalendarRecord]) -> bool:

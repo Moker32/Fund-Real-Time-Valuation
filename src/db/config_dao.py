@@ -1,4 +1,6 @@
 # -*- coding: UTF-8 -*-
+from __future__ import annotations
+
 """配置数据访问对象
 
 提供基金和商品配置的 CRUD 操作。
@@ -16,7 +18,7 @@ class ConfigDAO:
     提供基金和商品配置的 CRUD 操作。
     """
 
-    def __init__(self, db_manager: "DatabaseManager"):
+    def __init__(self, db_manager: DatabaseManager):  # noqa: F821
         self.db = db_manager
 
     # ==================== 基金配置操作 ====================
@@ -155,14 +157,14 @@ class ConfigDAO:
         """切换持有标记"""
         return self.update_fund(code, is_hold=is_hold)
 
-    def get_hold_funds(self) -> list["FundConfig"]:
+    def get_hold_funds(self) -> list[FundConfig]:
         """获取标记为持有的基金列表"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM fund_config WHERE is_hold = 1 ORDER BY updated_at DESC")
             return [FundConfig(**row) for row in cursor.fetchall()]
 
-    def get_funds_by_hold(self, holding: bool) -> list["FundConfig"]:
+    def get_funds_by_hold(self, holding: bool) -> list[FundConfig]:
         """根据持有标记获取基金列表"""
         with self.db.get_connection() as conn:
             cursor = conn.cursor()

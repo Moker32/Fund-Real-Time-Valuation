@@ -1,4 +1,6 @@
 # -*- coding: UTF-8 -*-
+from __future__ import annotations
+
 """基金日内分时缓存数据访问对象
 
 提供基金日内分时数据的存储和查询功能。
@@ -24,7 +26,7 @@ class FundIntradayCacheDAO:
     # 默认缓存过期时间（秒）- 0 表示禁用缓存
     DEFAULT_CACHE_TTL = 0
 
-    def __init__(self, db_manager: "DatabaseManager", cache_ttl: int = DEFAULT_CACHE_TTL):
+    def __init__(self, db_manager: DatabaseManager, cache_ttl: int = DEFAULT_CACHE_TTL):  # noqa: F821
         """
         初始化日内分时缓存 DAO
 
