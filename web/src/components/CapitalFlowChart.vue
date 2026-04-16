@@ -32,7 +32,7 @@ const props = withDefaults(defineProps<{
   showDetail: false,
 });
 
-// eslint-disable-next-line no-undef
+ 
 const chartContainer = ref<HTMLElement | null>(null);
 let uplotInstance: uPlot | null = null;
 

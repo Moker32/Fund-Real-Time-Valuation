@@ -1,4 +1,6 @@
 # -*- coding: UTF-8 -*-
+from __future__ import annotations
+
 """SQLite 数据库管理器
 
 提供基金实时估值应用的数据持久化支持。
@@ -10,7 +12,7 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,11 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     if "enabled" in result:
         result["enabled"] = bool(result["enabled"])
     return result
+
+
+if TYPE_CHECKING:
+    from src.db.calendar.exchange_holiday_dao import ExchangeHolidayDAO
+    from src.db.calendar.trading_calendar_dao import TradingCalendarDAO
 
 
 class DatabaseManager:
@@ -50,14 +57,14 @@ class DatabaseManager:
         self._init_database()
 
     @property
-    def trading_calendar_dao(self) -> "TradingCalendarDAO":  # noqa: F821
+    def trading_calendar_dao(self) -> TradingCalendarDAO:
         """获取交易日历 DAO"""
         from src.db.calendar.trading_calendar_dao import TradingCalendarDAO
 
         return TradingCalendarDAO(self)
 
     @property
-    def holiday_dao(self) -> "ExchangeHolidayDAO":  # noqa: F821
+    def holiday_dao(self) -> ExchangeHolidayDAO:
         """获取节假日 DAO"""
         from src.db.calendar.exchange_holiday_dao import ExchangeHolidayDAO
 

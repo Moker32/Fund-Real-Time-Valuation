@@ -1,6 +1,8 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 """新闻缓存数据访问对象
 
 提供新闻缓存的存储和查询功能。
@@ -9,6 +11,9 @@ from __future__ import annotations
 from datetime import datetime
 
 from src.db.models import NewsRecord
+
+if TYPE_CHECKING:
+    from src.db.database import DatabaseManager
 
 
 class NewsDAO:

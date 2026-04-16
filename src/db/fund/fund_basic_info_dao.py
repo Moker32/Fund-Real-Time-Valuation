@@ -1,6 +1,8 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 """基金基本信息数据访问对象
 
 提供基金基本信息的存储和查询功能。
@@ -11,6 +13,9 @@ from datetime import datetime
 from typing import Any
 
 from src.db.models import FundBasicInfo
+
+if TYPE_CHECKING:
+    from src.db.database import DatabaseManager
 
 
 class FundBasicInfoDAO:

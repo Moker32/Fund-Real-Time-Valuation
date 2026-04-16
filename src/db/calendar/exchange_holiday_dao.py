@@ -1,6 +1,8 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 """交易所节假日数据访问对象
 
 提供交易所节假日的存储和查询功能。
@@ -9,6 +11,9 @@ from __future__ import annotations
 from datetime import datetime
 
 from src.db.models import ExchangeHoliday
+
+if TYPE_CHECKING:
+    from src.db.database import DatabaseManager
 
 
 class ExchangeHolidayDAO:

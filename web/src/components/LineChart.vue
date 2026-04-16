@@ -3,7 +3,7 @@
     <div v-if="!hasData" class="chart-empty">
       <span class="chart-empty-text">暂无数据</span>
     </div>
-    <div v-if="showTooltip" class="chart-tooltip" :style="tooltipStyle">
+    <div v-if="isTooltipVisible" class="chart-tooltip" :style="tooltipStyle">
       <div class="tooltip-time">{{ tooltipTime }}</div>
       <div class="tooltip-value">{{ tooltipValue }}</div>
     </div>
@@ -175,7 +175,7 @@ const formatXAxisLabel = (timestamp: number): string => {
   return `${month}/${day}`;
 };
 
-const showTooltip = ref(false);
+const isTooltipVisible = ref(false);
 const tooltipStyle = ref<Record<string, string>>({});
 const tooltipTime = ref('');
 const tooltipValue = ref('');
@@ -183,19 +183,19 @@ const tooltipValue = ref('');
 const onCursorMove = (u: uPlot) => {
   const idx = u.cursor.idx;
   if (idx == null || idx < 0 || !rawDataItems.length) {
-    showTooltip.value = false;
+    isTooltipVisible.value = false;
     return;
   }
 
   const rawItem = rawDataItems[idx];
   if (!rawItem) {
-    showTooltip.value = false;
+    isTooltipVisible.value = false;
     return;
   }
 
   const val = processedValues[idx];
   if (val == null) {
-    showTooltip.value = false;
+    isTooltipVisible.value = false;
     return;
   }
 
@@ -224,7 +224,7 @@ const onCursorMove = (u: uPlot) => {
     left: `${left}px`,
     top: `${yPos - 40}px`,
   };
-  showTooltip.value = true;
+  isTooltipVisible.value = true;
 };
 
 const initChart = () => {

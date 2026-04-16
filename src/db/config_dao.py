@@ -1,6 +1,8 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 """配置数据访问对象
 
 提供基金和商品配置的 CRUD 操作。
@@ -10,6 +12,9 @@ import sqlite3
 from datetime import datetime
 
 from src.db.models import CommodityConfig, FundConfig
+
+if TYPE_CHECKING:
+    from src.db.database import DatabaseManager
 
 
 class ConfigDAO:

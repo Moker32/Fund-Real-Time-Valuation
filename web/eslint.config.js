@@ -34,6 +34,7 @@ export default [
         Element: "readonly",
         Event: "readonly",
         HTMLInputElement: "readonly",
+        HTMLElement: "readonly",
       },
     },
   },
