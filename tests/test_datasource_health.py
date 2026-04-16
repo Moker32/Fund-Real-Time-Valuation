@@ -37,6 +37,7 @@ from src.datasources.manager import DataSourceManager
 # 1. 单元测试 - HealthStatus 枚举
 # ============================================================================
 
+
 class TestHealthStatus:
     """健康状态枚举测试"""
 
@@ -70,6 +71,7 @@ class TestHealthStatus:
 # 2. 单元测试 - HealthCheckResult
 # ============================================================================
 
+
 class TestHealthCheckResult:
     """HealthCheckResult 测试"""
 
@@ -80,7 +82,7 @@ class TestHealthCheckResult:
             status=HealthStatus.HEALTHY,
             response_time_ms=100.5,
             error_count=0,
-            last_check=datetime.now()
+            last_check=datetime.now(),
         )
         assert result.source_name == "test_source"
         assert result.status == HealthStatus.HEALTHY
@@ -96,7 +98,7 @@ class TestHealthCheckResult:
             response_time_ms=6000.0,
             error_count=2,
             last_check=datetime.now(),
-            message="响应时间过长"
+            message="响应时间过长",
         )
         assert result.message == "响应时间过长"
 
@@ -109,7 +111,7 @@ class TestHealthCheckResult:
             error_count=3,
             last_check=datetime.now(),
             message="连接失败",
-            details={"error_type": "ConnectionError", "endpoint": "http://test.com"}
+            details={"error_type": "ConnectionError", "endpoint": "http://test.com"},
         )
         assert result.details["error_type"] == "ConnectionError"
         assert result.details["endpoint"] == "http://test.com"
@@ -123,7 +125,7 @@ class TestHealthCheckResult:
             response_time_ms=50.0,
             error_count=0,
             last_check=now,
-            message="OK"
+            message="OK",
         )
 
         result_dict = result.to_dict()
@@ -139,6 +141,7 @@ class TestHealthCheckResult:
 # 3. 单元测试 - DataSourceHealthChecker
 # ============================================================================
 
+
 class TestDataSourceHealthChecker:
     """数据源健康检查器测试"""
 
@@ -149,7 +152,7 @@ class TestDataSourceHealthChecker:
             check_interval=60,
             timeout=10.0,
             max_response_time_ms=5000.0,
-            consecutive_failure_threshold=3
+            consecutive_failure_threshold=3,
         )
 
     @pytest.fixture
@@ -210,9 +213,7 @@ class TestDataSourceHealthChecker:
     @pytest.mark.asyncio
     async def test_check_source_timeout(self, checker, mock_source_healthy):
         """测试检查超时"""
-        mock_source_healthy.health_check = AsyncMock(
-            side_effect=asyncio.TimeoutError()
-        )
+        mock_source_healthy.health_check = AsyncMock(side_effect=asyncio.TimeoutError())
 
         result = await checker.check_source(mock_source_healthy)
 
@@ -223,9 +224,7 @@ class TestDataSourceHealthChecker:
     @pytest.mark.asyncio
     async def test_check_source_exception(self, checker, mock_source_healthy):
         """测试检查异常"""
-        mock_source_healthy.health_check = AsyncMock(
-            side_effect=Exception("Connection failed")
-        )
+        mock_source_healthy.health_check = AsyncMock(side_effect=Exception("Connection failed"))
 
         result = await checker.check_source(mock_source_healthy)
 
@@ -379,6 +378,7 @@ class TestDataSourceHealthChecker:
 # 4. 服务测试 - HealthCheckInterceptor
 # ============================================================================
 
+
 class TestHealthCheckInterceptor:
     """健康检查拦截器测试"""
 
@@ -386,9 +386,7 @@ class TestHealthCheckInterceptor:
     def checker(self):
         """创建健康检查器"""
         return DataSourceHealthChecker(
-            check_interval=60,
-            timeout=10.0,
-            consecutive_failure_threshold=2
+            check_interval=60, timeout=10.0, consecutive_failure_threshold=2
         )
 
     @pytest.fixture
@@ -425,7 +423,9 @@ class TestHealthCheckInterceptor:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_get_healthy_source_prefer_healthy(self, interceptor, mock_source_1, mock_source_2):
+    async def test_get_healthy_source_prefer_healthy(
+        self, interceptor, mock_source_1, mock_source_2
+    ):
         """测试优先获取健康的数据源"""
         sources = [mock_source_1, mock_source_2]
         result = await interceptor.get_healthy_source(sources, prefer_healthy=True)
@@ -474,6 +474,7 @@ class TestHealthCheckInterceptor:
 # 5. 集成测试 - DataSourceManager 健康检查集成
 # ============================================================================
 
+
 class TestDataSourceManagerHealthCheck:
     """DataSourceManager 健康检查集成测试"""
 
@@ -481,9 +482,7 @@ class TestDataSourceManagerHealthCheck:
     def manager(self):
         """创建数据源管理器"""
         return DataSourceManager(
-            max_concurrent=10,
-            enable_load_balancing=False,
-            health_check_interval=60
+            max_concurrent=10, enable_load_balancing=False, health_check_interval=60
         )
 
     @pytest.fixture
@@ -492,11 +491,9 @@ class TestDataSourceManagerHealthCheck:
         source = MagicMock(spec=DataSource)
         source.name = "test_source"
         source.source_type = DataSourceType.STOCK
-        source.fetch = AsyncMock(return_value=DataSourceResult(
-            success=True,
-            data={"price": 100},
-            source="test_source"
-        ))
+        source.fetch = AsyncMock(
+            return_value=DataSourceResult(success=True, data={"price": 100}, source="test_source")
+        )
         source.health_check = AsyncMock(return_value=True)
         return source
 
@@ -535,11 +532,9 @@ class TestDataSourceManagerHealthCheck:
         mock_source = MagicMock(spec=DataSource)
         mock_source.name = "test_source"
         mock_source.source_type = DataSourceType.STOCK
-        mock_source.fetch = AsyncMock(return_value=DataSourceResult(
-            success=True,
-            data={"price": 100},
-            source="test_source"
-        ))
+        mock_source.fetch = AsyncMock(
+            return_value=DataSourceResult(success=True, data={"price": 100}, source="test_source")
+        )
         mock_source.health_check = AsyncMock(return_value=True)
 
         manager.register(mock_source)
@@ -558,11 +553,9 @@ class TestDataSourceManagerHealthCheck:
         mock_source = MagicMock(spec=DataSource)
         mock_source.name = "test_source"
         mock_source.source_type = DataSourceType.STOCK
-        mock_source.fetch = AsyncMock(return_value=DataSourceResult(
-            success=True,
-            data={"price": 100},
-            source="test_source"
-        ))
+        mock_source.fetch = AsyncMock(
+            return_value=DataSourceResult(success=True, data={"price": 100}, source="test_source")
+        )
         mock_source.health_check = AsyncMock(return_value=True)
 
         manager.register(mock_source)
@@ -585,11 +578,9 @@ class TestDataSourceManagerHealthCheck:
         mock_source = MagicMock(spec=DataSource)
         mock_source.name = "test_source"
         mock_source.source_type = DataSourceType.STOCK
-        mock_source.fetch = AsyncMock(return_value=DataSourceResult(
-            success=True,
-            data={"price": 100},
-            source="test_source"
-        ))
+        mock_source.fetch = AsyncMock(
+            return_value=DataSourceResult(success=True, data={"price": 100}, source="test_source")
+        )
         mock_source.health_check = AsyncMock(return_value=True)
 
         manager.register(mock_source)
@@ -604,11 +595,9 @@ class TestDataSourceManagerHealthCheck:
         mock_source = MagicMock(spec=DataSource)
         mock_source.name = "test_source"
         mock_source.source_type = DataSourceType.STOCK
-        mock_source.fetch = AsyncMock(return_value=DataSourceResult(
-            success=True,
-            data={"price": 100},
-            source="test_source"
-        ))
+        mock_source.fetch = AsyncMock(
+            return_value=DataSourceResult(success=True, data={"price": 100}, source="test_source")
+        )
         mock_source.health_check = AsyncMock(return_value=True)
 
         manager.register(mock_source)
@@ -622,10 +611,7 @@ class TestDataSourceManagerHealthCheck:
         """测试健康感知的获取"""
         manager.register(mock_source)
 
-        result = await manager.fetch(
-            DataSourceType.STOCK,
-            health_aware=True
-        )
+        result = await manager.fetch(DataSourceType.STOCK, health_aware=True)
 
         assert result.success is True
         assert result.data["price"] == 100
@@ -637,21 +623,17 @@ class TestDataSourceManagerHealthCheck:
         healthy_source = MagicMock(spec=DataSource)
         healthy_source.name = "healthy"
         healthy_source.source_type = DataSourceType.STOCK
-        healthy_source.fetch = AsyncMock(return_value=DataSourceResult(
-            success=True,
-            data={"price": 100},
-            source="healthy"
-        ))
+        healthy_source.fetch = AsyncMock(
+            return_value=DataSourceResult(success=True, data={"price": 100}, source="healthy")
+        )
         healthy_source.health_check = AsyncMock(return_value=True)
 
         unhealthy_source = MagicMock(spec=DataSource)
         unhealthy_source.name = "unhealthy"
         unhealthy_source.source_type = DataSourceType.STOCK
-        unhealthy_source.fetch = AsyncMock(return_value=DataSourceResult(
-            success=False,
-            error="Source down",
-            source="unhealthy"
-        ))
+        unhealthy_source.fetch = AsyncMock(
+            return_value=DataSourceResult(success=False, error="Source down", source="unhealthy")
+        )
         unhealthy_source.health_check = AsyncMock(return_value=False)
 
         manager.register(healthy_source)
@@ -661,10 +643,7 @@ class TestDataSourceManagerHealthCheck:
         await manager.health_check_all_sources()
 
         # 获取数据时应优先选择健康的数据源
-        result = await manager.fetch(
-            DataSourceType.STOCK,
-            health_aware=True
-        )
+        result = await manager.fetch(DataSourceType.STOCK, health_aware=True)
 
         assert result.success is True
         assert result.source == "healthy"

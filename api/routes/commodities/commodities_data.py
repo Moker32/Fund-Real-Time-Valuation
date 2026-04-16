@@ -118,7 +118,10 @@ def _commodity_to_item(data: dict[str, Any], source: str) -> CommodityCategoryIt
     response_model=CommodityListData,
     summary="获取商品行情",
     description="获取所有支持的商品实时行情",
-    responses={200: {"description": "成功获取商品行情"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取商品行情"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_commodities(
     types: str | None = None,
@@ -176,7 +179,10 @@ async def get_commodities(
     response_model=CommodityCategoriesResponse,
     summary="获取商品分类",
     description="获取所有商品分类及其包含的商品实时行情",
-    responses={200: {"description": "成功获取分类数据"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取分类数据"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_categories(
     manager: DataSourceManager = Depends(DataSourceDependency()),
@@ -231,7 +237,11 @@ async def get_categories(
     response_model=CommodityHistoryResponse,
     summary="获取商品历史行情",
     description="获取指定商品的历史行情数据",
-    responses={200: {"description": "成功获取历史数据"}, 400: {"model": ErrorResponse, "description": "不支持的商品类型"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取历史数据"},
+        400: {"model": ErrorResponse, "description": "不支持的商品类型"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_history(
     commodity_type: str,
@@ -285,7 +295,10 @@ async def get_history(
     response_model=CommodityResponse,
     summary="获取国内黄金行情",
     description="获取上海黄金交易所 Au99.99 实时行情",
-    responses={200: {"description": "成功获取国内黄金行情"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取国内黄金行情"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_gold_cny(
     manager: DataSourceManager = Depends(DataSourceDependency()),
@@ -320,7 +333,10 @@ async def get_gold_cny(
     response_model=CommodityResponse,
     summary="获取国际黄金行情",
     description="获取 COMEX 黄金期货实时行情",
-    responses={200: {"description": "成功获取国际黄金行情"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取国际黄金行情"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_gold_international() -> dict:
     """获取国际黄金行情（COMEX 黄金）"""
@@ -354,7 +370,10 @@ async def get_gold_international() -> dict:
     response_model=CommodityResponse,
     summary="获取 WTI 原油行情",
     description="获取 WTI 原油期货实时行情",
-    responses={200: {"description": "成功获取 WTI 原油行情"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取 WTI 原油行情"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_wti_oil() -> dict:
     """获取 WTI 原油行情"""
@@ -406,7 +425,10 @@ class CommodityByTickerResponse(TypedDict):
     response_model=CommodityByTickerResponse,
     summary="按 ticker 获取商品行情",
     description="根据 yfinance ticker 符号获取商品实时行情（支持用户关注的任意商品）",
-    responses={200: {"description": "成功获取商品行情"}, 500: {"model": ErrorResponse, "description": "获取数据失败"}},
+    responses={
+        200: {"description": "成功获取商品行情"},
+        500: {"model": ErrorResponse, "description": "获取数据失败"},
+    },
 )
 async def get_commodity_by_ticker(symbol: str) -> CommodityByTickerResponse:
     """按 ticker 获取商品行情"""
@@ -449,7 +471,11 @@ async def get_commodity_by_ticker(symbol: str) -> CommodityByTickerResponse:
     response_model=CommodityResponse,
     summary="获取单个商品行情",
     description="根据商品类型获取单个商品的实时行情",
-    responses={200: {"description": "成功获取商品行情"}, 400: {"model": ErrorResponse, "description": "不支持的商品类型"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取商品行情"},
+        400: {"model": ErrorResponse, "description": "不支持的商品类型"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_commodity(
     commodity_type: str,

@@ -12,7 +12,7 @@ import yaml
 
 from .models import AppConfig
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class BaseConfigLoader(ABC, Generic[T]):
@@ -33,7 +33,7 @@ class BaseConfigLoader(ABC, Generic[T]):
     def _get_default_config_dir(self) -> str:
         """获取默认配置目录"""
         home = Path.home()
-        return str(home / '.fund-tui')
+        return str(home / ".fund-tui")
 
     def _ensure_config_dir(self) -> None:
         """确保配置目录存在"""
@@ -42,7 +42,7 @@ class BaseConfigLoader(ABC, Generic[T]):
     def _load_yaml(self) -> dict:
         """加载 YAML 文件"""
         try:
-            with open(self._config_path, encoding='utf-8') as f:
+            with open(self._config_path, encoding="utf-8") as f:
                 return yaml.safe_load(f) or {}
         except FileNotFoundError:
             return {}
@@ -51,7 +51,7 @@ class BaseConfigLoader(ABC, Generic[T]):
 
     def _save_yaml(self, data: Any) -> None:
         """保存 YAML 文件"""
-        with open(self._config_path, 'w', encoding='utf-8') as f:
+        with open(self._config_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, allow_unicode=True, indent=2)
 
     def load(self) -> T:
@@ -73,6 +73,7 @@ class BaseConfigLoader(ABC, Generic[T]):
         if self.exists():
             backup_path = f"{self._config_path}.backup"
             import shutil
+
             shutil.copy2(self._config_path, backup_path)
             return backup_path
         return ""
@@ -92,26 +93,26 @@ class AppConfigLoader(BaseConfigLoader[AppConfig]):
     """应用主配置加载器"""
 
     def __init__(self, config_dir: str | None = None):
-        super().__init__('config.yaml', config_dir)
+        super().__init__("config.yaml", config_dir)
 
     def _parse(self, data: dict) -> AppConfig:
         """解析主配置数据"""
         return AppConfig(
-            refresh_interval=data.get('refresh_interval', 30),
-            theme=data.get('theme', 'dark'),
-            default_fund_source=data.get('default_fund_source', 'sina'),
-            max_history_points=data.get('max_history_points', 100),
-            enable_auto_refresh=data.get('enable_auto_refresh', True),
-            show_profit_loss=data.get('show_profit_loss', True),
+            refresh_interval=data.get("refresh_interval", 30),
+            theme=data.get("theme", "dark"),
+            default_fund_source=data.get("default_fund_source", "sina"),
+            max_history_points=data.get("max_history_points", 100),
+            enable_auto_refresh=data.get("enable_auto_refresh", True),
+            show_profit_loss=data.get("show_profit_loss", True),
         )
 
     def _serialize(self, config: AppConfig) -> dict:
         """序列化主配置对象"""
         return {
-            'refresh_interval': config.refresh_interval,
-            'theme': config.theme,
-            'default_fund_source': config.default_fund_source,
-            'max_history_points': config.max_history_points,
-            'enable_auto_refresh': config.enable_auto_refresh,
-            'show_profit_loss': config.show_profit_loss,
+            "refresh_interval": config.refresh_interval,
+            "theme": config.theme,
+            "default_fund_source": config.default_fund_source,
+            "max_history_points": config.max_history_points,
+            "enable_auto_refresh": config.enable_auto_refresh,
+            "show_profit_loss": config.show_profit_loss,
         }

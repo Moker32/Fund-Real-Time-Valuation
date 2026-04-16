@@ -27,10 +27,10 @@ class TestGetWsStatus:
                 {"client_id": "test-1", "subscriptions": ["funds"]}
             ]
             mock_get_manager.return_value = mock_manager
-            
+
             with TestClient(app) as client:
                 response = client.get("/ws/manager/status")
-            
+
             assert response.status_code == 200
             data = response.json()
             assert "connections" in data
@@ -46,10 +46,10 @@ class TestGetWsStatus:
             mock_manager.get_subscriptions_info.return_value = {}
             mock_manager.get_clients_info.return_value = []
             mock_get_manager.return_value = mock_manager
-            
+
             with TestClient(app) as client:
                 response = client.get("/ws/manager/status")
-            
+
             assert response.status_code == 200
             data = response.json()
             assert data["connections"] == 0
@@ -61,12 +61,12 @@ class TestBroadcastMsg:
 
     def test_broadcast_msg_success(self):
         """测试广播消息成功 - 修复请求参数格式"""
-        
+
         with patch("api.routes.websocket.get_websocket_manager") as mock_get_manager:
             mock_manager = MagicMock()
             mock_manager.broadcast_to_subscription = AsyncMock(return_value=3)
             mock_get_manager.return_value = mock_manager
-            
+
             with TestClient(app) as client:
                 # data 需要作为 JSON 字符串传递
                 response = client.post(
@@ -77,7 +77,7 @@ class TestBroadcastMsg:
                     },
                     json={"fund_code": "000001", "price": 1.5},
                 )
-            
+
             assert response.status_code == 200
             data = response.json()
             assert data["success"] is True
@@ -94,10 +94,11 @@ class TestPushFunctions:
             mock_manager = MagicMock()
             mock_manager.broadcast_to_subscription = AsyncMock()
             mock_get_manager.return_value = mock_manager
-            
+
             from api.routes.websocket import push_fund_update
+
             await push_fund_update({"fund_code": "000001", "price": 1.5})
-            
+
             mock_manager.broadcast_to_subscription.assert_called_once()
 
     @pytest.mark.asyncio
@@ -107,10 +108,11 @@ class TestPushFunctions:
             mock_manager = MagicMock()
             mock_manager.broadcast_to_subscription = AsyncMock()
             mock_get_manager.return_value = mock_manager
-            
+
             from api.routes.websocket import push_commodity_update
+
             await push_commodity_update({"symbol": "AU9999", "price": 400.0})
-            
+
             mock_manager.broadcast_to_subscription.assert_called_once()
 
     @pytest.mark.asyncio
@@ -120,10 +122,11 @@ class TestPushFunctions:
             mock_manager = MagicMock()
             mock_manager.broadcast_to_subscription = AsyncMock()
             mock_get_manager.return_value = mock_manager
-            
+
             from api.routes.websocket import push_index_update
+
             await push_index_update({"index": "shanghai", "price": 3000.0})
-            
+
             mock_manager.broadcast_to_subscription.assert_called_once()
 
     @pytest.mark.asyncio
@@ -133,10 +136,11 @@ class TestPushFunctions:
             mock_manager = MagicMock()
             mock_manager.broadcast_to_subscription = AsyncMock()
             mock_get_manager.return_value = mock_manager
-            
+
             from api.routes.websocket import push_sector_update
+
             await push_sector_update({"sector": "半导体", "change": 2.5})
-            
+
             mock_manager.broadcast_to_subscription.assert_called_once()
 
     @pytest.mark.asyncio
@@ -146,10 +150,11 @@ class TestPushFunctions:
             mock_manager = MagicMock()
             mock_manager.broadcast_to_subscription = AsyncMock()
             mock_get_manager.return_value = mock_manager
-            
+
             from api.routes.websocket import push_all_update
+
             await push_all_update({"type": "full_refresh", "timestamp": "2024-01-15"})
-            
+
             mock_manager.broadcast_to_subscription.assert_called_once()
 
 
@@ -160,16 +165,16 @@ class TestWebSocketRouter:
         """测试 WebSocket 路由存在"""
         # 检查路由是否正确注册
         from api.routes import websocket
-        
+
         # 验证 router 存在
         assert hasattr(websocket, "router")
-        
+
         # 验证路由前缀
         assert websocket.router.prefix == "/ws"
-        
+
         # 获取所有路由
         routes = [route.path for route in websocket.router.routes]
-        
+
         # 验证路由 (注意路由前缀是 /ws)
         assert "/ws/realtime" in routes
         assert "/ws/manager/status" in routes

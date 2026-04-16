@@ -20,10 +20,8 @@ class TestCacheCleaner:
     def cleaner(self):
         """创建缓存清理器实例"""
         from src.datasources.cache_cleaner import CacheCleaner
-        return CacheCleaner(
-            cleanup_interval=3600,
-            days_before_expired=7
-        )
+
+        return CacheCleaner(cleanup_interval=3600, days_before_expired=7)
 
     def test_init(self, cleaner):
         """测试初始化"""
@@ -35,8 +33,9 @@ class TestCacheCleaner:
     def test_init_defaults(self):
         """测试默认初始化"""
         from src.datasources.cache_cleaner import CacheCleaner
+
         cleaner = CacheCleaner()
-        
+
         assert cleaner.cleanup_interval == 3600
         assert cleaner.days_before_expired == 7
 
@@ -52,7 +51,7 @@ class TestCacheCleaner:
     def test_cache_dirs_paths(self, cleaner):
         """测试缓存目录路径"""
         status = cleaner.get_status()
-        
+
         # 验证缓存目录路径
         assert "fund" in status["cache_dirs"]
         assert "commodity" in status["cache_dirs"]
@@ -124,7 +123,7 @@ class TestCacheCleaner:
     async def test_cleanup_on_startup_without_db(self, cleaner):
         """测试启动时清理（无数据库）"""
         # 直接测试各清理方法，不依赖数据库
-        with patch.object(cleaner, '_cleanup_file_cache', return_value=0):
+        with patch.object(cleaner, "_cleanup_file_cache", return_value=0):
             result = await cleaner.cleanup_on_startup()
 
             assert "started_at" in result
@@ -135,7 +134,7 @@ class TestCacheCleaner:
     @pytest.mark.asyncio
     async def test_cleanup_all(self, cleaner):
         """测试完整清理"""
-        with patch.object(cleaner, 'cleanup_on_startup', return_value={"test": "result"}):
+        with patch.object(cleaner, "cleanup_on_startup", return_value={"test": "result"}):
             result = await cleaner.cleanup_all()
             assert result == {"test": "result"}
 
@@ -150,7 +149,7 @@ class TestCacheCleaner:
         """测试启动后台清理"""
         await cleaner.start_background_cleanup()
         assert cleaner._running is True
-        
+
         # 使用 mock 停止任务，避免 InvalidStateError
         if cleaner._cleanup_task:
             cleaner._cleanup_task.cancel()
@@ -162,7 +161,7 @@ class TestCacheCleaner:
     async def test_start_background_cleanup_already_running(self, cleaner):
         """测试启动已运行的后台清理"""
         cleaner._running = True
-        
+
         await cleaner.start_background_cleanup()
         # 应该只记录警告，不抛出异常
 
@@ -173,19 +172,20 @@ class TestCacheCleanerFunctions:
     def test_get_cache_cleaner_singleton(self):
         """测试单例获取"""
         from src.datasources.cache_cleaner import _cache_cleaner, get_cache_cleaner
-        
+
         # 保存原始单例
         original = _cache_cleaner
-        
+
         # 清除单例
         import src.datasources.cache_cleaner as module
+
         module._cache_cleaner = None
-        
+
         cleaner1 = get_cache_cleaner()
         cleaner2 = get_cache_cleaner()
-        
+
         assert cleaner1 is cleaner2
-        
+
         # 恢复原始单例
         module._cache_cleaner = original
 
@@ -193,25 +193,25 @@ class TestCacheCleanerFunctions:
     async def test_startup_cleanup(self):
         """测试启动清理函数"""
         from src.datasources.cache_cleaner import startup_cleanup
-        
-        with patch('src.datasources.cache_cleaner.get_cache_cleaner') as mock_get:
+
+        with patch("src.datasources.cache_cleaner.get_cache_cleaner") as mock_get:
             mock_cleaner = MagicMock()
             mock_cleaner.cleanup_on_startup = AsyncMock(return_value={"deleted": 0})
             mock_get.return_value = mock_cleaner
-            
+
             await startup_cleanup()
-            
+
             mock_cleaner.cleanup_on_startup.assert_called_once()
 
     def test_start_background_cleanup_task(self):
         """测试启动后台清理任务"""
         from src.datasources.cache_cleaner import start_background_cleanup_task
-        
-        with patch('src.datasources.cache_cleaner.get_cache_cleaner') as mock_get:
-            with patch('src.datasources.cache_cleaner.asyncio.create_task'):
+
+        with patch("src.datasources.cache_cleaner.get_cache_cleaner") as mock_get:
+            with patch("src.datasources.cache_cleaner.asyncio.create_task"):
                 mock_cleaner = MagicMock()
                 mock_get.return_value = mock_cleaner
-                
+
                 start_background_cleanup_task(interval=1800)
-                
+
                 mock_cleaner.cleanup_interval = 1800

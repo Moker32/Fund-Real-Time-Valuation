@@ -4,7 +4,6 @@ API 路由测试
 """
 
 
-
 def test_routes_module_imports():
     """测试各个路由模块可以正确导入"""
     from api.routes import (
@@ -21,16 +20,16 @@ def test_routes_module_imports():
     )
 
     # 验证路由存在
-    assert hasattr(cache, 'router')
-    assert hasattr(commodities, 'router')
-    assert hasattr(datasource, 'router')
-    assert hasattr(funds, 'router')
-    assert hasattr(indices, 'router')
-    assert hasattr(overview, 'router')
-    assert hasattr(sectors, 'router')
-    assert hasattr(sentiment, 'router')
-    assert hasattr(trading_calendar, 'router')
-    assert hasattr(websocket, 'router')
+    assert hasattr(cache, "router")
+    assert hasattr(commodities, "router")
+    assert hasattr(datasource, "router")
+    assert hasattr(funds, "router")
+    assert hasattr(indices, "router")
+    assert hasattr(overview, "router")
+    assert hasattr(sectors, "router")
+    assert hasattr(sentiment, "router")
+    assert hasattr(trading_calendar, "router")
+    assert hasattr(websocket, "router")
 
 
 def test_models_module_imports():
@@ -52,4 +51,5 @@ def test_models_module_imports():
 def test_dependencies_module_imports():
     """测试依赖模块可以正确导入"""
     from api.dependencies import DataSourceDependency
+
     assert DataSourceDependency is not None

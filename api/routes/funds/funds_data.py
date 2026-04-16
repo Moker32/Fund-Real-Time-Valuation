@@ -235,7 +235,9 @@ def build_fund_response(
     responses={200: {"description": "搜索成功"}},
 )
 async def search_funds(
-    q: str | None = Query(None, min_length=1, max_length=20, description="搜索关键词（基金代码或名称）"),
+    q: str | None = Query(
+        None, min_length=1, max_length=20, description="搜索关键词（基金代码或名称）"
+    ),
     limit: int = Query(20, ge=1, le=100, description="返回结果数量"),
 ) -> dict:
     """本地搜索基金"""
@@ -265,7 +267,10 @@ async def search_funds(
     response_model=FundListData,
     summary="获取基金列表",
     description="获取所有已注册基金数据源的基金信息",
-    responses={200: {"description": "成功获取基金列表"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取基金列表"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_funds_list(
     codes: str | None = None,
@@ -292,7 +297,9 @@ async def get_funds_list(
                 is_holding = result.data.get("fund_code") in holding_codes
                 funds.append(build_fund_response(result.data, result.source, is_holding))
             else:
-                fund_code = result.metadata.get("fund_code", "unknown") if result.metadata else "unknown"
+                fund_code = (
+                    result.metadata.get("fund_code", "unknown") if result.metadata else "unknown"
+                )
                 logger.warning(f"基金获取失败: {fund_code} - {result.error}")
                 failed_count += 1
 
@@ -312,7 +319,9 @@ async def get_funds_list(
             is_holding = result.data.get("fund_code") in holding_codes
             funds.append(build_fund_response(result.data, result.source, is_holding))
         else:
-            fund_code = result.metadata.get("fund_code", "unknown") if result.metadata else "unknown"
+            fund_code = (
+                result.metadata.get("fund_code", "unknown") if result.metadata else "unknown"
+            )
             logger.warning(f"基金获取失败: {fund_code} - {result.error}")
             failed_count += 1
 
@@ -329,7 +338,11 @@ async def get_funds_list(
     "/{code}",
     summary="获取基金详情",
     description="根据基金代码获取单个基金的详细信息",
-    responses={200: {"description": "成功获取基金详情"}, 404: {"model": ErrorResponse, "description": "基金不存在"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取基金详情"},
+        404: {"model": ErrorResponse, "description": "基金不存在"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_fund_detail(
     code: str,
@@ -379,7 +392,11 @@ async def get_fund_detail(
     "/{code}/estimate",
     summary="获取基金估值",
     description="根据基金代码获取基金的实时估值信息",
-    responses={200: {"description": "成功获取基金估值"}, 404: {"model": ErrorResponse, "description": "基金不存在"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取基金估值"},
+        404: {"model": ErrorResponse, "description": "基金不存在"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_fund_estimate(
     code: str,
@@ -428,7 +445,11 @@ async def get_fund_estimate(
     response_model=dict,
     summary="获取基金历史净值",
     description="根据基金代码获取基金的历史净值数据",
-    responses={200: {"description": "成功获取基金历史净值"}, 404: {"model": ErrorResponse, "description": "基金不存在"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取基金历史净值"},
+        404: {"model": ErrorResponse, "description": "基金不存在"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_fund_history(
     code: str,
@@ -464,7 +485,11 @@ async def get_fund_history(
     response_model=FundIntradayResponse,
     summary="获取基金日内分时数据",
     description="根据基金代码获取 fund123.cn 的完整日内分时数据",
-    responses={200: {"description": "成功获取日内分时数据"}, 404: {"model": ErrorResponse, "description": "基金不存在"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取日内分时数据"},
+        404: {"model": ErrorResponse, "description": "基金不存在"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_fund_intraday(
     code: str,
@@ -496,7 +521,11 @@ async def get_fund_intraday(
     response_model=FundIntradayResponse,
     summary="获取指定日期的基金日内分时数据",
     description="根据基金代码和日期获取历史日内分时数据",
-    responses={200: {"description": "成功获取日内分时数据"}, 404: {"model": ErrorResponse, "description": "数据不存在"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取日内分时数据"},
+        404: {"model": ErrorResponse, "description": "数据不存在"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_fund_intraday_by_date(
     code: str,

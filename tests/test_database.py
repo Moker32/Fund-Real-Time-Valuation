@@ -309,9 +309,7 @@ class TestFundHistoryDAO:
             unit_net_value=1.5,
         )
 
-        history = history_dao.get_history(
-            "DATE001", start_date="2024-06-01", end_date="2024-06-30"
-        )
+        history = history_dao.get_history("DATE001", start_date="2024-06-01", end_date="2024-06-30")
 
         assert len(history) == 1
         assert history[0].date == "2024-06-15"
@@ -355,9 +353,7 @@ class TestFundConfig:
 
     def test_fund_config_creation(self):
         """测试基金配置创建"""
-        fund = FundConfig(
-            code="FUND001", name="测试基金", watchlist=True, shares=1000, cost=1.5
-        )
+        fund = FundConfig(code="FUND001", name="测试基金", watchlist=True, shares=1000, cost=1.5)
 
         assert fund.code == "FUND001"
         assert fund.name == "测试基金"
@@ -371,9 +367,7 @@ class TestCommodityConfig:
 
     def test_commodity_config_creation(self):
         """测试商品配置创建"""
-        commodity = CommodityConfig(
-            symbol="GOLD", name="黄金", source="yfinance", enabled=True
-        )
+        commodity = CommodityConfig(symbol="GOLD", name="黄金", source="yfinance", enabled=True)
 
         assert commodity.symbol == "GOLD"
         assert commodity.name == "黄金"

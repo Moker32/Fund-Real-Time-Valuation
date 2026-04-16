@@ -54,7 +54,7 @@ class TestFundList:
             Holding(code="000001", name="华夏成长", shares=1000, cost=1.5),
         ]
         fund_list = FundList(watchlist=funds, holdings=holdings)
-        
+
         assert len(fund_list.watchlist) == 2
         assert len(fund_list.holdings) == 1
         assert fund_list.is_watching("000001")
@@ -67,7 +67,7 @@ class TestFundList:
         funds = [Fund(code="000001", name="基金1")]
         holdings = [Holding(code="000002", name="基金2", shares=100, cost=1.0)]
         fund_list = FundList(watchlist=funds, holdings=holdings)
-        
+
         codes = fund_list.get_all_codes()
         assert "000001" in codes
         assert "000002" in codes
@@ -76,11 +76,11 @@ class TestFundList:
         """测试获取持仓"""
         holdings = [Holding(code="000001", name="基金1", shares=100, cost=1.5)]
         fund_list = FundList(holdings=holdings)
-        
+
         holding = fund_list.get_holding("000001")
         assert holding is not None
         assert holding.shares == 100
-        
+
         non_existent = fund_list.get_holding("999999")
         assert non_existent is None
 
@@ -95,7 +95,7 @@ class TestCommodityList:
             Commodity(symbol="AG9999", name="白银", source="akshare"),
         ]
         commodity_list = CommodityList(commodities=commodities)
-        
+
         assert len(commodity_list.commodities) == 2
         assert commodity_list.get_by_symbol("AU9999") is not None
         assert commodity_list.get_by_symbol("AU9999").name == "黄金"
@@ -113,7 +113,7 @@ class TestPriceAlert:
             target_price=1.5,
             direction=AlertDirection.ABOVE.value,
         )
-        
+
         # 低于目标价，不触发
         assert not alert.check(1.4)
         # 高于目标价，触发
@@ -130,7 +130,7 @@ class TestPriceAlert:
             target_price=1.5,
             direction=AlertDirection.BELOW.value,
         )
-        
+
         # 高于目标价，不触发
         assert not alert.check(1.6)
         # 低于目标价，触发
@@ -143,7 +143,7 @@ class TestNotificationConfig:
     def test_add_remove_alert(self):
         """测试添加和移除预警"""
         config = NotificationConfig()
-        
+
         alert1 = PriceAlert(
             fund_code="000001",
             fund_name="基金1",
@@ -154,12 +154,12 @@ class TestNotificationConfig:
             fund_name="基金2",
             target_price=2.0,
         )
-        
+
         config.add_alert(alert1)
         config.add_alert(alert2)
-        
+
         assert len(config.price_alerts) == 2
-        
+
         # 移除
         result = config.remove_alert("000001", 1.5)
         assert result is True
@@ -168,18 +168,18 @@ class TestNotificationConfig:
     def test_get_alerts_for_fund(self):
         """测试获取基金的预警"""
         config = NotificationConfig()
-        
+
         alert1 = PriceAlert(fund_code="000001", fund_name="基金1", target_price=1.5)
         alert2 = PriceAlert(fund_code="000001", fund_name="基金1", target_price=1.8)
         alert3 = PriceAlert(fund_code="000002", fund_name="基金2", target_price=2.0)
-        
+
         config.add_alert(alert1)
         config.add_alert(alert2)
         config.add_alert(alert3)
-        
+
         alerts_000001 = config.get_alerts_for_fund("000001")
         assert len(alerts_000001) == 2
-        
+
         alerts_000002 = config.get_alerts_for_fund("000002")
         assert len(alerts_000002) == 1
 
@@ -190,11 +190,13 @@ class TestConfigManager:
     @pytest.fixture
     def manager(self, tmp_path):
         from src.config.manager import ConfigManager
+
         return ConfigManager(config_dir=str(tmp_path))
 
     def test_config_dir_created(self, manager):
         """测试配置目录已创建"""
         import os
+
         assert os.path.exists(manager.get_config_dir())
 
     def test_add_watchlist(self, manager):
@@ -227,7 +229,7 @@ class TestConfigManager:
         """测试更新持仓"""
         holding = Holding(code="000001", name="测试基金", shares=100, cost=1.5)
         manager.add_holding(holding)
-        
+
         updated = Holding(code="000001", name="测试基金", shares=200, cost=1.8)
         result = manager.update_holding(updated)
         assert result is True

@@ -39,9 +39,7 @@ class TestDataSourceError:
     def test_data_source_error_creation(self):
         """测试数据源错误创建"""
         error = DataSourceError(
-            message="Test error",
-            source_type=DataSourceType.FUND,
-            details={"key": "value"}
+            message="Test error", source_type=DataSourceType.FUND, details={"key": "value"}
         )
 
         assert error.message == "Test error"
@@ -50,41 +48,31 @@ class TestDataSourceError:
 
     def test_network_error(self):
         """测试网络错误"""
-        error = NetworkError(
-            message="Network failed",
-            source_type=DataSourceType.FUND
-        )
-        
+        error = NetworkError(message="Network failed", source_type=DataSourceType.FUND)
+
         assert isinstance(error, DataSourceError)
         assert error.message == "Network failed"
 
     def test_data_parse_error(self):
         """测试数据解析错误"""
-        error = DataParseError(
-            message="Parse failed",
-            source_type=DataSourceType.FUND
-        )
-        
+        error = DataParseError(message="Parse failed", source_type=DataSourceType.FUND)
+
         assert isinstance(error, DataSourceError)
         assert error.message == "Parse failed"
 
     def test_data_source_unavailable_error(self):
         """测试数据源不可用错误"""
         error = DataSourceUnavailableError(
-            message="Source unavailable",
-            source_type=DataSourceType.FUND
+            message="Source unavailable", source_type=DataSourceType.FUND
         )
-        
+
         assert isinstance(error, DataSourceError)
         assert error.message == "Source unavailable"
 
     def test_timeout_error(self):
         """测试超时错误"""
-        error = TimeoutError(
-            message="Request timeout",
-            source_type=DataSourceType.FUND
-        )
-        
+        error = TimeoutError(message="Request timeout", source_type=DataSourceType.FUND)
+
         assert isinstance(error, DataSourceError)
         assert error.message == "Request timeout"
 
@@ -100,7 +88,7 @@ class TestDataSourceResult:
             error=None,
             timestamp=time.time(),
             source="test_source",
-            metadata={"category": "test"}
+            metadata={"category": "test"},
         )
 
         assert result.success is True
@@ -112,16 +100,12 @@ class TestDataSourceResult:
     def test_data_source_result_default_timestamp(self):
         """测试默认时间戳"""
         result = DataSourceResult(success=True)
-        
+
         assert result.timestamp > 0
 
     def test_data_source_result_failure(self):
         """测试失败结果"""
-        result = DataSourceResult(
-            success=False,
-            error="Error message",
-            source="test_source"
-        )
+        result = DataSourceResult(success=False, error="Error message", source="test_source")
 
         assert result.success is False
         assert result.error == "Error message"
@@ -132,11 +116,7 @@ class MockDataSource(DataSource):
 
     async def fetch(self, *args, **kwargs) -> DataSourceResult:
         """模拟获取数据"""
-        return DataSourceResult(
-            success=True,
-            data={"mock": "data"},
-            source=self.name
-        )
+        return DataSourceResult(success=True, data={"mock": "data"}, source=self.name)
 
     async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
         """模拟批量获取数据"""
@@ -149,11 +129,7 @@ class TestDataSource:
     @pytest.fixture
     def mock_source(self):
         """返回模拟数据源实例"""
-        return MockDataSource(
-            name="mock_source",
-            source_type=DataSourceType.FUND,
-            timeout=10.0
-        )
+        return MockDataSource(name="mock_source", source_type=DataSourceType.FUND, timeout=10.0)
 
     def test_init(self, mock_source):
         """测试初始化"""
@@ -179,7 +155,7 @@ class TestDataSource:
     def test_handle_error(self, mock_source):
         """测试错误处理"""
         error = ValueError("Test error")
-        
+
         result = mock_source._handle_error(error, "test_source")
 
         assert result.success is False
@@ -192,9 +168,7 @@ class TestDataSource:
     def test_handle_data_source_error(self, mock_source):
         """测试处理 DataSourceError"""
         error = DataSourceError(
-            message="Custom error",
-            source_type=DataSourceType.FUND,
-            details={"key": "value"}
+            message="Custom error", source_type=DataSourceType.FUND, details={"key": "value"}
         )
 
         result = mock_source._handle_error(error, "test_source")
@@ -252,6 +226,7 @@ class TestDataSource:
     @pytest.mark.asyncio
     async def test_health_check_failure(self, mock_source):
         """测试健康检查失败"""
+
         # 创建一个总是失败的数据源
         class FailingSource(DataSource):
             async def fetch(self, *args, **kwargs) -> DataSourceResult:
@@ -260,10 +235,7 @@ class TestDataSource:
             async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
                 return []
 
-        failing_source = FailingSource(
-            name="failing",
-            source_type=DataSourceType.FUND
-        )
+        failing_source = FailingSource(name="failing", source_type=DataSourceType.FUND)
 
         result = await failing_source.health_check()
 

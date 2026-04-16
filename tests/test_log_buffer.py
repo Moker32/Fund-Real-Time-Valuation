@@ -37,36 +37,42 @@ class TestLogBuffer:
         # 直接添加日志
         with LogBuffer._lock:
             for i in range(5):
-                LogBuffer._buffer.append(LogEntry(
-                    timestamp=datetime.now(),
-                    level="INFO",
-                    logger="test",
-                    message=f"Message {i}",
-                ))
-        
+                LogBuffer._buffer.append(
+                    LogEntry(
+                        timestamp=datetime.now(),
+                        level="INFO",
+                        logger="test",
+                        message=f"Message {i}",
+                    )
+                )
+
         logs = LogBuffer.get_logs(limit=3)
         assert len(logs) == 3
 
     def test_get_logs_level_filter(self):
         """测试级别过滤"""
         with LogBuffer._lock:
-            LogBuffer._buffer.append(LogEntry(
-                timestamp=datetime.now(),
-                level="INFO",
-                logger="test",
-                message="Info message",
-            ))
-            LogBuffer._buffer.append(LogEntry(
-                timestamp=datetime.now(),
-                level="ERROR",
-                logger="test",
-                message="Error message",
-            ))
-        
+            LogBuffer._buffer.append(
+                LogEntry(
+                    timestamp=datetime.now(),
+                    level="INFO",
+                    logger="test",
+                    message="Info message",
+                )
+            )
+            LogBuffer._buffer.append(
+                LogEntry(
+                    timestamp=datetime.now(),
+                    level="ERROR",
+                    logger="test",
+                    message="Error message",
+                )
+            )
+
         info_logs = LogBuffer.get_logs(level="INFO")
         assert len(info_logs) == 1
         assert info_logs[0].level == "INFO"
-        
+
         error_logs = LogBuffer.get_logs(level="ERROR")
         assert len(error_logs) == 1
         assert error_logs[0].level == "ERROR"
@@ -74,34 +80,40 @@ class TestLogBuffer:
     def test_get_logs_logger_filter(self):
         """测试日志器过滤"""
         with LogBuffer._lock:
-            LogBuffer._buffer.append(LogEntry(
-                timestamp=datetime.now(),
-                level="INFO",
-                logger="test_logger1",
-                message="Logger1 message",
-            ))
-            LogBuffer._buffer.append(LogEntry(
-                timestamp=datetime.now(),
-                level="INFO",
-                logger="test_logger2",
-                message="Logger2 message",
-            ))
-        
+            LogBuffer._buffer.append(
+                LogEntry(
+                    timestamp=datetime.now(),
+                    level="INFO",
+                    logger="test_logger1",
+                    message="Logger1 message",
+                )
+            )
+            LogBuffer._buffer.append(
+                LogEntry(
+                    timestamp=datetime.now(),
+                    level="INFO",
+                    logger="test_logger2",
+                    message="Logger2 message",
+                )
+            )
+
         filtered = LogBuffer.get_logs(logger="logger1")
         assert len(filtered) == 1
 
     def test_clear(self):
         """测试清空"""
         with LogBuffer._lock:
-            LogBuffer._buffer.append(LogEntry(
-                timestamp=datetime.now(),
-                level="INFO",
-                logger="test",
-                message="Test",
-            ))
-        
+            LogBuffer._buffer.append(
+                LogEntry(
+                    timestamp=datetime.now(),
+                    level="INFO",
+                    logger="test",
+                    message="Test",
+                )
+            )
+
         assert len(LogBuffer.get_logs(limit=10)) == 1
-        
+
         LogBuffer.clear()
         assert len(LogBuffer.get_logs(limit=10)) == 0
 
@@ -111,7 +123,7 @@ class TestLogBuffer:
         logger = logging.getLogger("test_handler")
         logger.setLevel(logging.DEBUG)
         logger.addHandler(buffer)
-        
+
         # 直接调用 emit 来模拟日志记录
         record = logging.LogRecord(
             name="test_handler",
@@ -123,10 +135,10 @@ class TestLogBuffer:
             exc_info=None,
         )
         buffer.emit(record)
-        
+
         # 由于 emit 是异步的，给一点时间
         time.sleep(0.05)
-        
+
         logs = LogBuffer.get_logs(limit=10)
         # 可能没有记录成功，因为 emit 可能有异常处理
         # 这里我们只是确保不会崩溃

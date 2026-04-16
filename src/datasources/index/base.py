@@ -162,6 +162,7 @@ US_INDICES = ["dow_jones", "nasdaq", "sp500"]
 # 基类
 # ============================================================
 
+
 class IndexDataSource(DataSource):
     """全球指数数据源基类
 

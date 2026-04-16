@@ -779,7 +779,9 @@ class HybridIndexSource(IndexDataSource):
 
                     # 保存到缓存
                     cache_dao.save_intraday(index_type, today, intraday_points)
-                    logger.debug(f"[HybridIndexSource] Saved {len(intraday_points)} points to cache for {index_type}")
+                    logger.debug(
+                        f"[HybridIndexSource] Saved {len(intraday_points)} points to cache for {index_type}"
+                    )
 
                     return DataSourceResult(
                         success=True,

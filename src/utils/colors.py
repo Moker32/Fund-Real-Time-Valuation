@@ -4,6 +4,7 @@
 从原 src/gui/theme.py 迁移，提供涨跌颜色和格式化功能。
 """
 
+
 # ============== 涨跌颜色配置 ==============
 # A股习惯：红涨绿跌 (与西方绿涨红跌相反)
 class ChangeColors:
@@ -11,7 +12,7 @@ class ChangeColors:
 
     POSITIVE = "#FF3B30"  # 上涨/盈利 (红色)
     NEGATIVE = "#34C759"  # 下跌/亏损 (绿色)
-    NEUTRAL = "#8E8E93"   # 持平/无变化 (灰色)
+    NEUTRAL = "#8E8E93"  # 持平/无变化 (灰色)
 
 
 def get_change_color(value: float) -> str:

@@ -20,7 +20,7 @@ def mock_data_source():
     mock_manager.fetch = AsyncMock()
     mock_manager.fetch_batch = AsyncMock()
     mock_manager.fetch_with_source = AsyncMock()
-    
+
     # 设置全局 mock
     set_data_source_manager(mock_manager)
     yield mock_manager
@@ -41,15 +41,15 @@ class TestGetIndices:
     def test_get_indices_returns_200(self, client, mock_data_source):
         """测试获取指数列表返回 200"""
         mock_data_source.fetch_batch.return_value = []
-        
+
         response = client.get("/api/indices")
-        
+
         assert response.status_code == 200
 
     def test_get_indices_response_structure(self, client):
         """测试响应结构"""
         response = client.get("/api/indices")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "indices" in data
@@ -62,7 +62,7 @@ class TestGetIndex:
     def test_get_single_index_success(self, client):
         """测试获取单个指数成功 - 不使用 mock，直接测试真实 API"""
         response = client.get("/api/indices/shanghai")
-        
+
         assert response.status_code == 200
         data = response.json()
         # 验证返回的数据结构
@@ -89,7 +89,7 @@ class TestGetRegions:
     def test_get_regions_success(self, client):
         """测试获取支持的区域列表"""
         response = client.get("/api/indices/regions")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert "regions" in data
@@ -118,9 +118,9 @@ class TestGetIndexHistory:
                 source="eastmoney",
             )
             mock_get_source.return_value = mock_history_source
-            
+
             response = client.get("/api/indices/shanghai/history?period=1mo")
-            
+
             assert response.status_code == 200
 
     def test_get_index_history_fetch_failure(self, client):
@@ -135,9 +135,9 @@ class TestGetIndexHistory:
                 source="eastmoney",
             )
             mock_get_source.return_value = mock_history_source
-            
+
             response = client.get("/api/indices/shanghai/history")
-            
+
             assert response.status_code == 400
 
 
@@ -179,7 +179,7 @@ class TestValidatePeriod:
     def test_validate_period_valid(self):
         """测试有效的周期参数"""
         from api.routes.indices import _validate_period
-        
+
         assert _validate_period("1d") == "1d"
         assert _validate_period("1mo") == "1mo"
         assert _validate_period("1y") == "1y"
@@ -188,6 +188,6 @@ class TestValidatePeriod:
     def test_validate_period_invalid(self):
         """测试无效的周期参数，应返回默认值 1y"""
         from api.routes.indices import _validate_period
-        
+
         assert _validate_period("invalid") == "1y"
         assert _validate_period("") == "1y"

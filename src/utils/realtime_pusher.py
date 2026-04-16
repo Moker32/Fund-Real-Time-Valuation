@@ -75,9 +75,10 @@ class RealtimePusher:
         # 缓存检查结果，避免频繁调用阻塞的 is_within_trading_hours
         # 缓存1分钟，避免阻塞事件循环
         import time
+
         now = time.time()
         cache_key = f"_is_trading_hours_{market.value}"
-        if hasattr(self, '_trading_hours_cache') and cache_key in self._trading_hours_cache:
+        if hasattr(self, "_trading_hours_cache") and cache_key in self._trading_hours_cache:
             cached_result, cached_time = self._trading_hours_cache[cache_key]
             if now - cached_time < 60:
                 return cached_result
@@ -87,7 +88,7 @@ class RealtimePusher:
             is_open = result.get("status") == "open"
             logger.debug(f"交易时段检查: market={market.value}, result={result}, is_open={is_open}")
             # 缓存结果
-            if not hasattr(self, '_trading_hours_cache'):
+            if not hasattr(self, "_trading_hours_cache"):
                 self._trading_hours_cache = {}
             self._trading_hours_cache[cache_key] = (is_open, now)
             return is_open
@@ -135,6 +136,7 @@ class RealtimePusher:
         """获取自选基金代码列表"""
         try:
             from src.config import get_config_manager
+
             config_manager = get_config_manager()
             fund_list = config_manager.load_funds()
             codes = fund_list.get_all_codes()
@@ -164,16 +166,15 @@ class RealtimePusher:
                     continue
 
                 logger.debug(f"基金推送: 开始获取 {len(fund_codes)} 只基金数据...")
-                
+
                 # 交易时段不使用缓存，直接从数据源获取实时数据
                 # 非交易时段使用缓存以减少 API 调用
                 is_trading = self._is_trading_hours(Market.CHINA)
                 params_list = [
-                    {"args": [code], "kwargs": {"use_cache": not is_trading}}
-                    for code in fund_codes
+                    {"args": [code], "kwargs": {"use_cache": not is_trading}} for code in fund_codes
                 ]
                 results = await self.data_manager.fetch_batch(DataSourceType.FUND, params_list)
-                
+
                 # 汇总成功的基金数据
                 new_data = []
                 failed_count = 0
@@ -182,7 +183,7 @@ class RealtimePusher:
                         new_data.append(result.data)
                     else:
                         failed_count += 1
-                
+
                 if failed_count > 0:
                     logger.warning(
                         "基金推送部分失败",
@@ -192,7 +193,7 @@ class RealtimePusher:
                             "is_trading": is_trading,
                         },
                     )
-                
+
                 if new_data:
                     # 每次都推送完整数据（不使用差量更新）
                     camel_data = [_convert_dict_to_camel_case(item) for item in new_data]
@@ -276,21 +277,21 @@ class RealtimePusher:
     # 支持的指数类型列表
     # 注意：这里使用的是内部指数类型标识符，不是数据源特定的代码
     SUPPORTED_INDICES = [
-        "shanghai",      # 上证指数
-        "shenzhen",      # 深证成指
-        "chi_next",      # 创业板指
-        "hs300",         # 沪深300
-        "shanghai50",    # 上证50
-        "csi500",        # 中证500
-        "hang_seng",     # 恒生指数
-        "hang_seng_tech", # 恒生科技
-        "nikkei225",     # 日经225 - 新增
-        "dow_jones",     # 道琼斯
-        "nasdaq",        # 纳斯达克
-        "sp500",         # 标普500
-        "dax",           # 德国DAX - 新增
-        "ftse",          # 富时100 - 新增
-        "cac40",         # CAC40 - 新增
+        "shanghai",  # 上证指数
+        "shenzhen",  # 深证成指
+        "chi_next",  # 创业板指
+        "hs300",  # 沪深300
+        "shanghai50",  # 上证50
+        "csi500",  # 中证500
+        "hang_seng",  # 恒生指数
+        "hang_seng_tech",  # 恒生科技
+        "nikkei225",  # 日经225 - 新增
+        "dow_jones",  # 道琼斯
+        "nasdaq",  # 纳斯达克
+        "sp500",  # 标普500
+        "dax",  # 德国DAX - 新增
+        "ftse",  # 富时100 - 新增
+        "cac40",  # CAC40 - 新增
     ]
 
     async def _push_indices_loop(self):
@@ -306,7 +307,7 @@ class RealtimePusher:
                 # 使用 fetch_batch 批量获取指数数据
                 params_list = [{"args": [it]} for it in self.SUPPORTED_INDICES]
                 results = await self.data_manager.fetch_batch(DataSourceType.STOCK, params_list)
-                
+
                 # 汇总成功的指数数据
                 new_data = []
                 failed_count = 0
@@ -315,10 +316,12 @@ class RealtimePusher:
                         new_data.append(result.data)
                     else:
                         failed_count += 1
-                
+
                 if failed_count > 0:
-                    logger.debug(f"指数推送: {failed_count}/{len(self.SUPPORTED_INDICES)} 个指数获取失败")
-                
+                    logger.debug(
+                        f"指数推送: {failed_count}/{len(self.SUPPORTED_INDICES)} 个指数获取失败"
+                    )
+
                 if new_data:
                     if self._last_index_data is not None:
                         diff_data = self._diff_data("indices", self._last_index_data, new_data)

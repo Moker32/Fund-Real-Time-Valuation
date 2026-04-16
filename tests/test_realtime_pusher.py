@@ -100,12 +100,12 @@ class TestConvertDictToCamelCase:
         """测试嵌套字典转换"""
         data = {
             "fund_code": "000001",
-            "detail_info": {"manager_name": "张三", "company_name": "测试公司"}
+            "detail_info": {"manager_name": "张三", "company_name": "测试公司"},
         }
         result = _convert_dict_to_camel_case(data)
         assert result == {
             "fundCode": "000001",
-            "detailInfo": {"managerName": "张三", "companyName": "测试公司"}
+            "detailInfo": {"managerName": "张三", "companyName": "测试公司"},
         }
 
     def test_dict_with_list(self):
@@ -113,14 +113,14 @@ class TestConvertDictToCamelCase:
         data = {
             "fund_list": [
                 {"fund_code": "000001", "fund_name": "基金A"},
-                {"fund_code": "000002", "fund_name": "基金B"}
+                {"fund_code": "000002", "fund_name": "基金B"},
             ]
         }
         result = _convert_dict_to_camel_case(data)
         assert result == {
             "fundList": [
                 {"fundCode": "000001", "fundName": "基金A"},
-                {"fundCode": "000002", "fundName": "基金B"}
+                {"fundCode": "000002", "fundName": "基金B"},
             ]
         }
 
@@ -139,7 +139,7 @@ class TestConvertDictToCamelCase:
             "bool_value": True,
             "none_value": None,
             "list_value": [1, 2, 3],
-            "dict_value": {"inner_key": "inner_value"}
+            "dict_value": {"inner_key": "inner_value"},
         }
         result = _convert_dict_to_camel_case(data)
         assert result == {
@@ -149,7 +149,7 @@ class TestConvertDictToCamelCase:
             "boolValue": True,
             "noneValue": None,
             "listValue": [1, 2, 3],
-            "dictValue": {"innerKey": "inner_value"}
+            "dictValue": {"innerKey": "inner_value"},
         }
 
     def test_empty_dict(self):
@@ -159,31 +159,13 @@ class TestConvertDictToCamelCase:
 
     def test_deeply_nested_dict(self):
         """测试深度嵌套字典"""
-        data = {
-            "level_one": {
-                "level_two": {
-                    "level_three": {
-                        "deep_value": "found"
-                    }
-                }
-            }
-        }
+        data = {"level_one": {"level_two": {"level_three": {"deep_value": "found"}}}}
         result = _convert_dict_to_camel_case(data)
-        assert result == {
-            "levelOne": {
-                "levelTwo": {
-                    "levelThree": {
-                        "deepValue": "found"
-                    }
-                }
-            }
-        }
+        assert result == {"levelOne": {"levelTwo": {"levelThree": {"deepValue": "found"}}}}
 
     def test_list_of_lists(self):
         """测试嵌套列表"""
-        data = {
-            "matrix": [[1, 2], [3, 4]]
-        }
+        data = {"matrix": [[1, 2], [3, 4]]}
         result = _convert_dict_to_camel_case(data)
         assert result == {"matrix": [[1, 2], [3, 4]]}
 
@@ -192,43 +174,19 @@ class TestConvertDictToCamelCase:
         data = {
             "fund_code": "000001",
             "holdings": [
-                {
-                    "stock_code": "600000",
-                    "stock_name": "浦发银行",
-                    "position_ratio": 5.23
-                },
-                {
-                    "stock_code": "000001",
-                    "stock_name": "平安银行",
-                    "position_ratio": 3.45
-                }
+                {"stock_code": "600000", "stock_name": "浦发银行", "position_ratio": 5.23},
+                {"stock_code": "000001", "stock_name": "平安银行", "position_ratio": 3.45},
             ],
-            "performance": {
-                "one_month": 2.3,
-                "three_month": 5.6,
-                "one_year": 12.5
-            }
+            "performance": {"one_month": 2.3, "three_month": 5.6, "one_year": 12.5},
         }
         result = _convert_dict_to_camel_case(data)
         assert result == {
             "fundCode": "000001",
             "holdings": [
-                {
-                    "stockCode": "600000",
-                    "stockName": "浦发银行",
-                    "positionRatio": 5.23
-                },
-                {
-                    "stockCode": "000001",
-                    "stockName": "平安银行",
-                    "positionRatio": 3.45
-                }
+                {"stockCode": "600000", "stockName": "浦发银行", "positionRatio": 5.23},
+                {"stockCode": "000001", "stockName": "平安银行", "positionRatio": 3.45},
             ],
-            "performance": {
-                "oneMonth": 2.3,
-                "threeMonth": 5.6,
-                "oneYear": 12.5
-            }
+            "performance": {"oneMonth": 2.3, "threeMonth": 5.6, "oneYear": 12.5},
         }
 
 
@@ -706,9 +664,7 @@ class TestRealtimePusherPushLoops:
             error="Network error",
             source="test",
         )
-        mock_data_manager.fetch_batch = AsyncMock(
-            return_value=[success_result, fail_result]
-        )
+        mock_data_manager.fetch_batch = AsyncMock(return_value=[success_result, fail_result])
 
         pusher = RealtimePusher(
             data_source_manager=mock_data_manager,
@@ -733,9 +689,7 @@ class TestRealtimePusherPushLoops:
     async def test_push_commodities_loop_success(self, mock_dependencies):
         """测试商品推送循环 - 成功推送"""
         mock_data_manager, mock_ws_manager = mock_dependencies
-        mock_ws_manager.get_subscriptions_info = MagicMock(
-            return_value={"commodities": 1}
-        )
+        mock_ws_manager.get_subscriptions_info = MagicMock(return_value={"commodities": 1})
 
         mock_result = DataSourceResult(
             success=True,
@@ -763,9 +717,7 @@ class TestRealtimePusherPushLoops:
     async def test_push_commodities_loop_no_changes(self, mock_dependencies):
         """测试商品推送循环 - 数据无变化"""
         mock_data_manager, mock_ws_manager = mock_dependencies
-        mock_ws_manager.get_subscriptions_info = MagicMock(
-            return_value={"commodities": 1}
-        )
+        mock_ws_manager.get_subscriptions_info = MagicMock(return_value={"commodities": 1})
 
         mock_result = DataSourceResult(
             success=True,
@@ -823,12 +775,8 @@ class TestRealtimePusherPushLoops:
     async def test_push_loop_exception_handling(self, mock_dependencies):
         """测试推送循环异常处理"""
         mock_data_manager, mock_ws_manager = mock_dependencies
-        mock_ws_manager.get_subscriptions_info = MagicMock(
-            return_value={"funds": 1}
-        )
-        mock_data_manager.fetch_batch = AsyncMock(
-            side_effect=Exception("Network error")
-        )
+        mock_ws_manager.get_subscriptions_info = MagicMock(return_value={"funds": 1})
+        mock_data_manager.fetch_batch = AsyncMock(side_effect=Exception("Network error"))
 
         pusher = RealtimePusher(
             data_source_manager=mock_data_manager,

@@ -45,7 +45,10 @@ class WatchlistData(TypedDict):
     response_model=WatchlistResponse,
     summary="获取自选基金列表",
     description="获取当前用户的自选基金列表",
-    responses={200: {"description": "获取成功"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "获取成功"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_watchlist(
     config_manager: ConfigManager = Depends(ConfigManagerDependency()),

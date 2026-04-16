@@ -2,7 +2,6 @@
 大宗商品配置测试
 """
 
-
 import pytest
 
 from src.config.commodities_config import (
@@ -111,7 +110,7 @@ class TestCommoditiesConfigInstance:
         """测试按分类获取"""
         config.add_watched_commodity("GC=F", "黄金")
         config.add_watched_commodity("CL=F", "原油")
-        
+
         precious = config.get_watched_by_category("precious_metal")
         assert len(precious) == 1
         assert precious[0]["symbol"] == "GC=F"

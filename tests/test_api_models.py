@@ -4,7 +4,6 @@
 测试 API 数据模型
 """
 
-
 from api.models import (
     CommodityListResponse,
     CommodityResponse,
@@ -32,7 +31,7 @@ class TestFundResponse:
             estimated_net_value=1.52,
             estimated_growth_rate=2.7,
             estimate_time="2024-01-15 15:00",
-            source="sina"
+            source="sina",
         )
 
         assert fund.code == "000001"
@@ -43,11 +42,7 @@ class TestFundResponse:
 
     def test_fund_response_aliases(self):
         """测试字段别名"""
-        fund = FundResponse(
-            fund_code="000001",
-            name="测试基金",
-            unit_net_value=1.0
-        )
+        fund = FundResponse(fund_code="000001", name="测试基金", unit_net_value=1.0)
 
         # 测试别名可以工作
         assert fund.code == "000001"
@@ -55,10 +50,7 @@ class TestFundResponse:
 
     def test_fund_response_optional_fields(self):
         """测试可选字段"""
-        fund = FundResponse(
-            fund_code="000001",
-            name="测试基金"
-        )
+        fund = FundResponse(fund_code="000001", name="测试基金")
 
         assert fund.type is None
         assert fund.netValue is None
@@ -71,9 +63,7 @@ class TestFundListResponse:
     def test_fund_list_response(self):
         """测试基金列表响应"""
         response = FundListResponse(
-            funds=[{"code": "000001"}, {"code": "000002"}],
-            total=2,
-            timestamp="2024-01-15T15:00:00"
+            funds=[{"code": "000001"}, {"code": "000002"}], total=2, timestamp="2024-01-15T15:00:00"
         )
 
         assert len(response.funds) == 2
@@ -85,10 +75,7 @@ class TestFundDetailResponse:
 
     def test_fund_detail_response(self):
         """测试基金详情响应"""
-        fund = FundDetailResponse(
-            fund_code="000001",
-            name="华夏成长混合"
-        )
+        fund = FundDetailResponse(fund_code="000001", name="华夏成长混合")
 
         assert fund.code == "000001"
         assert isinstance(fund, FundResponse)
@@ -100,10 +87,7 @@ class TestFundEstimateResponse:
     def test_fund_estimate_response(self):
         """测试基金估值响应"""
         fund = FundEstimateResponse(
-            fund_code="000001",
-            name="测试基金",
-            estimated_net_value=1.5,
-            estimated_growth_rate=2.5
+            fund_code="000001", name="测试基金", estimated_net_value=1.5, estimated_growth_rate=2.5
         )
 
         assert fund.code == "000001"
@@ -115,12 +99,7 @@ class TestCommodityResponse:
 
     def test_commodity_response_creation(self):
         """测试商品响应创建"""
-        commodity = CommodityResponse(
-            symbol="AU9999",
-            name="黄金",
-            price=450.0,
-            source="akshare"
-        )
+        commodity = CommodityResponse(symbol="AU9999", name="黄金", price=450.0, source="akshare")
 
         assert commodity.symbol == "AU9999"
         assert commodity.name == "黄金"
@@ -128,12 +107,7 @@ class TestCommodityResponse:
 
     def test_commodity_response_optional(self):
         """测试可选字段"""
-        commodity = CommodityResponse(
-            symbol="AG9999",
-            name="白银",
-            price=5.0,
-            source="akshare"
-        )
+        commodity = CommodityResponse(symbol="AG9999", name="白银", price=5.0, source="akshare")
 
         assert commodity.symbol == "AG9999"
         assert commodity.price == 5.0
@@ -147,7 +121,7 @@ class TestCommodityListResponse:
         """测试商品列表响应"""
         response = CommodityListResponse(
             commodities=[{"symbol": "AU9999"}, {"symbol": "AG9999"}],
-            timestamp="2024-01-15T15:00:00"
+            timestamp="2024-01-15T15:00:00",
         )
 
         assert len(response.commodities) == 2
@@ -159,10 +133,7 @@ class TestErrorResponse:
 
     def test_error_response_creation(self):
         """测试错误响应创建"""
-        error = ErrorResponse(
-            error="Something went wrong",
-            detail="Detailed error message"
-        )
+        error = ErrorResponse(error="Something went wrong", detail="Detailed error message")
 
         assert error.error == "Something went wrong"
         assert error.detail == "Detailed error message"

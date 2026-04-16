@@ -137,9 +137,7 @@ def rate_limit(calls_per_second: float = DEFAULT_RATE_LIMIT) -> Callable[[F], F]
             lock = threading.Lock()
 
             with lock:
-                elapsed = time.time() - getattr(
-                    sync_wrapper, "_last_call_time", 0
-                )
+                elapsed = time.time() - getattr(sync_wrapper, "_last_call_time", 0)
                 if elapsed < min_interval:
                     time.sleep(min_interval - elapsed)
                 sync_wrapper._last_call_time = time.time()  # type: ignore
@@ -190,10 +188,7 @@ async def retry_with_backoff(
             if attempt < max_retries:
                 # 指数退避: delay = base_delay * (2 ^ attempt)
                 delay = min(base_delay * (2**attempt), max_delay)
-                logger.warning(
-                    f"[Retry] 第 {attempt + 1} 次尝试失败: {e}, "
-                    f"{delay:.1f}s 后重试..."
-                )
+                logger.warning(f"[Retry] 第 {attempt + 1} 次尝试失败: {e}, {delay:.1f}s 后重试...")
                 await asyncio.sleep(delay)
             else:
                 logger.error(f"[Retry] 所有 {max_retries + 1} 次尝试均失败")

@@ -99,7 +99,10 @@ class AddWatchlistResponse(TypedDict):
     response_model=SearchResultResponse,
     summary="搜索商品",
     description="搜索可关注的大宗商品",
-    responses={200: {"description": "成功获取搜索结果"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取搜索结果"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def search_commodities_handler(
     q: str = Query(..., min_length=1, description="搜索关键词"),
@@ -124,7 +127,10 @@ async def search_commodities_handler(
     response_model=SearchResultResponse,
     summary="获取所有可用商品",
     description="获取所有可关注的大宗商品列表",
-    responses={200: {"description": "成功获取商品列表"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取商品列表"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_available_commodities() -> SearchResultResponse:
     """获取所有可关注的大宗商品列表"""
@@ -147,7 +153,10 @@ async def get_available_commodities() -> SearchResultResponse:
     response_model=WatchlistResponse,
     summary="获取关注列表",
     description="获取用户关注的大宗商品列表",
-    responses={200: {"description": "成功获取关注列表"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取关注列表"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_watchlist() -> WatchlistResponse:
     """获取关注的大宗商品列表"""
@@ -168,7 +177,11 @@ async def get_watchlist() -> WatchlistResponse:
     response_model=AddWatchlistResponse,
     summary="添加关注商品",
     description="将商品添加到关注列表",
-    responses={200: {"description": "成功添加"}, 400: {"model": ErrorResponse, "description": "请求参数错误"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功添加"},
+        400: {"model": ErrorResponse, "description": "请求参数错误"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def add_to_watchlist(
     request: WatchedCommodityAddRequest,
@@ -200,7 +213,11 @@ async def add_to_watchlist(
     response_model=AddWatchlistResponse,
     summary="移除关注商品",
     description="将商品从关注列表移除",
-    responses={200: {"description": "成功移除"}, 400: {"model": ErrorResponse, "description": "商品不在关注列表中"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功移除"},
+        400: {"model": ErrorResponse, "description": "商品不在关注列表中"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def remove_from_watchlist(
     symbol: str,
@@ -219,7 +236,11 @@ async def remove_from_watchlist(
     response_model=AddWatchlistResponse,
     summary="更新关注商品",
     description="更新关注商品的名称",
-    responses={200: {"description": "成功更新"}, 400: {"model": ErrorResponse, "description": "请求参数错误"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功更新"},
+        400: {"model": ErrorResponse, "description": "请求参数错误"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def update_watchlist_commodity(
     symbol: str,
@@ -244,7 +265,10 @@ async def update_watchlist_commodity(
     response_model=WatchlistResponse,
     summary="按分类获取关注",
     description="按分类获取关注的大宗商品列表",
-    responses={200: {"description": "成功获取关注列表"}, 500: {"model": ErrorResponse, "description": "服务器错误"}},
+    responses={
+        200: {"description": "成功获取关注列表"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
 )
 async def get_watchlist_by_category(
     category: str,

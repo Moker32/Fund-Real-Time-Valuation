@@ -144,8 +144,9 @@ class TestDataCache:
                 cache.set("test_key", {"data": "value"}, ttl_seconds=300)
 
         # 检查是否有警告日志记录
-        assert any("缓存写入失败" in record.message for record in caplog.records), \
+        assert any("缓存写入失败" in record.message for record in caplog.records), (
             "写入失败时应记录警告日志"
+        )
 
     def test_cache_delete_error_logged(self, cache, caplog):
         """测试缓存删除失败时记录警告日志"""
@@ -157,8 +158,9 @@ class TestDataCache:
                 cache.clear("nonexistent_key")
 
         # 验证删除失败时有警告日志
-        assert any("缓存删除失败" in record.message for record in caplog.records), \
+        assert any("缓存删除失败" in record.message for record in caplog.records), (
             "删除失败时应记录警告日志"
+        )
 
     def test_cache_clear_all_error_logged(self, cache, caplog):
         """测试批量清除失败时记录警告日志"""
@@ -170,8 +172,9 @@ class TestDataCache:
                 cache.clear()  # 清除所有缓存
 
         # 验证批量清除失败时有警告日志
-        assert any("批量清除缓存失败" in record.message for record in caplog.records), \
+        assert any("批量清除缓存失败" in record.message for record in caplog.records), (
             "批量清除失败时应记录警告日志"
+        )
 
     def test_cache_cleanup_error_logged(self, cache, caplog):
         """测试清理过期缓存失败时记录警告日志"""
@@ -186,5 +189,6 @@ class TestDataCache:
                 cache.cleanup_expired()
 
         # 验证清理失败时有警告日志（即使部分失败也应记录）
-        assert any("清理过期缓存失败" in record.message for record in caplog.records), \
+        assert any("清理过期缓存失败" in record.message for record in caplog.records), (
             "清理过期缓存失败时应记录警告日志"
+        )

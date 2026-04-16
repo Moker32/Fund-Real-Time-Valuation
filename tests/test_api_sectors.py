@@ -20,7 +20,7 @@ def mock_data_source():
     mock_manager.fetch = AsyncMock()
     mock_manager.fetch_batch = AsyncMock()
     mock_manager.fetch_with_source = AsyncMock()
-    
+
     # 设置全局 mock
     set_data_source_manager(mock_manager)
     yield mock_manager
@@ -58,9 +58,9 @@ class TestGetIndustrySectors:
             source="sector_industry_fund_flow",
         )
         mock_data_source.fetch_with_source.return_value = mock_result
-        
+
         response = client.get("/api/sectors/industry")
-        
+
         assert response.status_code == 200
 
     def test_get_industry_sectors_all_failed(self, client):
@@ -93,9 +93,9 @@ class TestGetConceptSectors:
             source="sector_concept_fund_flow",
         )
         mock_data_source.fetch_with_source.return_value = mock_result
-        
+
         response = client.get("/api/sectors/concept")
-        
+
         assert response.status_code == 200
 
     def test_get_concept_sectors_all_failed(self, client):
@@ -111,7 +111,7 @@ class TestGetIndustryDetail:
     def test_get_industry_detail_success(self, client):
         """测试获取行业板块详情成功 - 不使用 mock，直接测试真实 API"""
         response = client.get("/api/sectors/industry/半导体")
-        
+
         # 真实 API 可能成功或失败，接受 200 或 503
         assert response.status_code in [200, 503]
         if response.status_code == 200:
@@ -127,9 +127,9 @@ class TestGetIndustryDetail:
             source="sector_industry_detail_akshare",
         )
         mock_data_source.fetch_with_source.return_value = mock_result
-        
+
         response = client.get("/api/sectors/industry/不存在的板块")
-        
+
         assert response.status_code == 503
 
 
@@ -139,7 +139,7 @@ class TestGetConceptDetail:
     def test_get_concept_detail_success(self, client):
         """测试获取概念板块详情成功 - 不使用 mock，直接测试真实 API"""
         response = client.get("/api/sectors/concept/人工智能")
-        
+
         # 真实 API 可能成功或失败，接受 200 或 503
         assert response.status_code in [200, 503]
         if response.status_code == 200:
@@ -153,19 +153,19 @@ class TestGetFundFlow:
     def test_get_fund_flow_invalid_flow_type(self, client):
         """测试无效的资金流向类型"""
         response = client.get("/api/sectors/fund-flow/invalid")
-        
+
         assert response.status_code == 400
 
     def test_get_fund_flow_invalid_symbol(self, client):
         """测试无效的时间周期参数"""
         response = client.get("/api/sectors/fund-flow/industry?symbol=invalid")
-        
+
         assert response.status_code == 400
 
     def test_get_fund_flow_industry_success(self, client):
         """测试获取行业资金流向成功 - 不使用 mock，直接测试真实 API"""
         response = client.get("/api/sectors/fund-flow/industry")
-        
+
         # 真实 API 可能成功或失败，接受 200 或 503
         assert response.status_code in [200, 503]
 
@@ -178,7 +178,7 @@ class TestGetFundFlow:
             source="fund_flow_ths_akshare",
         )
         mock_data_source.fetch_with_source.return_value = failed_result
-        
+
         response = client.get("/api/sectors/fund-flow/industry")
-        
+
         assert response.status_code == 503

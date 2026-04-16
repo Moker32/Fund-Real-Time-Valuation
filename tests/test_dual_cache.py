@@ -50,7 +50,7 @@ class TestMemoryCache:
         await small_cache.set("key2", "value2")
         # 这应该淘汰 key1
         await small_cache.set("key3", "value3")
-        
+
         # key1 应该被淘汰
         result = await small_cache.get("key1")
         assert result is None
@@ -96,10 +96,10 @@ class TestDualLayerCache:
         # 验证内存缓存有数据
         result, cache_type = await cache.get("key1")
         assert result == "value1"
-        
+
         # 等待内存缓存过期
         await asyncio.sleep(1.1)
-        
+
         # 内存缓存应该过期，但文件缓存还有
         result, cache_type = await cache.get("key1")
         assert result == "value1"

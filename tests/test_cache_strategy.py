@@ -527,9 +527,7 @@ class TestFundCacheStrategy:
 
         # 并发发送多个请求
         tasks = [
-            asyncio.create_task(
-                cache_strategy.get_with_cache(fund_code, fetch_func)
-            )
+            asyncio.create_task(cache_strategy.get_with_cache(fund_code, fetch_func))
             for _ in range(5)
         ]
 
@@ -714,11 +712,13 @@ class TestFundSourceIntegration:
         assert metadata is None, "初始应无缓存"
 
         # 2. 首次获取：API 回源
-        fetch_func = MagicMock(return_value={
-            "name": "生命周期测试基金",
-            "type": "混合型",
-            "manager": "测试管理人",
-        })
+        fetch_func = MagicMock(
+            return_value={
+                "name": "生命周期测试基金",
+                "type": "混合型",
+                "manager": "测试管理人",
+            }
+        )
 
         result = await cache_strategy.get_with_cache(
             fund_code=fund_code,
@@ -749,10 +749,12 @@ class TestFundSourceIntegration:
         assert metadata.cache_status == "stale", "状态应为 stale"
 
         # 6. 强制刷新
-        new_fetch_func = MagicMock(return_value={
-            "name": "刷新后的基金名称",
-            "type": "股票型",
-        })
+        new_fetch_func = MagicMock(
+            return_value={
+                "name": "刷新后的基金名称",
+                "type": "股票型",
+            }
+        )
 
         result = await cache_strategy.force_refresh(
             fund_code=fund_code,

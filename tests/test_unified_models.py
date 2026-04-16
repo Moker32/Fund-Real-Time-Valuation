@@ -4,7 +4,6 @@
 测试统一数据模型
 """
 
-
 from src.datasources.base import DataSourceType
 from src.datasources.unified_models import (
     BatchDataRequest,
@@ -50,10 +49,7 @@ class TestDataRequest:
 
     def test_data_request_creation(self):
         """测试创建数据请求"""
-        request = DataRequest(
-            symbol="000001",
-            source_type=DataSourceType.FUND
-        )
+        request = DataRequest(symbol="000001", source_type=DataSourceType.FUND)
 
         assert request.symbol == "000001"
         assert request.source_type == DataSourceType.FUND
@@ -64,9 +60,7 @@ class TestDataRequest:
     def test_data_request_with_priority(self):
         """测试指定优先级"""
         request = DataRequest(
-            symbol="000001",
-            source_type=DataSourceType.FUND,
-            priority=RequestPriority.HIGH
+            symbol="000001", source_type=DataSourceType.FUND, priority=RequestPriority.HIGH
         )
 
         assert request.priority == RequestPriority.HIGH
@@ -78,10 +72,7 @@ class TestDataResponse:
     def test_data_response_success(self):
         """测试成功响应"""
         response = DataResponse(
-            request_id="test-123",
-            success=True,
-            data={"key": "value"},
-            source="test_source"
+            request_id="test-123", success=True, data={"key": "value"}, source="test_source"
         )
 
         assert response.success is True
@@ -90,11 +81,7 @@ class TestDataResponse:
 
     def test_data_response_failure(self):
         """测试失败响应"""
-        response = DataResponse(
-            request_id="test-123",
-            success=False,
-            error="Error message"
-        )
+        response = DataResponse(request_id="test-123", success=False, error="Error message")
 
         assert response.success is False
         assert response.error == "Error message"
@@ -102,11 +89,8 @@ class TestDataResponse:
     def test_data_response_status_auto_update(self):
         """测试状态自动更新"""
         # 失败时状态应自动更新为 FAILED
-        response = DataResponse(
-            request_id="test-123",
-            success=False
-        )
-        
+        response = DataResponse(request_id="test-123", success=False)
+
         assert response.status == ResponseStatus.FAILED
 
 
@@ -119,9 +103,9 @@ class TestBatchDataRequest:
             DataRequest(symbol="000001", source_type=DataSourceType.FUND),
             DataRequest(symbol="000002", source_type=DataSourceType.FUND),
         ]
-        
+
         batch = BatchDataRequest(requests=requests)
-        
+
         assert len(batch.requests) == 2
 
 
@@ -137,8 +121,8 @@ class TestBatchDataResponse:
             success_count=2,
             failed_count=0,
             total_latency_ms=100.0,
-            responses=[]
+            responses=[],
         )
-        
+
         assert response.total_count == 2
         assert response.success_count == 2

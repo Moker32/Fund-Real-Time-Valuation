@@ -12,6 +12,7 @@ from typing import NamedTuple
 
 class MarketType(str, Enum):
     """市场类型"""
+
     SGE = "sge"  # 上海黄金交易所
     COMEX = "comex"  # 纽约商品交易所
     NYMEX = "nymex"  # 纽约商业交易所
@@ -31,6 +32,7 @@ class MarketType(str, Enum):
 
 class TradingSession(NamedTuple):
     """交易时段"""
+
     start: time
     end: time
     name: str
@@ -40,6 +42,7 @@ class TradingSession(NamedTuple):
 @dataclass
 class TradingHoursConfig:
     """交易时间配置"""
+
     market: MarketType
     name: str
     timezone: str  # IANA 时区名称
@@ -65,6 +68,7 @@ class TradingHoursConfig:
 
         # 构建今天的日期时间
         from datetime import datetime
+
         today = datetime.now().date()
 
         # 转换开始时间
@@ -82,7 +86,7 @@ class TradingHoursConfig:
             start=start_shanghai.time(),
             end=end_shanghai.time(),
             name=session.name,
-            overnight=overnight
+            overnight=overnight,
         )
 
 
@@ -389,9 +393,7 @@ def get_commodity_market(symbol: str) -> MarketType:
 
 
 def is_trading_hours(
-    market: MarketType | str,
-    check_time: time | None = None,
-    check_weekday: int | None = None
+    market: MarketType | str, check_time: time | None = None, check_weekday: int | None = None
 ) -> bool:
     """
     检查指定市场是否处于交易时间
