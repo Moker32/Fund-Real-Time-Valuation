@@ -410,7 +410,6 @@ const hasLunchBreak = (data: { time: string }[]): boolean => {
   const { start, end } = getLunchBreakConfig();
   let hasMorning = false;
   let hasAfternoon = false;
-  let hasLunchGap = true;
 
   for (const item of data) {
     const m = item.time.match(/^(\d{1,2}):(\d{2})$/);
@@ -418,9 +417,24 @@ const hasLunchBreak = (data: { time: string }[]): boolean => {
     const minutes = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
     if (minutes <= start) hasMorning = true;
     if (minutes >= end) hasAfternoon = true;
-    if (minutes > start && minutes < end) hasLunchGap = false;
   }
-  return hasMorning && hasAfternoon && hasLunchGap;
+
+  // 如果上午和下午都有数据，检查午休期间是否有数据点
+  // 只有当午休期间完全没有数据点时，才认为存在午休间隙
+  if (hasMorning && hasAfternoon) {
+    for (const item of data) {
+      const m = item.time.match(/^(\d{1,2}):(\d{2})$/);
+      if (!m || !m[1] || !m[2]) continue;
+      const minutes = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+      // 检查是否有数据点在午休时间段内（不包括边界）
+      if (minutes > start && minutes < end) {
+        return false; // 午休期间有数据，不是真正的午休
+      }
+    }
+    return true; // 午休期间没有数据，存在午休间隙
+  }
+
+  return false;
 };
 
 const timeToMinutes = (timeStr: string): number => {
@@ -441,6 +455,7 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
   const reals: number[] = [];
 
   let lunchIdx = -1;
+  let prevDisplayTs: number | null = null;
 
   for (const item of sortedData) {
     const minutes = timeToMinutes(item.time);
@@ -464,9 +479,17 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
       lunchIdx = displayTimestamps.length;
     }
 
+    // 如果当前时间戳与上一个时间戳相同（压缩后重叠），插入 null 断开连接
+    if (prevDisplayTs !== null && displayTs <= prevDisplayTs) {
+      displayTimestamps.push(prevDisplayTs + 1); // 微小偏移
+      values.push(null);
+      reals.push(0);
+    }
+
     displayTimestamps.push(displayTs);
     values.push(price);
     reals.push(realTs);
+    prevDisplayTs = displayTs;
   }
 
   if (lunchIdx > 0) {
