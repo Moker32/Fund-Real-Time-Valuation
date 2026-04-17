@@ -6,7 +6,7 @@ interface Props {
   showDetails?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   fallbackMessage: '组件加载失败',
   showDetails: false,
 })

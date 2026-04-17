@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed, type Ref } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 
