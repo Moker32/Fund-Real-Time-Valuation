@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed, type Ref } from 'vue';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 
@@ -46,21 +46,21 @@ const props = withDefaults(defineProps<{
 });
 
 const chartContainer = ref<HTMLElement | null>(null);
-let uplotInstance: uPlot | null = null;
+const uplotInstance = ref<uPlot | null>(null);
 
 const color = computed(() => getTrendColor());
 
 const hasData = computed(() => {
-  if (!uplotInstance && (!props.data || props.data.length === 0)) return false;
+  if (!uplotInstance.value && (!props.data || props.data.length === 0)) return false;
   return true;
 });
 
-let lastDataJson = '';
-let processedTimestamps: number[] = [];
-let processedValues: (number | null)[] = [];
-let realTimestamps: number[] = [];
-let rawDataItems: ChartDataItem[] = [];
-let lunchBreakX: number | null = null;
+const lastDataJson = ref('');
+const processedTimestamps = ref<number[]>([]);
+const processedValues = ref<(number | null)[]>([]);
+const realTimestamps = ref<number[]>([]);
+const rawDataItems = ref<ChartDataItem[]>([]);
+const lunchBreakX = ref<number | null>(null);
 
 const getTrendColor = (): string => {
   if (props.trend === 'rising') return '#ef4444';
@@ -157,10 +157,10 @@ const getYScaleRange = (data: [number[], (number | null)[]] | null, baseline: nu
 };
 
 const formatXAxisLabel = (timestamp: number): string => {
-  if (isIntradayData(props.data) && realTimestamps.length > 0) {
-    const idx = processedTimestamps.indexOf(timestamp);
-    if (idx >= 0 && realTimestamps[idx]) {
-      const date = new Date(realTimestamps[idx] * 1000);
+  if (isIntradayData(props.data) && realTimestamps.value.length > 0) {
+    const idx = processedTimestamps.value.indexOf(timestamp);
+    if (idx >= 0 && realTimestamps.value[idx]) {
+      const date = new Date(realTimestamps.value[idx] * 1000);
       const h = date.getHours();
       const m = date.getMinutes();
       return `${h}:${m.toString().padStart(2, '0')}`;
@@ -182,24 +182,24 @@ const tooltipValue = ref('');
 
 const onCursorMove = (u: uPlot) => {
   const idx = u.cursor.idx;
-  if (idx == null || idx < 0 || !rawDataItems.length) {
+  if (idx == null || idx < 0 || !rawDataItems.value.length) {
     isTooltipVisible.value = false;
     return;
   }
 
-  const rawItem = rawDataItems[idx];
+  const rawItem = rawDataItems.value[idx];
   if (!rawItem) {
     isTooltipVisible.value = false;
     return;
   }
 
-  const val = processedValues[idx];
+  const val = processedValues.value[idx];
   if (val == null) {
     isTooltipVisible.value = false;
     return;
   }
 
-  const ts = realTimestamps.length > 0 ? realTimestamps[idx] : processedTimestamps[idx];
+  const ts = realTimestamps.value.length > 0 ? realTimestamps.value[idx] : processedTimestamps.value[idx];
   const date = new Date(ts * 1000);
 
   if (isIntradayData(props.data)) {
@@ -210,7 +210,7 @@ const onCursorMove = (u: uPlot) => {
 
   tooltipValue.value = val.toFixed(4);
 
-  const xPos = u.valToPos(processedTimestamps[idx], 'x', true);
+  const xPos = u.valToPos(processedTimestamps.value[idx], 'x', true);
   const yPos = u.valToPos(val, 'y', true);
   const containerWidth = chartContainer.value?.clientWidth ?? 300;
 
@@ -228,13 +228,13 @@ const onCursorMove = (u: uPlot) => {
 
 const initChart = () => {
   if (!chartContainer.value) return;
-  if (uplotInstance) return;
+  if (uplotInstance.value) return;
 
   chartContainer.value.innerHTML = '';
   const xRange = getIntradayXRange(props.data);
 
   try {
-    uplotInstance = new uPlot({
+    uplotInstance.value = new uPlot({
       width: chartContainer.value.clientWidth || 300,
       height: props.height,
       legend: { show: false },
@@ -311,8 +311,8 @@ const initChart = () => {
             const ctx = u.ctx;
             ctx.save();
 
-            if (lunchBreakX !== null) {
-              const xPos = u.valToPos(lunchBreakX, 'x', true);
+            if (lunchBreakX.value !== null) {
+              const xPos = u.valToPos(lunchBreakX.value, 'x', true);
               if (xPos > u.bbox.left + 2 && xPos < u.bbox.left + u.bbox.width - 2) {
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
                 ctx.lineWidth = 1;
@@ -353,7 +353,7 @@ const initChart = () => {
 };
 
 const updateData = () => {
-  if (!uplotInstance) return;
+  if (!uplotInstance.value) return;
   if (!props.data || props.data.length === 0) return;
 
   const validData = props.data.filter((item): item is { time: string; price: number; close?: number | null } => {
@@ -365,10 +365,10 @@ const updateData = () => {
   if (validData.length === 0) return;
 
   const currentDataJson = JSON.stringify(validData.map(d => d.time + (d.close ?? d.price)));
-  if (currentDataJson === lastDataJson) return;
-  lastDataJson = currentDataJson;
+  if (currentDataJson === lastDataJson.value) return;
+  lastDataJson.value = currentDataJson;
 
-  rawDataItems = [...validData];
+  rawDataItems.value = [...validData];
 
   const sortedData = [...validData].sort((a, b) => {
     const tsA = parseTimeToTimestamp(a.time);
@@ -384,10 +384,10 @@ const updateData = () => {
     buildRegularData(sortedData);
   }
 
-  const newData: [number[], (number | null)[]] = [processedTimestamps, processedValues];
+  const newData: [number[], (number | null)[]] = [processedTimestamps.value, processedValues.value];
 
   try {
-    uplotInstance.setData(newData);
+    uplotInstance.value.setData(newData);
     updateYScaleRange(newData);
   } catch (e) {
     console.warn('[FundChart] setData error:', e);
@@ -484,12 +484,12 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
   }
 
   if (lunchIdx > 0) {
-    lunchBreakX = minutesToTimestamp(start, baseDate);
+    lunchBreakX.value = minutesToTimestamp(start, baseDate);
   }
 
-  processedTimestamps = displayTimestamps;
-  processedValues = values;
-  realTimestamps = reals;
+  processedTimestamps.value = displayTimestamps;
+  processedValues.value = values;
+  realTimestamps.value = reals;
 };
 
 const buildRegularData = (sortedData: { time: string; price?: number; close?: number | null }[]) => {
@@ -527,56 +527,56 @@ const buildRegularData = (sortedData: { time: string; price?: number; close?: nu
     reals.push(0);
   }
 
-  processedTimestamps = timestamps;
-  processedValues = values;
-  realTimestamps = reals;
+  processedTimestamps.value = timestamps;
+  processedValues.value = values;
+  realTimestamps.value = reals;
 };
 
 const updateYScaleRange = (data: [number[], (number | null)[]]) => {
-  if (!uplotInstance) return;
+  if (!uplotInstance.value) return;
 
   const range = getYScaleRange(data, props.baseline);
   if (!range) return;
 
   try {
-    uplotInstance.setScale('y', range);
+    uplotInstance.value.setScale('y', range);
   } catch (e) {
     console.warn('[FundChart] setScale error:', e);
   }
 };
 
 const updateColor = () => {
-  if (!uplotInstance) return;
+  if (!uplotInstance.value) return;
 
   const newColor = getTrendColor();
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    uplotInstance.setSeries(1, { stroke: newColor } as any);
-    (uplotInstance as uPlotWithBaseline)._baselineColor = newColor;
-    uplotInstance.redraw();
+    uplotInstance.value.setSeries(1, { stroke: newColor } as any);
+    (uplotInstance.value as uPlotWithBaseline)._baselineColor = newColor;
+    uplotInstance.value.redraw();
   } catch (e) {
     console.warn('[FundChart] updateColor error:', e);
   }
 };
 
-let lastDataType: 'history' | 'intraday' | null = null;
+const lastDataType = ref<'history' | 'intraday' | null>(null);
 
 watch(() => props.data, (newData) => {
-  if (!uplotInstance && chartContainer.value && newData && newData.length > 0) {
+  if (!uplotInstance.value && chartContainer.value && newData && newData.length > 0) {
     initChart();
-    lastDataType = isIntradayData(newData) ? 'intraday' : 'history';
+    lastDataType.value = isIntradayData(newData) ? 'intraday' : 'history';
   }
 
-  if (!uplotInstance) return;
+  if (!uplotInstance.value) return;
   if (!newData || newData.length === 0) return;
 
   const currentDataType = isIntradayData(newData) ? 'intraday' : 'history';
-  if (lastDataType !== null && lastDataType !== currentDataType) {
-    uplotInstance.destroy();
-    uplotInstance = null;
-    lastDataType = null;
+  if (lastDataType.value !== null && lastDataType.value !== currentDataType) {
+    uplotInstance.value.destroy();
+    uplotInstance.value = null;
+    lastDataType.value = null;
     initChart();
-    lastDataType = currentDataType;
+    lastDataType.value = currentDataType;
   }
 
   updateColor();
@@ -584,18 +584,18 @@ watch(() => props.data, (newData) => {
 }, { deep: true, flush: 'post' });
 
 watch(() => props.trend, () => {
-  if (uplotInstance) {
+  if (uplotInstance.value) {
     updateColor();
   }
 });
 
 watch(() => props.baseline, () => {
-  if (uplotInstance) {
-    const data = uplotInstance.data;
+  if (uplotInstance.value) {
+    const data = uplotInstance.value.data;
     if (data && data[0].length > 0) {
       updateYScaleRange(data as [number[], (number | null)[]]);
     }
-    uplotInstance.redraw();
+    uplotInstance.value.redraw();
   }
 });
 
@@ -610,15 +610,15 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
-  if (uplotInstance) {
-    uplotInstance.destroy();
-    uplotInstance = null;
+  if (uplotInstance.value) {
+    uplotInstance.value.destroy();
+    uplotInstance.value = null;
   }
 });
 
 const handleResize = () => {
-  if (uplotInstance && chartContainer.value) {
-    uplotInstance.setSize({
+  if (uplotInstance.value && chartContainer.value) {
+    uplotInstance.value.setSize({
       width: chartContainer.value.clientWidth,
       height: props.height,
     });

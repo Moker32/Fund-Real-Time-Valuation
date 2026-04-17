@@ -28,9 +28,9 @@ from src.datasources.fund.cache_strategy import (
     FundCacheStrategy,
 )
 from src.db.database import DatabaseManager
-from src.db.models import CacheMetadata
 from src.db.fund import FundBasicInfoDAO
 from src.db.fund.cache_metadata_dao import CacheMetadataDAO
+from src.db.models import CacheMetadata
 
 # ==================== Fixtures ====================
 
