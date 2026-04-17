@@ -17,12 +17,24 @@ from .dependencies_impl import (
     CloseDataSourceManager,
     ConfigManagerDependency,
     ConfigManagerDependencyCallable,
+    DatabaseDependency,
     DataSourceDependency,
+    IndexHistoryDependency,
+    IndexIntradayDependency,
     RequestIdDependency,
+    TradingCalendarDependency,
     close_data_source_manager,
     get_data_source_manager,
+    get_database_source,
+    get_index_history_source,
+    get_index_intraday_source,
     get_request_id,
+    get_trading_calendar_source,
     set_data_source_manager,
+    set_database_source,
+    set_index_history_source,
+    set_index_intraday_source,
+    set_trading_calendar_source,
 )
 
 # 重新导出配置管理器函数
@@ -42,4 +54,18 @@ __all__ = [
     "ConfigManagerDependencyCallable",
     "RequestIdDependency",
     "get_request_id",
+    "TradingCalendarDependency",
+    "IndexHistoryDependency",
+    "IndexIntradayDependency",
+    "DatabaseDependency",
+    # Getter functions
+    "get_trading_calendar_source",
+    "get_index_history_source",
+    "get_index_intraday_source",
+    "get_database_source",
+    # Setter functions for testing
+    "set_trading_calendar_source",
+    "set_index_history_source",
+    "set_index_intraday_source",
+    "set_database_source",
 ]

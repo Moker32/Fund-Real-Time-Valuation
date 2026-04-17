@@ -395,19 +395,12 @@ async def get_index(
 # 支持的历史周期参数
 INDEX_HISTORY_PERIODS = ["1d", "5d", "1w", "1mo", "3mo", "6mo", "1y", "2y", "5y", "max"]
 
-# 历史数据源单例（缓存）
-_index_history_source: "HybridIndexSource | None" = None
-
-
+# 历史数据源实例（通过依赖注入获取）
 def _get_index_history_source() -> "HybridIndexSource":
-    """获取指数历史数据源实例（缓存）"""
-    global _index_history_source
-    if _index_history_source is None:
-        # 延迟导入避免循环依赖
-        from src.datasources.index_source import HybridIndexSource
+    """获取指数历史数据源实例（通过依赖注入）"""
+    from ..dependencies import get_index_history_source as get_source
 
-        _index_history_source = HybridIndexSource()
-    return _index_history_source
+    return get_source()
 
 
 @lru_cache
@@ -460,19 +453,12 @@ async def get_index_history(
     return result.data
 
 
-# 指数日内分时数据源单例（缓存）
-_index_intraday_source: "HybridIndexSource | None" = None
-
-
+# 指数日内分时数据源实例（通过依赖注入获取）
 def _get_index_intraday_source() -> "HybridIndexSource":
-    """获取指数日内分时数据源实例（缓存）"""
-    global _index_intraday_source
-    if _index_intraday_source is None:
-        # 延迟导入避免循环依赖
-        from src.datasources.index_source import HybridIndexSource
+    """获取指数日内分时数据源实例（通过依赖注入）"""
+    from ..dependencies import get_index_intraday_source as get_source
 
-        _index_intraday_source = HybridIndexSource()
-    return _index_intraday_source
+    return get_source()
 
 
 @router.get(

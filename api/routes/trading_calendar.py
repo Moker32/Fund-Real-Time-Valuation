@@ -30,14 +30,11 @@ class MarketStatusResponse(BaseModel):
     is_within_session: bool
 
 
-_calendar_source: TradingCalendarSource | None = None
-
-
 def get_calendar_source() -> TradingCalendarSource:
-    global _calendar_source
-    if _calendar_source is None:
-        _calendar_source = TradingCalendarSource()
-    return _calendar_source
+    """获取交易日历源实例（通过依赖注入）"""
+    from ..dependencies import get_trading_calendar_source as get_calendar
+
+    return get_calendar()
 
 
 @router.get(

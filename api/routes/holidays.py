@@ -15,14 +15,11 @@ class HolidayResponse(BaseModel):
     holiday_name: str | None = None
 
 
-_db: DatabaseManager | None = None
-
-
 def get_db() -> DatabaseManager:
-    global _db
-    if _db is None:
-        _db = DatabaseManager()
-    return _db
+    """获取数据库管理器实例（通过依赖注入）"""
+    from ..dependencies import get_database_source as get_db_source
+
+    return get_db_source()
 
 
 @router.get("", response_model=list[HolidayResponse], summary="获取节假日列表")

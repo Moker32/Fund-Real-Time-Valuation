@@ -5,13 +5,18 @@
 
 import uuid
 from contextvars import ContextVar
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 from fastapi import Depends, Header
 
 from src.config import get_config_manager as get_config_manager_func
 from src.config.manager import ConfigManager
 from src.datasources.manager import DataSourceManager, create_default_manager
+
+if TYPE_CHECKING:
+    from src.datasources.index_source import HybridIndexSource
+    from src.datasources.trading_calendar_source import TradingCalendarSource
+    from src.db.database import DatabaseManager
 
 # 全局数据源管理器实例
 _data_source_manager: DataSourceManager | None = None
@@ -127,3 +132,191 @@ class RequestIdDependency:
 
 # 预定义类型别名，方便使用
 RequestId = Annotated[str, Depends(RequestIdDependency())]
+
+
+# ==================== 交易日历数据源依赖 ====================
+
+
+_trading_calendar_source: "TradingCalendarSource | None" = None
+
+
+def get_trading_calendar_source() -> "TradingCalendarSource":
+    """
+    获取交易日历数据源实例（单例）
+
+    Returns:
+        TradingCalendarSource: 交易日历数据源实例
+    """
+    global _trading_calendar_source
+    if _trading_calendar_source is None:
+        from src.datasources.trading_calendar_source import TradingCalendarSource
+
+        _trading_calendar_source = TradingCalendarSource()
+    return _trading_calendar_source
+
+
+def set_trading_calendar_source(source: "TradingCalendarSource") -> None:
+    """
+    设置交易日历数据源实例（用于测试）
+
+    Args:
+        source: 交易日历数据源实例
+    """
+    global _trading_calendar_source
+    _trading_calendar_source = source
+
+
+class TradingCalendarDependency:
+    """
+    FastAPI 依赖类：获取交易日历数据源
+
+    Usage:
+        @app.get("/items")
+        async def read_items(calendar: TradingCalendarSource = Depends(TradingCalendarDependency())):
+            ...
+    """
+
+    def __call__(self) -> "TradingCalendarSource":
+        """获取交易日历数据源实例"""
+        return get_trading_calendar_source()
+
+
+# ==================== 指数历史数据源依赖 ====================
+
+
+_index_history_source: "HybridIndexSource | None" = None
+
+
+def get_index_history_source() -> "HybridIndexSource":
+    """
+    获取指数历史数据源实例（单例）
+
+    Returns:
+        HybridIndexSource: 指数历史数据源实例
+    """
+    global _index_history_source
+    if _index_history_source is None:
+        from src.datasources.index_source import HybridIndexSource
+
+        _index_history_source = HybridIndexSource()
+    return _index_history_source
+
+
+def set_index_history_source(source: "HybridIndexSource") -> None:
+    """
+    设置指数历史数据源实例（用于测试）
+
+    Args:
+        source: 指数历史数据源实例
+    """
+    global _index_history_source
+    _index_history_source = source
+
+
+class IndexHistoryDependency:
+    """
+    FastAPI 依赖类：获取指数历史数据源
+
+    Usage:
+        @app.get("/indices/history")
+        async def get_history(source: HybridIndexSource = Depends(IndexHistoryDependency())):
+            ...
+    """
+
+    def __call__(self) -> "HybridIndexSource":
+        """获取指数历史数据源实例"""
+        return get_index_history_source()
+
+
+# ==================== 指数分时数据源依赖 ====================
+
+
+_index_intraday_source: "HybridIndexSource | None" = None
+
+
+def get_index_intraday_source() -> "HybridIndexSource":
+    """
+    获取指数分时数据源实例（单例）
+
+    Returns:
+        HybridIndexSource: 指数分时数据源实例
+    """
+    global _index_intraday_source
+    if _index_intraday_source is None:
+        from src.datasources.index_source import HybridIndexSource
+
+        _index_intraday_source = HybridIndexSource()
+    return _index_intraday_source
+
+
+def set_index_intraday_source(source: "HybridIndexSource") -> None:
+    """
+    设置指数分时数据源实例（用于测试）
+
+    Args:
+        source: 指数分时数据源实例
+    """
+    global _index_intraday_source
+    _index_intraday_source = source
+
+
+class IndexIntradayDependency:
+    """
+    FastAPI 依赖类：获取指数分时数据源
+
+    Usage:
+        @app.get("/indices/intraday")
+        async def get_intraday(source: HybridIndexSource = Depends(IndexIntradayDependency())):
+            ...
+    """
+
+    def __call__(self) -> "HybridIndexSource":
+        """获取指数分时数据源实例"""
+        return get_index_intraday_source()
+
+
+# ==================== 数据库管理器依赖 ====================
+
+
+_db_source: "DatabaseManager | None" = None
+
+
+def get_database_source() -> "DatabaseManager":
+    """
+    获取数据库管理器实例（单例）
+
+    Returns:
+        DatabaseManager: 数据库管理器实例
+    """
+    global _db_source
+    if _db_source is None:
+        from src.db.database import DatabaseManager
+
+        _db_source = DatabaseManager()
+    return _db_source
+
+
+def set_database_source(source: "DatabaseManager") -> None:
+    """
+    设置数据库管理器实例（用于测试）
+
+    Args:
+        source: 数据库管理器实例
+    """
+    global _db_source
+    _db_source = source
+
+
+class DatabaseDependency:
+    """
+    FastAPI 依赖类：获取数据库管理器
+
+    Usage:
+        @app.get("/holidays")
+        async def get_holidays(db: DatabaseManager = Depends(DatabaseDependency())):
+            ...
+    """
+
+    def __call__(self) -> "DatabaseManager":
+        """获取数据库管理器实例"""
+        return get_database_source()

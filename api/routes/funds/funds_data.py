@@ -20,7 +20,10 @@ from src.datasources.trading_calendar_source import Market, TradingCalendarSourc
 if TYPE_CHECKING:
     from src.datasources.fund_source import FundHistorySource
 
-from ...dependencies import ConfigManagerDependency, DataSourceDependency
+from ...dependencies import (
+    ConfigManagerDependency,
+    DataSourceDependency,
+)
 from ...models import (
     ErrorResponse,
     FundDetailResponse,
@@ -47,15 +50,11 @@ logger = logging.getLogger(__name__)
 # ==================== 辅助函数 ====================
 
 
-_trading_calendar_source: TradingCalendarSource | None = None
-
-
 def _get_trading_calendar_source() -> TradingCalendarSource:
-    """获取交易日历源单例"""
-    global _trading_calendar_source
-    if _trading_calendar_source is None:
-        _trading_calendar_source = TradingCalendarSource()
-    return _trading_calendar_source
+    """获取交易日历源实例（通过依赖注入）"""
+    from ...dependencies import get_trading_calendar_source as get_calendar
+
+    return get_calendar()
 
 
 @lru_cache
