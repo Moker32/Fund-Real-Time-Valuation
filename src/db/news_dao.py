@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 """新闻缓存数据访问对象
@@ -14,6 +15,8 @@ from src.db.models import NewsRecord
 
 if TYPE_CHECKING:
     from src.db.database import DatabaseManager
+
+logger = logging.getLogger(__name__)
 
 
 class NewsDAO:
@@ -45,7 +48,8 @@ class NewsDAO:
                     (title, url, source, category, publish_time, content, fetched_at),
                 )
                 return True
-            except Exception:
+            except Exception as e:
+                logger.warning(f"添加新闻记录失败: {e}")
                 return False
 
     def get_news(self, category: str | None = None, limit: int = 50) -> list[NewsRecord]:

@@ -7,7 +7,10 @@
 """
 
 import csv
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 def _get_value(obj: dict | object, key: str, default: str = "") -> str:
@@ -72,5 +75,6 @@ def export_funds_to_csv(funds: list[dict | object], filepath: str | Path) -> boo
                 )
 
         return True
-    except Exception:
+    except Exception as e:
+        logger.warning(f"导出基金列表到CSV失败: {e}")
         return False

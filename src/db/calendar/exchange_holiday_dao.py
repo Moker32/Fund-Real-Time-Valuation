@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 """交易所节假日数据访问对象
@@ -14,6 +15,8 @@ from src.db.models import ExchangeHoliday
 
 if TYPE_CHECKING:
     from src.db.database import DatabaseManager
+
+logger = logging.getLogger(__name__)
 
 
 class ExchangeHolidayDAO:
@@ -36,7 +39,8 @@ class ExchangeHolidayDAO:
                     (market, holiday_date, holiday_name, now, now),
                 )
                 return True
-            except Exception:
+            except Exception as e:
+                logger.warning(f"添加节假日失败 market={market}: {e}")
                 cursor.execute(
                     """
                     UPDATE exchange_holidays
@@ -63,7 +67,8 @@ class ExchangeHolidayDAO:
                         (h.market, h.holiday_date, h.holiday_name, now, now),
                     )
                     count += 1
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"添加节假日失败 market={h.market}: {e}")
                     cursor.execute(
                         """
                         UPDATE exchange_holidays
@@ -105,7 +110,8 @@ class ExchangeHolidayDAO:
                     try:
                         if h.holiday_date.startswith(str(year)):
                             result.append(h)
-                    except Exception:
+                    except Exception as e:
+                        logger.warning(f"解析节假日日期失败: {e}")
                         pass
                 else:
                     result.append(h)

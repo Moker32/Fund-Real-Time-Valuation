@@ -4,10 +4,13 @@
 提供基金缓存状态的管理功能，支持缓存状态机实现。
 """
 
+import logging
 from datetime import datetime
 
 from src.db.database import DatabaseManager
 from src.db.models import CacheMetadata
+
+logger = logging.getLogger(__name__)
 
 
 class CacheMetadataDAO:
@@ -97,7 +100,8 @@ class CacheMetadataDAO:
                     (fund_code, status, now, expires_at.isoformat(), error, fund_code),
                 )
                 return True
-            except Exception:
+            except Exception as e:
+                logger.warning(f"设置缓存状态失败 fund_code={fund_code}: {e}")
                 return False
 
     async def mark_refreshing(self, fund_code: str) -> bool:
@@ -136,7 +140,8 @@ class CacheMetadataDAO:
                     (fund_code, now),
                 )
                 return True
-            except Exception:
+            except Exception as e:
+                logger.warning(f"标记缓存刷新失败 fund_code={fund_code}: {e}")
                 return False
 
     async def release_refresh_lock(self, fund_code: str) -> bool:

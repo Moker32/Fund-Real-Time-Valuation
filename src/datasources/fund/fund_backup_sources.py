@@ -125,7 +125,8 @@ class SinaFundDataSource(DataSource):
             except asyncio.TimeoutError:
                 await asyncio.sleep(self.retry_delay)
                 continue
-            except Exception:
+            except Exception as e:
+                logger.warning(f"获取基金数据失败 fund_code={fund_code}: {e}")
                 await asyncio.sleep(self.retry_delay)
                 continue
 
@@ -293,7 +294,8 @@ class EastMoneyFundDataSource(DataSource):
             except asyncio.TimeoutError:
                 await asyncio.sleep(self.retry_delay)
                 continue
-            except Exception:
+            except Exception as e:
+                logger.warning(f"获取基金数据失败 fund_code={fund_code}: {e}")
                 await asyncio.sleep(self.retry_delay)
                 continue
 

@@ -12,6 +12,8 @@ from typing import ClassVar
 
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
+
 
 class LogEntry(BaseModel):
     """日志条目"""
@@ -47,7 +49,8 @@ class LogBuffer(logging.Handler):
             )
             with self._lock:
                 self._buffer.append(entry)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"记录日志条目失败: {e}")
             self.handleError(record)
 
     @classmethod
