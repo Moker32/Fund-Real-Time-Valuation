@@ -210,8 +210,7 @@ const onCursorMove = (u: uPlot) => {
 
   tooltipValue.value = val.toFixed(4);
 
-  const displayTs = processedTimestamps[idx];
-  const xPos = u.valToPos(displayTs, 'x', true);
+  const xPos = u.valToPos(processedTimestamps[idx], 'x', true);
   const yPos = u.valToPos(val, 'y', true);
   const containerWidth = chartContainer.value?.clientWidth ?? 300;
 
@@ -410,6 +409,7 @@ const hasLunchBreak = (data: { time: string }[]): boolean => {
   const { start, end } = getLunchBreakConfig();
   let hasMorning = false;
   let hasAfternoon = false;
+  let hasLunchData = false;
 
   for (const item of data) {
     const m = item.time.match(/^(\d{1,2}):(\d{2})$/);
@@ -417,24 +417,11 @@ const hasLunchBreak = (data: { time: string }[]): boolean => {
     const minutes = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
     if (minutes <= start) hasMorning = true;
     if (minutes >= end) hasAfternoon = true;
+    if (minutes > start && minutes < end) hasLunchData = true;
   }
 
-  // 如果上午和下午都有数据，检查午休期间是否有数据点
-  // 只有当午休期间完全没有数据点时，才认为存在午休间隙
-  if (hasMorning && hasAfternoon) {
-    for (const item of data) {
-      const m = item.time.match(/^(\d{1,2}):(\d{2})$/);
-      if (!m || !m[1] || !m[2]) continue;
-      const minutes = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-      // 检查是否有数据点在午休时间段内（不包括边界）
-      if (minutes > start && minutes < end) {
-        return false; // 午休期间有数据，不是真正的午休
-      }
-    }
-    return true; // 午休期间没有数据，存在午休间隙
-  }
-
-  return false;
+  // 只有上午和下午都有数据，且午休期间无数据时，才认为存在午休间隙
+  return hasMorning && hasAfternoon && !hasLunchData;
 };
 
 const timeToMinutes = (timeStr: string): number => {
@@ -443,8 +430,8 @@ const timeToMinutes = (timeStr: string): number => {
   return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
 };
 
-const minutesToTimestamp = (minutes: number): number => {
-  const now = new Date();
+const minutesToTimestamp = (minutes: number, baseDate?: Date): number => {
+  const now = baseDate ?? new Date();
   return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate(), Math.floor(minutes / 60), minutes % 60, 0).getTime() / 1000);
 };
 
@@ -456,6 +443,7 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
 
   let lunchIdx = -1;
   let prevDisplayTs: number | null = null;
+  let baseDate: Date | undefined;
 
   for (const item of sortedData) {
     const minutes = timeToMinutes(item.time);
@@ -465,6 +453,9 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
     if (price === undefined) continue;
 
     const realTs = parseTimeToTimestamp(item.time);
+    if (!baseDate) {
+      baseDate = new Date(realTs * 1000);
+    }
 
     let displayMinutes: number;
     if (minutes <= start) {
@@ -473,7 +464,7 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
       displayMinutes = minutes - (end - start);
     }
 
-    const displayTs = minutesToTimestamp(displayMinutes);
+    const displayTs = minutesToTimestamp(displayMinutes, baseDate);
 
     if (lunchIdx === -1 && minutes > start && displayTimestamps.length > 0) {
       lunchIdx = displayTimestamps.length;
@@ -493,7 +484,7 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
   }
 
   if (lunchIdx > 0) {
-    lunchBreakX = minutesToTimestamp(start);
+    lunchBreakX = minutesToTimestamp(start, baseDate);
   }
 
   processedTimestamps = displayTimestamps;
@@ -522,7 +513,7 @@ const buildRegularData = (sortedData: { time: string; price?: number; close?: nu
   const marketEndInMinutes = 15 * 60;
   const marketStartInMinutes = 9 * 60 + 30;
 
-  if (lastTs && currentTimeInMinutes > marketStartInMinutes && currentTimeInMinutes < marketEndInMinutes) {
+  if (lastTs && currentTimeInMinutes >= marketStartInMinutes && currentTimeInMinutes <= marketEndInMinutes) {
     const year = now.getFullYear();
     const month = now.getMonth();
     const day = now.getDate();
