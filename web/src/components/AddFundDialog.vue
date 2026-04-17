@@ -66,8 +66,7 @@ let popperObserver: MutationObserver | null = null;
 function applyDarkThemeToPopper() {
   const poppers = document.querySelectorAll('.el-popper');
   poppers.forEach((popper) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const el = popper as any;
+    const el = popper as HTMLElement;
     el.style.backgroundColor = '#2a2a2a';
     el.style.borderColor = '#3a3a3a';
     el.style.color = '#fff';

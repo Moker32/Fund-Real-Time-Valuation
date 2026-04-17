@@ -550,8 +550,7 @@ const updateColor = () => {
 
   const newColor = getTrendColor();
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    uplotInstance.value.setSeries(1, { stroke: newColor } as any);
+    uplotInstance.value.setSeries(1, { stroke: newColor } as uPlot.Series);
     (uplotInstance.value as uPlotWithBaseline)._baselineColor = newColor;
     uplotInstance.value.redraw();
   } catch (e) {
