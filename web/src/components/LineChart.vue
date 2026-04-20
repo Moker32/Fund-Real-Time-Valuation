@@ -38,11 +38,14 @@ const props = withDefaults(defineProps<{
   showAxes?: boolean;
   showTooltip?: boolean;
   lunchBreak?: LunchBreak;  // 午休时间段，如 { start: 690, end: 780 } 表示 11:30-13:00
+  streaming?: boolean;      // streaming 模式，增量追加数据
+  maxPoints?: number;       // streaming 模式下最大数据点数，超出后丢弃最老的点
 }>(), {
   height: 100,
   trend: 'neutral',
   showAxes: true,
   showTooltip: true,
+  streaming: false,
 });
 
 const chartContainer = ref<HTMLElement | null>(null);
@@ -61,6 +64,7 @@ const processedValues = ref<(number | null)[]>([]);
 const realTimestamps = ref<number[]>([]);
 const rawDataItems = ref<ChartDataItem[]>([]);
 const lunchBreakX = ref<number | null>(null);
+const lastDataLen = ref(0);  // streaming 模式追踪已有数据长度
 
 const getTrendColor = (): string => {
   if (props.trend === 'rising') return '#ef4444';
@@ -231,7 +235,19 @@ const initChart = () => {
   if (uplotInstance.value) return;
 
   chartContainer.value.innerHTML = '';
-  const xRange = getIntradayXRange(props.data);
+
+  let xRange: { min: number; max: number } | null = null;
+  if (props.streaming) {
+    const now = new Date();
+    const baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const padding = 5 * 60;
+    xRange = {
+      min: minutesToTimestamp(570, baseDate) - padding,
+      max: minutesToTimestamp(810, baseDate) + padding,
+    };
+  } else {
+    xRange = getIntradayXRange(props.data);
+  }
 
   try {
     uplotInstance.value = new uPlot({
@@ -367,6 +383,12 @@ const updateData = () => {
   const currentDataJson = JSON.stringify(validData.map(d => d.time + (d.close ?? d.price)));
   if (currentDataJson === lastDataJson.value) return;
   lastDataJson.value = currentDataJson;
+
+  // streaming 模式：增量追加数据
+  if (props.streaming) {
+    updateDataStreaming(validData);
+    return;
+  }
 
   rawDataItems.value = [...validData];
 
@@ -597,6 +619,100 @@ watch(() => props.baseline, () => {
     uplotInstance.value.redraw();
   }
 });
+
+// streaming 模式下的增量追加逻辑
+const updateDataStreaming = (validData: { time: string; price?: number; close?: number | null }[]) => {
+  const { start, end } = getLunchBreakConfig();
+
+  // 首次数据（全量构建）
+  if (lastDataLen.value === 0 || processedTimestamps.value.length === 0) {
+    lastDataLen.value = validData.length;
+    rawDataItems.value = [...validData];
+
+    const sortedData = [...validData].sort((a, b) => {
+      const tsA = parseTimeToTimestamp(a.time);
+      const tsB = parseTimeToTimestamp(b.time);
+      return tsA - tsB;
+    });
+
+    buildCompressedIntradayData(sortedData);
+
+    const newData: [number[], (number | null)[]] = [processedTimestamps.value, processedValues.value];
+    try {
+      uplotInstance.value?.setData(newData);
+      updateYScaleRange(newData);
+    } catch (e) {
+      console.warn('[FundChart] streaming setData error:', e);
+    }
+    return;
+  }
+
+  // 增量追加：找到新增的数据点
+  const prevLen = lastDataLen.value;
+  lastDataLen.value = validData.length;
+
+  const newItems = validData.slice(prevLen);
+  if (newItems.length === 0) return;
+
+  rawDataItems.value = [...validData];
+
+  const baseDate = new Date();
+  baseDate.setHours(0, 0, 0, 0);
+
+  // 处理每个新增点
+  for (const item of newItems) {
+    const minutes = timeToMinutes(item.time);
+    if (minutes < 0) continue;
+
+    const price = 'close' in item ? (item.close ?? item.price) : item.price;
+    if (price === undefined) continue;
+
+    const realTs = parseTimeToTimestamp(item.time);
+
+    // 跳过时间相同的重复点
+    const lastRealTs = realTimestamps.value.length > 0 ? realTimestamps.value[realTimestamps.value.length - 1] : 0;
+    if (realTs === lastRealTs) continue;
+
+    // 计算压缩后的时间戳
+    let displayMinutes: number;
+    if (minutes <= start) {
+      displayMinutes = minutes;
+    } else {
+      displayMinutes = minutes - (end - start);
+    }
+
+    const displayTs = minutesToTimestamp(displayMinutes, baseDate);
+    const lastDisplayTs = processedTimestamps.value.length > 0 ? processedTimestamps.value[processedTimestamps.value.length - 1] : 0;
+
+    // 如果压缩后时间戳小于等于上一个（午休压缩导致的时间重叠），插入 null 断开
+    if (displayTs <= lastDisplayTs) {
+      processedTimestamps.value.push(lastDisplayTs + 1);
+      processedValues.value.push(null);
+      realTimestamps.value.push(0);
+    }
+
+    processedTimestamps.value.push(displayTs);
+    processedValues.value.push(price);
+    realTimestamps.value.push(realTs);
+  }
+
+  // 如果配置了 maxPoints，超出后丢弃最老的点
+  if (props.maxPoints && props.maxPoints > 0) {
+    while (processedTimestamps.value.length > props.maxPoints) {
+      processedTimestamps.value.shift();
+      processedValues.value.shift();
+      realTimestamps.value.shift();
+    }
+  }
+
+  const newData: [number[], (number | null)[]] = [processedTimestamps.value, processedValues.value];
+  try {
+    uplotInstance.value?.setData(newData);
+    updateYScaleRange(newData);
+  } catch (e) {
+    console.warn('[FundChart] streaming setData error:', e);
+  }
+};
 
 onMounted(() => {
   if (props.data && props.data.length > 0) {

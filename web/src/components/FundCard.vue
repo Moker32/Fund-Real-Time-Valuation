@@ -98,7 +98,7 @@
           </div>
         </div>
 
-        <LineChart v-if="shouldShowChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" class="fund-chart" />
+        <LineChart v-if="shouldShowChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" :streaming="!!fund.intraday?.length" :max-points="500" class="fund-chart" />
       </div>
 
       <div class="card-footer">
