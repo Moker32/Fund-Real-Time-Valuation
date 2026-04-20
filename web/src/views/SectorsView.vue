@@ -88,9 +88,23 @@
         v-for="sector in sectorStore.sortedSectors"
         :key="sector.code"
         :sector="sector"
-        @click="handleSelectSector(sector)"
+        @click="sectorStore.selectChartSymbol(sector.name)"
       />
     </div>
+
+    <!-- Streaming Chart -->
+    <SectorChart
+      v-if="selectedChart"
+      :symbol="selectedChart.symbol"
+      :name="selectedChart.name"
+      :current-price="selectedChart.currentPrice"
+      :change="selectedChart.change"
+      :change-percent="selectedChart.changePercent"
+      :high="selectedChart.high"
+      :low="selectedChart.low"
+      :chart-history="selectedChart.chartHistory"
+      @close="sectorStore.selectChartSymbol(null)"
+    />
 
     <!-- Quick Stats -->
     <div v-if="!showFlowView && sectorStore.currentSectors.length > 0" class="quick-stats">
@@ -183,6 +197,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useSectorStore, type SectorType } from '@/stores/sectorStore';
 import SectorCard from '@/components/SectorCard.vue';
+import SectorChart from '@/components/SectorChart.vue';
 import FlowSummary from '@/components/FlowSummary.vue';
 import CapitalFlowRank from '@/components/CapitalFlowRank.vue';
 import type { Sector } from '@/types';
@@ -219,6 +234,23 @@ const emptySector: Sector = {
   leadStock: '',
   leadChange: 0,
 };
+
+// 选中板块的折线图数据
+const selectedChart = computed(() => {
+  if (!sectorStore.selectedChartSymbol) return null;
+  const sector = sectorStore.currentSectors.find(s => s.name === sectorStore.selectedChartSymbol);
+  if (!sector) return null;
+  return {
+    symbol: sector.name,
+    name: sector.name,
+    currentPrice: sector.price || 0,
+    change: sector.change || 0,
+    changePercent: sector.changePercent || 0,
+    high: sector.high || sector.price || 0,
+    low: sector.low || sector.price || 0,
+    chartHistory: sectorStore.selectedChartHistory,
+  };
+});
 
 async function switchType(type: SectorType) {
   showFlowView.value = false;
@@ -257,6 +289,7 @@ function formatFlow(value: number | undefined): string {
 }
 
 onMounted(async () => {
+  sectorStore.initWebSocket();
   await sectorStore.fetchIndustrySectors({ showError: true });
 });
 </script>

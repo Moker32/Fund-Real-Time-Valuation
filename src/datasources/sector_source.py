@@ -20,6 +20,7 @@ from src.datasources.sector import (
     FundFlowIndustrySource,
     SectorDataAggregator,
     SinaSectorDataSource,
+    ThsSectorSource,
     get_last_trading_day,
     is_trading_day,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "EastMoneyConceptDetailSource",
     "FundFlowConceptSource",
     "FundFlowIndustrySource",
+    "ThsSectorSource",
     "get_last_trading_day",
     "is_trading_day",
 ]

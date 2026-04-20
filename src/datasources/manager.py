@@ -226,7 +226,11 @@ class DataSourceManager:
                     continue
 
                 try:
-                    result = await source.fetch(*args, **kwargs)
+                    # 特殊处理：COMMODITY 类型无参数时调用 fetch_all()（推送循环用）
+                    if source_type == DataSourceType.COMMODITY and not args and not kwargs.get("commodity_type"):
+                        result = await source.fetch_all()
+                    else:
+                        result = await source.fetch(*args, **kwargs)
 
                     # 记录请求
                     self._record_request(source.name, source_type, result)
@@ -800,7 +804,7 @@ def create_default_manager(
     Returns:
         DataSourceManager: 配置好的管理器实例
     """
-    from .commodity_source import AKShareCommoditySource, YFinanceCommoditySource
+    from .commodity_source import CommodityRealtimeSource
     from .fund_source import Fund123DataSource
     from .sector_source import (
         EastMoneyConceptDetailSource,
@@ -810,6 +814,7 @@ def create_default_manager(
         FundFlowConceptSource,
         FundFlowIndustrySource,
         SinaSectorDataSource,
+        ThsSectorSource,
     )
 
     manager = DataSourceManager(
@@ -832,13 +837,9 @@ def create_default_manager(
         ),
     )
 
-    # 注册商品数据源
-    commodity_source = AKShareCommoditySource()
+    # 注册商品数据源（akshare 国际期货实时 + Binance BTC）
+    commodity_source = CommodityRealtimeSource()
     manager.register(commodity_source)
-
-    # 注册 YFinance 商品数据源（国际商品 + 贵金属/基本金属预留）
-    yfinance_commodity_source = YFinanceCommoditySource()
-    manager.register(yfinance_commodity_source)
 
     # === 新增 AKShare 舆情数据源 ===
     from .akshare_sentiment_source import (
@@ -877,6 +878,19 @@ def create_default_manager(
         ),
     )
 
+    # 同花顺行业板块数据源（主数据源，包含净流入字段）
+    ths_sector_source = ThsSectorSource()
+    manager.register(
+        ths_sector_source,
+        DataSourceConfig(
+            source_class=type(ths_sector_source),
+            name=ths_sector_source.name,
+            source_type=DataSourceType.SECTOR,
+            enabled=True,
+            priority=0,  # 最高优先级
+        ),
+    )
+
     # 行业板块资金流向数据源（非交易时间可用）
     fundflow_industry_source = FundFlowIndustrySource()
     manager.register(
@@ -886,7 +900,7 @@ def create_default_manager(
             name=fundflow_industry_source.name,
             source_type=DataSourceType.SECTOR,
             enabled=False,
-            priority=0,
+            priority=1,
         ),
     )
 

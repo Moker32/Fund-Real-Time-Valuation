@@ -2,7 +2,7 @@
 """商品缓存数据访问层
 
 提供商品行情数据的 SQLite 存储和查询功能。
-支持贵金属、能源、基本金属三类商品的实时行情缓存。
+只支持7个核心商品：黄金、白银、铂金、WTI原油、布伦特原油、天然气、比特币。
 """
 
 import logging
@@ -22,75 +22,39 @@ class CommodityCategory(Enum):
 
     PRECIOUS_METAL = "precious_metal"  # 贵金属
     ENERGY = "energy"  # 能源化工
-    BASE_METAL = "base_metal"  # 基本金属
-    AGRICULTURE = "agriculture"  # 农产品
     CRYPTO = "crypto"  # 加密货币
 
 
-# 商品到分类的映射
+# 商品到分类的映射（只保留7个核心商品）
 COMMODITY_CATEGORY_MAP: dict[str, CommodityCategory] = {
     # 贵金属
     "gold": CommodityCategory.PRECIOUS_METAL,
-    "gold_cny": CommodityCategory.PRECIOUS_METAL,
-    "gold_pax": CommodityCategory.PRECIOUS_METAL,
     "silver": CommodityCategory.PRECIOUS_METAL,
     "platinum": CommodityCategory.PRECIOUS_METAL,
-    "palladium": CommodityCategory.PRECIOUS_METAL,
     # 能源
     "wti": CommodityCategory.ENERGY,
     "brent": CommodityCategory.ENERGY,
     "natural_gas": CommodityCategory.ENERGY,
-    # 基本金属
-    "copper": CommodityCategory.BASE_METAL,
-    "aluminum": CommodityCategory.BASE_METAL,
-    "zinc": CommodityCategory.BASE_METAL,
-    "nickel": CommodityCategory.BASE_METAL,
-    # 农产品
-    "soybean": CommodityCategory.AGRICULTURE,
-    "corn": CommodityCategory.AGRICULTURE,
-    "wheat": CommodityCategory.AGRICULTURE,
-    "coffee": CommodityCategory.AGRICULTURE,
-    "sugar": CommodityCategory.AGRICULTURE,
     # 加密货币
     "btc": CommodityCategory.CRYPTO,
-    "btc_futures": CommodityCategory.CRYPTO,
-    "eth": CommodityCategory.CRYPTO,
-    "eth_futures": CommodityCategory.CRYPTO,
 }
 
 # 分类名称映射
 CATEGORY_NAMES: dict[CommodityCategory, str] = {
     CommodityCategory.PRECIOUS_METAL: "贵金属",
     CommodityCategory.ENERGY: "能源化工",
-    CommodityCategory.BASE_METAL: "基本金属",
-    CommodityCategory.AGRICULTURE: "农产品",
     CommodityCategory.CRYPTO: "加密货币",
 }
 
 # 商品显示名称
 COMMODITY_NAMES: dict[str, str] = {
     "gold": "黄金 (COMEX)",
-    "gold_cny": "沪金 Au99.99",
-    "gold_pax": "Pax Gold",
-    "silver": "国际白银",
-    "platinum": "铂金",
-    "palladium": "钯金",
-    "wti": "WTI原油",
-    "brent": "布伦特原油",
-    "natural_gas": "天然气",
-    "copper": "铜",
-    "aluminum": "铝",
-    "zinc": "锌",
-    "nickel": "镍",
-    "soybean": "大豆",
-    "corn": "玉米",
-    "wheat": "小麦",
-    "coffee": "咖啡",
-    "sugar": "白糖",
-    "btc": "比特币",
-    "btc_futures": "比特币期货",
-    "eth": "以太坊",
-    "eth_futures": "以太坊期货",
+    "silver": "白银 (COMEX)",
+    "platinum": "铂金 (伦敦)",
+    "wti": "WTI原油 (NYMEX)",
+    "brent": "布伦特原油 (ICE)",
+    "natural_gas": "天然气 (NYMEX)",
+    "btc": "比特币 (Binance)",
 }
 
 

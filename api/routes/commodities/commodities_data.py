@@ -13,7 +13,7 @@ from typing_extensions import TypedDict
 
 from src.datasources.base import DataSourceType
 from src.datasources.commodity_source import (
-    YFinanceCommoditySource,
+    CommodityRealtimeSource,
     get_all_commodity_types,
     get_commodities_by_category,
 )
@@ -90,9 +90,9 @@ SUPPORTED_COMMODITIES = get_all_commodity_types()
 
 
 @lru_cache
-def _get_yfinance_source() -> YFinanceCommoditySource:
-    """获取 YFinance 商品数据源实例（缓存）"""
-    return YFinanceCommoditySource()
+def _get_realtime_source() -> CommodityRealtimeSource:
+    """获取 CommodityRealtimeSource 实例（缓存）"""
+    return CommodityRealtimeSource()
 
 
 def _commodity_to_item(data: dict[str, Any], source: str) -> CommodityCategoryItem:
@@ -275,8 +275,9 @@ async def get_history(
             for r in records
         ]
 
-        name_source = _get_yfinance_source()
-        name = name_source.get_name(commodity_type)
+        from src.db.commodity_repo import COMMODITY_NAMES
+
+        name = COMMODITY_NAMES.get(commodity_type, commodity_type)
 
         return {
             "commodityType": commodity_type,
@@ -291,44 +292,6 @@ async def get_history(
 
 
 @router.get(
-    "/gold/cny",
-    response_model=CommodityResponse,
-    summary="获取国内黄金行情",
-    description="获取上海黄金交易所 Au99.99 实时行情",
-    responses={
-        200: {"description": "成功获取国内黄金行情"},
-        500: {"model": ErrorResponse, "description": "服务器错误"},
-    },
-)
-async def get_gold_cny(
-    manager: DataSourceManager = Depends(DataSourceDependency()),
-) -> dict:
-    """获取国内黄金行情（上海黄金交易所 Au99.99）"""
-    result = await manager.fetch(DataSourceType.COMMODITY, "gold_cny")
-
-    if not result.success or not result.data:
-        raise HTTPException(status_code=500, detail=result.error or "获取数据失败")
-
-    data = result.data
-    return CommodityResponse(
-        commodity=data.get("commodity", ""),
-        symbol=data.get("symbol", ""),
-        name=data.get("name", ""),
-        price=data.get("price", 0.0),
-        change=data.get("change"),
-        change_percent=data.get("change_percent"),
-        currency=data.get("currency", "CNY"),
-        exchange=data.get("exchange", "SGE"),
-        timestamp=data.get("timestamp"),
-        source=result.source,
-        high=data.get("high"),
-        low=data.get("low"),
-        open=data.get("open"),
-        prev_close=data.get("prev_close"),
-    ).model_dump()
-
-
-@router.get(
     "/gold/international",
     response_model=CommodityResponse,
     summary="获取国际黄金行情",
@@ -340,7 +303,7 @@ async def get_gold_cny(
 )
 async def get_gold_international() -> dict:
     """获取国际黄金行情（COMEX 黄金）"""
-    source = _get_yfinance_source()
+    source = _get_realtime_source()
     result = await source.fetch("gold")
 
     if not result.success or not result.data:
@@ -377,7 +340,7 @@ async def get_gold_international() -> dict:
 )
 async def get_wti_oil() -> dict:
     """获取 WTI 原油行情"""
-    source = _get_yfinance_source()
+    source = _get_realtime_source()
     result = await source.fetch("wti")
 
     if not result.success or not result.data:
@@ -400,70 +363,6 @@ async def get_wti_oil() -> dict:
         open=data.get("open"),
         prev_close=data.get("prev_close"),
     ).model_dump()
-
-
-class CommodityByTickerResponse(TypedDict):
-    """按 ticker 获取商品响应"""
-
-    commodity: str
-    symbol: str
-    name: str
-    price: float
-    currency: str
-    change: float | None
-    change_percent: float | None
-    high: float | None
-    low: float | None
-    open: float | None
-    prev_close: float | None
-    source: str
-    timestamp: str
-
-
-@router.get(
-    "/by-ticker/{symbol}",
-    response_model=CommodityByTickerResponse,
-    summary="按 ticker 获取商品行情",
-    description="根据 yfinance ticker 符号获取商品实时行情（支持用户关注的任意商品）",
-    responses={
-        200: {"description": "成功获取商品行情"},
-        500: {"model": ErrorResponse, "description": "获取数据失败"},
-    },
-)
-async def get_commodity_by_ticker(symbol: str) -> CommodityByTickerResponse:
-    """按 ticker 获取商品行情"""
-    try:
-        source = _get_yfinance_source()
-        result = await source.fetch_by_ticker(symbol)
-
-        if not result.success or not result.data:
-            raise HTTPException(
-                status_code=500,
-                detail=result.error or f"无法获取 {symbol} 的价格数据",
-            )
-
-        data = result.data
-        return {
-            "commodity": data.get("commodity", symbol.lower()),
-            "symbol": data.get("symbol", symbol),
-            "name": data.get("name", symbol),
-            "price": data.get("price", 0),
-            "currency": data.get("currency", "USD"),
-            "change": data.get("change"),
-            "change_percent": data.get("change_percent"),
-            "high": data.get("high"),
-            "low": data.get("low"),
-            "open": data.get("open"),
-            "prev_close": data.get("prev_close"),
-            "source": data.get("source", "yfinance"),
-            "timestamp": data.get("timestamp"),
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"获取商品 {symbol} 数据失败: {e}")
-        raise HTTPException(status_code=500, detail=f"获取数据失败: {str(e)}")
 
 
 @router.get(
@@ -515,7 +414,7 @@ async def get_commodity(
 # 导出辅助函数供 watchlist 模块使用
 __all__ = [
     "router",
-    "_get_yfinance_source",
+    "_get_realtime_source",
     "_commodity_to_item",
     "SUPPORTED_COMMODITIES",
 ]

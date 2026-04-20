@@ -1,5 +1,5 @@
 <template>
-  <div class="commodity-card" :class="{ loading: loading }">
+  <div class="commodity-card" :class="{ loading: loading }" @click="$emit('click')">
     <template v-if="loading">
       <div class="skeleton-content">
         <div class="skeleton skeleton-title"></div>
@@ -93,6 +93,10 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
 });
 
+const emit = defineEmits<{
+  click: [];
+}>();
+
 const store = useCommodityStore();
 
 // 简化数据源名称显示
@@ -101,7 +105,6 @@ const sourceName = computed(() => {
   const source = props.commodity.source;
   if (!source) return '';
   if (source.includes('akshare')) return 'AKShare';
-  if (source.includes('yfinance')) return 'yFinance';
   if (source.includes('binance')) return 'Binance';
   return source;
 });

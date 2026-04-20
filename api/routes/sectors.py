@@ -65,24 +65,24 @@ async def get_industry_sectors(
     获取 A 股行业板块列表
 
     数据源优先级：
-    1. FundFlowIndustrySource - 资金流向接口，非交易时间可用
-    2. EastMoneySectorSource - 实时行情接口，交易时间更及时
-    3. EastMoneyDirectSource - 直连 API，兜底
+    1. ThsSectorSource - 同花顺行业板块，净流入字段（优先级最高）
+    2. FundFlowIndustrySource - 资金流向接口，非交易时间可用
+    3. EastMoneySectorSource - 实时行情接口，交易时间更及时
     4. SinaSectorDataSource - 最后备用
     """
     current_time = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     sector_type = "industry"
 
-    # 优先使用资金流向接口（非交易时间可用）
-    result = await manager.fetch_with_source("sector_industry_fund_flow", "industry")
+    # 优先使用同花顺行业板块（净流入数据）
+    result = await manager.fetch_with_source("sector_ths_akshare")
+
+    if not _check_result_success(result):
+        # 备用：资金流向接口（非交易时间可用）
+        result = await manager.fetch_with_source("sector_industry_fund_flow", "industry")
 
     if not _check_result_success(result):
         # 备用：AKShare _spot_em 接口（实时行情，数据更完整）
         result = await manager.fetch_with_source("sector_eastmoney_akshare", "industry")
-
-    if not _check_result_success(result):
-        # 备用：EastMoney 直连 API（包含资金流向）
-        result = await manager.fetch_with_source("sector_eastmoney_direct", "industry")
 
     if not _check_result_success(result):
         # 最后尝试 Sina
@@ -155,6 +155,9 @@ async def get_industry_sectors(
                 sector["mainInflowPct"] = item.get("main_inflow_pct")
                 sector["smallInflow"] = item.get("small_inflow")
                 sector["smallInflowPct"] = item.get("small_inflow_pct")
+            # 添加净流入数据（同花顺ths_sector来源）
+            if "net_inflow" in item:
+                sector["mainInflow"] = item.get("net_inflow")
             sectors.append(sector)
 
         return {"sectors": sectors, "timestamp": current_time, "type": sector_type}

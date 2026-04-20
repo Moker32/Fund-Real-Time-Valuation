@@ -111,96 +111,77 @@ class CommodityDataAggregator(CommodityDataSource):
 
 
 def get_all_commodity_types() -> list[str]:
-    """获取所有支持的商品类型"""
+    """获取所有支持的商品类型（7个核心商品）"""
     return [
         # 贵金属
         "gold",
-        "gold_cny",
-        "gold_pax",
         "silver",
+        "platinum",
         # 能源
         "wti",
         "brent",
         "natural_gas",
-        # 基本金属
-        "copper",
-        "aluminum",
-        "zinc",
-        "nickel",
-        # 农产品
-        "soybean",
-        "corn",
-        "wheat",
-        "coffee",
-        "sugar",
         # 加密货币
         "btc",
-        "btc_futures",
-        "eth",
-        "eth_futures",
     ]
 
 
 def get_commodities_by_category() -> dict[CommodityCategory, list[str]]:
     """获取按分类组织的商品类型"""
     return {
-        CommodityCategory.PRECIOUS_METAL: ["gold", "gold_cny", "gold_pax", "silver"],
+        CommodityCategory.PRECIOUS_METAL: ["gold", "silver", "platinum"],
         CommodityCategory.ENERGY: ["wti", "brent", "natural_gas"],
-        CommodityCategory.BASE_METAL: ["copper", "aluminum", "zinc", "nickel"],
-        CommodityCategory.AGRICULTURE: ["soybean", "corn", "wheat", "coffee", "sugar"],
-        CommodityCategory.CRYPTO: ["btc", "btc_futures", "eth", "eth_futures"],
+        CommodityCategory.CRYPTO: ["btc"],
     }
 
 
-# 搜索商品配置映射（用于自定义关注商品搜索）
+# 搜索商品配置映射（7个核心商品）
 SEARCHABLE_COMMODITIES: dict[str, dict[str, str]] = {
     # 贵金属
-    "GC=F": {
+    "GC": {
         "name": "黄金 (COMEX)",
         "category": "precious_metal",
-        "exchange": "CME",
+        "exchange": "COMEX",
         "currency": "USD",
     },
-    "Au99.99": {
-        "name": "上海黄金 (Au99.99)",
+    "SI": {
+        "name": "白银 (COMEX)",
         "category": "precious_metal",
-        "exchange": "SGE",
-        "currency": "CNY",
+        "exchange": "COMEX",
+        "currency": "USD",
     },
-    "SI=F": {"name": "白银", "category": "precious_metal", "exchange": "CME", "currency": "USD"},
-    "PT=F": {"name": "铂金", "category": "precious_metal", "exchange": "NYMEX", "currency": "USD"},
-    "PA=F": {"name": "钯金", "category": "precious_metal", "exchange": "NYMEX", "currency": "USD"},
+    "XPT": {
+        "name": "铂金 (伦敦)",
+        "category": "precious_metal",
+        "exchange": "LBMA",
+        "currency": "USD",
+    },
     # 能源
-    "CL=F": {"name": "WTI 原油", "category": "energy", "exchange": "NYMEX", "currency": "USD"},
-    "BZ=F": {"name": "布伦特原油", "category": "energy", "exchange": "ICE", "currency": "USD"},
-    "NG=F": {"name": "天然气", "category": "energy", "exchange": "NYMEX", "currency": "USD"},
-    "HO=F": {"name": "燃油", "category": "energy", "exchange": "NYMEX", "currency": "USD"},
-    "RB=F": {"name": "汽油", "category": "energy", "exchange": "NYMEX", "currency": "USD"},
-    # 基本金属
-    "HG=F": {"name": "铜", "category": "base_metal", "exchange": "CME", "currency": "USD"},
-    "ALU": {"name": "铝", "category": "base_metal", "exchange": "LME", "currency": "USD"},
-    "ZN=F": {"name": "锌", "category": "base_metal", "exchange": "LME", "currency": "USD"},
-    "NI=F": {"name": "镍", "category": "base_metal", "exchange": "LME", "currency": "USD"},
-    "PB=F": {"name": "铅", "category": "base_metal", "exchange": "LME", "currency": "USD"},
-    "SN=F": {"name": "锡", "category": "base_metal", "exchange": "LME", "currency": "USD"},
-    # 农产品
-    "ZS=F": {"name": "大豆", "category": "agriculture", "exchange": "CBOT", "currency": "USD"},
-    "ZC=F": {"name": "玉米", "category": "agriculture", "exchange": "CBOT", "currency": "USD"},
-    "ZW=F": {"name": "小麦", "category": "agriculture", "exchange": "CBOT", "currency": "USD"},
-    "KC=F": {"name": "咖啡", "category": "agriculture", "exchange": "ICE", "currency": "USD"},
-    "SB=F": {"name": "白糖", "category": "agriculture", "exchange": "ICE", "currency": "USD"},
-    "CC=F": {"name": "可可", "category": "agriculture", "exchange": "ICE", "currency": "USD"},
-    "CT=F": {"name": "棉花", "category": "agriculture", "exchange": "ICE", "currency": "USD"},
-    "LE=F": {"name": "活牛", "category": "agriculture", "exchange": "CME", "currency": "USD"},
-    "HE=F": {"name": "瘦肉猪", "category": "agriculture", "exchange": "CME", "currency": "USD"},
-    "ZR=F": {"name": "糙米", "category": "agriculture", "exchange": "CBOT", "currency": "USD"},
-    "OJ=F": {"name": "橙汁", "category": "agriculture", "exchange": "ICE", "currency": "USD"},
-    # 加密货币现货
-    "BTC-USD": {"name": "比特币", "category": "crypto", "exchange": "Spot", "currency": "USD"},
-    "ETH-USD": {"name": "以太坊", "category": "crypto", "exchange": "Spot", "currency": "USD"},
-    # 加密货币期货
-    "BTC=F": {"name": "比特币期货", "category": "crypto", "exchange": "CME", "currency": "USD"},
-    "ETH=F": {"name": "以太坊期货", "category": "crypto", "exchange": "CME", "currency": "USD"},
+    "CL": {
+        "name": "WTI原油 (NYMEX)",
+        "category": "energy",
+        "exchange": "NYMEX",
+        "currency": "USD",
+    },
+    "OIL": {
+        "name": "布伦特原油 (ICE)",
+        "category": "energy",
+        "exchange": "ICE",
+        "currency": "USD",
+    },
+    "NG": {
+        "name": "天然气 (NYMEX)",
+        "category": "energy",
+        "exchange": "NYMEX",
+        "currency": "USD",
+    },
+    # 加密货币
+    "BTCUSDT": {
+        "name": "比特币 (Binance)",
+        "category": "crypto",
+        "exchange": "Binance",
+        "currency": "USDT",
+    },
 }
 
 

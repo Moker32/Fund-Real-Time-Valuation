@@ -324,7 +324,7 @@ function setupWebSocketHandlers() {
 
 function startWebSocket() {
   wsStore.connect();
-  wsStore.subscribe(['funds', 'commodities', 'indices']);
+  wsStore.subscribe(['funds', 'commodities', 'indices', 'sectors']);
   setupWebSocketHandlers();
 }
 

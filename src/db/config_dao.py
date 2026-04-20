@@ -268,11 +268,13 @@ class ConfigDAO:
     def init_default_commodities(self) -> None:
         """初始化默认商品列表"""
         default_commodities = [
-            ("gold_cny", "Au99.99 (上海黄金)", "akshare"),
-            ("gold", "黄金 (COMEX)", "yfinance"),
-            ("wti", "WTI原油", "yfinance"),
-            ("silver", "白银", "yfinance"),
-            ("natural_gas", "天然气", "yfinance"),
+            ("gold", "黄金 (COMEX)", "akshare"),
+            ("silver", "白银 (COMEX)", "akshare"),
+            ("platinum", "铂金 (LONDON)", "akshare"),
+            ("wti", "WTI原油 (NYMEX)", "akshare"),
+            ("brent", "布伦特原油", "akshare"),
+            ("natural_gas", "天然气 (NYMEX)", "akshare"),
+            ("btc", "BTC (Binance)", "akshare"),
         ]
         for symbol, name, source in default_commodities:
             if not self.get_commodity(symbol):

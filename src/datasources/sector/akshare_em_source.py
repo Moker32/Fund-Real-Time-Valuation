@@ -457,3 +457,221 @@ class EastMoneySectorSource(DataSource):
         except Exception as e:
             logger.warning(f"健康检查失败: {e}")
             return False
+
+
+class ThsSectorSource(DataSource):
+    """
+    同花顺行业板块数据源 - 基于 akshare 的 stock_board_industry_summary_ths 接口
+
+    功能:
+    - 获取同花顺行业板块实时行情
+    - 包含净流入字段
+
+    接口:
+    - stock_board_industry_summary_ths() - 同花顺行业板块一览
+
+    数据字段映射:
+    - 板块代码 -> code
+    - 板块名称 -> name
+    - 现价 -> price
+    - 涨跌幅 -> change_percent
+    - 涨跌额 -> change
+    - 成交量 -> volume
+    - 成交额 -> amount
+    - 开盘 -> open
+    - 最高 -> high
+    - 最低 -> low
+    - 净流入 -> net_inflow
+    """
+
+    def __init__(self, timeout: float = 15.0):
+        super().__init__(
+            name="sector_ths_akshare", source_type=DataSourceType.SECTOR, timeout=timeout
+        )
+        self._cache: dict[str, Any] = {}
+        self._cache_timeout = 60.0
+
+    def log(self, message: str) -> None:
+        """日志方法"""
+        logger.info(f"[ThsSectorSource] {message}")
+
+    async def fetch(self, sector_code: str | None = None) -> DataSourceResult:
+        """
+        获取同花顺行业板块数据
+
+        Args:
+            sector_code: 可选，指定板块代码进行过滤
+
+        Returns:
+            DataSourceResult: 板块数据结果
+        """
+        cache_key = sector_code or "all"
+        if self._is_cache_valid(cache_key):
+            return DataSourceResult(
+                success=True,
+                data=self._cache[cache_key],
+                timestamp=self._cache[cache_key].get("_cache_time", time.time()),
+                source=self.name,
+                metadata={"sector_code": sector_code, "from_cache": True},
+            )
+
+        try:
+            import akshare as ak
+
+            loop = asyncio.get_event_loop()
+
+            # 使用 run_in_executor 包装同步调用，添加超时控制
+            try:
+                df = await asyncio.wait_for(
+                    loop.run_in_executor(None, ak.stock_board_industry_summary_ths),
+                    timeout=10.0,
+                )
+            except asyncio.TimeoutError:
+                return DataSourceResult(
+                    success=False,
+                    error="获取同花顺行业板块数据超时（10秒）",
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"sector_code": sector_code, "error_type": "TimeoutError"},
+                )
+
+            if df is not None and not df.empty:
+                data = self._parse_dataframe(df)
+                data["_cache_time"] = time.time()
+                self._cache[cache_key] = data
+
+                # 过滤指定板块
+                if sector_code:
+                    data["sectors"] = [s for s in data["sectors"] if s.get("code") == sector_code]
+                    data["count"] = len(data["sectors"])
+
+                self._record_success()
+                return DataSourceResult(
+                    success=True,
+                    data=data,
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={
+                        "sector_code": sector_code,
+                        "count": data.get("count", 0),
+                    },
+                )
+
+            return DataSourceResult(
+                success=False,
+                error="获取同花顺行业板块数据为空",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_code": sector_code},
+            )
+
+        except ImportError:
+            return DataSourceResult(
+                success=False,
+                error="akshare 未安装，请运行: pip install akshare",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"sector_code": sector_code, "error_type": "ImportError"},
+            )
+        except Exception as e:
+            logger.error(f"获取同花顺行业板块数据失败: {e}")
+            return self._handle_error(e, self.name)
+
+    def _parse_dataframe(self, df) -> dict[str, Any]:
+        """
+        解析 DataFrame 返回统一格式
+
+        Args:
+            df: akshare 返回的 DataFrame
+
+        Returns:
+            Dict: 统一格式的板块数据
+        """
+        sectors = []
+        for idx, row in df.iterrows():
+            item = {
+                "code": f"THS_{int(row.get("序号", idx))}",  # 同花顺无代码，用序号
+                "name": str(row.get("板块", "")),
+                "price": self._safe_float(row.get("均价", 0)),
+                "change": self._safe_float(row.get("涨跌幅", 0)),  # 同花顺无涨跌额，用涨跌幅
+                "change_percent": self._safe_float(row.get("涨跌幅", 0)),
+                "volume": str(row.get("总成交量", "")),
+                "amount": str(row.get("总成交额", "")),
+                "open": 0.0,
+                "high": 0.0,
+                "low": 0.0,
+                "net_inflow": self._safe_float(row.get("净流入", 0)),
+                "up_count": self._safe_int(row.get("上涨家数", 0)),
+                "down_count": self._safe_int(row.get("下跌家数", 0)),
+                "lead_stock": str(row.get("领涨股", "")),
+                "lead_change": self._safe_float(row.get("领涨股-涨跌幅", 0)),
+            }
+            sectors.append(item)
+
+        # 使用最近交易日作为时间戳
+        trading_day = get_last_trading_day()
+
+        return {
+            "type": "industry_ths",
+            "sectors": sectors,
+            "count": len(sectors),
+            "timestamp": trading_day.timestamp(),
+        }
+
+    def _safe_float(self, value: Any) -> float:
+        """安全转换为浮点数"""
+        if value is None:
+            return 0.0
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
+
+    def _is_cache_valid(self, cache_key: str) -> bool:
+        """检查缓存是否有效"""
+        if cache_key not in self._cache:
+            return False
+        cache_time = self._cache[cache_key].get("_cache_time", 0)
+        return (time.time() - cache_time) < self._cache_timeout
+
+    def clear_cache(self):
+        """清空缓存"""
+        self._cache.clear()
+
+    def get_status(self) -> dict[str, Any]:
+        """获取数据源状态"""
+        status = super().get_status()
+        status["cache_size"] = len(self._cache)
+        status["cache_timeout"] = self._cache_timeout
+        status["api_version"] = "ths_summary"
+        return status
+
+    async def health_check(self) -> bool:
+        """
+        健康检查 - 同花顺行业板块接口
+
+        Returns:
+            bool: 健康状态
+        """
+        try:
+            import akshare as ak
+
+            loop = asyncio.get_event_loop()
+
+            # 尝试获取数据，添加超时控制
+            try:
+                df = await asyncio.wait_for(
+                    loop.run_in_executor(None, ak.stock_board_industry_summary_ths),
+                    timeout=10.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("健康检查超时（10秒）")
+                return False
+
+            # 验证返回数据
+            if df is not None and not df.empty:
+                return True
+            return False
+        except Exception as e:
+            logger.warning(f"健康检查失败: {e}")
+            return False

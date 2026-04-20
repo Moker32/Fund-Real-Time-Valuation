@@ -26,11 +26,13 @@ logger = logging.getLogger(__name__)
 TRADING_FUND_INTERVAL = 30  # 基金估值更新频率（每30秒从数据源获取一次）
 TRADING_COMMODITY_INTERVAL = 10
 TRADING_INDEX_INTERVAL = 10
+TRADING_SECTOR_INTERVAL = 10
 
 # 非交易时段推送间隔（秒）
 NON_TRADING_FUND_INTERVAL = 60  # 非交易时段降低频率
 NON_TRADING_COMMODITY_INTERVAL = 30
 NON_TRADING_INDEX_INTERVAL = 30
+NON_TRADING_SECTOR_INTERVAL = 30
 
 
 class RealtimePusher:
@@ -49,6 +51,7 @@ class RealtimePusher:
         self._last_fund_data: list[dict] | None = None
         self._last_commodity_data: list[dict] | None = None
         self._last_index_data: list[dict] | None = None
+        self._last_sector_data: dict | None = None
 
         self._trading_calendar = TradingCalendarSource()
         self._trading_hours_cache: dict[str, tuple[bool, float]] = {}
@@ -96,11 +99,21 @@ class RealtimePusher:
             logger.warning(f"检查交易时段失败: {e}")
             return False
 
-    def _get_intervals(self) -> tuple[int, int, int]:
+    def _get_intervals(self) -> tuple[int, int, int, int]:
         is_trading = self._is_trading_hours(Market.CHINA)
         if is_trading:
-            return TRADING_FUND_INTERVAL, TRADING_COMMODITY_INTERVAL, TRADING_INDEX_INTERVAL
-        return NON_TRADING_FUND_INTERVAL, NON_TRADING_COMMODITY_INTERVAL, NON_TRADING_INDEX_INTERVAL
+            return (
+                TRADING_FUND_INTERVAL,
+                TRADING_COMMODITY_INTERVAL,
+                TRADING_INDEX_INTERVAL,
+                TRADING_SECTOR_INTERVAL,
+            )
+        return (
+            NON_TRADING_FUND_INTERVAL,
+            NON_TRADING_COMMODITY_INTERVAL,
+            NON_TRADING_INDEX_INTERVAL,
+            NON_TRADING_SECTOR_INTERVAL,
+        )
 
     def _diff_data(
         self, data_type: str, old_data: list[dict], new_data: list[dict]
@@ -358,6 +371,93 @@ class RealtimePusher:
 
             await asyncio.sleep(index_interval)
 
+    async def _push_sectors_loop(self):
+        _, _, _, sector_interval = self._get_intervals()
+        logger.info(f"板块推送循环启动，间隔: {sector_interval}s")
+        while self._running:
+            try:
+                if not self._has_subscribers("sectors"):
+                    logger.debug("板块推送: 无订阅者，等待...")
+                    await asyncio.sleep(5)
+                    continue
+
+                # 获取行业板块数据（ths_sector）和概念板块数据（sina_sector）
+                ths_result = await self.data_manager.fetch_with_source("sector_ths_akshare")
+                sina_result = await self.data_manager.fetch_with_source("sina_sector")
+
+                industry_sectors = []
+                if ths_result.success and ths_result.data:
+                    data = ths_result.data
+                    if isinstance(data, dict) and "sectors" in data:
+                        industry_sectors = data.get("sectors", [])
+                    elif isinstance(data, list):
+                        industry_sectors = data
+
+                concept_sectors = []
+                if sina_result.success and sina_result.data:
+                    sina_data = sina_result.data
+                    if isinstance(sina_data, list):
+                        concept_sectors = sina_data
+                    elif isinstance(sina_data, dict) and "sectors" in sina_data:
+                        concept_sectors = sina_data.get("sectors", [])
+
+                new_data = {
+                    "industry": industry_sectors,
+                    "concept": concept_sectors,
+                    "industry_count": len(industry_sectors),
+                    "concept_count": len(concept_sectors),
+                }
+
+                if self._last_sector_data is not None:
+                    # 检查是否有变化
+                    old_industry = self._last_sector_data.get("industry", [])
+                    old_concept = self._last_sector_data.get("concept", [])
+
+                    industry_diff = self._diff_data("industry", old_industry, industry_sectors)
+                    concept_diff = self._diff_data("concept", old_concept, concept_sectors)
+
+                    if industry_diff is None and concept_diff is None:
+                        logger.debug("板块数据无变化，跳过推送")
+                        self._last_sector_data = new_data
+                        await asyncio.sleep(sector_interval)
+                        continue
+
+                    # 构建推送数据
+                    push_data = {
+                        "industry": industry_diff if industry_diff else industry_sectors,
+                        "concept": concept_diff if concept_diff else concept_sectors,
+                    }
+
+                    camel_data = _convert_dict_to_camel_case(push_data)
+                    sent = await self.ws_manager.broadcast_to_subscription(
+                        subscription="sectors",
+                        message_type="sector_update",
+                        data=camel_data,
+                    )
+                    logger.info(
+                        f"推送板块数据变化，发送到 {sent} 个客户端: "
+                        f"{len(push_data.get('industry', []))} 个行业，{len(push_data.get('concept', []))} 个概念"
+                    )
+                else:
+                    # 首次推送
+                    camel_data = _convert_dict_to_camel_case(new_data)
+                    sent = await self.ws_manager.broadcast_to_subscription(
+                        subscription="sectors",
+                        message_type="sector_update",
+                        data=camel_data,
+                    )
+                    logger.info(
+                        f"首次推送板块数据，发送到 {sent} 个客户端: "
+                        f"{len(industry_sectors)} 个行业，{len(concept_sectors)} 个概念"
+                    )
+
+                self._last_sector_data = new_data
+
+            except Exception as e:
+                logger.error(f"板块推送循环异常: {e}")
+
+            await asyncio.sleep(sector_interval)
+
     async def start(self):
         if self._running:
             logger.warning("推送器已在运行中")
@@ -370,6 +470,7 @@ class RealtimePusher:
             asyncio.create_task(self._push_funds_loop()),
             asyncio.create_task(self._push_commodities_loop()),
             asyncio.create_task(self._push_indices_loop()),
+            asyncio.create_task(self._push_sectors_loop()),
         ]
 
         logger.info(f"已启动 {len(self._tasks)} 个推送任务")

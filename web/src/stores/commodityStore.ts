@@ -93,6 +93,12 @@ export const useCommodityStore = defineStore('commodities', () => {
   const wsConnected = ref(false);
   const wsSubscribed = ref(false);
 
+  // 折线图历史数据（用于 streaming 实时绘制）
+  const commodityHistory = ref<Map<string, { time: string; price: number }[]>>(new Map());
+  // 当前选中显示折线图的商品
+  const selectedChartSymbol = ref<string | null>(null);
+  const MAX_HISTORY_POINTS = 500;
+
   // Getters
   const risingCommodities = computed(() =>
     commodities.value.filter((c) => c.changePercent > 0)
@@ -117,6 +123,30 @@ export const useCommodityStore = defineStore('commodities', () => {
       c.name.includes('原油')
     )
   );
+
+  // 获取当前选中的折线图历史数据
+  const selectedChartHistory = computed(() => {
+    if (!selectedChartSymbol.value) return [];
+    return commodityHistory.value.get(selectedChartSymbol.value) || [];
+  });
+
+  // 选中折线图商品
+  function selectChartSymbol(symbol: string | null) {
+    if (symbol === null) {
+      selectedChartSymbol.value = null;
+      return;
+    }
+    selectedChartSymbol.value = symbol;
+    // 如果还没有该商品的历史，先初始化当前价格
+    if (!commodityHistory.value.has(symbol)) {
+      const commodity = commodities.value.find(c => c.symbol === symbol);
+      if (commodity) {
+        const now = new Date();
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        commodityHistory.value.set(symbol, [{ time: timeStr, price: commodity.price }]);
+      }
+    }
+  }
 
   // 获取当前选中的分类数据
   const activeCategoryData = computed(() => {
@@ -814,6 +844,22 @@ export const useCommodityStore = defineStore('commodities', () => {
 
     // 更新最后更新时间
     lastUpdated.value = formatTime(new Date());
+
+    // 追加到折线图历史（如果有选中该商品）
+    if (selectedChartSymbol.value === symbol && price !== undefined) {
+      const now = new Date();
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+      const history = commodityHistory.value.get(symbol) || [];
+      // 防抖：跳过时间戳相同的重复推送
+      const lastPoint = history[history.length - 1];
+      if (!lastPoint || lastPoint.time !== timeStr) {
+        const newHistory = [...history, { time: timeStr, price }];
+        if (newHistory.length > MAX_HISTORY_POINTS) {
+          newHistory.splice(0, newHistory.length - MAX_HISTORY_POINTS);
+        }
+        commodityHistory.value.set(symbol, newHistory);
+      }
+    }
   }
 
   /**
@@ -888,6 +934,10 @@ export const useCommodityStore = defineStore('commodities', () => {
     // WebSocket State
     wsConnected,
     wsSubscribed,
+    // 折线图 State
+    commodityHistory,
+    selectedChartSymbol,
+    selectedChartHistory,
     // 关注列表 State
     watchedCommodities,
     watchlistLoading,
@@ -940,6 +990,8 @@ export const useCommodityStore = defineStore('commodities', () => {
     updateCommoditiesBatch,
     initWebSocket,
     unsubscribeWebSocket,
+    // 折线图 Actions
+    selectChartSymbol,
   };
 }, {
   persist: {

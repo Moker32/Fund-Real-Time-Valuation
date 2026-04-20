@@ -15,7 +15,7 @@
 """
 
 from .aggregator import SectorDataAggregator
-from .akshare_em_source import EastMoneySectorDataSource, EastMoneySectorSource
+from .akshare_em_source import EastMoneySectorDataSource, EastMoneySectorSource, ThsSectorSource
 from .detail_source import EastMoneyConceptDetailSource, EastMoneyIndustryDetailSource
 from .eastmoney_source import EastMoneyDirectSource
 from .fund_flow_source import FundFlowConceptSource, FundFlowIndustrySource
@@ -30,6 +30,8 @@ __all__ = [
     # 东方财富 akshare
     "EastMoneySectorSource",
     "EastMoneySectorDataSource",
+    # 同花顺
+    "ThsSectorSource",
     # 板块详情
     "EastMoneyIndustryDetailSource",
     "EastMoneyConceptDetailSource",

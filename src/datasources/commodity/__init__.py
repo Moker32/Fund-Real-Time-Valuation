@@ -1,11 +1,10 @@
 """
 商品数据源模块
 
-提供多种商品数据源：
-- YFinanceCommoditySource: 国际商品期货 + 加密货币
-- AKShareCommoditySource: 国内黄金 (上海黄金交易所)
-- AKShareForeignFuturesSource: 外盘期货 (LME/NYMEX/CBOT等)
+提供单一商品数据源：
+- CommodityDataSource: 商品数据源基类
 - CommodityDataAggregator: 多数据源聚合器
+- CommodityRealtimeSource: akshare 国际大宗商品实时行情 + Binance BTC
 
 辅助函数:
 - get_all_commodity_types()
@@ -21,7 +20,6 @@ from .aggregator import (
     identify_category,
     search_commodities,
 )
-from .akshare_source import AKShareCommoditySource
 from .base import (
     MAX_CACHE_SIZE,
     MAX_RETRIES,
@@ -29,26 +27,14 @@ from .base import (
     CommoditySearchResponse,
     CommoditySearchResult,
 )
-from .foreign_source import (
-    FOREIGN_FUTURES_NAMES,
-    FOREIGN_FUTURES_REVERSE,
-    FOREIGN_FUTURES_TICKERS,
-    AKShareForeignFuturesSource,
-)
-from .yfinance_source import YFinanceCommoditySource
+from .akshare_source import CommodityRealtimeSource
 
 __all__ = [
     # 基类
     "CommodityDataSource",
     # 数据源
-    "YFinanceCommoditySource",
-    "AKShareCommoditySource",
-    "AKShareForeignFuturesSource",
+    "CommodityRealtimeSource",
     "CommodityDataAggregator",
-    # 外盘常量
-    "FOREIGN_FUTURES_TICKERS",
-    "FOREIGN_FUTURES_REVERSE",
-    "FOREIGN_FUTURES_NAMES",
     # 搜索
     "SEARCHABLE_COMMODITIES",
     "CommoditySearchResult",

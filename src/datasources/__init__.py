@@ -11,7 +11,7 @@
 使用示例:
     from src.datasources import (
         TiantianFundDataSource,
-        AKShareCommoditySource,
+        CommodityRealtimeSource,
         DataSourceManager,
         DataGateway,
     )
@@ -46,10 +46,9 @@ from .base import (
 )
 from .cache_cleaner import CacheCleaner, get_cache_cleaner, startup_cleanup
 from .commodity_source import (
-    AKShareCommoditySource,
     CommodityDataAggregator,
     CommodityDataSource,
-    YFinanceCommoditySource,
+    CommodityRealtimeSource,
 )
 from .fund import (
     EastMoneyFundDataSource,
@@ -111,8 +110,7 @@ __all__ = [
     "Fund123DataSource",
     # 商品数据源
     "CommodityDataSource",
-    "YFinanceCommoditySource",
-    "AKShareCommoditySource",
+    "CommodityRealtimeSource",
     "CommodityDataAggregator",
     # 数据聚合器
     "DataAggregator",

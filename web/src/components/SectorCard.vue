@@ -1,5 +1,5 @@
 <template>
-  <div class="sector-card" :class="{ loading: loading }">
+  <div class="sector-card" :class="{ loading: loading }" @click="emit('click', sector)">
     <template v-if="loading">
       <div class="skeleton-content">
         <div class="skeleton skeleton-title"></div>
@@ -85,6 +85,10 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
 });
+
+const emit = defineEmits<{
+  click: [sector: Sector];
+}>();
 
 // eslint-disable-next-line no-useless-assignment
 const changeClass = computed(() => {
