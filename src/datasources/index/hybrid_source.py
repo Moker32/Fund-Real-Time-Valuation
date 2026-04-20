@@ -707,9 +707,9 @@ class HybridIndexSource(IndexDataSource):
                 try:
                     ticker_obj = yf.Ticker(ticker)
 
-                    # 港股指数需要使用5天数据才能获取分钟级数据
-                    # 其他指数可以使用1天数据
-                    period = "5d" if index_type in HK_INDICES else "1d"
+                    # 港股/日经/欧洲指数都需要5天数据才能获取分钟级数据
+                    # (yfinance 在 period="1d" 时 interval="1m" 对部分指数返回空)
+                    period = "5d"
 
                     hist = await asyncio.wait_for(
                         loop.run_in_executor(

@@ -41,7 +41,7 @@ class DataSourceManager:
 
     def __init__(
         self,
-        max_concurrent: int = 10,
+        max_concurrent: int = 20,
         enable_load_balancing: bool = False,
         health_check_interval: int = 60,
     ):
@@ -62,8 +62,8 @@ class DataSourceManager:
             DataSourceType.SECTOR: [],
             DataSourceType.STOCK: [],  # 指数数据源复用此类型
         }
-        self._max_concurrent = max_concurrent  # 延迟创建 semaphore
-        self._semaphore: asyncio.Semaphore | None = None  # 延迟初始化
+        self._max_concurrent = max_concurrent  # 单个全局 semaphore 的最大并发
+        self._semaphores: dict[DataSourceType, asyncio.Semaphore] = {}  # 按类型分桶，避免跨类型争抢
         self._enable_load_balancing = enable_load_balancing
         self._round_robin_index: dict[DataSourceType, int] = {
             DataSourceType.FUND: 0,
@@ -79,11 +79,12 @@ class DataSourceManager:
         self._health_checker = DataSourceHealthChecker(check_interval=health_check_interval)
         self._health_interceptor = HealthCheckInterceptor(self._health_checker)
 
-    async def _get_semaphore(self) -> asyncio.Semaphore:
-        """延迟初始化 semaphore"""
-        if self._semaphore is None:
-            self._semaphore = asyncio.Semaphore(self._max_concurrent)
-        return self._semaphore
+    async def _get_semaphore(self, source_type: DataSourceType | None = None) -> asyncio.Semaphore:
+        """延迟初始化 semaphore（按类型分桶，避免跨类型争抢）"""
+        key = source_type or DataSourceType.STOCK  # fetch_with_source 调用时无 type，用 STOCK 作为兜底
+        if key not in self._semaphores:
+            self._semaphores[key] = asyncio.Semaphore(self._max_concurrent)
+        return self._semaphores[key]
 
     def register(self, source: DataSource, config: DataSourceConfig | None = None) -> None:
         """
@@ -190,7 +191,7 @@ class DataSourceManager:
             DataSourceResult: 第一个成功的数据源结果
         """
         start_time = time.time()
-        async with await self._get_semaphore():
+        async with await self._get_semaphore(source_type):
             sources = self._get_ordered_sources(source_type)
             errors = []
 
@@ -419,7 +420,7 @@ class DataSourceManager:
 
         # 并行执行 - 使用信号量限制并发数
         async def fetch_one(params: dict[str, Any]) -> DataSourceResult:
-            async with await self._get_semaphore():
+            async with await self._get_semaphore(source_type):
                 source_args = params.get("args", args)
                 source_kwargs = {**kwargs, **params.get("kwargs", {})}
 
