@@ -227,12 +227,46 @@ export const useIndexStore = defineStore('indices', () => {
   const wsConnected = ref(false);
   const wsSubscribed = ref(false);
 
+  // 追加 intraday 数据点（streaming 模式，用于折线图实时绘制）
+  function appendIntradayPoint(
+    indexType: string,
+    price: number,
+    change?: number,
+  ) {
+    const index = indices.value.findIndex((i) => i.index === indexType);
+    if (index === -1) return;
+
+    const current = indices.value[index];
+    if (!current.intraday || current.intraday.length === 0) return;
+
+    // 构造当前时间点（HH:MM:SS，兼容日内数据格式）
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+    // 防抖：跳过与最后一个数据点时间相同的重复推送（push 间隔 10s，通常不重复）
+    const lastPoint = current.intraday[current.intraday.length - 1];
+    if (lastPoint && lastPoint.time === timeStr) return;
+
+    const newPoint: IndexIntraday = { time: timeStr, price, change };
+    const newIntraday = [...current.intraday, newPoint];
+
+    // 超过 maxPoints 丢弃最老的点
+    const maxPoints = 500;
+    const trimmed = newIntraday.length > maxPoints ? newIntraday.slice(-maxPoints) : newIntraday;
+
+    indices.value.splice(index, 1, { ...current, intraday: trimmed });
+  }
+
   // 更新单个指数数据（用于 WebSocket 实时更新）
   function updateIndexFromWS(update: Partial<MarketIndex> & { index: string }) {
     const idx = indices.value.findIndex((i) => i.index === update.index);
     if (idx !== -1) {
       const current = indices.value[idx];
       indices.value.splice(idx, 1, { ...current, ...update });
+    }
+    // 同时追加 intraday 数据点（折线图 streaming 追加）
+    if (update.price !== undefined) {
+      appendIntradayPoint(update.index, update.price, update.change);
     }
   }
 
