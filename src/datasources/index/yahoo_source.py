@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
@@ -111,7 +111,7 @@ class YahooIndexSource(IndexDataSource):
             if market_time:
                 try:
                     time_str = datetime.fromtimestamp(market_time).strftime("%Y-%m-%d %H:%M:%S")
-                    data_timestamp = datetime.fromtimestamp(market_time, datetime.UTC).strftime(
+                    data_timestamp = datetime.fromtimestamp(market_time, timezone.utc).strftime(
                         "%Y-%m-%dT%H:%M:%SZ"
                     )
                 except (ValueError, TypeError, OSError):
