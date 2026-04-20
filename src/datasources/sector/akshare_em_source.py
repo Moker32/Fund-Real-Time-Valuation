@@ -590,7 +590,7 @@ class ThsSectorSource(DataSource):
         sectors = []
         for idx, row in df.iterrows():
             item = {
-                "code": f"THS_{int(row.get("序号", idx))}",  # 同花顺无代码，用序号
+                "code": f'THS_{int(row.get("序号", idx))}',  # 同花顺无代码，用序号
                 "name": str(row.get("板块", "")),
                 "price": self._safe_float(row.get("均价", 0)),
                 "change": self._safe_float(row.get("涨跌幅", 0)),  # 同花顺无涨跌额，用涨跌幅
