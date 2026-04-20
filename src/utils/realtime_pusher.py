@@ -408,26 +408,23 @@ class RealtimePusher:
                     "concept_count": len(concept_sectors),
                 }
 
-                if self._last_sector_data is not None:
-                    # 检查是否有变化
+                # 与 commodity/index loop 保持一致：diff 只决定是否推送，推送时发完整数据
+                should_push = False
+                if self._last_sector_data is None:
+                    should_push = True
+                else:
                     old_industry = self._last_sector_data.get("industry", [])
                     old_concept = self._last_sector_data.get("concept", [])
-
                     industry_diff = self._diff_data("industry", old_industry, industry_sectors)
                     concept_diff = self._diff_data("concept", old_concept, concept_sectors)
+                    if industry_diff is not None or concept_diff is not None:
+                        should_push = True
 
-                    if industry_diff is None and concept_diff is None:
-                        logger.debug("板块数据无变化，跳过推送")
-                        self._last_sector_data = new_data
-                        await asyncio.sleep(sector_interval)
-                        continue
-
-                    # 构建推送数据
+                if should_push:
                     push_data = {
-                        "industry": industry_diff if industry_diff else industry_sectors,
-                        "concept": concept_diff if concept_diff else concept_sectors,
+                        "industry": industry_sectors,
+                        "concept": concept_sectors,
                     }
-
                     camel_data = _convert_dict_to_camel_case(push_data)
                     sent = await self.ws_manager.broadcast_to_subscription(
                         subscription="sectors",
@@ -435,19 +432,7 @@ class RealtimePusher:
                         data=camel_data,
                     )
                     logger.info(
-                        f"推送板块数据变化，发送到 {sent} 个客户端: "
-                        f"{len(push_data.get('industry', []))} 个行业，{len(push_data.get('concept', []))} 个概念"
-                    )
-                else:
-                    # 首次推送
-                    camel_data = _convert_dict_to_camel_case(new_data)
-                    sent = await self.ws_manager.broadcast_to_subscription(
-                        subscription="sectors",
-                        message_type="sector_update",
-                        data=camel_data,
-                    )
-                    logger.info(
-                        f"首次推送板块数据，发送到 {sent} 个客户端: "
+                        f"推送板块数据，发送到 {sent} 个客户端: "
                         f"{len(industry_sectors)} 个行业，{len(concept_sectors)} 个概念"
                     )
 

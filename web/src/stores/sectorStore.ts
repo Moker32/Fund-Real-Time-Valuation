@@ -20,6 +20,7 @@ interface WSSectorUpdate {
   changePercent: number;
   stockCount?: number;
   timestamp?: string;
+  mainInflow?: number;
 }
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -330,7 +331,7 @@ export const useSectorStore = defineStore('sectors', () => {
 
     // 监听板块更新消息
     wsStore.on('sector_update', (data: unknown) => {
-      console.log('[SectorStore] 收到 sector_update:', JSON.stringify(data)?.substring(0, 200));
+
       try {
         // 后端推送格式: { industry: [...], concept: [...] }
         const payload = data as { industry?: WSSectorUpdate[]; concept?: WSSectorUpdate[] };

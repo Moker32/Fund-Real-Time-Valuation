@@ -194,7 +194,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useSectorStore, type SectorType } from '@/stores/sectorStore';
 import SectorCard from '@/components/SectorCard.vue';
 import SectorChart from '@/components/SectorChart.vue';
@@ -246,8 +246,6 @@ const selectedChart = computed(() => {
     currentPrice: sector.price || 0,
     change: sector.change || 0,
     changePercent: sector.changePercent || 0,
-    high: sector.high || sector.price || 0,
-    low: sector.low || sector.price || 0,
     chartHistory: sectorStore.selectedChartHistory,
   };
 });
@@ -291,6 +289,10 @@ function formatFlow(value: number | undefined): string {
 onMounted(async () => {
   sectorStore.initWebSocket();
   await sectorStore.fetchIndustrySectors({ showError: true });
+});
+
+onUnmounted(() => {
+  sectorStore.unsubscribeWebSocket();
 });
 </script>
 
