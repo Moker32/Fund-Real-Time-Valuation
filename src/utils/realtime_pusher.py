@@ -16,17 +16,7 @@ from src.utils.websocket_manager import (
     _convert_dict_to_camel_case,
     get_websocket_manager,
 )
-from typing import TypedDict
-
 logger = logging.getLogger(__name__)
-
-
-class DiffResult(TypedDict):
-    """_diff_data 返回类型：有变化时返回变化项列表，无变化时返回 None"""
-    added: list[dict]
-    updated: list[dict]
-    removed: list[dict]
-    unchanged: list[dict]
 
 # 交易时段推送间隔（秒）
 # 注意：基金推送间隔设为 30 秒是为了平衡实时性和 API 压力
