@@ -4,6 +4,7 @@ import { indexApi } from '@/api';
 import type { MarketIndex, IndexHistory, IndexIntraday } from '@/types';
 import { ApiError } from '@/api';
 import { formatTime } from '@/utils/time';
+import { useWSStore } from './wsStore';
 
 export interface FetchOptions {
   retries?: number;
@@ -222,6 +223,77 @@ export const useIndexStore = defineStore('indices', () => {
     error.value = null;
   }
 
+  // WebSocket 相关状态
+  const wsConnected = ref(false);
+  const wsSubscribed = ref(false);
+
+  // 更新单个指数数据（用于 WebSocket 实时更新）
+  function updateIndexFromWS(update: Partial<MarketIndex> & { index: string }) {
+    const idx = indices.value.findIndex((i) => i.index === update.index);
+    if (idx !== -1) {
+      const current = indices.value[idx];
+      indices.value.splice(idx, 1, { ...current, ...update });
+    }
+  }
+
+  // 批量更新指数数据（用于 WebSocket 批量推送）
+  function updateIndicesBatch(updates: (Partial<MarketIndex> & { index: string })[]) {
+    for (const update of updates) {
+      const idx = indices.value.findIndex((i) => i.index === update.index);
+      if (idx !== -1) {
+        const current = indices.value[idx];
+        indices.value.splice(idx, 1, { ...current, ...update });
+      }
+    }
+  }
+
+  /**
+   * 初始化 WebSocket 连接并订阅指数频道
+   */
+  function initWebSocket() {
+    const wsStore = useWSStore();
+
+    // 监听连接状态
+    wsStore.on('connected', () => {
+      wsConnected.value = true;
+      wsStore.subscribe('indices');
+      wsSubscribed.value = true;
+    });
+
+    wsStore.on('disconnected', () => {
+      wsConnected.value = false;
+      wsSubscribed.value = false;
+    });
+
+    // 监听指数更新消息
+    wsStore.on('index_update', (data: unknown) => {
+      try {
+        const payload = data as { indices?: (Partial<MarketIndex> & { index: string })[] };
+        if (payload.indices && Array.isArray(payload.indices)) {
+          updateIndicesBatch(payload.indices);
+        }
+      } catch (e) {
+        console.error('[IndexStore] 处理 WebSocket 消息失败:', e);
+      }
+    });
+
+    // 如果已经连接，直接订阅
+    if (wsStore.isConnected) {
+      wsConnected.value = true;
+      wsStore.subscribe('indices');
+      wsSubscribed.value = true;
+    }
+  }
+
+  /**
+   * 取消 WebSocket 订阅
+   */
+  function unsubscribeWebSocket() {
+    const wsStore = useWSStore();
+    wsStore.unsubscribe('indices');
+    wsSubscribed.value = false;
+  }
+
   // 重试函数
   async function retry() {
     await fetchIndices();
@@ -235,6 +307,9 @@ export const useIndexStore = defineStore('indices', () => {
     lastUpdated,
     retryCount,
     maxRetries,
+    // WebSocket State
+    wsConnected,
+    wsSubscribed,
     // Getters
     indicesByRegion,
     risingIndices,
@@ -248,5 +323,10 @@ export const useIndexStore = defineStore('indices', () => {
     fetchIndexIntraday,
     clearError,
     retry,
+    // WebSocket Actions
+    initWebSocket,
+    unsubscribeWebSocket,
+    updateIndexFromWS,
+    updateIndicesBatch,
   };
 });

@@ -281,6 +281,8 @@ async function preloadIndexIntraday() {
 }
 
 onMounted(async () => {
+  // 初始化 WebSocket 连接（接收实时推送）
+  indexStore.initWebSocket();
   // 先获取指数列表
   if (indexStore.indices.length === 0) {
     await indexStore.fetchIndices({ force: true });
