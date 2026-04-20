@@ -87,7 +87,7 @@
             <!-- 区间收益率标签 -->
             <div v-if="fund.intervalReturns" class="interval-returns">
               <span
-                v-for="[label, pct] in Object.entries(fund.intervalReturns)"
+                v-for="[label, pct] in Object.entries(fund.intervalReturns || {})"
                 :key="label"
                 class="return-tag"
                 :class="pct >= 0 ? 'return-up' : 'return-down'"

@@ -893,11 +893,11 @@ export const useCommodityStore = defineStore('commodities', () => {
     // 监听大宗商品更新消息
     wsStore.on('commodity_update', (data: unknown) => {
       try {
-        const update = data as WSCommodityUpdate | WSCommodityUpdate[];
-        if (Array.isArray(update)) {
-          updateCommoditiesBatch(update);
-        } else {
-          updateCommodity(update);
+        // 修复: 后端发送 { commodities: [...] }，需解包
+        const payload = data as { commodities?: WSCommodityUpdate[] };
+        const updates = payload.commodities;
+        if (updates && Array.isArray(updates) && updates.length > 0) {
+          updateCommoditiesBatch(updates);
         }
       } catch (e) {
         console.error('[CommodityStore] 处理 WebSocket 消息失败:', e);

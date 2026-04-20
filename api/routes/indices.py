@@ -74,7 +74,7 @@ async def fetch_yahoo_market_state(index_type: str) -> str | None:
     now = asyncio.get_event_loop().time
     if index_type in _market_state_cache:
         state, timestamp = _market_state_cache[index_type]
-        if now() - timestamp < _MARKET_STATE_CACHE_DURATION:
+        if now - timestamp < _MARKET_STATE_CACHE_DURATION:
             return state
 
     ticker = YAHOO_TICKERS.get(index_type)

@@ -14,6 +14,7 @@ import re
 import time
 from typing import Any
 
+import os
 import httpx
 import pandas as pd
 
@@ -90,7 +91,7 @@ class Fund123DataSource(DataSource):
                     max_connections=20,
                     keepalive_expiry=30.0,  # 30s 后清理空闲 keepalive 连接
                 ),
-                verify=False,
+                verify=os.environ.get("FUND123_SKIP_SSL_VERIFY", "").lower() in ("1", "true"),
                 headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
                     "Accept": "application/json, text/plain, */*",

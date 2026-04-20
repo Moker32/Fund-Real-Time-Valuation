@@ -49,6 +49,8 @@ const commodityStore = useCommodityStore();
 const searchDialogVisible = ref(false);
 
 onMounted(async () => {
+  // 初始化 WebSocket 连接（接收实时推送）
+  commodityStore.initWebSocket();
   // 先加载分类数据
   if (commodityStore.categories.length === 0) {
     await commodityStore.fetchCategories({ force: true });

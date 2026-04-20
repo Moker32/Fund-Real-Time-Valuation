@@ -193,13 +193,20 @@ class WebSocketManager:
 
             self._clients[client_id] = client
 
+            # TOCTOU 修复: accept() 必须在锁内执行，确保 max_connections 检查原子化
+            try:
+                await websocket.accept()
+                client.state = ConnectionState.CONNECTED
+            except Exception as e:
+                # accept 失败，从 _clients 移除（仍在锁内）
+                self._clients.pop(client_id, None)
+                logger.warning(f"WebSocket accept 失败: {client_id}, error: {e}")
+                return
+
+        logger.info(f"WebSocket 客户端连接: {client_id}, 当前连接数: {len(self._clients)}")
+
         try:
-            await websocket.accept()
-            client.state = ConnectionState.CONNECTED
-            logger.info(f"WebSocket 客户端连接: {client_id}, 当前连接数: {len(self._clients)}")
-
             yield client
-
         except Exception as e:
             logger.warning(f"WebSocket 连接异常: {client_id}, error: {e}")
             raise
