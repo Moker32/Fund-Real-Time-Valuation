@@ -1,15 +1,14 @@
 <template>
   <div class="commodity-view">
     <!-- 折线图（选中商品时显示） -->
-    <CommodityChart
+    <StreamingChart
       v-if="selectedChart"
+      type="commodity"
       :symbol="selectedChart.symbol"
       :name="selectedChart.name"
       :current-price="selectedChart.price"
       :change="selectedChart.change"
       :change-percent="selectedChart.changePercent"
-      :high="selectedChart.high"
-      :low="selectedChart.low"
       :chart-history="store.selectedChartHistory"
       :chart-height="160"
       @close="store.selectChartSymbol(null)"
@@ -78,7 +77,7 @@ import { computed } from 'vue';
 import { useCommodityStore } from '@/stores/commodityStore';
 import CommodityTabs from './CommodityTabs.vue';
 import CommodityCard from './CommodityCard.vue';
-import CommodityChart from './CommodityChart.vue';
+import StreamingChart from './StreamingChart.vue';
 
 const store = useCommodityStore();
 

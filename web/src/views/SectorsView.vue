@@ -93,15 +93,14 @@
     </div>
 
     <!-- Streaming Chart -->
-    <SectorChart
+    <StreamingChart
       v-if="selectedChart"
+      type="sector"
       :symbol="selectedChart.symbol"
       :name="selectedChart.name"
       :current-price="selectedChart.currentPrice"
       :change="selectedChart.change"
       :change-percent="selectedChart.changePercent"
-      :high="selectedChart.high"
-      :low="selectedChart.low"
       :chart-history="selectedChart.chartHistory"
       @close="sectorStore.selectChartSymbol(null)"
     />
@@ -197,7 +196,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useSectorStore, type SectorType } from '@/stores/sectorStore';
 import SectorCard from '@/components/SectorCard.vue';
-import SectorChart from '@/components/SectorChart.vue';
+import StreamingChart from '@/components/StreamingChart.vue';
 import FlowSummary from '@/components/FlowSummary.vue';
 import CapitalFlowRank from '@/components/CapitalFlowRank.vue';
 import type { Sector } from '@/types';

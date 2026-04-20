@@ -1,5 +1,5 @@
 <template>
-  <div class="commodity-chart">
+  <div :class="rootClass">
     <div class="chart-header">
       <div class="chart-title">
         <span class="symbol">{{ symbol }}</span>
@@ -42,13 +42,12 @@ interface ChartDataItem {
 }
 
 const props = defineProps<{
+  type?: 'sector' | 'commodity';
   symbol: string;
   name: string;
   currentPrice: number;
   change: number;
   changePercent: number;
-  high: number;
-  low: number;
   chartHistory: ChartDataItem[];
   chartHeight?: number;
 }>();
@@ -56,6 +55,10 @@ const props = defineProps<{
 defineEmits<{
   close: [];
 }>();
+
+const rootClass = computed(() =>
+  props.type === 'commodity' ? 'streaming-chart commodity-chart' : 'streaming-chart sector-chart'
+);
 
 const trend = computed((): 'rising' | 'falling' | 'neutral' => {
   if (props.changePercent > 0) return 'rising';
@@ -70,7 +73,6 @@ const priceClass = computed(() => {
 });
 
 const baseline = computed(() => {
-  // 用昨收作为基准线
   return props.currentPrice - props.change;
 });
 
@@ -96,7 +98,7 @@ function formatPercent(value: number): string {
 </script>
 
 <style lang="scss" scoped>
-.commodity-chart {
+.streaming-chart {
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
