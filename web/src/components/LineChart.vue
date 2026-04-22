@@ -203,7 +203,11 @@ const onCursorMove = (u: uPlot) => {
     return;
   }
 
-  const ts = realTimestamps.value.length > 0 ? realTimestamps.value[idx] : processedTimestamps.value[idx];
+  const ts = realTimestamps.value[idx] ?? processedTimestamps.value[idx];
+  if (ts == null) {
+    isTooltipVisible.value = false;
+    return;
+  }
   const date = new Date(ts * 1000);
 
   if (isIntradayData(props.data)) {
@@ -214,7 +218,8 @@ const onCursorMove = (u: uPlot) => {
 
   tooltipValue.value = val.toFixed(4);
 
-  const xPos = u.valToPos(processedTimestamps.value[idx], 'x', true);
+  const xTs = processedTimestamps.value[idx];
+  const xPos = xTs != null ? u.valToPos(xTs, 'x', true) : 0;
   const yPos = u.valToPos(val, 'y', true);
   const containerWidth = chartContainer.value?.clientWidth ?? 300;
 
@@ -429,6 +434,12 @@ const getLunchBreakConfig = (): { start: number; end: number } => {
 
 const hasLunchBreak = (data: { time: string }[]): boolean => {
   const { start, end } = getLunchBreakConfig();
+
+  // 无午休配置（start >= end），直接返回 false
+  if (start >= end) {
+    return false;
+  }
+
   let hasMorning = false;
   let hasAfternoon = false;
   let hasLunchData = false;
@@ -458,14 +469,11 @@ const minutesToTimestamp = (minutes: number, baseDate?: Date): number => {
 };
 
 const buildCompressedIntradayData = (sortedData: { time: string; price?: number; close?: number | null }[]) => {
-  const { start, end } = getLunchBreakConfig();
   const displayTimestamps: number[] = [];
   const values: (number | null)[] = [];
   const reals: number[] = [];
 
-  let lunchIdx = -1;
   let prevDisplayTs: number | null = null;
-  let baseDate: Date | undefined;
 
   for (const item of sortedData) {
     const minutes = timeToMinutes(item.time);
@@ -475,26 +483,13 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
     if (price === undefined) continue;
 
     const realTs = parseTimeToTimestamp(item.time);
-    if (!baseDate) {
-      baseDate = new Date(realTs * 1000);
-    }
 
-    let displayMinutes: number;
-    if (minutes <= start) {
-      displayMinutes = minutes;
-    } else {
-      displayMinutes = minutes - (end - start);
-    }
+    // 直接使用原始时间戳
+    const displayTs = realTs;
 
-    const displayTs = minutesToTimestamp(displayMinutes, baseDate);
-
-    if (lunchIdx === -1 && minutes > start && displayTimestamps.length > 0) {
-      lunchIdx = displayTimestamps.length;
-    }
-
-    // 如果当前时间戳与上一个时间戳相同（压缩后重叠），插入 null 断开连接
+    // 如果当前时间戳与上一个时间戳相同，插入 null 断开连接
     if (prevDisplayTs !== null && displayTs <= prevDisplayTs) {
-      displayTimestamps.push(prevDisplayTs + 1); // 微小偏移
+      displayTimestamps.push(prevDisplayTs + 1);
       values.push(null);
       reals.push(0);
     }
@@ -503,10 +498,6 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
     values.push(price);
     reals.push(realTs);
     prevDisplayTs = displayTs;
-  }
-
-  if (lunchIdx > 0) {
-    lunchBreakX.value = minutesToTimestamp(start, baseDate);
   }
 
   processedTimestamps.value = displayTimestamps;
@@ -622,8 +613,6 @@ watch(() => props.baseline, () => {
 
 // streaming 模式下的增量追加逻辑
 const updateDataStreaming = (validData: { time: string; price?: number; close?: number | null }[]) => {
-  const { start, end } = getLunchBreakConfig();
-
   // 首次数据（全量构建）
   if (lastDataLen.value === 0 || processedTimestamps.value.length === 0) {
     lastDataLen.value = validData.length;
@@ -656,7 +645,14 @@ const updateDataStreaming = (validData: { time: string; price?: number; close?: 
 
   rawDataItems.value = [...validData];
 
-  const baseDate = new Date();
+  // 从已有数据提取 baseDate，保持与 buildCompressedIntradayData 一致
+  let baseDate: Date;
+  const firstRealTs = realTimestamps.value[0];
+  if (firstRealTs != null && firstRealTs > 0) {
+    baseDate = new Date(firstRealTs * 1000);
+  } else {
+    baseDate = new Date();
+  }
   baseDate.setHours(0, 0, 0, 0);
 
   // 处理每个新增点
@@ -670,22 +666,16 @@ const updateDataStreaming = (validData: { time: string; price?: number; close?: 
     const realTs = parseTimeToTimestamp(item.time);
 
     // 跳过时间相同的重复点
-    const lastRealTs = realTimestamps.value.length > 0 ? realTimestamps.value[realTimestamps.value.length - 1] : 0;
-    if (realTs === lastRealTs) continue;
+    const lastRealTs = realTimestamps.value[realTimestamps.value.length - 1];
+    if (lastRealTs != null && realTs === lastRealTs) continue;
 
-    // 计算压缩后的时间戳
-    let displayMinutes: number;
-    if (minutes <= start) {
-      displayMinutes = minutes;
-    } else {
-      displayMinutes = minutes - (end - start);
-    }
+    // 直接使用原始时间戳
+    const displayTs = realTs;
 
-    const displayTs = minutesToTimestamp(displayMinutes, baseDate);
-    const lastDisplayTs = processedTimestamps.value.length > 0 ? processedTimestamps.value[processedTimestamps.value.length - 1] : 0;
+    const lastDisplayTs = processedTimestamps.value[processedTimestamps.value.length - 1];
 
-    // 如果压缩后时间戳小于等于上一个（午休压缩导致的时间重叠），插入 null 断开
-    if (displayTs <= lastDisplayTs) {
+    // 如果时间戳重叠，插入 null 断开
+    if (lastDisplayTs != null && displayTs <= lastDisplayTs) {
       processedTimestamps.value.push(lastDisplayTs + 1);
       processedValues.value.push(null);
       realTimestamps.value.push(0);
