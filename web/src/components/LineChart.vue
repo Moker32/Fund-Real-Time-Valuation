@@ -63,8 +63,10 @@ const processedTimestamps = ref<number[]>([]);
 const processedValues = ref<(number | null)[]>([]);
 const realTimestamps = ref<number[]>([]);
 const rawDataItems = ref<ChartDataItem[]>([]);
-const lunchBreakX = ref<number | null>(null);
 const lastDataLen = ref(0);  // streaming 模式追踪已有数据长度
+
+// 午休区间标记：用于绘制虚线
+const lunchBreakSegment = ref<{ start: number; end: number; price: number } | null>(null);
 
 const getTrendColor = (): string => {
   if (props.trend === 'rising') return '#ef4444';
@@ -332,15 +334,20 @@ const initChart = () => {
             const ctx = u.ctx;
             ctx.save();
 
-            if (lunchBreakX.value !== null) {
-              const xPos = u.valToPos(lunchBreakX.value, 'x', true);
-              if (xPos > u.bbox.left + 2 && xPos < u.bbox.left + u.bbox.width - 2) {
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([2, 2]);
+            // 绘制午休虚线段
+            const segment = lunchBreakSegment.value;
+            if (segment !== null) {
+              const startX = u.valToPos(segment.start, 'x', true);
+              const endX = u.valToPos(segment.end, 'x', true);
+              const yPos = u.valToPos(segment.price, 'y', true);
+
+              if (startX >= u.bbox.left && endX <= u.bbox.left + u.bbox.width) {
+                ctx.strokeStyle = (color.value + '50');
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
                 ctx.beginPath();
-                ctx.moveTo(xPos, u.bbox.top);
-                ctx.lineTo(xPos, u.bbox.top + u.bbox.height);
+                ctx.moveTo(startX, yPos);
+                ctx.lineTo(endX, yPos);
                 ctx.stroke();
               }
             }
@@ -469,12 +476,35 @@ const minutesToTimestamp = (minutes: number, baseDate?: Date): number => {
 };
 
 const buildCompressedIntradayData = (sortedData: { time: string; price?: number; close?: number | null }[]) => {
+  const { start, end } = getLunchBreakConfig();
+  const hasLunch = start < end;
+
   const displayTimestamps: number[] = [];
   const values: (number | null)[] = [];
   const reals: number[] = [];
 
   let prevDisplayTs: number | null = null;
+  let morningLastPrice: number | null = null;
+  let morningLastTs: number | null = null;
+  let lunchStartTs: number | null = null;
 
+  // 第一遍：找到上午最后的收盘价和时间
+  if (hasLunch) {
+    for (const item of sortedData) {
+      const minutes = timeToMinutes(item.time);
+      if (minutes < 0) continue;
+      const price = 'close' in item ? (item.close ?? item.price) : item.price;
+      if (price === undefined) continue;
+
+      if (minutes <= start) {
+        morningLastPrice = price;
+        morningLastTs = parseTimeToTimestamp(item.time);
+      }
+    }
+  }
+
+  // 第二遍：构建数据，在午休边界插入虚线标记点
+  let insertedLunch = false;
   for (const item of sortedData) {
     const minutes = timeToMinutes(item.time);
     if (minutes < 0) continue;
@@ -483,9 +513,28 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
     if (price === undefined) continue;
 
     const realTs = parseTimeToTimestamp(item.time);
-
-    // 直接使用原始时间戳
     const displayTs = realTs;
+
+    // 如果是上午最后一点且尚未插入午休标记，插入午休虚线段
+    if (hasLunch && !insertedLunch && morningLastPrice !== null && morningLastTs !== null && minutes > start) {
+      // 插入午休起点（用上午最后价格延续到 11:30）
+      lunchStartTs = minutesToTimestamp(start);
+      displayTimestamps.push(lunchStartTs);
+      values.push(morningLastPrice);
+      reals.push(0);
+      prevDisplayTs = lunchStartTs;
+
+      // 插入午休终点（13:00，同样价格）
+      const lunchEndTs = minutesToTimestamp(end);
+      displayTimestamps.push(lunchEndTs);
+      values.push(morningLastPrice);
+      reals.push(0);
+      prevDisplayTs = lunchEndTs;
+
+      // 记录虚线区间
+      lunchBreakSegment.value = { start: lunchStartTs, end: lunchEndTs, price: morningLastPrice };
+      insertedLunch = true;
+    }
 
     // 如果当前时间戳与上一个时间戳相同，插入 null 断开连接
     if (prevDisplayTs !== null && displayTs <= prevDisplayTs) {
