@@ -12,9 +12,6 @@ if TYPE_CHECKING:
     from src.datasources.trading_calendar_source import TradingCalendarSource
 from zoneinfo import ZoneInfo
 
-from src.db.database import DatabaseManager
-
-from .cache_strategy import FundCacheStrategy
 from .fund_cache_helpers import (
     _fund_info_cache,
     _fund_info_cache_ttl,
@@ -26,25 +23,8 @@ from .fund_cache_helpers import (
 
 logger = logging.getLogger(__name__)
 
-# 缓存策略单例
-_cache_strategy: FundCacheStrategy | None = None
 # 交易日历源单例
 _trading_calendar_source: "TradingCalendarSource | None" = None
-
-
-def get_cache_strategy() -> FundCacheStrategy:
-    """
-    获取缓存策略单例
-
-    Returns:
-        FundCacheStrategy: 缓存策略实例
-    """
-    global _cache_strategy
-    if _cache_strategy is None:
-        # 使用 DatabaseManager 实例
-        db_manager = DatabaseManager()
-        _cache_strategy = FundCacheStrategy(db_manager)
-    return _cache_strategy
 
 
 def get_basic_info_db(fund_code: str) -> dict[str, Any] | None:

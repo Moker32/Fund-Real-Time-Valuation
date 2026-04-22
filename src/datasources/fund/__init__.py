@@ -11,13 +11,6 @@
 - Fund123DataSource: fund123.cn 数据源
 """
 
-from .cache_strategy import (
-    CacheLockManager,
-    CacheLockTimeoutError,
-    CacheResult,
-    FundCacheStrategy,
-    get_fund_data_with_cache,
-)
 from .fund123_source import Fund123DataSource
 from .fund_backup_sources import EastMoneyFundDataSource, SinaFundDataSource
 from .fund_cache_helpers import (
@@ -38,7 +31,6 @@ from .fund_info_utils import (
     _is_net_value_cache_valid,
     _update_net_value_cache,
     get_basic_info_db,
-    get_cache_strategy,
     get_full_fund_info,
     get_fund_basic_info,
     get_fund_cache_stats,
@@ -75,11 +67,4 @@ __all__ = [
     "_get_latest_trading_day",
     "_is_net_value_cache_valid",
     "_update_net_value_cache",
-    # 缓存策略
-    "CacheLockManager",
-    "CacheLockTimeoutError",
-    "CacheResult",
-    "FundCacheStrategy",
-    "get_cache_strategy",
-    "get_fund_data_with_cache",
 ]

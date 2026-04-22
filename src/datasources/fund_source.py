@@ -8,12 +8,8 @@
 """
 
 from src.datasources.fund import (
-    CacheLockManager,
-    CacheLockTimeoutError,
-    CacheResult,
     EastMoneyFundDataSource,
     Fund123DataSource,
-    FundCacheStrategy,
     FundHistorySource,
     FundHistoryYFinanceSource,
     SinaFundDataSource,
@@ -29,13 +25,11 @@ from src.datasources.fund import (
     _update_net_value_cache,
     get_basic_info_dao,
     get_basic_info_db,
-    get_cache_strategy,
     get_daily_cache_dao,
     get_full_fund_info,
     get_fund_basic_info,
     get_fund_cache,
     get_fund_cache_stats,
-    get_fund_data_with_cache,
     get_intraday_cache_dao,
     save_basic_info_to_db,
 )
@@ -65,10 +59,4 @@ __all__ = [
     "_get_latest_trading_day",
     "_is_net_value_cache_valid",
     "_update_net_value_cache",
-    "CacheLockManager",
-    "CacheLockTimeoutError",
-    "CacheResult",
-    "FundCacheStrategy",
-    "get_cache_strategy",
-    "get_fund_data_with_cache",
 ]
