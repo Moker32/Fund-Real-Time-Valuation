@@ -485,10 +485,8 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
 
   let prevDisplayTs: number | null = null;
   let morningLastPrice: number | null = null;
-  let morningLastTs: number | null = null;
-  let lunchStartTs: number | null = null;
 
-  // 第一遍：找到上午最后的收盘价和时间
+  // 第一遍：找到上午最后的收盘价
   if (hasLunch) {
     for (const item of sortedData) {
       const minutes = timeToMinutes(item.time);
@@ -498,13 +496,12 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
 
       if (minutes <= start) {
         morningLastPrice = price;
-        morningLastTs = parseTimeToTimestamp(item.time);
       }
     }
   }
 
-  // 第二遍：构建数据，在午休边界插入虚线标记点
-  let insertedLunch = false;
+  // 第二遍：构建数据，在午休区间插入 null 断开连接
+  let pastLunch = false;
   for (const item of sortedData) {
     const minutes = timeToMinutes(item.time);
     if (minutes < 0) continue;
@@ -515,25 +512,22 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
     const realTs = parseTimeToTimestamp(item.time);
     const displayTs = realTs;
 
-    // 如果是上午最后一点且尚未插入午休标记，插入午休虚线段
-    if (hasLunch && !insertedLunch && morningLastPrice !== null && morningLastTs !== null && minutes > start) {
-      // 插入午休起点（用上午最后价格延续到 11:30）
-      lunchStartTs = minutesToTimestamp(start);
-      displayTimestamps.push(lunchStartTs);
-      values.push(morningLastPrice);
-      reals.push(0);
-      prevDisplayTs = lunchStartTs;
+    // 如果进入午休区间，插入 null 断开上午和下午的连接
+    if (hasLunch && !pastLunch && minutes > start) {
+      // 在午休开始时插入 null，断开上午到午休的连接
+      if (prevDisplayTs !== null) {
+        displayTimestamps.push(displayTs - 1);
+        values.push(null);
+        reals.push(0);
+      }
+      pastLunch = true;
 
-      // 插入午休终点（13:00，同样价格）
+      // 记录虚线区间（用于 draw hook 绘制虚线）
+      const lunchStartTs = minutesToTimestamp(start);
       const lunchEndTs = minutesToTimestamp(end);
-      displayTimestamps.push(lunchEndTs);
-      values.push(morningLastPrice);
-      reals.push(0);
-      prevDisplayTs = lunchEndTs;
-
-      // 记录虚线区间
-      lunchBreakSegment.value = { start: lunchStartTs, end: lunchEndTs, price: morningLastPrice };
-      insertedLunch = true;
+      if (morningLastPrice !== null) {
+        lunchBreakSegment.value = { start: lunchStartTs, end: lunchEndTs, price: morningLastPrice };
+      }
     }
 
     // 如果当前时间戳与上一个时间戳相同，插入 null 断开连接
