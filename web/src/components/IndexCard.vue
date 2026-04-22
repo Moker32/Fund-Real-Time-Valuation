@@ -50,7 +50,7 @@
         </div>
 
         <Transition name="chart-expand">
-          <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" :lunch-break="lunchBreak" :streaming="!!props.index.intraday?.length" :max-points="500" class="index-chart" />
+          <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" :lunch-break="lunchBreak" :timezone="timezone" :streaming="!!props.index.intraday?.length" :max-points="500" class="index-chart" />
         </Transition>
       </div>
 
@@ -130,6 +130,21 @@ const lunchBreak = computed(() => {
       return { start: 11 * 60 + 30, end: 13 * 60 }; // A 股 11:30-13:00
   }
 });
+
+// 市场时区配置
+const marketTimezone: Record<string, string> = {
+  'dax': 'Europe/Berlin',
+  'ftse': 'Europe/London',
+  'cac40': 'Europe/Paris',
+  'nikkei225': 'Asia/Tokyo',
+  'hang_seng': 'Asia/Hong_Kong',
+  'hang_seng_tech': 'Asia/Hong_Kong',
+  'dow_jones': 'America/New_York',
+  'nasdaq': 'America/New_York',
+  'sp500': 'America/New_York',
+};
+
+const timezone = computed(() => marketTimezone[props.index.index] ?? 'Asia/Shanghai');
 
 const prevPrice = ref<number | undefined>();
 const prevChangePercent = ref<number | undefined>();

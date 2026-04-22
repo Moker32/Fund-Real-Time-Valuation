@@ -38,6 +38,7 @@ const props = withDefaults(defineProps<{
   showAxes?: boolean;
   showTooltip?: boolean;
   lunchBreak?: LunchBreak;  // 午休时间段，如 { start: 690, end: 780 } 表示 11:30-13:00
+  timezone?: string;       // 市场时区，如 'Asia/Shanghai', 'Europe/Berlin', 'America/New_York'
   streaming?: boolean;      // streaming 模式，增量追加数据
   maxPoints?: number;       // streaming 模式下最大数据点数，超出后丢弃最老的点
 }>(), {
@@ -74,12 +75,39 @@ const getTrendColor = (): string => {
   return '#71717a';
 };
 
-const parseTimeToTimestamp = (timeStr: string): number => {
+// 将市场时间转换为 UTC 时间戳
+// timeStr: "HH:mm" 格式的市场当地时间
+// tzName: IANA 时区名，如 'Asia/Shanghai', 'Europe/Berlin'
+const parseTimeToTimestamp = (timeStr: string, tzName?: string): number => {
   const timeOnlyMatch = timeStr.match(/^(\d{1,2}):(\d{2})$/);
   if (timeOnlyMatch && timeOnlyMatch[1] && timeOnlyMatch[2]) {
     const hour = parseInt(timeOnlyMatch[1], 10);
     const minute = parseInt(timeOnlyMatch[2], 10);
     const now = new Date();
+
+    if (tzName) {
+      // 计算目标时区相对 UTC 的偏移
+      const utcStr = now.toLocaleString('en-US', { timeZone: 'UTC', hour12: false });
+      const utcH = parseInt(utcStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
+      const utcM = parseInt(utcStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
+
+      const targetStr = now.toLocaleString('en-US', { timeZone: tzName, hour12: false });
+      const targetH = parseInt(targetStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
+      const targetM = parseInt(targetStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
+
+      const utcMinuteOfDay = utcH * 60 + utcM;
+      const targetMinuteOfDay = targetH * 60 + targetM;
+      const tzOffsetMinutes = targetMinuteOfDay - utcMinuteOfDay;
+
+      // 构建今天的 UTC 时间戳
+      const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0);
+      // 市场时间转 UTC
+      const marketMinuteOfDay = hour * 60 + minute;
+      const utcMarketMinute = marketMinuteOfDay - tzOffsetMinutes;
+      return Math.floor((todayUtc + utcMarketMinute * 60000) / 1000);
+    }
+
+    // 默认：使用浏览器本地时间
     return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0).getTime() / 1000);
   }
 
@@ -114,7 +142,7 @@ const getIntradayXRange = (data: ChartDataItem[]): { min: number; max: number } 
   const timestamps: number[] = [];
   for (const item of data) {
     if (item && item.time) {
-      const ts = parseTimeToTimestamp(item.time);
+      const ts = parseTimeToTimestamp(item.time, props.timezone);
       timestamps.push(ts);
     }
   }
@@ -249,8 +277,8 @@ const initChart = () => {
     const baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const padding = 5 * 60;
     xRange = {
-      min: minutesToTimestamp(570, baseDate) - padding,
-      max: minutesToTimestamp(810, baseDate) + padding,
+      min: minutesToTimestamp(570, baseDate, props.timezone) - padding,
+      max: minutesToTimestamp(810, baseDate, props.timezone) + padding,
     };
   } else {
     xRange = getIntradayXRange(props.data);
@@ -405,8 +433,8 @@ const updateData = () => {
   rawDataItems.value = [...validData];
 
   const sortedData = [...validData].sort((a, b) => {
-    const tsA = parseTimeToTimestamp(a.time);
-    const tsB = parseTimeToTimestamp(b.time);
+    const tsA = parseTimeToTimestamp(a.time, props.timezone);
+    const tsB = parseTimeToTimestamp(b.time, props.timezone);
     return tsA - tsB;
   });
 
@@ -470,9 +498,32 @@ const timeToMinutes = (timeStr: string): number => {
   return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
 };
 
-const minutesToTimestamp = (minutes: number, baseDate?: Date): number => {
+const minutesToTimestamp = (minutes: number, baseDate?: Date, tzName?: string): number => {
   const now = baseDate ?? new Date();
-  return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate(), Math.floor(minutes / 60), minutes % 60, 0).getTime() / 1000);
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+
+  if (tzName) {
+    // 时区感知计算：将市场时间转换为 UTC 时间戳
+    const utcStr = now.toLocaleString('en-US', { timeZone: 'UTC', hour12: false });
+    const utcH = parseInt(utcStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
+    const utcM = parseInt(utcStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
+
+    const targetStr = now.toLocaleString('en-US', { timeZone: tzName, hour12: false });
+    const targetH = parseInt(targetStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
+    const targetM = parseInt(targetStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
+
+    const utcMinuteOfDay = utcH * 60 + utcM;
+    const targetMinuteOfDay = targetH * 60 + targetM;
+    const tzOffsetMinutes = targetMinuteOfDay - utcMinuteOfDay;
+
+    const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0);
+    const marketMinuteOfDay = hour * 60 + minute;
+    const utcMarketMinute = marketMinuteOfDay - tzOffsetMinutes;
+    return Math.floor((todayUtc + utcMarketMinute * 60000) / 1000);
+  }
+
+  return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0).getTime() / 1000);
 };
 
 const buildCompressedIntradayData = (sortedData: { time: string; price?: number; close?: number | null }[]) => {
@@ -509,7 +560,7 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
     const price = 'close' in item ? (item.close ?? item.price) : item.price;
     if (price === undefined) continue;
 
-    const realTs = parseTimeToTimestamp(item.time);
+    const realTs = parseTimeToTimestamp(item.time, props.timezone);
     const displayTs = realTs;
 
     // 如果进入午休区间，插入 null 断开上午和下午的连接
@@ -523,8 +574,8 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
       pastLunch = true;
 
       // 记录虚线区间（用于 draw hook 绘制虚线）
-      const lunchStartTs = minutesToTimestamp(start);
-      const lunchEndTs = minutesToTimestamp(end);
+      const lunchStartTs = minutesToTimestamp(start, undefined, props.timezone);
+      const lunchEndTs = minutesToTimestamp(end, undefined, props.timezone);
       if (morningLastPrice !== null) {
         lunchBreakSegment.value = { start: lunchStartTs, end: lunchEndTs, price: morningLastPrice };
       }
@@ -554,7 +605,7 @@ const buildRegularData = (sortedData: { time: string; price?: number; close?: nu
   const reals: number[] = [];
 
   for (const item of sortedData) {
-    const ts = parseTimeToTimestamp(item.time);
+    const ts = parseTimeToTimestamp(item.time, props.timezone);
     const price = 'close' in item ? (item.close ?? item.price) : item.price;
     if (price === undefined) continue;
 
@@ -662,8 +713,8 @@ const updateDataStreaming = (validData: { time: string; price?: number; close?: 
     rawDataItems.value = [...validData];
 
     const sortedData = [...validData].sort((a, b) => {
-      const tsA = parseTimeToTimestamp(a.time);
-      const tsB = parseTimeToTimestamp(b.time);
+      const tsA = parseTimeToTimestamp(a.time, props.timezone);
+      const tsB = parseTimeToTimestamp(b.time, props.timezone);
       return tsA - tsB;
     });
 
@@ -706,7 +757,7 @@ const updateDataStreaming = (validData: { time: string; price?: number; close?: 
     const price = 'close' in item ? (item.close ?? item.price) : item.price;
     if (price === undefined) continue;
 
-    const realTs = parseTimeToTimestamp(item.time);
+    const realTs = parseTimeToTimestamp(item.time, props.timezone);
 
     // 跳过时间相同的重复点
     const lastRealTs = realTimestamps.value[realTimestamps.value.length - 1];
