@@ -275,10 +275,11 @@ const initChart = () => {
   if (props.streaming) {
     const now = new Date();
     const baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const { start: marketStart, end: marketEnd } = getMarketTradingRange();
     const padding = 5 * 60;
     xRange = {
-      min: minutesToTimestamp(570, baseDate, props.timezone) - padding,
-      max: minutesToTimestamp(810, baseDate, props.timezone) + padding,
+      min: minutesToTimestamp(marketStart, baseDate, props.timezone) - padding,
+      max: minutesToTimestamp(marketEnd, baseDate, props.timezone) + padding,
     };
   } else {
     xRange = getIntradayXRange(props.data);
@@ -465,6 +466,37 @@ const getLunchBreakConfig = (): { start: number; end: number } => {
     return { start: props.lunchBreak.start, end: props.lunchBreak.end };
   }
   return { start: LUNCH_BREAK_START, end: LUNCH_BREAK_END };
+};
+
+// 根据午休配置获取市场交易时段范围
+// 用于 streaming 模式固定 X 轴范围
+const getMarketTradingRange = (): { start: number; end: number } => {
+  const { start, end } = getLunchBreakConfig();
+  const hasLunch = start < end;
+
+  if (hasLunch) {
+    // 有午休的市场：根据午休时间推断交易时段
+    // A 股: 9:30-11:30, 13:00-15:00 → start=570, end=900
+    // 港股: 9:30-12:00, 13:00-16:00 → start=570, end=960
+    // 日经: 9:00-12:30, 13:30-15:00 → start=540, end=900
+    // 根据午休开始时间判断
+    if (start === 690) {
+      // A 股 11:30-13:00
+      return { start: 570, end: 900 };
+    } else if (start === 720) {
+      // 港股 12:00-13:00
+      return { start: 570, end: 960 };
+    } else if (start === 750) {
+      // 日经 12:30-13:30
+      return { start: 540, end: 900 };
+    } else {
+      // 其他有午休的市场，默认 A 股时段
+      return { start: 570, end: 900 };
+    }
+  } else {
+    // 无午休的市场：美股/欧股 9:30-16:00 或 9:00-17:00
+    return { start: 540, end: 1020 };
+  }
 };
 
 const hasLunchBreak = (data: { time: string }[]): boolean => {
