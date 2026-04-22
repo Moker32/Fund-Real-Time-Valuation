@@ -336,7 +336,7 @@ const initChart = () => {
       scales: {
         x: {
           time: true,
-          ...(xRange && { min: xRange.min, max: xRange.max }),
+          ...(xRange ? { min: xRange.min, max: xRange.max } : {}),
         },
         y: { auto: true },
       },
