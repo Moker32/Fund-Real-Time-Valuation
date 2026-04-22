@@ -268,6 +268,7 @@ def _has_real_time_estimate(fund_type: str, fund_name: str) -> bool:
     - FOF 基金投资海外基金（QDII-FOF）：无实时估值
     - 其他 FOF、ETF-联接基金：有实时估值（底层资产是国内基金）
     - 普通基金：有实时估值
+    - 类型未知时：从名称推断，仍无法判断时保守返回 True
 
     Args:
         fund_type: 基金类型
@@ -276,15 +277,21 @@ def _has_real_time_estimate(fund_type: str, fund_name: str) -> bool:
     Returns:
         bool: 是否有实时估值
     """
-    if not fund_type:
-        return False
+    # 类型为空时，尝试从名称推断
+    effective_type = fund_type
+    if not effective_type and fund_name:
+        effective_type = _infer_fund_type_from_name(fund_name)
+
+    # 仍无法判断类型时，保守返回 True（大多数基金有实时估值）
+    if not effective_type:
+        return True
 
     # QDII 基金无实时估值（包括 QDII-商品、QDII-股票等子类型）
-    if fund_type.startswith("QDII"):
+    if effective_type.startswith("QDII"):
         return False
 
     # FOF 基金需要进一步判断是否投资海外
-    if fund_type == "FOF":
+    if effective_type == "FOF":
         name_upper = (fund_name or "").upper()
         # QDII-FOF 或投资海外的 FOF 无实时估值
         if "QDII" in name_upper or "海外" in name_upper or "全球" in name_upper:
