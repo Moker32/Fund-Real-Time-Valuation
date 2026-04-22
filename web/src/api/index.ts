@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, Overview, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, IndexHistoryResponse, IndexIntradayResponse, CommodityCategory, CommodityHistoryItem, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse, EconomicEventsData, WeiboSentimentData, SentimentAllData } from '@/types';
+import type { Fund, Commodity, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, IndexHistoryResponse, IndexIntradayResponse, CommodityCategory, CommodityHistoryItem, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse, EconomicEventsData, WeiboSentimentData, SentimentAllData } from '@/types';
 
 // API Configuration
 // 生产环境使用相对路径（同源部署），开发环境可通过环境变量覆盖
@@ -223,14 +223,6 @@ export const fundApi = {
     return api.get(`/api/funds/${code}/intraday/${date}`);
   },
 
-  async getWatchlist(): Promise<{
-    success: boolean;
-    watchlist: Array<{ code: string; name: string; isHolding: boolean }>;
-    total: number;
-  }> {
-    return api.get('/api/funds/watchlist');
-  },
-
   async addToWatchlist(code: string, name: string): Promise<{
     success: boolean;
     message: string;
@@ -353,12 +345,6 @@ export const commodityApi = {
   },
 };
 
-export const overviewApi = {
-  async getOverview(): Promise<Overview> {
-    return api.get('/api/overview');
-  },
-};
-
 export const healthApi = {
   async getHealth(): Promise<HealthStatus> {
     return api.get('/api/health');
@@ -384,16 +370,6 @@ export const indexApi = {
 
   async getIndexIntraday(indexType: string): Promise<IndexIntradayResponse> {
     return api.get(`/api/indices/${indexType}/intraday`);
-  },
-
-  async getRegions(): Promise<{
-    regions: Array<{
-      name: string;
-      indices: Array<{ index: string; name: string }>;
-    }>;
-    supported_indices: string[];
-  }> {
-    return api.get('/api/indices/regions');
   },
 };
 

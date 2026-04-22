@@ -43,14 +43,7 @@ export interface Fund {
   intraday?: FundIntraday[];  // 可选的日内分时数据
 }
 
-export interface FundListResponse {
-  funds: Fund[];
-  total: number;
-  timestamp: string;
-}
-
-// Commodity Types
-export interface Commodity {
+// Commodity History Types
   symbol: string;
   name: string;
   price: number;
@@ -64,11 +57,6 @@ export interface Commodity {
   source?: string;
   timestamp: string;
   tradingStatus?: string; // 交易状态: 'open', 'closed'
-}
-
-export interface CommodityListResponse {
-  commodities: Commodity[];
-  timestamp: string;
 }
 
 // Commodity Category Types
@@ -111,13 +99,6 @@ export interface CommodityHistoryItem {
   prevClose: number;
 }
 
-export interface CommodityHistoryResponse {
-  commodityType: string;
-  name: string;
-  history: CommodityHistoryItem[];
-  timestamp: string;
-}
-
 // Watched Commodity Types
 export interface WatchedCommodity {
   symbol: string;
@@ -145,17 +126,6 @@ export interface CommoditySearchResponse {
   results: CommoditySearchResult[];
   count: number;
   timestamp: string;
-}
-
-export interface AddWatchedCommodityRequest {
-  symbol: string;
-  name: string;
-  category?: string;
-}
-
-export interface AddWatchedCommodityResponse {
-  success: boolean;
-  message: string;
 }
 
 // Index Intraday Types
@@ -292,45 +262,7 @@ export interface HealthStatus {
   message: string;
   version: string;
   timestamp: string;
-}
-
-// API Response Types
-export interface ApiResponse<T> {
-  data: T;
-  success: boolean;
-  error?: string;
-}
-
 // Store State Types
-export interface FundState {
-  funds: Fund[];
-  loading: boolean;
-  error: string | null;
-  lastUpdated: string | null;
-}
-
-export interface CommodityState {
-  commodities: Commodity[];
-  categories: CommodityCategory[];
-  activeCategory: string | null;
-  loading: boolean;
-  error: string | null;
-  lastUpdated: string | null;
-}
-
-export interface IndexState {
-  indices: MarketIndex[];
-  loading: boolean;
-  error: string | null;
-  lastUpdated: string | null;
-}
-
-export interface AppState {
-  overview: Overview | null;
-  health: HealthStatus | null;
-  sidebarCollapsed: boolean;
-  showChart: boolean;
-}
 
 // Economic Calendar Types
 export interface EconomicEventItem {
