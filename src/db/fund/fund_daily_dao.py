@@ -135,8 +135,6 @@ class FundDailyCacheDAO:
         # 过滤无效日期（NaT、空字符串等）
         if not date or date in ("NaT", "NaN", "None", "null"):
             return False
-        if not date:
-            return False
 
         # 获取估值时间（来自 API 的 gztime 字段）
         estimate_time = data.get("estimate_time", "")
