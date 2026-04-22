@@ -199,12 +199,7 @@ const getYScaleRange = (data: [number[], (number | null)[]] | null, baseline: nu
   max += padding;
 
   if (baseline !== undefined && baseline > 0) {
-    if (baseline <= min + padding * 0.5) {
-      min = baseline - (max - baseline) * 0.1;
-    }
-    if (baseline >= max - padding * 0.5) {
-      max = baseline + (baseline - min) * 0.1;
-    }
+    // 确保 baseline 在范围内
     min = Math.min(min, baseline);
     max = Math.max(max, baseline);
   }
@@ -406,18 +401,20 @@ const initChart = () => {
             if (props.baseline !== undefined) {
               const baseline = props.baseline;
               const yScale = u.scales.y;
-              if (yScale) {
-                const yPos = u.valToPos(baseline, 'y', true);
-                if (yPos >= 0 && yPos <= u.bbox.height) {
-                  const uWithBaseline = u as uPlotWithBaseline;
-                  ctx.strokeStyle = uWithBaseline._baselineColor ?? getTrendColor();
-                  ctx.lineWidth = 1;
-                  ctx.setLineDash([4, 4]);
-                  ctx.beginPath();
-                  ctx.moveTo(u.bbox.left, yPos);
-                  ctx.lineTo(u.bbox.left + u.bbox.width, yPos);
-                  ctx.stroke();
-                }
+              if (yScale && yScale.min !== undefined && yScale.max !== undefined) {
+                // Clamp baseline to ensure it's within visible range with some padding
+                const range = yScale.max - yScale.min;
+                const padding = range * 0.05;
+                const effectiveBaseline = Math.max(yScale.min + padding, Math.min(yScale.max - padding, baseline));
+                const yPos = u.valToPos(effectiveBaseline, 'y', true);
+                const uWithBaseline = u as uPlotWithBaseline;
+                ctx.strokeStyle = uWithBaseline._baselineColor ?? getTrendColor();
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(u.bbox.left, yPos);
+                ctx.lineTo(u.bbox.left + u.bbox.width, yPos);
+                ctx.stroke();
               }
             }
 
@@ -473,7 +470,6 @@ const updateData = () => {
 
   try {
     uplotInstance.value.setData(newData);
-    updateYScaleRange(newData);
   } catch (e) {
     console.warn('[FundChart] setData error:', e);
   }
@@ -849,7 +845,6 @@ const updateDataStreaming = (validData: { time: string; price?: number; close?: 
     // 先设置 X 轴范围，再设置数据
     resetXScale();
     uplotInstance.value?.setData(newData);
-    updateYScaleRange(newData);
   } catch (e) {
     console.warn('[FundChart] streaming setData error:', e);
   }
