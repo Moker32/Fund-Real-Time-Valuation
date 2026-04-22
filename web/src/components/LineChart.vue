@@ -69,6 +69,28 @@ const lastDataLen = ref(0);  // streaming 模式追踪已有数据长度
 // 午休区间标记：用于绘制虚线
 const lunchBreakSegment = ref<{ start: number; end: number; price: number } | null>(null);
 
+// 重新设置 X 轴范围（固定为市场交易时段）
+const resetXScale = () => {
+  if (!uplotInstance.value) return;
+  const { start: marketStart, end: marketEnd } = getMarketTradingRange();
+
+  // 从第一数据点提取日期作为 baseDate
+  let baseDate: Date;
+  const firstRealTs = realTimestamps.value[0];
+  if (firstRealTs != null && firstRealTs > 0) {
+    baseDate = new Date(firstRealTs * 1000);
+  } else {
+    baseDate = new Date();
+  }
+  baseDate.setHours(0, 0, 0, 0);
+
+  const padding = 5 * 60;
+  const min = minutesToTimestamp(marketStart, baseDate, props.timezone) - padding;
+  const max = minutesToTimestamp(marketEnd, baseDate, props.timezone) + padding;
+
+  uplotInstance.value.setScale('x', { min, max });
+};
+
 const getTrendColor = (): string => {
   if (props.trend === 'rising') return '#ef4444';
   if (props.trend === 'falling') return '#22c55e';
@@ -755,6 +777,7 @@ const updateDataStreaming = (validData: { time: string; price?: number; close?: 
     const newData: [number[], (number | null)[]] = [processedTimestamps.value, processedValues.value];
     try {
       uplotInstance.value?.setData(newData);
+      resetXScale();
       updateYScaleRange(newData);
     } catch (e) {
       console.warn('[FundChart] streaming setData error:', e);
@@ -823,6 +846,8 @@ const updateDataStreaming = (validData: { time: string; price?: number; close?: 
 
   const newData: [number[], (number | null)[]] = [processedTimestamps.value, processedValues.value];
   try {
+    // 先设置 X 轴范围，再设置数据
+    resetXScale();
     uplotInstance.value?.setData(newData);
     updateYScaleRange(newData);
   } catch (e) {
