@@ -273,105 +273,6 @@ class TiantianFundDataSource(DataSource):
             metadata={"fund_code": fund_code},
         )
 
-    async def _fetch_etf(self, fund_code: str) -> DataSourceResult:
-        """
-        获取 ETF 数据 - 使用东方财富接口
-
-        Args:
-            fund_code: ETF 代码
-
-        Returns:
-            DataSourceResult: ETF 数据结果
-        """
-        try:
-            # 使用 akshare 获取 ETF 数据
-            loop = asyncio.get_running_loop()
-            import akshare as ak
-
-            # 获取 ETF 最新数据
-            df = await loop.run_in_executor(None, lambda: ak.fund_etf_fund_info_em(fund=fund_code))
-
-            if df is None or df.empty:
-                return DataSourceResult(
-                    success=False,
-                    error=f"ETF {fund_code} 无数据",
-                    timestamp=time.time(),
-                    source=self.name,
-                    metadata={"fund_code": fund_code},
-                )
-
-            # 获取最新一条数据
-            latest = df.iloc[0]
-
-            # 使用缓存获取基金名称（使用 run_in_executor 避免阻塞事件循环）
-            fund_info = await loop.run_in_executor(None, get_fund_basic_info, fund_code)
-            if fund_info:
-                fund_name, fund_type = fund_info
-            else:
-                fund_name, fund_type = "", ""
-
-            # 如果没获取到名称，使用基金代码作为名称
-            if not fund_name:
-                fund_name = f"ETF {fund_code}"
-
-            # 提取数据
-            data = {
-                "fund_code": fund_code,
-                "name": fund_name,
-                "type": fund_type,
-                "net_value_date": str(latest.get("净值日期", "")),
-                "unit_net_value": float(latest.get("单位净值", 0))
-                if pd.notna(latest.get("单位净值"))
-                else None,
-                "estimated_net_value": float(latest.get("单位净值", 0))
-                if pd.notna(latest.get("单位净值"))
-                else None,
-                "estimated_growth_rate": float(latest.get("日增长率", 0))
-                if pd.notna(latest.get("日增长率"))
-                else None,
-                "estimate_time": str(latest.get("净值日期", "")),
-                "has_real_time_estimate": True,  # ETF 有实时估值
-            }
-
-            self._record_success()
-
-            # 保存基金基本信息到数据库
-            save_basic_info_to_db(
-                fund_code,
-                {
-                    "short_name": fund_name,
-                    "name": fund_name,
-                    "type": fund_type,
-                    "net_value": data.get("unit_net_value"),
-                    "net_value_date": data.get("net_value_date", ""),
-                },
-            )
-
-            return DataSourceResult(
-                success=True,
-                data=data,
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-
-        except ImportError:
-            return DataSourceResult(
-                success=False,
-                error="akshare 库未安装",
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-        except Exception as e:
-            return DataSourceResult(
-                success=False,
-                error=f"ETF 数据获取失败: {str(e)}",
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-
     async def _fetch_lof(
         self, fund_code: str, has_real_time_estimate: bool = True
     ) -> DataSourceResult:
@@ -551,24 +452,6 @@ class TiantianFundDataSource(DataSource):
         """
         return bool(re.match(r"^\d{6}$", str(fund_code)))
 
-    async def _get_fund_type(self, fund_code: str) -> str:
-        """
-        获取基金类型信息
-
-        Args:
-            fund_code: 基金代码
-
-        Returns:
-            str: 基金类型（如：股票型、混合型、债券型、QDII、ETF等）
-        """
-        # 使用缓存获取基金信息（使用 run_in_executor 避免阻塞事件循环）
-        loop = asyncio.get_running_loop()
-        fund_info = await loop.run_in_executor(None, get_fund_basic_info, fund_code)
-        if fund_info:
-            _, fund_type = fund_info
-            return fund_type
-        return ""
-
     def _parse_response(self, response_text: str, fund_code: str) -> dict[str, Any] | None:
         """
         解析天天基金返回的 JS 数据
@@ -640,16 +523,6 @@ class TiantianFundDataSource(DataSource):
     async def close(self):
         """关闭异步客户端"""
         await self.client.aclose()
-
-    def __del__(self):
-        """析构时确保关闭客户端（异步客户端需要在异步上下文中关闭）"""
-        try:
-            if hasattr(self, "client") and self.client.is_closed is False:
-                # Note: 异步客户端无法在 __del__ 中安全关闭
-                # 应使用 async with 或显式调用 close() 方法
-                pass
-        except Exception:
-            pass
 
     async def health_check(self) -> bool:
         """

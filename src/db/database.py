@@ -12,22 +12,9 @@ import os
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
-
-
-def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    """将 sqlite3.Row 转换为字典，处理整数到布尔值的转换"""
-    if row is None:
-        return {}
-    result = dict(row)
-    # 转换特定字段从整数到布尔值
-    if "watchlist" in result:
-        result["watchlist"] = bool(result["watchlist"])
-    if "enabled" in result:
-        result["enabled"] = bool(result["enabled"])
-    return result
 
 
 if TYPE_CHECKING:

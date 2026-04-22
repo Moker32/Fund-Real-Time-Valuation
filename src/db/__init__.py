@@ -18,7 +18,7 @@
 
 from src.db.calendar import ExchangeHolidayDAO, TradingCalendarDAO
 from src.db.config_dao import ConfigDAO
-from src.db.database import DatabaseManager, _row_to_dict
+from src.db.database import DatabaseManager
 from src.db.fund import (
     CacheMetadataDAO,
     FundBasicInfoDAO,
@@ -70,6 +70,4 @@ __all__ = [
     "TradingCalendarDAO",
     "ExchangeHolidayDAO",
     "CacheMetadataDAO",
-    # Utility
-    "_row_to_dict",
 ]

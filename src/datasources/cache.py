@@ -44,31 +44,6 @@ class DataCache:
         key_hash = hashlib.md5(key.encode()).hexdigest()
         return self.cache_dir / f"{key_hash}.json"
 
-    def _is_expired(self, cache_path: Path, ttl_seconds: int) -> bool:
-        """
-        检查缓存是否过期
-
-        Args:
-            cache_path: 缓存文件路径
-            ttl_seconds: TTL 时间（秒）
-
-        Returns:
-            bool: True 表示已过期，False 表示有效
-        """
-        if not cache_path.exists():
-            return True
-
-        # 读取缓存创建时间
-        try:
-            with open(cache_path, encoding="utf-8") as f:
-                cache_data = json.load(f)
-                created_at = datetime.fromisoformat(cache_data.get("created_at", ""))
-                expires_at = created_at + timedelta(seconds=ttl_seconds)
-                return datetime.now() >= expires_at
-        except (json.JSONDecodeError, KeyError, ValueError):
-            # 如果读取失败，视为过期
-            return True
-
     def get(self, key: str) -> Any | None:
         """
         获取缓存数据

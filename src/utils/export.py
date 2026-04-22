@@ -30,23 +30,6 @@ def _get_value(obj: dict | object, key: str, default: str = "") -> str:
         return str(getattr(obj, key, default))
 
 
-def _get_float(obj: dict | object, key: str, default: float = 0.0) -> float:
-    """获取对象或字典的浮点数值
-
-    Args:
-        obj: 对象或字典
-        key: 属性名或键名
-        default: 默认值
-
-    Returns:
-        float: 属性的浮点数值
-    """
-    if isinstance(obj, dict):
-        return float(obj.get(key, default))
-    else:
-        return float(getattr(obj, key, default))
-
-
 def export_funds_to_csv(funds: list[dict | object], filepath: str | Path) -> bool:
     """导出基金列表到 CSV 文件
 

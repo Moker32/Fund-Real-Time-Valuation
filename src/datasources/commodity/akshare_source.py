@@ -23,6 +23,7 @@ from typing import Any
 import httpx
 
 from ..base import DataSourceResult
+from .aggregator import get_all_commodity_types
 from .base import CommodityDataSource
 
 logger = logging.getLogger(__name__)
