@@ -320,16 +320,11 @@ class TiantianFundDataSource(DataSource):
                         fund_type or "", fund_name
                     )
 
-                    # QDII 基金或投资海外的 FOF 需要获取上一交易日净值用于对比
-                    if not data["has_real_time_estimate"]:
-                        # 调用东方财富接口获取上一净值
-                        lof_result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
-                        if lof_result.success:
-                            data["prev_net_value"] = lof_result.data.get("prev_net_value")
-                            data["prev_net_value_date"] = lof_result.data.get("prev_net_value_date")
-                        else:
-                            data["prev_net_value"] = None
-                            data["prev_net_value_date"] = None
+                    # 所有基金都需要获取前一交易日净值作为折线图基准线
+                    lof_result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
+                    if lof_result.success:
+                        data["prev_net_value"] = lof_result.data.get("prev_net_value")
+                        data["prev_net_value_date"] = lof_result.data.get("prev_net_value_date")
                     else:
                         data["prev_net_value"] = None
                         data["prev_net_value_date"] = None
