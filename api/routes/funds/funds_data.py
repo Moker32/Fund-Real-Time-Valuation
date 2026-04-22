@@ -13,12 +13,12 @@ from typing_extensions import TypedDict
 
 from src.config.manager import ConfigManager
 from src.datasources.base import DataSourceType
-from src.datasources.fund_source import Fund123DataSource
+from src.datasources.fund import Fund123DataSource
 from src.datasources.manager import DataSourceManager
 from src.datasources.trading_calendar_source import Market, TradingCalendarSource
 
 if TYPE_CHECKING:
-    from src.datasources.fund_source import FundHistorySource
+    from src.datasources.fund import FundHistorySource
 
 from ...dependencies import (
     ConfigManagerDependency,

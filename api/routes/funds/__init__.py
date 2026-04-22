@@ -14,7 +14,7 @@
 from fastapi import APIRouter
 
 # 先导入 get_basic_info_db，避免循环导入时找不到
-from src.datasources.fund_source import get_basic_info_db
+from src.datasources.fund import get_basic_info_db
 
 # 导入所有子模块路由
 from . import funds_data, funds_holdings, funds_watchlist

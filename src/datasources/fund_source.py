@@ -1,12 +1,12 @@
+"""基金数据源模块 - 兼容性别名
+
+此模块将 src.datasources.fund 中的公开 API 重新导出，
+提供向后兼容的导入路径。
+
+新代码推荐直接从 src.datasources.fund 导入：
+    from src.datasources.fund import TiantianFundDataSource
 """
-基金数据源模块 - 兼容性别名
 
-WARNING: 此模块已弃用，请从 src.datasources.fund 导入。
-
-此文件仅用于向后兼容，所有功能已移至 src.datasources.fund 模块。
-"""
-
-# 从新的模块重新导出所有公开 API
 from src.datasources.fund import (
     CacheLockManager,
     CacheLockTimeoutError,
