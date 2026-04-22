@@ -155,172 +155,30 @@ class TiantianFundDataSource(DataSource):
                     metadata={"fund_code": fund_code, "cache": cache_type},
                 )
 
-        # 3. 从 API 获取数据
-        # 场内基金（交易所交易）
-        is_etf = fund_code.startswith("5") or fund_code.startswith("15")  # ETF
-        is_lof = fund_code.startswith("16")  # LOF 基金
+        # 3. 获取基金类型（使用 akshare，有缓存）
+        loop = asyncio.get_running_loop()
+        fund_info = await loop.run_in_executor(None, get_fund_basic_info, fund_code)
+        fund_name, fund_type = fund_info if fund_info else ("", "")
+        if not fund_name:
+            fund_name = f"基金 {fund_code}"
 
+        # 4. 调用天天基金接口获取实时估值
         for attempt in range(self.max_retries):
             try:
-                # LOF 使用东方财富 LOF 接口
-                if is_lof:
-                    result = await self._fetch_lof(fund_code, has_real_time_estimate=True)
-                    if result.success:
-                        # 写入数据库缓存
-                        daily_dao = get_daily_cache_dao()
-                        daily_dao.save_daily_from_fund_data(fund_code, result.data)
-                        # 写入内存/文件缓存
-                        cache = get_fund_cache()
-                        await cache.set(cache_key, result.data)
-                        return result
-                    # LOF 获取失败，返回错误（不再尝试其他接口）
-                    return DataSourceResult(
-                        success=False,
-                        error=f"{fund_code} 是 LOF 基金，数据获取失败: {result.error}",
-                        timestamp=time.time(),
-                        source=self.name,
-                        metadata={"fund_code": fund_code},
-                    )
-
-                # ETF 使用东方财富 ETF 接口
-                if is_etf:
-                    result = await self._fetch_etf(fund_code)
-                    if result.success:
-                        # 写入数据库缓存
-                        daily_dao = get_daily_cache_dao()
-                        daily_dao.save_daily_from_fund_data(fund_code, result.data)
-                        # 写入内存/文件缓存
-                        cache = get_fund_cache()
-                        await cache.set(cache_key, result.data)
-                        return result
-                    # ETF 获取失败，返回错误（不再尝试其他接口）
-                    return DataSourceResult(
-                        success=False,
-                        error=f"{fund_code} 是 ETF 基金，数据获取失败: {result.error}",
-                        timestamp=time.time(),
-                        source=self.name,
-                        metadata={"fund_code": fund_code},
-                    )
-
-                # 普通基金使用天天基金接口
                 url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
                 response = await self.client.get(url)
                 response.raise_for_status()
 
-                # 检查是否是空响应
-                if response.text.strip() in ("jsonpgz();", "jsonpgz()"):
-                    # 判断基金类型并返回友好错误
-                    if fund_code.startswith("5") or fund_code.startswith("15"):
-                        return DataSourceResult(
-                            success=False,
-                            error=f"{fund_code} 是 ETF 基金，请使用场内基金交易接口",
-                            timestamp=time.time(),
-                            source=self.name,
-                            metadata={"fund_code": fund_code},
-                        )
-                    if fund_code.startswith("16"):
-                        return DataSourceResult(
-                            success=False,
-                            error=f"{fund_code} 是 LOF 基金，请使用场内基金交易接口",
-                            timestamp=time.time(),
-                            source=self.name,
-                            metadata={"fund_code": fund_code},
-                        )
-
-                # 检查是否是空响应
-                if response.text.strip() in ("jsonpgz();", "jsonpgz()"):
-                    # 天天基金不支持的基金，尝试使用东方财富开放式基金接口
-                    # QDII/FOF 基金（如 470888）可能在这里获取到
-                    # 这些基金没有实时估值，只有上一个交易日的日增长率
-                    result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
-                    if result.success:
-                        return result
-
-                    # 东方财富接口也失败，返回友好错误
-                    if fund_code.startswith("5") or fund_code.startswith("15"):
-                        return DataSourceResult(
-                            success=False,
-                            error=f"{fund_code} 是 ETF 基金，请使用场内基金交易接口",
-                            timestamp=time.time(),
-                            source=self.name,
-                            metadata={"fund_code": fund_code},
-                        )
-                    if fund_code.startswith("16"):
-                        return DataSourceResult(
-                            success=False,
-                            error=f"{fund_code} 是 LOF 基金，请使用场内基金交易接口",
-                            timestamp=time.time(),
-                            source=self.name,
-                            metadata={"fund_code": fund_code},
-                        )
-                    return DataSourceResult(
-                        success=False,
-                        error=f"基金 {fund_code} 数据获取失败: {result.error}",
-                        timestamp=time.time(),
-                        source=self.name,
-                        metadata={"fund_code": fund_code},
-                    )
-
-                # 解析返回的 JS 数据
+                # 解析天天基金响应
                 data = self._parse_response(response.text, fund_code)
 
                 if data:
-                    # 获取基金类型
-                    fund_type = await self._get_fund_type(fund_code)
-                    if not fund_type:
-                        # Fallback: 从基金名称中识别 QDII/FOF
-                        fund_name = data.get("name", "")
-                        if "(QDII)" in fund_name or fund_name.endswith("QDII"):
-                            fund_type = "QDII"
-                        elif fund_name.endswith("FOF") or "(FOF)" in fund_name:
-                            fund_type = "FOF"
-
-                    # QDII/FOF 基金不应该使用天天基金的数据（估值数据不准确）
-                    # 跳过天天基金，直接使用 akshare 东方财富接口
-                    fund_name = data.get("name", "")
-                    if fund_type and (fund_type.startswith("QDII") or fund_type == "FOF"):
-                        if fund_type == "FOF":
-                            name_upper = fund_name.upper()
-                            if (
-                                "QDII" not in name_upper
-                                and "海外" not in name_upper
-                                and "全球" not in name_upper
-                            ):
-                                # 非投资海外的 FOF 可以使用天天基金数据
-                                pass
-                            else:
-                                # QDII-FOF 或投资海外的 FOF，跳过天天基金
-                                result = await self._fetch_lof(
-                                    fund_code, has_real_time_estimate=False
-                                )
-                                if result.success:
-                                    # QDII-FOF 数据也需要保存到数据库缓存
-                                    daily_dao = get_daily_cache_dao()
-                                    daily_dao.save_daily_from_fund_data(fund_code, result.data)
-                                    # 写入内存/文件缓存
-                                    cache = get_fund_cache()
-                                    await cache.set(cache_key, result.data)
-                                    return result
-                        else:
-                            # QDII 基金，跳过天天基金
-                            result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
-                            if result.success:
-                                # QDII 基金数据也需要保存到数据库缓存
-                                daily_dao = get_daily_cache_dao()
-                                daily_dao.save_daily_from_fund_data(fund_code, result.data)
-                                # 写入内存/文件缓存
-                                cache = get_fund_cache()
-                                await cache.set(cache_key, result.data)
-                                return result
-
                     data["type"] = fund_type
 
-                    # 根据基金类型和名称判断是否有实时估值
-                    data["has_real_time_estimate"] = _has_real_time_estimate(
-                        fund_type or "", fund_name
-                    )
+                    # 根据基金类型判断是否有实时估值
+                    data["has_real_time_estimate"] = _has_real_time_estimate(fund_type, fund_name)
 
-                    # 所有基金都需要获取前一交易日净值作为折线图基准线
+                    # 获取前一交易日净值作为折线图基准线
                     lof_result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
                     if lof_result.success:
                         data["prev_net_value"] = lof_result.data.get("prev_net_value")
@@ -383,25 +241,29 @@ class TiantianFundDataSource(DataSource):
                     metadata={"fund_code": fund_code},
                 )
 
-        # 如果是 LOF，返回更明确的错误信息
-        if is_lof:
-            return DataSourceResult(
-                success=False,
-                error=f"{fund_code} 是 QDII/LOF 基金，akshare 东方财富接口返回数据为空",
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
+        # 天天基金失败，回退到 akshare 获取净值
+        lof_result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
+        if lof_result.success:
+            lof_result.data["type"] = fund_type
+            lof_result.data["name"] = fund_name
+            lof_result.data["has_real_time_estimate"] = _has_real_time_estimate(fund_type, fund_name)
+            return lof_result
 
-        # 如果是 ETF，返回更明确的错误信息
-        if is_etf:
-            return DataSourceResult(
-                success=False,
-                error=f"{fund_code} 是 ETF 基金，当前数据源暂不支持",
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
+        return DataSourceResult(
+            success=False,
+            error=f"基金 {fund_code} 数据获取失败",
+            timestamp=time.time(),
+            source=self.name,
+            metadata={"fund_code": fund_code},
+        )
+
+        # 天天基金失败，回退到 akshare 获取净值
+        lof_result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
+        if lof_result.success:
+            lof_result.data["type"] = fund_type
+            lof_result.data["name"] = fund_name
+            lof_result.data["has_real_time_estimate"] = _has_real_time_estimate(fund_type, fund_name)
+            return lof_result
 
         return DataSourceResult(
             success=False,

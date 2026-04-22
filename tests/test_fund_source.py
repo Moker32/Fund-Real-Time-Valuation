@@ -232,12 +232,16 @@ class TestHasRealTimeEstimate:
         assert _has_real_time_estimate("FOF", "某全球配置FOF") is False
         assert _has_real_time_estimate("FOF", "某QDII-FOF基金") is False
 
-    def test_empty_type_returns_false(self):
-        """空类型返回 False"""
+    def test_empty_type_returns_true(self):
+        """空类型时从名称推断，仍无法判断则返回 True（保守）"""
         from src.datasources.fund_source import _has_real_time_estimate
 
-        assert _has_real_time_estimate("", "某基金") is False
-        assert _has_real_time_estimate(None, "某基金") is False  # type: ignore
+        # 类型为空但名称可以推断时，返回推断结果
+        assert _has_real_time_estimate("", "华夏全球精选股票(QDII)") is False
+        assert _has_real_time_estimate(None, "某QDII基金") is False  # type: ignore
+        # 类型为空且名称也无法推断时，保守返回 True
+        assert _has_real_time_estimate("", "某基金") is True
+        assert _has_real_time_estimate(None, "基金") is True  # type: ignore
 
     def test_etf_link_has_real_time(self):
         """ETF-联接基金有实时估值"""
