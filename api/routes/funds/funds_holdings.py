@@ -7,7 +7,6 @@ import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing_extensions import TypedDict
 
 from src.config.manager import ConfigManager
 from src.config.models import Holding
@@ -20,13 +19,6 @@ from ...models import ErrorResponse, OperationResponse
 router = APIRouter(prefix="/api/funds", tags=["基金"])
 
 logger = logging.getLogger(__name__)
-
-
-class HoldingData(TypedDict):
-    """持仓基金响应数据结构"""
-
-    success: bool
-    message: str
 
 
 # ==================== 持仓管理路由 ====================

@@ -43,14 +43,6 @@ class FundResponse(BaseModel):
     }
 
 
-class FundListResponse(BaseModel):
-    """基金列表响应模型"""
-
-    funds: list[dict] = Field(..., description="基金列表")
-    total: int = Field(..., description="基金总数")
-    timestamp: str = Field(..., description="响应时间戳")
-
-
 class FundDetailResponse(FundResponse):
     """基金详情响应模型"""
 
@@ -152,14 +144,6 @@ class AddFundRequest(BaseModel):
 
     code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d+$", description="基金代码")
     name: str = Field(..., min_length=1, max_length=100, description="基金名称")
-
-
-class AddFundResponse(BaseModel):
-    """添加基金响应模型"""
-
-    success: bool = Field(default=True, description="是否成功")
-    message: str = Field(..., description="响应消息")
-    fund: dict = Field(..., description="添加的基金信息")
 
 
 class FundIntradayPoint(BaseModel):

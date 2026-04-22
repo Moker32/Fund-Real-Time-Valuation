@@ -251,98 +251,6 @@ def create_httpx_client(
     return client
 
 
-class AKShareSession:
-    """
-    AKShare 优化会话管理器
-
-    提供统一的请求配置和优化：
-    - 自定义请求头
-    - 自动限流
-    - 自动重试
-    - 代理支持
-    """
-
-    def __init__(
-        self,
-        headers: dict[str, str] | None = None,
-        timeout: float = DEFAULT_TIMEOUT,
-        proxy: str | None = None,
-        rate_limit_cps: float = DEFAULT_RATE_LIMIT,
-        max_retries: int = MAX_RETRIES,
-    ):
-        """
-        初始化 AKShare 会话
-
-        Args:
-            headers: 自定义请求头
-            timeout: 请求超时（秒）
-            proxy: 代理地址
-            rate_limit_cps: 每秒最大请求数
-            max_retries: 最大重试次数
-        """
-        self.headers = headers or {}
-        self.timeout = timeout
-        self.proxy = proxy
-        self.rate_limit_cps = rate_limit_cps
-        self.max_retries = max_retries
-        self._client: httpx.AsyncClient | None = None
-        self._rate_limiter = RateLimiter(rate_limit_cps)
-
-    async def __aenter__(self) -> "AKShareSession":
-        """异步上下文管理器入口"""
-        self._client = create_httpx_client(
-            headers=self.headers,
-            timeout=self.timeout,
-            proxy=self.proxy,
-        )
-        return self
-
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """异步上下文管理器出口"""
-        if self._client:
-            await self._client.aclose()
-            self._client = None
-
-    async def request(
-        self,
-        method: str,
-        url: str,
-        **kwargs: Any,
-    ) -> httpx.Response:
-        """
-        发送 HTTP 请求（带限流和重试）
-
-        Args:
-            method: HTTP 方法
-            url: 请求 URL
-            **kwargs: 其他请求参数
-
-        Returns:
-            httpx.Response 响应对象
-        """
-        if not self._client:
-            raise RuntimeError("Session 未初始化，请使用 async with")
-
-        async def _do_request() -> httpx.Response:
-            await self._rate_limiter.acquire()
-            response = await self._client.request(method, url, **kwargs)
-            response.raise_for_status()
-            return response
-
-        return await retry_with_backoff(
-            _do_request,
-            max_retries=self.max_retries,
-        )
-
-    async def get(self, url: str, **kwargs: Any) -> httpx.Response:
-        """发送 GET 请求"""
-        return await self.request("GET", url, **kwargs)
-
-    async def post(self, url: str, **kwargs: Any) -> httpx.Response:
-        """发送 POST 请求"""
-        return await self.request("POST", url, **kwargs)
-
-
 # AKShare 函数包装器
 async def call_akshare_with_retry(
     func: Callable[..., Any],
@@ -415,27 +323,6 @@ def configure_akshare_headers() -> bool:
     except Exception as e:
         logger.warning(f"[AKShareConfig] 配置请求头失败: {e}")
         return False
-
-
-# 代理配置
-class ProxyConfig:
-    """代理配置管理"""
-
-    def __init__(self):
-        self.http_proxy: str | None = None
-        self.https_proxy: str | None = None
-
-    def from_env(self) -> "ProxyConfig":
-        """从环境变量读取代理配置"""
-        import os
-
-        self.http_proxy = os.environ.get("HTTP_PROXY") or os.environ.get("http_proxy")
-        self.https_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
-        return self
-
-    def get_proxy_url(self) -> str | None:
-        """获取代理 URL（优先使用 HTTPS 代理）"""
-        return self.https_proxy or self.http_proxy
 
 
 # 便捷函数：获取优化的 AKShare 调用器

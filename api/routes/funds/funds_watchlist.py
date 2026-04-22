@@ -7,7 +7,6 @@ import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
-from typing_extensions import TypedDict
 
 from src.config.manager import ConfigManager
 from src.config.models import Fund
@@ -26,14 +25,6 @@ from ...models import (
 router = APIRouter(prefix="/api/funds", tags=["基金"])
 
 logger = logging.getLogger(__name__)
-
-
-class WatchlistData(TypedDict):
-    """自选基金列表响应数据结构"""
-
-    success: bool
-    watchlist: list[WatchlistItem]
-    total: int
 
 
 # ==================== 自选相关路由 ====================
