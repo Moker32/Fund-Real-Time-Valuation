@@ -55,8 +55,7 @@ const uplotInstance = ref<uPlot | null>(null);
 const color = computed(() => getTrendColor());
 
 const hasData = computed(() => {
-  if (!uplotInstance.value && (!props.data || props.data.length === 0)) return false;
-  return true;
+  return !!(props.data && props.data.length > 0);
 });
 
 const lastDataJson = ref('');
@@ -97,6 +96,22 @@ const getTrendColor = (): string => {
   return '#71717a';
 };
 
+const getTimezoneOffsetMinutes = (tzName: string, now: Date): number => {
+  const utcStr = now.toLocaleString('en-US', { timeZone: 'UTC', hour12: false });
+  const utcH = parseInt(utcStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
+  const utcM = parseInt(utcStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
+  const targetStr = now.toLocaleString('en-US', { timeZone: tzName, hour12: false });
+  const targetH = parseInt(targetStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
+  const targetM = parseInt(targetStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
+  return (targetH * 60 + targetM) - (utcH * 60 + utcM);
+};
+
+const timeToMinutes = (timeStr: string): number => {
+  const m = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m || !m[1] || !m[2]) return -1;
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+};
+
 // 将市场时间转换为 UTC 时间戳
 // timeStr: "HH:mm" 格式的市场当地时间
 // tzName: IANA 时区名，如 'Asia/Shanghai', 'Europe/Berlin'
@@ -108,22 +123,8 @@ const parseTimeToTimestamp = (timeStr: string, tzName?: string): number => {
     const now = new Date();
 
     if (tzName) {
-      // 计算目标时区相对 UTC 的偏移
-      const utcStr = now.toLocaleString('en-US', { timeZone: 'UTC', hour12: false });
-      const utcH = parseInt(utcStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
-      const utcM = parseInt(utcStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
-
-      const targetStr = now.toLocaleString('en-US', { timeZone: tzName, hour12: false });
-      const targetH = parseInt(targetStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
-      const targetM = parseInt(targetStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
-
-      const utcMinuteOfDay = utcH * 60 + utcM;
-      const targetMinuteOfDay = targetH * 60 + targetM;
-      const tzOffsetMinutes = targetMinuteOfDay - utcMinuteOfDay;
-
-      // 构建今天的 UTC 时间戳
+      const tzOffsetMinutes = getTimezoneOffsetMinutes(tzName, now);
       const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0);
-      // 市场时间转 UTC
       const marketMinuteOfDay = hour * 60 + minute;
       const utcMarketMinute = marketMinuteOfDay - tzOffsetMinutes;
       return Math.floor((todayUtc + utcMarketMinute * 60000) / 1000);
@@ -199,7 +200,7 @@ const getYScaleRange = (data: [number[], (number | null)[]] | null, baseline: nu
   max += padding;
 
   if (baseline !== undefined && baseline > 0) {
-    // 确保 baseline 在范围内
+    // expand range to include baseline when it's near an edge (within 0.5× padding)
     min = Math.min(min, baseline);
     max = Math.max(max, baseline);
   }
@@ -407,14 +408,16 @@ const initChart = () => {
                 const padding = range * 0.05;
                 const effectiveBaseline = Math.max(yScale.min + padding, Math.min(yScale.max - padding, baseline));
                 const yPos = u.valToPos(effectiveBaseline, 'y', true);
-                const uWithBaseline = u as uPlotWithBaseline;
-                ctx.strokeStyle = uWithBaseline._baselineColor ?? getTrendColor();
-                ctx.lineWidth = 1;
-                ctx.setLineDash([4, 4]);
-                ctx.beginPath();
-                ctx.moveTo(u.bbox.left, yPos);
-                ctx.lineTo(u.bbox.left + u.bbox.width, yPos);
-                ctx.stroke();
+                if (yPos >= 0 && yPos <= u.bbox.height) {
+                  const uWithBaseline = u as uPlotWithBaseline;
+                  ctx.strokeStyle = uWithBaseline._baselineColor ?? getTrendColor();
+                  ctx.lineWidth = 1;
+                  ctx.setLineDash([4, 4]);
+                  ctx.beginPath();
+                  ctx.moveTo(u.bbox.left, yPos);
+                  ctx.lineTo(u.bbox.left + u.bbox.width, yPos);
+                  ctx.stroke();
+                }
               }
             }
 
@@ -530,9 +533,8 @@ const hasLunchBreak = (data: { time: string }[]): boolean => {
   let hasLunchData = false;
 
   for (const item of data) {
-    const m = item.time.match(/^(\d{1,2}):(\d{2})$/);
-    if (!m || !m[1] || !m[2]) continue;
-    const minutes = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    const minutes = timeToMinutes(item.time);
+    if (minutes < 0) continue;
     if (minutes <= start) hasMorning = true;
     if (minutes >= end) hasAfternoon = true;
     if (minutes > start && minutes < end) hasLunchData = true;
@@ -542,31 +544,13 @@ const hasLunchBreak = (data: { time: string }[]): boolean => {
   return hasMorning && hasAfternoon && !hasLunchData;
 };
 
-const timeToMinutes = (timeStr: string): number => {
-  const m = timeStr.match(/^(\d{1,2}):(\d{2})$/);
-  if (!m || !m[1] || !m[2]) return -1;
-  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
-};
-
 const minutesToTimestamp = (minutes: number, baseDate?: Date, tzName?: string): number => {
   const now = baseDate ?? new Date();
   const hour = Math.floor(minutes / 60);
   const minute = minutes % 60;
 
   if (tzName) {
-    // 时区感知计算：将市场时间转换为 UTC 时间戳
-    const utcStr = now.toLocaleString('en-US', { timeZone: 'UTC', hour12: false });
-    const utcH = parseInt(utcStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
-    const utcM = parseInt(utcStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
-
-    const targetStr = now.toLocaleString('en-US', { timeZone: tzName, hour12: false });
-    const targetH = parseInt(targetStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
-    const targetM = parseInt(targetStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
-
-    const utcMinuteOfDay = utcH * 60 + utcM;
-    const targetMinuteOfDay = targetH * 60 + targetM;
-    const tzOffsetMinutes = targetMinuteOfDay - utcMinuteOfDay;
-
+    const tzOffsetMinutes = getTimezoneOffsetMinutes(tzName, now);
     const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0);
     const marketMinuteOfDay = hour * 60 + minute;
     const utcMarketMinute = marketMinuteOfDay - tzOffsetMinutes;
