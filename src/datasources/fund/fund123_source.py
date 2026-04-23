@@ -307,7 +307,13 @@ class Fund123DataSource(DataSource):
                         latest_date = date.fromisoformat(latest_trading_day)
                         # 只有缓存净值日期是最新交易日，才使用缓存
                         if cached_date == latest_date and not daily_dao.is_expired(fund_code):
-                            use_cached = True
+                            # 进一步检查：盘中时，缓存的 estimate_time 必须是今天的数据才使用
+                            # 如果 estimate_time 是昨天的，说明盘中没有更新，需要重新获取
+                            if cached_daily.estimate_time:
+                                today_str = time.strftime("%Y-%m-%d")
+                                if not cached_daily.estimate_time.startswith(today_str):
+                                    # estimate_time 不是今天的，缓存可能已过时
+                                    use_cached = False
                     except ValueError:
                         # 日期解析失败，不使用缓存
                         use_cached = False

@@ -6,6 +6,7 @@
 import asyncio
 import logging
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -96,6 +97,8 @@ class DataSourceHealthChecker:
     - 支持自动恢复检测
     """
 
+    MAX_HISTORY = 100
+
     def __init__(
         self,
         check_interval: int = 60,
@@ -116,8 +119,6 @@ class DataSourceHealthChecker:
         self.timeout = timeout
         self.max_response_time_ms = max_response_time_ms
         self.consecutive_failure_threshold = consecutive_failure_threshold
-
-        MAX_HISTORY = 100
 
         self.health_history: dict[str, deque[HealthCheckResult]] = {}
         self._check_tasks: dict[str, asyncio.Task] = {}
@@ -193,7 +194,7 @@ class DataSourceHealthChecker:
             # 保存到历史记录
             if save_history:
                 if source_name not in self.health_history:
-                    self.health_history[source_name] = deque(maxlen=MAX_HISTORY)
+                    self.health_history[source_name] = deque(maxlen=self.MAX_HISTORY)
                 self.health_history[source_name].append(result)
 
             return result
@@ -222,7 +223,7 @@ class DataSourceHealthChecker:
 
             if save_history:
                 if source_name not in self.health_history:
-                    self.health_history[source_name] = deque(maxlen=MAX_HISTORY)
+                    self.health_history[source_name] = deque(maxlen=self.MAX_HISTORY)
                 self.health_history[source_name].append(result)
 
             return result
@@ -254,7 +255,7 @@ class DataSourceHealthChecker:
 
             if save_history:
                 if source_name not in self.health_history:
-                    self.health_history[source_name] = deque(maxlen=MAX_HISTORY)
+                    self.health_history[source_name] = deque(maxlen=self.MAX_HISTORY)
                 self.health_history[source_name].append(result)
 
             return result
