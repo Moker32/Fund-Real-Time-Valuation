@@ -117,7 +117,9 @@ class DataSourceHealthChecker:
         self.max_response_time_ms = max_response_time_ms
         self.consecutive_failure_threshold = consecutive_failure_threshold
 
-        self.health_history: dict[str, list[HealthCheckResult]] = {}
+        MAX_HISTORY = 100
+
+        self.health_history: dict[str, deque[HealthCheckResult]] = {}
         self._check_tasks: dict[str, asyncio.Task] = {}
         self._running = False
         self._consecutive_failures: dict[str, int] = {}
@@ -191,15 +193,8 @@ class DataSourceHealthChecker:
             # 保存到历史记录
             if save_history:
                 if source_name not in self.health_history:
-                    self.health_history[source_name] = []
+                    self.health_history[source_name] = deque(maxlen=MAX_HISTORY)
                 self.health_history[source_name].append(result)
-
-                # 限制历史记录数量
-                max_history = 100
-                if len(self.health_history[source_name]) > max_history:
-                    self.health_history[source_name] = self.health_history[source_name][
-                        -max_history:
-                    ]
 
             return result
 
@@ -227,7 +222,7 @@ class DataSourceHealthChecker:
 
             if save_history:
                 if source_name not in self.health_history:
-                    self.health_history[source_name] = []
+                    self.health_history[source_name] = deque(maxlen=MAX_HISTORY)
                 self.health_history[source_name].append(result)
 
             return result
@@ -259,7 +254,7 @@ class DataSourceHealthChecker:
 
             if save_history:
                 if source_name not in self.health_history:
-                    self.health_history[source_name] = []
+                    self.health_history[source_name] = deque(maxlen=MAX_HISTORY)
                 self.health_history[source_name].append(result)
 
             return result
