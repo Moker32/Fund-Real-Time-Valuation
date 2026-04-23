@@ -71,7 +71,7 @@ async def fetch_yahoo_market_state(index_type: str) -> str | None:
         marketState 字符串或 None
     """
     # 检查缓存
-    now = asyncio.get_event_loop().time
+    now = asyncio.get_event_loop().time()
     if index_type in _market_state_cache:
         state, timestamp = _market_state_cache[index_type]
         if now - timestamp < _MARKET_STATE_CACHE_DURATION:
