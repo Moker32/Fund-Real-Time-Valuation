@@ -39,6 +39,11 @@ class AKShareEconomicNewsDataSource(DataSource):
         self._cache_time: float = 0.0
         self._cache_timeout = 300.0  # 缓存5分钟
 
+    @property
+    def _cache_type(self) -> str:
+        """List 缓存类型"""
+        return "list"
+
     async def fetch(self, date: str | None = None) -> DataSourceResult:
         """
         获取全球宏观事件（财经日历）
@@ -131,17 +136,6 @@ class AKShareEconomicNewsDataSource(DataSource):
 
         return processed_results
 
-    def _is_cache_valid(self, cache_key: str) -> bool:
-        """检查缓存是否有效"""
-        if not self._cache:
-            return False
-        return (time.time() - self._cache_time) < self._cache_timeout
-
-    def clear_cache(self):
-        """清空缓存"""
-        self._cache = []
-        self._cache_time = 0.0
-
 
 class AKShareWeiboSentimentDataSource(DataSource):
     """AKShare 微博舆情数据源"""
@@ -170,6 +164,11 @@ class AKShareWeiboSentimentDataSource(DataSource):
         self._cache: list[dict[str, Any]] = []
         self._cache_time: float = 0.0
         self._cache_timeout = 180.0  # 缓存3分钟
+
+    @property
+    def _cache_type(self) -> str:
+        """List 缓存类型"""
+        return "list"
 
     async def fetch(self, period: str = "12h") -> DataSourceResult:
         """
@@ -263,17 +262,6 @@ class AKShareWeiboSentimentDataSource(DataSource):
                 processed_results.append(result)
 
         return processed_results
-
-    def _is_cache_valid(self, cache_key: str) -> bool:
-        """检查缓存是否有效"""
-        if not self._cache:
-            return False
-        return (time.time() - self._cache_time) < self._cache_timeout
-
-    def clear_cache(self):
-        """清空缓存"""
-        self._cache = []
-        self._cache_time = 0.0
 
 
 class AKShareSentimentAggregatorDataSource(DataSource):

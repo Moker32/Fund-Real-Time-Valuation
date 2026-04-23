@@ -43,6 +43,11 @@ class EastMoneySectorDataSource(DataSource):
         self._cache_time: float = 0.0
         self._cache_timeout = 60.0
 
+    @property
+    def _cache_type(self) -> str:
+        """List 缓存类型"""
+        return "list"
+
     def log(self, message: str) -> None:
         logger.info(f"[EastMoneySectorDataSource] {message}")
 
@@ -160,15 +165,6 @@ class EastMoneySectorDataSource(DataSource):
             "汽车": "制造",
         }
         return category_map.get(name, "其他")
-
-    def _is_cache_valid(self, cache_key: str) -> bool:
-        if not self._cache:
-            return False
-        return (time.time() - self._cache_time) < self._cache_timeout
-
-    def clear_cache(self):
-        """清空缓存"""
-        self._cache.clear()
 
     async def health_check(self) -> bool:
         """健康检查"""
@@ -408,17 +404,6 @@ class EastMoneySectorSource(DataSource):
                 processed_results.append(result)
         return processed_results
 
-    def _is_cache_valid(self, cache_key: str) -> bool:
-        """检查缓存是否有效"""
-        if cache_key not in self._cache:
-            return False
-        cache_time = self._cache[cache_key].get("_cache_time", 0)
-        return (time.time() - cache_time) < self._cache_timeout
-
-    def clear_cache(self):
-        """清空缓存"""
-        self._cache.clear()
-
     def get_status(self) -> dict[str, Any]:
         """获取数据源状态"""
         status = super().get_status()
@@ -626,17 +611,6 @@ class ThsSectorSource(DataSource):
             return float(value)
         except (ValueError, TypeError):
             return 0.0
-
-    def _is_cache_valid(self, cache_key: str) -> bool:
-        """检查缓存是否有效"""
-        if cache_key not in self._cache:
-            return False
-        cache_time = self._cache[cache_key].get("_cache_time", 0)
-        return (time.time() - cache_time) < self._cache_timeout
-
-    def clear_cache(self):
-        """清空缓存"""
-        self._cache.clear()
 
     def get_status(self) -> dict[str, Any]:
         """获取数据源状态"""

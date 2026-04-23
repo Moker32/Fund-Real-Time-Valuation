@@ -61,6 +61,10 @@ export const useSectorStore = defineStore('sectors', () => {
   const selectedChartSymbol = ref<string | null>(null);
   const MAX_HISTORY_POINTS = 500;
 
+  // 板块 name -> index 映射，用于 O(1) 查找
+  const industrySectorsMap = ref<Map<string, number>>(new Map());
+  const conceptSectorsMap = ref<Map<string, number>>(new Map());
+
   // Getters
   const currentSectors = computed(() => {
     return currentType.value === 'industry' ? industrySectors.value : conceptSectors.value;
@@ -150,6 +154,9 @@ export const useSectorStore = defineStore('sectors', () => {
         } else {
           conceptSectors.value = response.sectors;
         }
+
+        // 重建 Map 以保持同步
+        rebuildSectorsMap();
 
         lastUpdated.value = response.timestamp;
         loading.value = false;
@@ -246,36 +253,50 @@ export const useSectorStore = defineStore('sectors', () => {
   // ========== WebSocket 实时更新相关 ==========
 
   /**
+   * 重建板块 name -> index 映射
+   */
+  function rebuildSectorsMap() {
+    industrySectorsMap.value.clear();
+    industrySectors.value.forEach((s, index) => {
+      industrySectorsMap.value.set(s.name, index);
+    });
+    conceptSectorsMap.value.clear();
+    conceptSectors.value.forEach((s, index) => {
+      conceptSectorsMap.value.set(s.name, index);
+    });
+  }
+
+  /**
    * 更新单个板块数据（用于 WebSocket 实时更新）
    */
   function updateSector(updatedData: WSSectorUpdate) {
     const { name, change, changePercent, stockCount, timestamp } = updatedData;
 
-    // 更新 industrySectors 列表
-    const industryIndex = industrySectors.value.findIndex((s) => s.name === name);
-    if (industryIndex !== -1) {
+    // O(1) 查找 industrySectors
+    const industryIndex = industrySectorsMap.value.get(name);
+    if (industryIndex !== undefined) {
       const current = industrySectors.value[industryIndex];
       if (current) {
         industrySectors.value[industryIndex] = {
           ...current,
           change,
           changePercent,
-          stockCount: stockCount ?? current.stockCount,
+          stockCount: stockCount ?? (current as any).stockCount,
           timestamp: timestamp ?? current.timestamp,
         };
       }
     }
 
-    // 更新 conceptSectors 列表
-    const conceptIndex = conceptSectors.value.findIndex((s) => s.name === name);
-    if (conceptIndex !== -1) {
+    // O(1) 查找 conceptSectors
+    const conceptIndex = conceptSectorsMap.value.get(name);
+    if (conceptIndex !== undefined) {
       const current = conceptSectors.value[conceptIndex];
       if (current) {
         conceptSectors.value[conceptIndex] = {
           ...current,
           change,
           changePercent,
-          stockCount: stockCount ?? current.stockCount,
+          stockCount: stockCount ?? (current as any).stockCount,
           timestamp: timestamp ?? current.timestamp,
         };
       }

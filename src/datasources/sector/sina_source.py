@@ -62,6 +62,11 @@ class SinaSectorDataSource(DataSource):
         self._cache_time: float = 0.0
         self._cache_timeout = 60.0  # 缓存60秒
 
+    @property
+    def _cache_type(self) -> str:
+        """List 缓存类型"""
+        return "list"
+
     async def fetch(self, sector_code: str | None = None) -> DataSourceResult:
         """
         获取板块数据
@@ -349,17 +354,6 @@ class SinaSectorDataSource(DataSource):
             "trading_status": "交易",
             "time": datetime.now().strftime("%H:%M:%S"),
         }
-
-    def _is_cache_valid(self, cache_key: str) -> bool:
-        """检查缓存是否有效"""
-        if not self._cache:
-            return False
-        return (time.time() - self._cache_time) < self._cache_timeout
-
-    def clear_cache(self):
-        """清空缓存"""
-        self._cache = []
-        self._cache_time = 0.0
 
     async def close(self):
         """关闭HTTP客户端"""

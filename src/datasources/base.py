@@ -233,7 +233,7 @@ class DataSource(ABC):
 
     def _is_cache_valid(self, cache_key: str) -> bool:
         """
-        检查缓存是否有效（默认实现）
+        检查缓存是否有效
 
         Args:
             cache_key: 缓存键
@@ -241,10 +241,31 @@ class DataSource(ABC):
         Returns:
             bool: 缓存是否有效
         """
-        if not hasattr(self, "_cache") or cache_key not in self._cache:
+        if not hasattr(self, "_cache"):
             return False
-        cache_time = self._cache[cache_key].get("_cache_time", 0)
-        return (time.time() - cache_time) < self._cache_timeout
+        if self._cache_type == "list":
+            if not self._cache:
+                return False
+            return (time.time() - self._cache_time) < self._cache_timeout
+        else:
+            if cache_key not in self._cache:
+                return False
+            cache_time = self._cache[cache_key].get("_cache_time", 0)
+            return (time.time() - cache_time) < self._cache_timeout
+
+    @property
+    def _cache_type(self) -> str:
+        """缓存类型: 'dict' 或 'list'"""
+        return "dict"
+
+    def clear_cache(self) -> None:
+        """清空缓存"""
+        if self._cache_type == "list":
+            self._cache = []
+            if hasattr(self, "_cache_time"):
+                self._cache_time = 0.0
+        else:
+            self._cache.clear()
 
     def _handle_error(self, error: Exception, source: str) -> DataSourceResult:
         """
