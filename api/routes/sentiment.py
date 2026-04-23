@@ -17,6 +17,17 @@ from ..models import ErrorResponse
 logger = logging.getLogger(__name__)
 
 
+def _clean_float(val):
+    """清理 NaN 和 Inf 值"""
+    import math
+
+    if val is None:
+        return None
+    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+        return None
+    return val
+
+
 class EconomicEventItem(TypedDict):
     """单条财经事件数据结构"""
 
@@ -128,24 +139,15 @@ async def get_economic_events(
                     date_val = date_val.isoformat()
 
                 # 处理 NaN 值
-                def clean_float(val):
-                    import math
-
-                    if val is None:
-                        return None
-                    if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
-                        return None
-                    return val
-
                 events.append(
                     {
                         "日期": str(date_val) if date_val else "",
                         "时间": item.get("时间", ""),
                         "地区": item.get("地区", ""),
                         "事件": item.get("事件", ""),
-                        "公布": clean_float(item.get("公布")),
-                        "预期": clean_float(item.get("预期")),
-                        "前值": clean_float(item.get("前值")),
+                        "公布": _clean_float(item.get("公布")),
+                        "预期": _clean_float(item.get("预期")),
+                        "前值": _clean_float(item.get("前值")),
                         "重要性": item.get("重要性", 0),
                     }
                 )
@@ -303,24 +305,15 @@ async def get_all_sentiment(
                         date_val = date_val.isoformat()
 
                     # 处理 NaN 值
-                    def clean_float(val):
-                        import math
-
-                        if val is None:
-                            return None
-                        if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
-                            return None
-                        return val
-
                     economic.append(
                         {
                             "日期": str(date_val) if date_val else "",
                             "时间": item.get("时间", ""),
                             "地区": item.get("地区", ""),
                             "事件": item.get("事件", ""),
-                            "公布": clean_float(item.get("公布")),
-                            "预期": clean_float(item.get("预期")),
-                            "前值": clean_float(item.get("前值")),
+                            "公布": _clean_float(item.get("公布")),
+                            "预期": _clean_float(item.get("预期")),
+                            "前值": _clean_float(item.get("前值")),
                             "重要性": item.get("重要性", 0),
                         }
                     )

@@ -257,22 +257,6 @@ class TiantianFundDataSource(DataSource):
             metadata={"fund_code": fund_code},
         )
 
-        # 天天基金失败，回退到 akshare 获取净值
-        lof_result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
-        if lof_result.success:
-            lof_result.data["type"] = fund_type
-            lof_result.data["name"] = fund_name
-            lof_result.data["has_real_time_estimate"] = _has_real_time_estimate(fund_type, fund_name)
-            return lof_result
-
-        return DataSourceResult(
-            success=False,
-            error=f"获取基金数据失败，已重试 {self.max_retries} 次",
-            timestamp=time.time(),
-            source=self.name,
-            metadata={"fund_code": fund_code},
-        )
-
     async def _fetch_lof(
         self, fund_code: str, has_real_time_estimate: bool = True
     ) -> DataSourceResult:

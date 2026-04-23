@@ -721,7 +721,7 @@ watch(() => props.data, (newData) => {
 
   updateColor();
   updateData();
-}, { deep: true, flush: 'post' });
+}, { flush: 'post' });
 
 watch(() => props.trend, () => {
   if (uplotInstance.value) {

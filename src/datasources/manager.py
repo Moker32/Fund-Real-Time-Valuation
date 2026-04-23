@@ -503,14 +503,7 @@ class DataSourceManager:
         source_ids = self._type_sources[source_type]
 
         if not self._enable_load_balancing or len(source_ids) <= 1:
-            # 按优先级排序
-            def get_priority(sid: str) -> int:
-                config = self._source_configs.get(sid)
-                if config:
-                    return config.priority
-                return 0
-
-            return [self._sources[sid] for sid in sorted(source_ids, key=get_priority)]
+            return [self._sources[sid] for sid in source_ids]
 
         # 负载均衡模式
         idx = self._round_robin_index[source_type] % len(source_ids)

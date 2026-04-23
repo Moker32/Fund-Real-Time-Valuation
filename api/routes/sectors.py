@@ -14,6 +14,18 @@ from src.datasources.manager import DataSourceManager
 from ..dependencies import DataSourceDependency
 from ..models import ErrorResponse
 
+# 常量定义
+FLOW_TYPE_INDUSTRY = "industry"
+FLOW_TYPE_CONCEPT = "concept"
+VALID_FLOW_TYPES = {FLOW_TYPE_INDUSTRY, FLOW_TYPE_CONCEPT}
+
+SYMBOL_IMMEDIATE = "即时"
+SYMBOL_3DAY = "3日排行"
+SYMBOL_5DAY = "5日排行"
+SYMBOL_10DAY = "10日排行"
+SYMBOL_20DAY = "20日排行"
+VALID_SYMBOLS = {SYMBOL_IMMEDIATE, SYMBOL_3DAY, SYMBOL_5DAY, SYMBOL_10DAY, SYMBOL_20DAY}
+
 
 def _check_result_success(result: DataSourceResult | object) -> bool:
     """
@@ -421,17 +433,16 @@ async def get_fund_flow(
             - 20日排行: 20日累计
     """
     # 参数验证
-    if flow_type not in ["industry", "concept"]:
+    if flow_type not in VALID_FLOW_TYPES:
         raise HTTPException(
             status_code=400,
             detail=f"无效的流向类型: {flow_type}，支持: industry, concept",
         )
 
-    valid_symbols = ["即时", "3日排行", "5日排行", "10日排行", "20日排行"]
-    if symbol not in valid_symbols:
+    if symbol not in VALID_SYMBOLS:
         raise HTTPException(
             status_code=400,
-            detail=f"无效的时间周期: {symbol}，支持: {', '.join(valid_symbols)}",
+            detail=f"无效的时间周期: {symbol}，支持: {', '.join(sorted(VALID_SYMBOLS))}",
         )
 
     current_time = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
