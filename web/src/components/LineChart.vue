@@ -73,22 +73,18 @@ const lastDataLen = ref(0);  // streaming 模式追踪已有数据长度
 // 午休区间标记：用于绘制虚线
 const lunchBreakSegment = ref<{ start: number; end: number; price: number } | null>(null);
 
-// 根据交易时段设置 X 轴，使用实际数据日期确保基准日正确
+// 根据实际数据范围设置 X 轴，两端保留少量 padding
 const resetXScale = () => {
   if (!uplotInstance.value) return;
-  const { start: marketStart, end: marketEnd } = getMarketTradingRange();
 
   const ts = realTimestamps.value;
   if (ts.length === 0) return;
   const validTs = ts.filter(t => t > 0);
   if (validTs.length < 2) return;
 
-  // 从有效数据点提取 UTC 日期，传递 UTC 日期给 minutesToTimestamp
-  const baseDate = new Date(validTs[0] * 1000);
-
   const padding = 5 * 60;
-  const min = minutesToTimestamp(marketStart, baseDate, props.timezone) - padding;
-  const max = minutesToTimestamp(marketEnd, baseDate, props.timezone) + padding;
+  const min = Math.min(...validTs) - padding;
+  const max = Math.max(...validTs) + padding;
 
   uplotInstance.value.setScale('x', { min, max });
 };
