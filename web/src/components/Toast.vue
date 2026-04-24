@@ -13,12 +13,12 @@ defineProps<{
   toasts: Toast[]
 }>()
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const emit = defineEmits<{
   (e: 'close', id: number): void
 }>()
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const getIcon = (type: ToastType) => {
   const icons = {
     success: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
@@ -29,7 +29,7 @@ const getIcon = (type: ToastType) => {
   return icons[type]
 }
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const getTypeClass = (type: ToastType) => {
   return `toast-${type}`
 }

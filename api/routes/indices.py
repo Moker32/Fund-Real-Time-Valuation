@@ -5,6 +5,7 @@
 
 import asyncio
 import logging
+import time
 from datetime import datetime
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
@@ -71,7 +72,7 @@ async def fetch_yahoo_market_state(index_type: str) -> str | None:
         marketState 字符串或 None
     """
     # 检查缓存
-    now = asyncio.get_event_loop().time()
+    now = time.time()
     if index_type in _market_state_cache:
         state, timestamp = _market_state_cache[index_type]
         if now - timestamp < _MARKET_STATE_CACHE_DURATION:
@@ -91,7 +92,7 @@ async def fetch_yahoo_market_state(index_type: str) -> str | None:
         market_state = info.get("marketState")
 
         if market_state:
-            _market_state_cache[index_type] = (market_state, now())
+            _market_state_cache[index_type] = (market_state, now)
             logger.debug(f"[indices] yfinance marketState for {index_type}: {market_state}")
 
         return market_state

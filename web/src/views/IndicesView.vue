@@ -150,7 +150,7 @@ const historyError = ref<string | null>(null);
 const historyPreloadLoading = ref(false);
 
 // Period options
-// eslint-disable-next-line no-useless-assignment
+ 
 const periods = [
   { label: '1周', value: '1w' },
   { label: '1月', value: '1mo' },
@@ -161,7 +161,7 @@ const periods = [
 ];
 
 // Transform history data for FundChart
-// eslint-disable-next-line no-useless-assignment
+ 
 const chartData = computed((): FundHistory[] => {
   return historyData.value.map(item => ({
     time: item.time,
@@ -174,7 +174,7 @@ const chartData = computed((): FundHistory[] => {
 });
 
 // Determine trend based on first and last data points
-// eslint-disable-next-line no-useless-assignment
+ 
 const chartTrend = computed((): 'rising' | 'falling' | 'neutral' => {
   if (historyData.value.length < 2) return 'neutral';
   const firstItem = historyData.value[0];
@@ -224,7 +224,7 @@ async function fetchHistory() {
 }
 
 // Empty index for loading skeleton
-// eslint-disable-next-line no-useless-assignment
+ 
 const emptyIndex: MarketIndex = {
   index: '---',
   symbol: '---',

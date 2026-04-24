@@ -90,14 +90,14 @@ const emit = defineEmits<{
   click: [sector: Sector];
 }>();
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const changeClass = computed(() => {
   if (props.sector.changePercent > 0) return 'rising';
   if (props.sector.changePercent < 0) return 'falling';
   return 'neutral';
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const leadChangeClass = computed(() => {
   if (props.sector.leadChange > 0) return 'rising';
   if (props.sector.leadChange < 0) return 'falling';

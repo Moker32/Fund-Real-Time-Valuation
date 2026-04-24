@@ -155,6 +155,7 @@ class DataSource(ABC):
         self._last_error: DataSourceError | None = None
         self._request_count = 0
         self._error_count = 0
+        self._cache: dict[str, Any] = {}
 
     @property
     def error_rate(self) -> float:

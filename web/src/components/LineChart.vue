@@ -374,7 +374,7 @@ const initChart = () => {
               show: true,
               size: 6,
               width: 2,
-              stroke: (_u: uPlot) => color.value,
+              stroke: (_u: uPlot) => color.value, // eslint-disable-line @typescript-eslint/no-unused-vars
               fill: '#1e1e1e',
             }
           : { show: false },

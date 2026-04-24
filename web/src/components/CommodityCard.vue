@@ -93,14 +93,12 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
 });
 
-const emit = defineEmits<{
+defineEmits<{
   click: [];
 }>();
 
 const store = useCommodityStore();
 
-// 简化数据源名称显示
-// eslint-disable-next-line no-useless-assignment
 const sourceName = computed(() => {
   const source = props.commodity.source;
   if (!source) return '';
@@ -139,7 +137,7 @@ const isWatched = computed(() => {
   );
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const changeClass = computed(() => {
   if (props.commodity.changePercent > 0) return 'rising';
   if (props.commodity.changePercent < 0) return 'falling';
@@ -313,7 +311,7 @@ const tradingStatus = computed(() => {
   return 'unknown';
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const statusText = computed(() => {
   const labels: Record<string, string> = {
     'open': '交易中',

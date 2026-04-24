@@ -209,18 +209,18 @@ const showDetail = ref(false);
 const selectedSectorData = ref<Sector | null>(null);
 
 // 检查是否有资金流向数据
-// eslint-disable-next-line no-useless-assignment
+ 
 const hasFlowData = computed(() => {
   return sectorStore.currentSectors.some(s => s.mainInflow !== undefined);
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const flowDataCount = computed(() => {
   return sectorStore.currentSectors.filter(s => s.mainInflow !== undefined).length;
 });
 
 // Empty sector for loading skeleton
-// eslint-disable-next-line no-useless-assignment
+ 
 const emptySector: Sector = {
   rank: 0,
   name: '加载中...',

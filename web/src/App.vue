@@ -3,7 +3,7 @@ import { RouterView } from 'vue-router'
 import Toast from '@/components/Toast.vue'
 import { useToast } from '@/composables/useToast'
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const { toasts, removeToast } = useToast()
 </script>
 

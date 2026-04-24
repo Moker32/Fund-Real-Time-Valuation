@@ -108,7 +108,7 @@ const emit = defineEmits<{
 }>();
 
 // Use a computed property to handle potential undefined values
-// eslint-disable-next-line no-useless-assignment
+ 
 const indexData = computed(() => props.index);
 
 // 午休配置：A股 11:30-13:00，港股 12:00-13:00，日经 12:30-13:30，美股/欧洲/其他无午休
@@ -192,7 +192,7 @@ onUnmounted(() => {
   // console.log('[IndexCard] onUnmounted for', props.index.index);
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const changeClass = computed(() => {
   if (props.index.changePercent > 0) return 'rising';
   if (props.index.changePercent < 0) return 'falling';
@@ -210,17 +210,17 @@ const chartData = computed(() => {
   return [];
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const showChart = computed(() => {
   return chartData.value.length > 0;
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const baseline = computed(() => {
   return props.index.prevClose;
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const regionLabel = computed(() => {
   const labels: Record<string, string> = {
     'china': 'A股',
@@ -232,7 +232,7 @@ const regionLabel = computed(() => {
   return labels[props.index.region || ''] || props.index.region || '';
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const sourceName = computed(() => {
   const source = props.index.source;
   if (!source) return '';
@@ -243,7 +243,7 @@ const sourceName = computed(() => {
   return source;
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const statusText = computed(() => {
   const labels: Record<string, string> = {
     'open': '交易中',
@@ -256,7 +256,7 @@ const statusText = computed(() => {
 });
 
 // 判断是否为延时数据源
-// eslint-disable-next-line no-useless-assignment
+ 
 const isDelayed = computed(() => {
   // 优先使用后端返回的 isDelayed 字段
   if (props.index.isDelayed !== undefined) {

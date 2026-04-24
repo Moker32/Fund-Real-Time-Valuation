@@ -11,14 +11,14 @@ const commodityStore = useCommodityStore();
 const indexStore = useIndexStore();
 
 // 计算属性
-// eslint-disable-next-line no-useless-assignment
+ 
 const hasFunds = computed(() => fundStore.funds.length > 0);
 
 
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const topGainers = computed(() => fundStore.topGainers.slice(0, 3));
-// eslint-disable-next-line no-useless-assignment
+ 
 const topLosers = computed(() => fundStore.topLosers.slice(0, 3));
 
 // 数字计数动画

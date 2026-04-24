@@ -281,7 +281,7 @@ export const useSectorStore = defineStore('sectors', () => {
           ...current,
           change,
           changePercent,
-          stockCount: stockCount ?? (current as any).stockCount,
+          stockCount: stockCount ?? current.stockCount,
           timestamp: timestamp ?? current.timestamp,
         };
       }
@@ -296,7 +296,7 @@ export const useSectorStore = defineStore('sectors', () => {
           ...current,
           change,
           changePercent,
-          stockCount: stockCount ?? (current as any).stockCount,
+          stockCount: stockCount ?? current.stockCount,
           timestamp: timestamp ?? current.timestamp,
         };
       }

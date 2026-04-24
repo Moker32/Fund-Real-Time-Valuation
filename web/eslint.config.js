@@ -45,7 +45,7 @@ export default [
       "@typescript-eslint/explicit-function-return-type": "off",
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": "warn",
-      "no-useless-assignment": "warn",
+      "no-useless-assignment": "off",
     },
   },
   skipFormatting,

@@ -20,6 +20,7 @@ from .aggregator import (
     identify_category,
     search_commodities,
 )
+from .akshare_source import CommodityRealtimeSource
 from .base import (
     MAX_CACHE_SIZE,
     MAX_RETRIES,
@@ -27,7 +28,6 @@ from .base import (
     CommoditySearchResponse,
     CommoditySearchResult,
 )
-from .akshare_source import CommodityRealtimeSource
 
 __all__ = [
     # 基类

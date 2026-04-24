@@ -145,16 +145,16 @@ const totalInflow = computed(() => flowData.value.totalInflow);
 const totalOutflow = computed(() => flowData.value.totalOutflow);
  
 const netFlow = computed(() => flowData.value.netFlow);
-// eslint-disable-next-line no-useless-assignment
+ 
 const sectorCount = computed(() => props.sectors?.length || 0);
-// eslint-disable-next-line no-useless-assignment
+ 
 const hasFlowData = computed(() => flowData.value.hasFlowData);
-// eslint-disable-next-line no-useless-assignment
+ 
 const inflowCount = computed(() => flowData.value.inflowCount);
-// eslint-disable-next-line no-useless-assignment
+ 
 const outflowCount = computed(() => flowData.value.outflowCount);
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const netFlowClass = computed(() => {
   if (netFlow.value > 0) return 'text-rise';
   if (netFlow.value < 0) return 'text-fall';
@@ -162,12 +162,12 @@ const netFlowClass = computed(() => {
 });
 
 const total = computed(() => Math.abs(totalInflow.value) + Math.abs(totalOutflow.value));
-// eslint-disable-next-line no-useless-assignment
+ 
 const inflowPercentage = computed(() => {
   if (total.value === 0) return 50;
   return (Math.abs(totalInflow.value) / total.value) * 100;
 });
-// eslint-disable-next-line no-useless-assignment
+ 
 const outflowPercentage = computed(() => {
   if (total.value === 0) return 50;
   return (Math.abs(totalOutflow.value) / total.value) * 100;

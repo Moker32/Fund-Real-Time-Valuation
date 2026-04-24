@@ -316,7 +316,7 @@ class DataSourceHealthChecker:
         Returns:
             List[HealthCheckResult]: 健康检查历史列表
         """
-        history = self.health_history.get(source_name, [])
+        history: deque[HealthCheckResult] = self.health_history.get(source_name, deque())
         return history[-limit:]
 
     def get_statistics(self) -> dict[str, Any]:

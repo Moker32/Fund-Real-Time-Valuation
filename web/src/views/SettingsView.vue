@@ -53,7 +53,7 @@ import { useFundStore } from '@/stores/fundStore';
 const fundStore = useFundStore();
 
 const showChart = ref(fundStore.showChart ?? true);
-// eslint-disable-next-line no-useless-assignment
+ 
 const apiUrl = ref(import.meta.env.VITE_API_URL || 'http://localhost:8000');
 
 watch(showChart, (value) => {

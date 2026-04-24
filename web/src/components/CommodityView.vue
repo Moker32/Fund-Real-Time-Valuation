@@ -87,13 +87,13 @@ const selectedChart = computed(() => {
   return store.commodities.find(c => c.symbol === store.selectedChartSymbol) || null;
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const categoryList = computed(() => store.categoryList);
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const activeCategoryData = computed(() => store.activeCategoryData);
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const activeCommodities = computed(() => store.activeCommodities);
 
 function handleCategorySelect(categoryId: string) {

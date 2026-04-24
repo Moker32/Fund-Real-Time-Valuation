@@ -206,6 +206,7 @@ export interface Sector {
   price: number;
   change: number;
   changePercent: number;
+  stockCount?: number;
   totalMarket?: string;
   turnover?: string;
   upCount: number;

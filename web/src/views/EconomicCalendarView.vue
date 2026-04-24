@@ -145,23 +145,23 @@ import type { EconomicEventItem } from '@/types';
 const sentimentStore = useSentimentStore();
 
 // Computed
-// eslint-disable-next-line no-useless-assignment
+ 
 const displayDate = computed(() => {
   const date = sentimentStore.selectedDate || getTodayDate();
   return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const importantCount = computed(() => {
   return sentimentStore.economicEvents.filter(e => e.重要性 >= 2).length;
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const releasedCount = computed(() => {
   return sentimentStore.economicEvents.filter(e => e.公布 !== null).length;
 });
 
-// eslint-disable-next-line no-useless-assignment
+ 
 const pendingCount = computed(() => {
   return sentimentStore.economicEvents.filter(e => e.公布 === null).length;
 });
