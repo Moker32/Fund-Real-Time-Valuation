@@ -114,7 +114,7 @@ const indexData = computed(() => props.index);
 const lunchBreak = computed(() => {
   switch (props.index.index) {
     case 'nikkei225':
-      return { start: 12 * 60 + 30, end: 13 * 60 + 30 }; // 12:30-13:30
+      return { start: 11 * 60 + 30, end: 12 * 60 + 30 }; // 11:30-12:30
     case 'hang_seng':
     case 'hang_seng_tech':
       return { start: 12 * 60, end: 13 * 60 }; // 12:00-13:00
