@@ -246,9 +246,9 @@ const emptyIndex: MarketIndex = {
 
 async function preloadIndexIntraday() {
   if (indexStore.indices.length === 0 || historyPreloadLoading.value) return;
-  
+
   historyPreloadLoading.value = true;
-  
+
   try {
     // 使用 store 中的 fetchIndexIntraday 方法获取日内数据（带缓存）
     // 预加载所有指数的日内数据
@@ -260,19 +260,20 @@ async function preloadIndexIntraday() {
         return { indexType: idx.index, intraday: [] };
       }
     });
-    
+
     const results = await Promise.all(intradayPromises);
-    
-    // 替换整个数组以确保响应式更新
+
+    // 替换整个数组以确保响应式更新（只更新有有效数据的，保留原有空数据的）
     const updatedIndices = indexStore.indices.map(idx => {
       const result = results.find(r => r.indexType === idx.index);
-      if (result) {
+      if (result && result.intraday.length > 0) {
         return { ...idx, intraday: result.intraday };
       }
+      // 如果没有新数据，保留原有的 intraday
       return idx;
     });
-    
-    indexStore.indices.splice(0, indexStore.indices.length, ...updatedIndices);
+
+    indexStore.indices = updatedIndices;
   } catch (error) {
     console.error('[IndicesView] preloadIndexIntraday error:', error);
   } finally {
