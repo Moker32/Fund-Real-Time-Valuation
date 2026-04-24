@@ -805,6 +805,35 @@ const updateDataStreaming = (validData: { time: string; price?: number; close?: 
 
   rawDataItems.value = [...validData];
 
+  // 检测是否跨过午休边界（增量追加时首次出现下午数据）
+  const lbConfig = getLunchBreakConfig();
+  if (lbConfig.start < lbConfig.end && prevLen > 0) {
+    const lastProcessed = validData[prevLen - 1];
+    const firstNew = newItems[0];
+    if (lastProcessed && firstNew) {
+      const lastMinutes = timeToMinutes(lastProcessed.time);
+      const firstMinutes = timeToMinutes(firstNew.time);
+      if (lastMinutes >= 0 && firstMinutes >= 0 && lastMinutes <= lbConfig.start && firstMinutes >= lbConfig.end) {
+        // 从上午跨入下午，重新构建完整数据以插入午休断开点和虚线
+        const sortedData = [...validData].sort((a, b) => {
+          const tsA = parseTimeToTimestamp(a.time, props.timezone);
+          const tsB = parseTimeToTimestamp(b.time, props.timezone);
+          return tsA - tsB;
+        });
+        buildCompressedIntradayData(sortedData);
+        const newData: [number[], (number | null)[]] = [processedTimestamps.value, processedValues.value];
+        try {
+          uplotInstance.value?.setData(newData);
+          resetXScale();
+          updateYScaleRange(newData);
+        } catch (e) {
+          console.warn('[FundChart] streaming rebuild error:', e);
+        }
+        return;
+      }
+    }
+  }
+
   // 处理每个新增点
   for (const item of newItems) {
     const minutes = timeToMinutes(item.time);
