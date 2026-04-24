@@ -116,6 +116,9 @@
         </div>
         <div class="footer-right">
           <span v-if="fund.sector" class="fund-sector">{{ fund.sector }}</span>
+          <template v-if="fund.conceptTags?.length">
+            <span v-for="tag in fund.conceptTags.slice(0, 3)" :key="tag" class="fund-concept-tag">{{ tag }}</span>
+          </template>
           <span v-if="fund.peerRank" class="peer-rank" :title="`同类排名: ${fund.peerRank.rank}/${fund.peerRank.total}`">
             {{ fund.peerRank.category }} {{ fund.peerRank.rank }}/{{ fund.peerRank.total }}
           </span>
@@ -152,7 +155,7 @@ const emit = defineEmits<{
 
 function handleCardClick(event: Event) {
   const target = event.target as Element;
-  const interactiveSelectors = ['button', '.action-btn', '.fund-type', '.fund-sector'];
+  const interactiveSelectors = ['button', '.action-btn', '.fund-type', '.fund-sector', '.fund-concept-tag'];
   const isInteractive = interactiveSelectors.some(selector =>
     target.matches(selector) || target.closest(selector)
   );
@@ -422,6 +425,26 @@ function sourceLabel(source: string): string {
   color: #3b82f6;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.fund-concept-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: rgba(139, 92, 246, 0.1);
+  color: #8b5cf6;
+}
+
+.fund-concept-tag:nth-child(2n) {
+  background: rgba(236, 72, 153, 0.1);
+  color: #ec4899;
+}
+
+.fund-concept-tag:nth-child(3n) {
+  background: rgba(234, 179, 8, 0.1);
+  color: #ca8a04;
 }
 
 .action-btn {
@@ -807,7 +830,7 @@ function sourceLabel(source: string): string {
   .fund-name { font-size: var(--font-size-xs); line-height: 1.2; }
   .fund-code { font-size: 10px; }
   .fund-type { font-size: 10px; padding: 1px 6px; }
-  .fund-sector { font-size: 10px; padding: 1px 6px; }
+  .fund-sector, .fund-concept-tag { font-size: 10px; padding: 1px 6px; }
 
   .action-btn {
     width: 32px; height: 32px;

@@ -10,6 +10,7 @@ from src.db.fund.fund_daily_dao import FundDailyCacheDAO
 from src.db.fund.fund_history_dao import FundHistoryDAO
 from src.db.fund.fund_industry_dao import FundIndustryDAO
 from src.db.fund.fund_intraday_dao import FundIntradayCacheDAO
+from src.db.fund.stock_concept_dao import FundConceptTagsDAO, StockConceptDAO
 
 __all__ = [
     "CacheMetadataDAO",
@@ -18,4 +19,6 @@ __all__ = [
     "FundDailyCacheDAO",
     "FundBasicInfoDAO",
     "FundIndustryDAO",
+    "StockConceptDAO",
+    "FundConceptTagsDAO",
 ]

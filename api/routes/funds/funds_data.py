@@ -273,12 +273,16 @@ def build_fund_response(
     # 从数据库读取行业配置缓存
     extra = _get_theme_industries(fund_code)
 
+    # 从数据库读取概念板块标签缓存
+    concept_tags = _get_cached_concept_tags(fund_code)
+
     validated = FundResponse.model_validate(
         {
             "fund_code": fund_code,
             "name": data.get("name", ""),
             "type": data.get("type"),
             "sector": extra.get("sector"),
+            "concept_tags": concept_tags,
             "industries": extra.get("industries"),
             "unit_net_value": unit_net,
             "net_value_date": data.get("net_value_date"),
@@ -411,8 +415,18 @@ async def get_funds_list(
     return {"funds": funds, "total": len(funds), "timestamp": current_time, "progress": 100}
 
 
+def _get_cached_concept_tags(fund_code: str) -> list[str] | None:
+    """从数据库读取缓存的基金概念标签（无网络请求）"""
+    try:
+        from src.datasources.fund.fund_concept_service import get_cached_fund_concept_tags
+
+        return get_cached_fund_concept_tags(fund_code)
+    except Exception:
+        return None
+
+
 async def _refresh_fund_industry_bg(fund_codes: list[str]) -> None:
-    """后台刷新基金行业配置和板块标签"""
+    """后台刷新基金行业配置、板块标签和概念主题标签"""
     from src.datasources.fund.fund_industry_service import (
         get_fund_industries,
         get_fund_theme,
@@ -429,6 +443,14 @@ async def _refresh_fund_industry_bg(fund_codes: list[str]) -> None:
                 save_fund_sector(code, theme, source="akshare")
         except Exception as e:
             logger.debug(f"后台刷新行业/板块数据失败: {code} - {e}")
+
+    # 3. 后台刷新概念标签（依赖股票→概念缓存，独立于行业配置）
+    try:
+        from src.datasources.fund.fund_concept_service import refresh_all_fund_concept_tags
+
+        await refresh_all_fund_concept_tags(fund_codes)
+    except Exception as e:
+        logger.debug(f"后台刷新概念标签失败: {e}")
 
 
 # ==================== 基金详情 ====================

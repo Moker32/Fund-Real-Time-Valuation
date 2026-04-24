@@ -22,10 +22,12 @@ from src.db.database import DatabaseManager
 from src.db.fund import (
     CacheMetadataDAO,
     FundBasicInfoDAO,
+    FundConceptTagsDAO,
     FundDailyCacheDAO,
     FundHistoryDAO,
     FundIndustryDAO,
     FundIntradayCacheDAO,
+    StockConceptDAO,
 )
 from src.db.index_intraday_dao import IndexIntradayCacheDAO
 from src.db.models import (
@@ -41,6 +43,7 @@ from src.db.models import (
     FundIntradayRecord,
     IndexIntradayRecord,
     NewsRecord,
+    StockConceptRecord,
     TradingCalendarRecord,
 )
 from src.db.news_dao import NewsDAO
@@ -58,6 +61,7 @@ __all__ = [
     "IndexIntradayRecord",
     "FundDailyRecord",
     "FundBasicInfo",
+    "StockConceptRecord",
     "CacheMetadata",
     "ApiCallStats",
     "TradingCalendarRecord",
@@ -71,6 +75,8 @@ __all__ = [
     "FundDailyCacheDAO",
     "FundBasicInfoDAO",
     "FundIndustryDAO",
+    "StockConceptDAO",
+    "FundConceptTagsDAO",
     "TradingCalendarDAO",
     "ExchangeHolidayDAO",
     "CacheMetadataDAO",

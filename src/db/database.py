@@ -284,6 +284,25 @@ class DatabaseManager:
                 )
             """)
 
+            # 股票概念标签缓存表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS stock_concept_cache (
+                    stock_code TEXT NOT NULL,
+                    concept_name TEXT NOT NULL,
+                    PRIMARY KEY (stock_code, concept_name)
+                )
+            """)
+
+            # 基金概念标签缓存表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS fund_concept_tags (
+                    fund_code TEXT PRIMARY KEY,
+                    tags TEXT NOT NULL,
+                    report_period TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT
+                )
+            """)
+
             # 缓存元数据表
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS fund_cache_metadata (

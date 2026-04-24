@@ -40,6 +40,7 @@ export interface Fund {
   peerRank?: { category: string; rank: number; total: number; percentile: number };
   manager?: { name: string; tenure: string };
   sector?: string;  // 投资主题标签（如：白酒、新能源、医药等）
+  conceptTags?: string[];  // 概念板块标签（如：CPO概念、AI芯片、商业航天等）
   industries?: Array<{ name: string; proportion: number }>;  // 行业配置
   history?: FundHistory[];  // 可选的历史 K 线数据
   intraday?: FundIntraday[];  // 可选的日内分时数据

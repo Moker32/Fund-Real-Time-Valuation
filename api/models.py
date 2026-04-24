@@ -48,6 +48,11 @@ class FundResponse(BaseModel):
     # 投资主题标签
     sector: str | None = Field(None, description="投资主题（如：白酒、新能源、医药等）")
 
+    # 概念板块标签
+    conceptTags: list[str] | None = Field(
+        None, alias="concept_tags", description="概念板块标签（如：CPO概念、AI芯片、商业航天等）"
+    )
+
     # 行业配置
     industries: list[IndustryItem] | None = Field(None, description="行业配置列表")
 

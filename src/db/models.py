@@ -158,6 +158,14 @@ class FundIndustryRecord:
 
 
 @dataclass
+class StockConceptRecord:
+    """股票概念标签缓存记录"""
+
+    stock_code: str = ""
+    concept_name: str = ""
+
+
+@dataclass
 class CacheMetadata:
     """缓存元数据"""
 
