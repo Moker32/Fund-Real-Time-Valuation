@@ -112,7 +112,6 @@
             <span class="footer-sep">·</span>
             <span>{{ formatTime(fund.estimateTime) }}</span>
           </span>
-          <span class="source" v-if="fund.source">{{ sourceLabel(fund.source) }}</span>
         </div>
         <div class="footer-right">
           <template v-if="fund.conceptTags?.length">
@@ -293,16 +292,6 @@ function intervalLabel(key: string): string {
   return map[key] || key;
 }
 
-function sourceLabel(source: string): string {
-  const map: Record<string, string> = {
-    'fund123': '天天基金',
-    'fund_tiantian': '天天基金',
-    'fund_sina': '新浪财经',
-    'fund_eastmoney': '东方财富',
-    'qdii_estimator': '指数估算',
-  };
-  return map[source] || source;
-}
 </script>
 
 <style lang="scss" scoped>
@@ -712,7 +701,7 @@ function sourceLabel(source: string): string {
   min-width: 0;
 }
 
-.update-time, .source, .peer-rank, .underlying-indices {
+.update-time, .peer-rank, .underlying-indices {
   font-size: var(--font-size-xs);
   color: var(--color-text-tertiary);
   white-space: nowrap;
