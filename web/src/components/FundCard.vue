@@ -115,7 +115,6 @@
           <span class="source" v-if="fund.source">{{ sourceLabel(fund.source) }}</span>
         </div>
         <div class="footer-right">
-          <span v-if="fund.sector" class="fund-sector">{{ fund.sector }}</span>
           <template v-if="fund.conceptTags?.length">
             <span v-for="tag in fund.conceptTags.slice(0, 3)" :key="tag" class="fund-concept-tag">{{ tag }}</span>
           </template>
@@ -155,7 +154,7 @@ const emit = defineEmits<{
 
 function handleCardClick(event: Event) {
   const target = event.target as Element;
-  const interactiveSelectors = ['button', '.action-btn', '.fund-type', '.fund-sector', '.fund-concept-tag'];
+  const interactiveSelectors = ['button', '.action-btn', '.fund-type', '.fund-concept-tag'];
   const isInteractive = interactiveSelectors.some(selector =>
     target.matches(selector) || target.closest(selector)
   );
@@ -415,16 +414,6 @@ function sourceLabel(source: string): string {
     background: rgba(139, 92, 246, 0.15);
     color: #8b5cf6;
   }
-}
-
-.fund-sector {
-  font-size: 10px;
-  padding: 1px 6px;
-  background: rgba(59, 130, 246, 0.1);
-  border-radius: 3px;
-  color: #3b82f6;
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .fund-concept-tag {
@@ -830,7 +819,7 @@ function sourceLabel(source: string): string {
   .fund-name { font-size: var(--font-size-xs); line-height: 1.2; }
   .fund-code { font-size: 10px; }
   .fund-type { font-size: 10px; padding: 1px 6px; }
-  .fund-sector, .fund-concept-tag { font-size: 10px; padding: 1px 6px; }
+  .fund-concept-tag { font-size: 10px; padding: 1px 6px; }
 
   .action-btn {
     width: 32px; height: 32px;
