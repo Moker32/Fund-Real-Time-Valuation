@@ -73,17 +73,22 @@ const lastDataLen = ref(0);  // streaming 模式追踪已有数据长度
 // 午休区间标记：用于绘制虚线
 const lunchBreakSegment = ref<{ start: number; end: number; price: number } | null>(null);
 
-// 根据实际数据范围设置 X 轴，适配各市场不同交易时段
+// 根据交易时段设置 X 轴，使用实际数据日期确保基准日正确
 const resetXScale = () => {
   if (!uplotInstance.value) return;
+  const { start: marketStart, end: marketEnd } = getMarketTradingRange();
+
   const ts = realTimestamps.value;
   if (ts.length === 0) return;
-  // 排除 0（午休 null 占位符），只取有效时间戳
   const validTs = ts.filter(t => t > 0);
   if (validTs.length < 2) return;
+
+  // 从有效数据点提取 UTC 日期，传递 UTC 日期给 minutesToTimestamp
+  const baseDate = new Date(validTs[0] * 1000);
+
   const padding = 5 * 60;
-  const min = Math.min(...validTs) - padding;
-  const max = Math.max(...validTs) + padding;
+  const min = minutesToTimestamp(marketStart, baseDate, props.timezone) - padding;
+  const max = minutesToTimestamp(marketEnd, baseDate, props.timezone) + padding;
 
   uplotInstance.value.setScale('x', { min, max });
 };
@@ -538,7 +543,7 @@ const hasLunchBreak = (data: { time: string }[]): boolean => {
     if (minutes < 0) continue;
     if (minutes <= start) hasMorning = true;
     if (minutes >= end) hasAfternoon = true;
-    if (minutes >= start && minutes <= end) hasLunchData = true;
+    if (minutes > start && minutes < end) hasLunchData = true;
   }
 
   // 只有上午和下午都有数据，且午休期间无数据时，才认为存在午休间隙
@@ -599,7 +604,7 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
     const displayTs = realTs;
 
     // 如果进入午休区间，插入 null 断开上午和下午的连接
-    if (hasLunch && !pastLunch && minutes >= start) {
+    if (hasLunch && !pastLunch && minutes > start) {
       // 在午休开始时插入 null，断开上午到午休的连接
       if (prevDisplayTs !== null) {
         displayTimestamps.push(displayTs - 1);
@@ -614,9 +619,7 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
       if (morningLastPrice !== null) {
         lunchBreakSegment.value = { start: lunchStartTs, end: lunchEndTs, price: morningLastPrice };
       }
-
-      // 跳过当前点（12:00），它只是断开标记，不应被绘制
-      continue;
+      // 继续处理当前点（如 13:01），不跳过
     }
 
     // 跳过午休期间的数据点（这些是外部数据源返回的伪数据）
