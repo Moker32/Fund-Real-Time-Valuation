@@ -50,8 +50,7 @@
         </div>
 
         <Transition name="chart-expand">
-          <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" :lunch-break="lunchBreak" :timezone="timezone" :streaming="!!props.index.intraday?.length" :max-points="500" class="index-chart" />
-          <div v-else class="chart-empty-state">无数据: intraday={{ props.index.intraday?.length ?? 0 }}, history={{ props.index.history?.length ?? 0 }}</div>
+          <LineChart v-if="chartData.length > 0" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" :lunch-break="lunchBreak" :timezone="timezone" :streaming="!!props.index.intraday?.length" :max-points="500" class="index-chart" />
         </Transition>
       </div>
 
@@ -211,9 +210,6 @@ const chartData = computed(() => {
 });
 
  
-const showChart = computed(() => {
-  return chartData.value.length > 0;
-});
 
  
 const baseline = computed(() => {
