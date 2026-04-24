@@ -39,6 +39,8 @@ export interface Fund {
   intervalReturns?: Record<string, number>;
   peerRank?: { category: string; rank: number; total: number; percentile: number };
   manager?: { name: string; tenure: string };
+  sector?: string;  // 投资主题标签（如：白酒、新能源、医药等）
+  industries?: Array<{ name: string; proportion: number }>;  // 行业配置
   history?: FundHistory[];  // 可选的历史 K 线数据
   intraday?: FundIntraday[];  // 可选的日内分时数据
 }

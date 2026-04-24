@@ -24,6 +24,7 @@ from src.db.fund import (
     FundBasicInfoDAO,
     FundDailyCacheDAO,
     FundHistoryDAO,
+    FundIndustryDAO,
     FundIntradayCacheDAO,
 )
 from src.db.index_intraday_dao import IndexIntradayCacheDAO
@@ -36,6 +37,7 @@ from src.db.models import (
     FundConfig,
     FundDailyRecord,
     FundHistoryRecord,
+    FundIndustryRecord,
     FundIntradayRecord,
     IndexIntradayRecord,
     NewsRecord,
@@ -50,6 +52,7 @@ __all__ = [
     "FundConfig",
     "CommodityConfig",
     "FundHistoryRecord",
+    "FundIndustryRecord",
     "NewsRecord",
     "FundIntradayRecord",
     "IndexIntradayRecord",
@@ -67,6 +70,7 @@ __all__ = [
     "IndexIntradayCacheDAO",
     "FundDailyCacheDAO",
     "FundBasicInfoDAO",
+    "FundIndustryDAO",
     "TradingCalendarDAO",
     "ExchangeHolidayDAO",
     "CacheMetadataDAO",

@@ -3,6 +3,7 @@
 提供基金数据相关的 REST API 端点
 """
 
+import asyncio
 import logging
 from datetime import datetime
 from functools import lru_cache
@@ -194,6 +195,66 @@ def _validate_estimate_change_percent(
     return provided_percent
 
 
+# CSI行业分类简称映射（长名缩写）
+_INDUSTRY_SHORT_MAP: dict[str, str] = {
+    "信息传输、软件和信息技术服务业": "信息技术",
+    "电力、热力、燃气及水生产和供应业": "公用事业",
+    "交通运输、仓储和邮政业": "交通运输",
+    "科学研究和技术服务业": "科研技术",
+    "水利、环境和公共设施管理业": "公共设施",
+    "卫生和社会工作": "卫生",
+    "文化、体育和娱乐业": "文娱",
+    "农、林、牧、渔业": "农林牧渔",
+    "批发和零售业": "批发零售",
+    "租赁和商务服务业": "商务服务",
+    "居民服务、修理和其他服务业": "居民服务",
+}
+
+
+def _get_theme_industries(fund_code: str) -> dict:
+    """从数据库获取基金主题和行业配置（缓存读取，无网络请求）
+
+    优先级：
+    1. 预计算的板块标签（来自跟踪标的或 fund_overview_em）
+    2. 行业配置 top1（跳过制造业）
+    """
+    try:
+        from src.datasources.fund.fund_industry_service import (
+            _get_industry_dao,
+            get_fund_sector,
+        )
+
+        # 1. 优先使用预计算的板块标签
+        sector = get_fund_sector(fund_code)
+        if sector:
+            # 仍然附带行业配置列表
+            dao = _get_industry_dao()
+            records = dao.get_latest(fund_code, limit=5)
+            industries = (
+                [{"name": r.industry_name, "proportion": r.proportion} for r in records]
+                if records
+                else None
+            )
+            return {"sector": sector, "industries": industries}
+
+        # 2. 用行业配置推断
+        dao = _get_industry_dao()
+        records = dao.get_latest(fund_code, limit=10)
+        if records:
+            industries = [
+                {"name": r.industry_name, "proportion": r.proportion}
+                for r in records
+            ]
+            for r in records:
+                if r.industry_name != "制造业" and r.proportion and r.proportion >= 5:
+                    name = _INDUSTRY_SHORT_MAP.get(r.industry_name, r.industry_name)
+                    return {"sector": name, "industries": industries}
+            return {"industries": industries}
+    except Exception:
+        pass
+    return {}
+
+
 def build_fund_response(
     data: dict, source: str = "", is_holding: bool = False, logger=None
 ) -> dict:
@@ -209,11 +270,16 @@ def build_fund_response(
         unit_net, estimate_net, provided_percent, fund_code, data.get("type"), logger
     )
 
+    # 从数据库读取行业配置缓存
+    extra = _get_theme_industries(fund_code)
+
     validated = FundResponse.model_validate(
         {
             "fund_code": fund_code,
             "name": data.get("name", ""),
             "type": data.get("type"),
+            "sector": extra.get("sector"),
+            "industries": extra.get("industries"),
             "unit_net_value": unit_net,
             "net_value_date": data.get("net_value_date"),
             "prev_net_value": data.get("prev_net_value"),
@@ -313,6 +379,10 @@ async def get_funds_list(
         if failed_count > 0:
             logger.info(f"批量获取基金完成: 成功 {len(funds)}, 失败 {failed_count}")
 
+        # 后台刷新行业配置缓存
+        if fund_codes:
+            asyncio.ensure_future(_refresh_fund_industry_bg(fund_codes))
+
         return {"funds": funds, "total": len(funds), "timestamp": current_time, "progress": 100}
 
     fund_codes = _get_default_fund_codes(config_manager)
@@ -335,7 +405,30 @@ async def get_funds_list(
     if failed_count > 0:
         logger.info(f"批量获取基金完成: 成功 {len(funds)}, 失败 {failed_count}")
 
+    # 后台刷新行业配置缓存（不阻塞响应）
+    asyncio.ensure_future(_refresh_fund_industry_bg(fund_codes))
+
     return {"funds": funds, "total": len(funds), "timestamp": current_time, "progress": 100}
+
+
+async def _refresh_fund_industry_bg(fund_codes: list[str]) -> None:
+    """后台刷新基金行业配置和板块标签"""
+    from src.datasources.fund.fund_industry_service import (
+        get_fund_industries,
+        get_fund_theme,
+        save_fund_sector,
+    )
+
+    for code in fund_codes:
+        try:
+            # 1. 刷新行业配置数据
+            await get_fund_industries(code)
+            # 2. 计算并缓存板块标签（通过跟踪标的或行业top1）
+            theme = await get_fund_theme(code)
+            if theme:
+                save_fund_sector(code, theme, source="akshare")
+        except Exception as e:
+            logger.debug(f"后台刷新行业/板块数据失败: {code} - {e}")
 
 
 # ==================== 基金详情 ====================

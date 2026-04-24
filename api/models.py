@@ -8,6 +8,13 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+class IndustryItem(BaseModel):
+    """行业配置项"""
+
+    name: str = Field(..., description="行业名称")
+    proportion: float | None = Field(None, description="占净值比例(%)")
+
+
 class FundResponse(BaseModel):
     """基金响应模型"""
 
@@ -37,6 +44,12 @@ class FundResponse(BaseModel):
     hasRealTimeEstimate: bool = Field(
         True, alias="has_real_time_estimate", description="是否有实时估值"
     )
+
+    # 投资主题标签
+    sector: str | None = Field(None, description="投资主题（如：白酒、新能源、医药等）")
+
+    # 行业配置
+    industries: list[IndustryItem] | None = Field(None, description="行业配置列表")
 
     model_config = {
         "populate_by_name": True,

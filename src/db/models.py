@@ -146,6 +146,18 @@ class FundBasicInfo:
 
 
 @dataclass
+class FundIndustryRecord:
+    """基金行业配置记录"""
+
+    fund_code: str = ""
+    industry_name: str = ""
+    proportion: float | None = None
+    report_date: str = ""
+    fetched_at: str = ""
+    id: int | None = None  # 数据库自增ID
+
+
+@dataclass
 class CacheMetadata:
     """缓存元数据"""
 

@@ -258,6 +258,32 @@ class DatabaseManager:
                 )
             """)
 
+            # 基金行业配置表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS fund_industry (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    fund_code TEXT NOT NULL,
+                    industry_name TEXT NOT NULL,
+                    proportion REAL,
+                    report_date TEXT NOT NULL,
+                    fetched_at TEXT,
+                    UNIQUE(fund_code, industry_name, report_date)
+                )
+            """)
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_fund_industry_code ON fund_industry(fund_code)"
+            )
+
+            # 基金板块主题标签表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS fund_sector (
+                    fund_code TEXT PRIMARY KEY,
+                    sector TEXT NOT NULL,
+                    source TEXT DEFAULT '',
+                    updated_at TEXT
+                )
+            """)
+
             # 缓存元数据表
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS fund_cache_metadata (
