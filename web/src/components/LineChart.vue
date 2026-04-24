@@ -58,6 +58,11 @@ const hasData = computed(() => {
   return !!(props.data && props.data.length > 0);
 });
 
+// 调试：追踪 data 变化
+watch(() => props.data, () => {
+  // console.log('[LineChart] data changed for chart - length:', newData?.length ?? 0);
+}, { immediate: true });
+
 const lastDataJson = ref('');
 const processedTimestamps = ref<number[]>([]);
 const processedValues = ref<(number | null)[]>([]);
@@ -537,7 +542,7 @@ const hasLunchBreak = (data: { time: string }[]): boolean => {
     if (minutes < 0) continue;
     if (minutes <= start) hasMorning = true;
     if (minutes >= end) hasAfternoon = true;
-    if (minutes > start && minutes < end) hasLunchData = true;
+    if (minutes >= start && minutes <= end) hasLunchData = true;
   }
 
   // 只有上午和下午都有数据，且午休期间无数据时，才认为存在午休间隙
@@ -598,7 +603,7 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
     const displayTs = realTs;
 
     // 如果进入午休区间，插入 null 断开上午和下午的连接
-    if (hasLunch && !pastLunch && minutes > start) {
+    if (hasLunch && !pastLunch && minutes >= start) {
       // 在午休开始时插入 null，断开上午到午休的连接
       if (prevDisplayTs !== null) {
         displayTimestamps.push(displayTs - 1);
@@ -613,6 +618,14 @@ const buildCompressedIntradayData = (sortedData: { time: string; price?: number;
       if (morningLastPrice !== null) {
         lunchBreakSegment.value = { start: lunchStartTs, end: lunchEndTs, price: morningLastPrice };
       }
+
+      // 跳过当前点（12:00），它只是断开标记，不应被绘制
+      continue;
+    }
+
+    // 跳过午休期间的数据点（这些是外部数据源返回的伪数据）
+    if (hasLunch && pastLunch && minutes < end) {
+      continue;
     }
 
     // 如果当前时间戳与上一个时间戳相同，插入 null 断开连接
@@ -702,6 +715,15 @@ const updateColor = () => {
 const lastDataType = ref<'history' | 'intraday' | null>(null);
 
 watch(() => props.data, (newData) => {
+  console.log('[LineChart] data changed - length:', newData?.length ?? 0, 'for chart');
+  // 如果从有数据变成没数据，打印警告和调用栈
+  if (lastDataLen.value > 0 && (!newData || newData.length === 0)) {
+    console.log('[LineChart] WARNING: data dropped from', lastDataLen.value, 'to 0!');
+    console.log('[LineChart] Stack trace:', new Error().stack);
+  }
+  if (newData?.length > 0) {
+    lastDataLen.value = newData.length;
+  }
   if (!uplotInstance.value && chartContainer.value && newData && newData.length > 0) {
     initChart();
     lastDataType.value = isIntradayData(newData) ? 'intraday' : 'history';

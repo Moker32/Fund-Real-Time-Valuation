@@ -51,6 +51,7 @@
 
         <Transition name="chart-expand">
           <LineChart v-if="showChart" :data="chartData" :height="60" :baseline="baseline" :trend="changeClass" :show-axes="false" :show-tooltip="false" :lunch-break="lunchBreak" :timezone="timezone" :streaming="!!props.index.intraday?.length" :max-points="500" class="index-chart" />
+          <div v-else class="chart-empty-state">无数据: intraday={{ props.index.intraday?.length ?? 0 }}, history={{ props.index.history?.length ?? 0 }}</div>
         </Transition>
       </div>
 
@@ -89,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import type { MarketIndex } from '@/types';
 import LineChart from './LineChart.vue';
 
@@ -182,6 +183,14 @@ function handleCardClick() {
     emit('click', props.index);
   }
 }
+
+onMounted(() => {
+  // console.log('[IndexCard] onMounted for', props.index.index);
+});
+
+onUnmounted(() => {
+  // console.log('[IndexCard] onUnmounted for', props.index.index);
+});
 
 // eslint-disable-next-line no-useless-assignment
 const changeClass = computed(() => {

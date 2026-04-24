@@ -44,6 +44,7 @@ export interface Fund {
 }
 
 // Commodity History Types
+export interface CommodityHistory {
   symbol: string;
   name: string;
   price: number;
@@ -262,6 +263,8 @@ export interface HealthStatus {
   message: string;
   version: string;
   timestamp: string;
+}
+
 // Store State Types
 
 // Economic Calendar Types
