@@ -133,3 +133,19 @@ Frontend runs on http://localhost:3000, API requests proxied to backend.
 
 - mypy ignores type stubs for: akshare, yfinance, matplotlib, pandas, numpy
 - src/datasources module has relaxed mypy rules due to dynamic data structures
+
+## Commit Workflow
+
+1. Run `git diff --stat` to show changes
+2. Wait for user to review and approve
+3. Run tests: `uv run pytest tests/` (Python) or `cd web && pnpm run lint` (frontend)
+4. Commit with Chinese message: `git commit -m "fix: 修复XXX问题"`
+5. Push if user approves
+
+## Bug Fix Workflow
+
+When debugging:
+1. Check edge cases first (>0 vs >=0, boundary values like yScaleMax)
+2. Verify API responses (look for None/null cases)
+3. For chart issues: verify data pipeline before fixing display logic
+4. Test with fresh state (clear localStorage) to verify fallback chains
