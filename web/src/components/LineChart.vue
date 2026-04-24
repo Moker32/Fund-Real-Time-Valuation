@@ -73,7 +73,7 @@ const lastDataLen = ref(0);  // streaming 模式追踪已有数据长度
 // 午休区间标记：用于绘制虚线
 const lunchBreakSegment = ref<{ start: number; end: number; price: number } | null>(null);
 
-// 根据实际数据范围设置 X 轴，两端保留少量 padding
+// 根据实际数据范围设置 X 轴，数据稀疏时显示完整交易时段
 const resetXScale = () => {
   if (!uplotInstance.value) return;
 
@@ -82,9 +82,28 @@ const resetXScale = () => {
   const validTs = ts.filter(t => t > 0);
   if (validTs.length < 2) return;
 
+  const { start: marketStart, end: marketEnd } = getMarketTradingRange();
+  const baseDate = new Date(validTs[0] * 1000);
   const padding = 5 * 60;
-  const min = Math.min(...validTs) - padding;
-  const max = Math.max(...validTs) + padding;
+
+  const dataMin = Math.min(...validTs);
+  const dataMax = Math.max(...validTs);
+  const dataRange = dataMax - dataMin;
+
+  const marketMinTs = minutesToTimestamp(marketStart, baseDate, props.timezone);
+  const marketMaxTs = minutesToTimestamp(marketEnd, baseDate, props.timezone);
+  const marketRange = marketMaxTs - marketMinTs;
+
+  let min: number, max: number;
+  if (marketRange > 0 && dataRange / marketRange > 0.6) {
+    // 数据覆盖大部分交易时段，紧密包裹数据
+    min = dataMin - padding;
+    max = dataMax + padding;
+  } else {
+    // 数据稀疏（如欧股刚开盘只有少量数据），显示完整交易时段
+    min = marketMinTs - padding;
+    max = marketMaxTs + padding;
+  }
 
   uplotInstance.value.setScale('x', { min, max });
 };
@@ -491,8 +510,7 @@ const getLunchBreakConfig = (): { start: number; end: number } => {
   return { start: LUNCH_BREAK_START, end: LUNCH_BREAK_END };
 };
 
-// 根据午休配置获取市场交易时段范围
-// 用于 streaming 模式固定 X 轴范围
+// 根据午休配置和时区获取精确交易时段
 const getMarketTradingRange = (): { start: number; end: number } => {
   const { start, end } = getLunchBreakConfig();
   const hasLunch = start < end;
@@ -502,23 +520,19 @@ const getMarketTradingRange = (): { start: number; end: number } => {
     // A 股: 9:30-11:30, 13:00-15:00 → start=570, end=900
     // 港股: 9:30-12:00, 13:00-16:00 → start=570, end=960
     // 日经: 9:00-12:30, 13:30-15:00 → start=540, end=900
-    // 根据午休开始时间判断
-    if (start === 690) {
-      // A 股 11:30-13:00
-      return { start: 570, end: 900 };
-    } else if (start === 720) {
-      // 港股 12:00-13:00
-      return { start: 570, end: 960 };
-    } else if (start === 750) {
-      // 日经 12:30-13:30
-      return { start: 540, end: 900 };
-    } else {
-      // 其他有午休的市场，默认 A 股时段
-      return { start: 570, end: 900 };
-    }
-  } else {
-    // 无午休的市场：美股/欧股 9:30-16:00 或 9:00-17:00
-    return { start: 540, end: 1020 };
+    if (start === 690) return { start: 570, end: 900 };    // A 股
+    if (start === 720) return { start: 570, end: 960 };    // 港股
+    if (start === 750) return { start: 540, end: 900 };    // 日经
+    return { start: 570, end: 900 };
+  }
+
+  // 根据市场时区返回精确交易时段
+  switch (props.timezone) {
+    case 'America/New_York': return { start: 570, end: 960 };  // 美股 9:30-16:00
+    case 'Europe/Berlin':
+    case 'Europe/Paris':    return { start: 540, end: 1050 };  // DAX/CAC 9:00-17:30
+    case 'Europe/London':   return { start: 480, end: 990 };   // FTSE 8:00-16:30
+    default:                return { start: 540, end: 1020 };  // 默认 9:00-17:00
   }
 };
 
