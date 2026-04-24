@@ -18,7 +18,6 @@ from .base import (
     HK_INDICES,
     INDEX_NAMES,
     TENCENT_CODES,
-    US_INDICES,
     YAHOO_TICKERS,
     IndexDataSource,
     uses_tencent,
@@ -591,10 +590,8 @@ class HybridIndexSource(IndexDataSource):
                             metadata={"index_type": index_type},
                         )
 
-                    # 对于港股和美股指数，只保留最近一个交易日的数据
-                    # yfinance period="5d" 会返回多个交易日的数据，需要过滤
-                    if (index_type in HK_INDICES or index_type in US_INDICES) and not hist.empty:
-                        # 获取最近日期
+                    # 保留最近一个交易日的数据（yfinance period="5d" 会返回多个交易日的数据）
+                    if not hist.empty:
                         latest_date = hist.index[-1].date()
                         hist = hist[hist.index.date == latest_date]
                         logger.debug(f"[HybridIndexSource] Filtered {index_type} to latest date {latest_date}, {len(hist)} rows")

@@ -73,24 +73,17 @@ const lastDataLen = ref(0);  // streaming 模式追踪已有数据长度
 // 午休区间标记：用于绘制虚线
 const lunchBreakSegment = ref<{ start: number; end: number; price: number } | null>(null);
 
-// 重新设置 X 轴范围（固定为市场交易时段）
+// 根据实际数据范围设置 X 轴，适配各市场不同交易时段
 const resetXScale = () => {
   if (!uplotInstance.value) return;
-  const { start: marketStart, end: marketEnd } = getMarketTradingRange();
-
-  // 从第一数据点提取日期作为 baseDate
-  let baseDate: Date;
-  const firstRealTs = realTimestamps.value[0];
-  if (firstRealTs != null && firstRealTs > 0) {
-    baseDate = new Date(firstRealTs * 1000);
-  } else {
-    baseDate = new Date();
-  }
-  baseDate.setHours(0, 0, 0, 0);
-
+  const ts = realTimestamps.value;
+  if (ts.length === 0) return;
+  // 排除 0（午休 null 占位符），只取有效时间戳
+  const validTs = ts.filter(t => t > 0);
+  if (validTs.length < 2) return;
   const padding = 5 * 60;
-  const min = minutesToTimestamp(marketStart, baseDate, props.timezone) - padding;
-  const max = minutesToTimestamp(marketEnd, baseDate, props.timezone) + padding;
+  const min = Math.min(...validTs) - padding;
+  const max = Math.max(...validTs) + padding;
 
   uplotInstance.value.setScale('x', { min, max });
 };
@@ -101,14 +94,26 @@ const getTrendColor = (): string => {
   return '#71717a';
 };
 
-const getTimezoneOffsetMinutes = (tzName: string, now: Date): number => {
-  const utcStr = now.toLocaleString('en-US', { timeZone: 'UTC', hour12: false });
-  const utcH = parseInt(utcStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
-  const utcM = parseInt(utcStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
-  const targetStr = now.toLocaleString('en-US', { timeZone: tzName, hour12: false });
-  const targetH = parseInt(targetStr.match(/(\d+):(\d+)/)?.[1] || '0', 10);
-  const targetM = parseInt(targetStr.match(/(\d+):(\d+)/)?.[2] || '0', 10);
-  return (targetH * 60 + targetM) - (utcH * 60 + utcM);
+const getTimezoneOffsetMinutes = (tzName: string, date: Date): number => {
+  // 用 Date.UTC 构建目标时区的"本地时间"并计算与 UTC 的差值，避免跨日问题
+  const utcEpoch = date.getTime();
+  const tzStr = date.toLocaleString('en-US', {
+    timeZone: tzName,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+  const m = tzStr.match(/(\d{2})\/(\d{2})\/(\d{4}),\s*(\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return 0;
+  const targetLocalEpoch = Date.UTC(
+    parseInt(m[3], 10), parseInt(m[1], 10) - 1, parseInt(m[2], 10),
+    parseInt(m[4], 10), parseInt(m[5], 10), parseInt(m[6], 10),
+  );
+  return (targetLocalEpoch - utcEpoch) / 60000;
 };
 
 const timeToMinutes = (timeStr: string): number => {
@@ -295,16 +300,7 @@ const initChart = () => {
   chartContainer.value.innerHTML = '';
 
   let xRange: { min: number; max: number } | null = null;
-  if (props.streaming) {
-    const now = new Date();
-    const baseDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const { start: marketStart, end: marketEnd } = getMarketTradingRange();
-    const padding = 5 * 60;
-    xRange = {
-      min: minutesToTimestamp(marketStart, baseDate, props.timezone) - padding,
-      max: minutesToTimestamp(marketEnd, baseDate, props.timezone) + padding,
-    };
-  } else {
+  if (!props.streaming) {
     xRange = getIntradayXRange(props.data);
   }
 
@@ -795,16 +791,6 @@ const updateDataStreaming = (validData: { time: string; price?: number; close?: 
   if (newItems.length === 0) return;
 
   rawDataItems.value = [...validData];
-
-  // 从已有数据提取 baseDate，保持与 buildCompressedIntradayData 一致
-  let baseDate: Date;
-  const firstRealTs = realTimestamps.value[0];
-  if (firstRealTs != null && firstRealTs > 0) {
-    baseDate = new Date(firstRealTs * 1000);
-  } else {
-    baseDate = new Date();
-  }
-  baseDate.setHours(0, 0, 0, 0);
 
   // 处理每个新增点
   for (const item of newItems) {
