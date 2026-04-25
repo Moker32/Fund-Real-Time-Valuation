@@ -60,10 +60,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     ws.value = new WebSocket(url)
 
     ws.value.onopen = () => {
-      console.log('[WS] Connected')
       isConnected.value = true
       error.value = null
-      
+
       // 发送待处理的消息
       while (pendingMessages.length > 0) {
         const msg = pendingMessages.shift()
@@ -71,13 +70,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           send(msg.action, msg.data)
         }
       }
-      
+
       // 重连后重新订阅之前的频道
       if (subscriptions.value.size > 0) {
-        console.log('[WS] Resubscribing:', Array.from(subscriptions.value))
         send('subscribe', Array.from(subscriptions.value))
       }
-      
+
       onConnected?.()
       startHeartbeat()
     }
@@ -87,26 +85,23 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
         const message: WSMessage = JSON.parse(event.data)
         lastMessage.value = message
         onMessage?.(message)
-      } catch (e) {
-        console.error('[WS] Failed to parse message:', e)
+      } catch {
+        // 忽略解析错误
       }
     }
 
     ws.value.onerror = (e) => {
-      console.error('[WS] Error:', e)
       error.value = e
       onError?.(e)
     }
 
     ws.value.onclose = () => {
-      console.log('[WS] Disconnected')
       isConnected.value = false
       stopHeartbeat()
       onDisconnected?.()
 
       if (autoReconnect) {
         reconnectTimer = setTimeout(() => {
-          console.log('[WS] Reconnecting...')
           connect()
         }, reconnectInterval)
       }
@@ -134,7 +129,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     } else if (ws.value?.readyState === WebSocket.CONNECTING) {
       // 连接建立中，缓存消息
       pendingMessages.push({ action, data })
-      console.log('[WS] 缓存消息，等待连接:', action, data)
     } else {
       console.warn('[WS] 无法发送消息，连接未建立:', action)
     }

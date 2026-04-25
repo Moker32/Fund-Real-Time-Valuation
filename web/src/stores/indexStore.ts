@@ -257,17 +257,14 @@ export const useIndexStore = defineStore('indices', () => {
   ) {
     const index = indices.value.findIndex((i) => i.index === indexType);
     if (index === -1) {
-      console.log('[IndexStore] appendIntradayPoint: index not found for', indexType);
       return;
     }
 
     const current = indices.value[index];
     if (!current) {
-      console.log('[IndexStore] appendIntradayPoint: current is null for', indexType);
       return;
     }
     if (!current.intraday || current.intraday.length === 0) {
-      console.log('[IndexStore] appendIntradayPoint: current.intraday is empty for', indexType);
       return;
     }
 
@@ -286,13 +283,11 @@ export const useIndexStore = defineStore('indices', () => {
     const maxPoints = 500;
     const trimmed = newIntraday.length > maxPoints ? newIntraday.slice(-maxPoints) : newIntraday;
 
-    console.log('[IndexStore] appendIntradayPoint: appending to', indexType, '- old length:', current.intraday.length, 'new length:', trimmed.length);
     // 使用新对象替换，确保 Vue 能追踪变化
     const newIndex: MarketIndex = {
       ...current,
       intraday: trimmed,
     };
-    console.log('[IndexStore] appendIntradayPoint: newIndex.intraday.length =', newIndex.intraday?.length ?? 'undefined');
     // 使用数组替换确保 Vue 响应式更新
     const newIndices = [...indices.value];
     newIndices[index] = newIndex;
@@ -303,7 +298,7 @@ export const useIndexStore = defineStore('indices', () => {
   function updateIndexFromWS(update: Partial<MarketIndex> & { index: string }) {
     // 关键：WebSocket 消息不应该包含 intraday 和 history，这些是本地缓存的
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { intraday: _i, history: _h, ...safeUpdate } = update;
+    const { intraday: _, history: _h, ...safeUpdate } = update;
 
     const idx = indices.value.findIndex((i) => i.index === update.index);
     if (idx !== -1) {
@@ -330,18 +325,16 @@ export const useIndexStore = defineStore('indices', () => {
 
   // 批量更新指数数据（用于 WebSocket 批量推送）
   function updateIndicesBatch(updates: (Partial<MarketIndex> & { index: string })[]) {
-    console.log('[IndexStore] updateIndicesBatch called with', updates.length, 'updates');
     // 强制替换整个数组以确保 Vue 响应式更新
     const newIndices = [...indices.value];
     for (const update of updates) {
       // 关键：WebSocket 消息不应该包含 intraday 和 history，这些是本地缓存的
       // 如果 update 包含这些字段且为空，会导致数据丢失，需要排除
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { intraday: _i, history: _h, ...safeUpdate } = update;
+      const { intraday: _, history: _h, ...safeUpdate } = update;
 
       // 只有包含有效价格更新的才处理，静默跳过无效更新
       if (safeUpdate.price === undefined && safeUpdate.change === undefined && safeUpdate.changePercent === undefined) {
-        console.log('[IndexStore] updateIndicesBatch: skipping', update.index, '- no relevant fields');
         continue;
       }
 
@@ -349,8 +342,6 @@ export const useIndexStore = defineStore('indices', () => {
       if (idx !== -1) {
         const current = newIndices[idx];
         if (current) {
-          const oldIntradayLen = current.intraday?.length ?? 0;
-          console.log('[IndexStore] Updating', update.index, '- current intraday:', oldIntradayLen);
           // 保留原有的 intraday 和 history，只更新基础字段
           newIndices[idx] = {
             ...current,
@@ -358,57 +349,41 @@ export const useIndexStore = defineStore('indices', () => {
             intraday: current.intraday,
             history: current.history,
           } as MarketIndex;
-          const newLen = newIndices[idx]?.intraday?.length ?? 0;
-          console.log('[IndexStore] After update', update.index, '- new intraday length:', newLen);
         }
       }
     }
     indices.value = newIndices;
-    console.log('[IndexStore] updateIndicesBatch complete - total indices with intraday:', indices.value.filter(i => (i.intraday?.length ?? 0) > 0).length);
   }
 
   /**
    * 初始化 WebSocket 连接并订阅指数频道
    */
   function initWebSocket() {
-    console.log('[IndexStore] initWebSocket called - wsInitialized =', wsInitialized);
     // 防止重复初始化
     if (wsInitialized) {
-      console.log('[IndexStore] initWebSocket: already initialized, skipping');
       return;
     }
     wsInitialized = true;
-    console.log('[IndexStore] initWebSocket: initializing WebSocket handlers');
 
     const wsStore = useWSStore();
 
     // 监听连接状态
     wsStore.on('connected', () => {
-      console.log('[IndexStore] WebSocket connected event');
       wsConnected.value = true;
       wsStore.subscribe('indices');
       wsSubscribed.value = true;
     });
 
     wsStore.on('disconnected', () => {
-      console.log('[IndexStore] WebSocket disconnected event');
       wsConnected.value = false;
       wsSubscribed.value = false;
     });
 
     // 监听指数更新消息
     wsStore.on('index_update', (data: unknown) => {
-      console.log('[IndexStore] Received index_update WebSocket message');
       try {
         const payload = data as { indices?: (Partial<MarketIndex> & { index: string })[] };
         if (payload.indices && Array.isArray(payload.indices)) {
-          // 检查是否有 index_update 消息包含了空的 intraday，这会导致数据丢失
-          const hasIntradayInPayload = payload.indices.some(u => 'intraday' in u);
-          console.log('[IndexStore] index_update has intraday field:', hasIntradayInPayload, '- count:', payload.indices.length);
-          if (hasIntradayInPayload) {
-            console.log('[IndexStore] WARNING: index_update contains intraday field, this may cause data loss!');
-          }
-          console.log('[IndexStore] Processing batch update for', payload.indices.length, 'indices');
           updateIndicesBatch(payload.indices);
         }
       } catch (e) {
@@ -418,7 +393,6 @@ export const useIndexStore = defineStore('indices', () => {
 
     // 如果已经连接，直接订阅
     if (wsStore.isConnected) {
-      console.log('[IndexStore] WebSocket already connected on init');
       wsConnected.value = true;
       wsStore.subscribe('indices');
       wsSubscribed.value = true;

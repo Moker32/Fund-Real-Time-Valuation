@@ -132,7 +132,6 @@ export const useFundStore = defineStore('funds', () => {
         return; // 成功，退出函数
       } catch (err) {
         lastError = err;
-        console.error(`[FundStore] fetchFunds attempt ${attempt + 1} error:`, err);
 
         // 如果还有重试次数，等待后重试
         if (attempt < retries && !(err instanceof ApiError && err.statusCode === 404)) {
@@ -240,7 +239,6 @@ export const useFundStore = defineStore('funds', () => {
       }
       return false;
     } catch (err) {
-      console.error('[FundStore] toggleHolding error:', err);
       error.value = getFriendlyErrorMessage(err);
       throw err;
     }
@@ -302,8 +300,7 @@ export const useFundStore = defineStore('funds', () => {
       }
 
       return fullHistory;
-    } catch (err) {
-      console.error(`[FundStore] fetchHistory error for ${code}:`, err);
+    } catch {
       return [];
     }
   }
@@ -352,8 +349,7 @@ export const useFundStore = defineStore('funds', () => {
       }
 
       return [];
-    } catch (err) {
-      console.error(`[FundStore] fetchIntraday error for ${code}:`, err);
+    } catch {
       return [];
     }
   }
@@ -378,8 +374,7 @@ export const useFundStore = defineStore('funds', () => {
       }
 
       return [];
-    } catch (err) {
-      console.error(`[FundStore] fetchIntradayByDate error for ${code}:`, err);
+    } catch {
       return [];
     }
   }
