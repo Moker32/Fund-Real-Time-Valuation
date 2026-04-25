@@ -77,3 +77,4 @@ scripts/output/
 scripts/research_*.py
 scripts/test_*.py
 web/e2e/ui-debug*.ts
+openspec/
