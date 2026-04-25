@@ -147,7 +147,7 @@ import { useIndexStore } from '@/stores/indexStore';
 import { useSectorStore } from '@/stores/sectorStore';
 import { useWSStore } from '@/stores/wsStore';
 import { healthApi } from '@/api';
-import type { Fund, Commodity, MarketIndex } from '@/types';
+import type { Fund } from '@/types';
 
 // WebSocket 推送的基金更新数据类型
 interface FundUpdateData {
@@ -276,48 +276,6 @@ function setupWebSocketHandlers() {
         fundStore.updateFund(normalizedFund);
       });
       fundStore.lastUpdated = new Date().toLocaleTimeString();
-    }
-  });
-
-  wsStore.on('commodity_update', (data) => {
-    const payload = data as { commodities?: Commodity[] };
-    const commodities = payload?.commodities;
-    if (commodities && commodities.length > 0) {
-      // 合并数据到 commodityStore（保留本地状态）
-      commodities.forEach((updatedCommodity) => {
-        const index = commodityStore.commodities.findIndex(
-          (c) => c.symbol === updatedCommodity.symbol
-        );
-        if (index !== -1) {
-          // 保留原始字段，只更新价格相关字段
-          const original = commodityStore.commodities[index];
-          commodityStore.commodities[index] = {
-            ...original,
-            ...updatedCommodity,
-          };
-        }
-      });
-      commodityStore.lastUpdated = new Date().toLocaleTimeString();
-    }
-  });
-
-  wsStore.on('index_update', (data) => {
-    const payload = data as { indices?: MarketIndex[] };
-    const indices = payload?.indices;
-    if (indices && indices.length > 0) {
-      // 合并数据到 indexStore
-      indices.forEach((updatedIndex) => {
-        const index = indexStore.indices.findIndex(
-          (i) => i.symbol === updatedIndex.symbol
-        );
-        if (index !== -1) {
-          indexStore.indices[index] = {
-            ...indexStore.indices[index],
-            ...updatedIndex,
-          };
-        }
-      });
-      indexStore.lastUpdated = new Date().toLocaleTimeString();
     }
   });
 }

@@ -35,7 +35,7 @@ def is_trading_day(date: datetime) -> bool:
     from src.datasources.trading_calendar_source import TradingCalendarSource
 
     cal = TradingCalendarSource()
-    return cal.is_trading_day("china", date)
+    return cal.is_trading_day("china", date.date())
 
 
 def get_last_trading_day() -> datetime:

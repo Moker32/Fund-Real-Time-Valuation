@@ -348,27 +348,28 @@ async def get_index(
     """
     # 验证指数类型
     if index_type not in SUPPORTED_INDICES:
-        raise ValueError(
-            f"不支持的指数类型: {index_type}，支持类型: {', '.join(SUPPORTED_INDICES)}"
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的指数类型: {index_type}，支持类型: {', '.join(SUPPORTED_INDICES)}"
         )
 
     result = await manager.fetch(DataSourceType.STOCK, index_type)
 
     if not result.success or not result.data:
         error_msg = result.error or "获取数据失败"
-        raise ValueError(error_msg)
+        raise HTTPException(status_code=503, detail=error_msg)
 
     data = result.data
-    index_type = data.get("index", "")
+    data_index = data.get("index", "")
     data_timestamp = data.get("data_timestamp")
     source = result.source
 
     # 获取 marketState
-    market_state = await get_market_state_for_index(data, index_type, source)
+    market_state = await get_market_state_for_index(data, data_index, source)
     trading_status = get_trading_status(market_state)
 
     # 判断是否为延时数据（腾讯的美股数据延时15分钟）
-    is_delayed = source == "tencent_index" and index_type in TENCENT_DELAYED_INDICES
+    is_delayed = source == "tencent_index" and data_index in TENCENT_DELAYED_INDICES
 
     return {
         "index": data.get("index", ""),
@@ -385,7 +386,7 @@ async def get_index(
         "low": data.get("low"),
         "open": data.get("open"),
         "prevClose": data.get("prev_close"),
-        "region": INDEX_REGIONS.get(index_type),
+        "region": INDEX_REGIONS.get(data_index),
         "tradingStatus": trading_status.get("status"),
         "marketTime": trading_status.get("market_time"),
         "isDelayed": is_delayed,
@@ -438,8 +439,9 @@ async def get_index_history(
         dict: 包含历史数据的字典
     """
     if index_type not in SUPPORTED_INDICES:
-        raise ValueError(
-            f"不支持的指数类型: {index_type}，支持类型: {', '.join(SUPPORTED_INDICES)}"
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的指数类型: {index_type}，支持类型: {', '.join(SUPPORTED_INDICES)}"
         )
 
     validated_period = _validate_period(period)

@@ -697,9 +697,7 @@ class DataSourceManager:
                 }
                 for name, s in all_sources.items()
             },
-            "max_concurrent": list(self._semaphores.values())[0]._value
-            if self._semaphores and hasattr(list(self._semaphores.values())[0], "_value")
-            else None,
+            "max_concurrent": self._max_concurrent,
         }
 
     def list_sources(self) -> list[dict[str, Any]]:

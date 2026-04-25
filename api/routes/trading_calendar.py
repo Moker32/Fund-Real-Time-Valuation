@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from src.datasources.trading_calendar_source import Market, TradingCalendarSource
@@ -51,8 +51,14 @@ async def get_calendar(
 ) -> CalendarResponse:
     source = get_calendar_source()
 
-    start = date.fromisoformat(start_date) if start_date else None
-    end = date.fromisoformat(end_date) if end_date else None
+    try:
+        start = date.fromisoformat(start_date) if start_date else None
+        end = date.fromisoformat(end_date) if end_date else None
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="日期格式无效，请使用 YYYY-MM-DD 格式"
+        )
 
     result = source.get_calendar(
         market=market,
@@ -88,7 +94,13 @@ async def is_trading_day(
 ) -> dict:
     source = get_calendar_source()
 
-    d = date.fromisoformat(check_date) if check_date else date.today()
+    try:
+        d = date.fromisoformat(check_date) if check_date else date.today()
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="日期格式无效，请使用 YYYY-MM-DD 格式"
+        )
     is_open = source.is_trading_day(market, d)
 
     return {
@@ -109,7 +121,13 @@ async def get_next_trading_day(
 ) -> dict:
     source = get_calendar_source()
 
-    d = date.fromisoformat(from_date) if from_date else date.today()
+    try:
+        d = date.fromisoformat(from_date) if from_date else date.today()
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="日期格式无效，请使用 YYYY-MM-DD 格式"
+        )
     next_day = source.get_next_trading_day(market, d)
 
     return {

@@ -192,41 +192,52 @@ class CommodityRealtimeSource(CommodityDataSource):
 
     async def _fetch_btc(self) -> DataSourceResult:
         """从 Binance 获取 BTC 实时行情"""
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            url = "https://api.binance.com/api/v3/ticker/24hr"
-            response = await client.get(url, params={"symbol": "BTCUSDT"})
-            response.raise_for_status()
-            data = response.json()
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                url = "https://api.binance.com/api/v3/ticker/24hr"
+                response = await client.get(url, params={"symbol": "BTCUSDT"})
+                response.raise_for_status()
+                data = response.json()
 
-        result_data = {
-            "commodity": "btc",
-            "symbol": "BTCUSDT",
-            "name": "比特币 (Binance)",
-            "price": float(data.get("lastPrice", 0)),
-            "change": float(data.get("priceChange", 0)),
-            "change_percent": float(data.get("priceChangePercent", 0)),
-            "currency": "USDT",
-            "exchange": "Binance",
-            "high": float(data.get("highPrice", 0)),
-            "low": float(data.get("lowPrice", 0)),
-            "open": float(data.get("openPrice", 0)),
-            "prev_close": float(data.get("prevClosePrice", 0)),
-            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        }
+            result_data = {
+                "commodity": "btc",
+                "symbol": "BTCUSDT",
+                "name": "比特币 (Binance)",
+                "price": float(data.get("lastPrice", 0)),
+                "change": float(data.get("priceChange", 0)),
+                "change_percent": float(data.get("priceChangePercent", 0)),
+                "currency": "USDT",
+                "exchange": "Binance",
+                "high": float(data.get("highPrice", 0)),
+                "low": float(data.get("lowPrice", 0)),
+                "open": float(data.get("openPrice", 0)),
+                "prev_close": float(data.get("prevClosePrice", 0)),
+                "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
 
-        cache_key = "btc"
-        result_data["_cache_time"] = time.time()
-        self._add_to_cache(cache_key, result_data)
-        await self._save_to_database("btc", result_data, self.name)
-        self._record_success()
+            cache_key = "btc"
+            result_data["_cache_time"] = time.time()
+            self._add_to_cache(cache_key, result_data)
+            await self._save_to_database("btc", result_data, self.name)
+            self._record_success()
 
-        return DataSourceResult(
-            success=True,
-            data=result_data,
-            timestamp=time.time(),
-            source=self.name,
-            metadata={"commodity_type": "btc", "source": "binance"},
-        )
+            return DataSourceResult(
+                success=True,
+                data=result_data,
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"commodity_type": "btc", "source": "binance"},
+            )
+        except Exception as e:
+            self._record_failure()
+            logger.warning(f"获取 BTC 行情失败: {e}")
+            return DataSourceResult(
+                success=False,
+                error=str(e),
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"commodity_type": "btc", "error_type": type(e).__name__},
+            )
 
     async def fetch_batch(self, commodity_types: list[str]) -> list[DataSourceResult]:
         """批量获取商品数据"""

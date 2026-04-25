@@ -272,16 +272,13 @@ class FundDailyCacheDAO:
                 return True
 
             # 检查 TTL 过期
-            if self.cache_ttl > 0:
-                try:
-                    fetched_time = datetime.fromisoformat(fetched_at.replace("Z", ""))
-                    now = datetime.now()
-                    elapsed_seconds = (now - fetched_time).total_seconds()
-                    return elapsed_seconds > self.cache_ttl
-                except (ValueError, TypeError):
-                    return True  # 时间解析失败，视为过期
-
-            return False  # TTL=0，缓存永久有效
+            try:
+                fetched_time = datetime.fromisoformat(fetched_at.replace("Z", ""))
+                now = datetime.now()
+                elapsed_seconds = (now - fetched_time).total_seconds()
+                return elapsed_seconds > self.cache_ttl
+            except (ValueError, TypeError):
+                return True  # 时间解析失败，视为过期
 
     def clear_cache(self, fund_code: str, date: str | None = None) -> int:
         """

@@ -208,6 +208,7 @@ async def get_categories(
             continue
 
         category_commodities: list[CommodityCategoryItem] = []
+        seen_commodities: set[str] = set()
 
         for source in sources:
             results = await source.fetch_batch(commodity_types)
@@ -216,7 +217,8 @@ async def get_categories(
                 if result.success and result.data:
                     data = result.data
                     commodity_type = data.get("commodity", "")
-                    if commodity_type:
+                    if commodity_type and commodity_type not in seen_commodities:
+                        seen_commodities.add(commodity_type)
                         item = _commodity_to_item(data, result.source)
                         category_commodities.append(item)
 

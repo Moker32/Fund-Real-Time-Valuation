@@ -8,7 +8,7 @@
 import logging
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
@@ -358,8 +358,8 @@ class CommodityCacheDAO:
             return True
 
         try:
-            created_time = datetime.fromisoformat(record.created_at.replace("Z", "+00:00"))
-            now = datetime.now(timezone.utc)
+            created_time = datetime.fromisoformat(record.created_at)
+            now = datetime.now()
             elapsed_hours = (now - created_time).total_seconds() / 3600
             return elapsed_hours > self.cache_ttl_hours
         except (ValueError, TypeError):

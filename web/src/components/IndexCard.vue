@@ -89,7 +89,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
+import { computed, ref, watch, onUnmounted } from 'vue';
 import type { MarketIndex } from '@/types';
 import LineChart from './LineChart.vue';
 
@@ -171,14 +171,19 @@ watch(() => props.index.changePercent, (newVal, oldVal) => {
 const priceAnimating = ref(false);
 const changeAnimating = ref(false);
 
+let priceTimer: ReturnType<typeof setTimeout> | null = null;
+let changeTimer: ReturnType<typeof setTimeout> | null = null;
+
 function triggerPriceAnimation() {
   priceAnimating.value = true;
-  setTimeout(() => priceAnimating.value = false, 500);
+  if (priceTimer) window.clearTimeout(priceTimer);
+  priceTimer = setTimeout(() => priceAnimating.value = false, 500);
 }
 
 function triggerChangeAnimation() {
   changeAnimating.value = true;
-  setTimeout(() => changeAnimating.value = false, 500);
+  if (changeTimer) window.clearTimeout(changeTimer);
+  changeTimer = setTimeout(() => changeAnimating.value = false, 500);
 }
 
 function handleCardClick() {
@@ -187,12 +192,9 @@ function handleCardClick() {
   }
 }
 
-onMounted(() => {
-  // console.log('[IndexCard] onMounted for', props.index.index);
-});
-
 onUnmounted(() => {
-  // console.log('[IndexCard] onUnmounted for', props.index.index);
+  if (priceTimer) window.clearTimeout(priceTimer);
+  if (changeTimer) window.clearTimeout(changeTimer);
 });
 
  

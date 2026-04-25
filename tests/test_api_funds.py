@@ -179,9 +179,9 @@ class TestHelperFunctions:
         result = _calculate_estimate_change(1.5000, 1.5234)
         assert result == 0.0234
 
-        # unit_net 为 0
+        # unit_net 为 0（边界值，减法运算仍然有效）
         result = _calculate_estimate_change(0, 1.5234)
-        assert result is None
+        assert result == 1.5234
 
         # estimate_net 为 None
         result = _calculate_estimate_change(1.5000, None)

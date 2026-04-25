@@ -5,6 +5,7 @@
 
 import asyncio
 import logging
+import time
 from datetime import datetime
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
@@ -65,23 +66,32 @@ def _get_trading_calendar_source() -> TradingCalendarSource:
     return get_calendar()
 
 
-@lru_cache
-def _is_trading_hours_cached() -> bool:
-    """检查当前是否为交易时段（带缓存）"""
-    try:
-        calendar = _get_trading_calendar_source()
-        if not calendar.is_trading_day(Market.CHINA):
-            return False
-        result = calendar.is_within_trading_hours(Market.CHINA)
-        return result.get("status") == "open"
-    except Exception as e:
-        logger.warning(f"检查交易时段失败: {e}")
-        return False
+
+_trading_hours_cache_result: bool | None = None
+_trading_hours_cache_time: float = 0.0
+_TRADING_HOURS_CACHE_TTL: float = 60.0
 
 
 def _is_trading_hours() -> bool:
-    """检查当前是否为交易时段（使用缓存）"""
-    return _is_trading_hours_cached()
+    """检查当前是否为交易时段（带60秒 TTL 缓存）"""
+    global _trading_hours_cache_result, _trading_hours_cache_time
+    now = time.monotonic()
+    if _trading_hours_cache_result is not None and (now - _trading_hours_cache_time) < _TRADING_HOURS_CACHE_TTL:
+        return _trading_hours_cache_result
+
+    try:
+        calendar = _get_trading_calendar_source()
+        if not calendar.is_trading_day(Market.CHINA):
+            _trading_hours_cache_result = False
+        else:
+            result = calendar.is_within_trading_hours(Market.CHINA)
+            _trading_hours_cache_result = result.get("status") == "open"
+    except Exception as e:
+        logger.warning(f"检查交易时段失败: {e}")
+        _trading_hours_cache_result = False
+
+    _trading_hours_cache_time = now
+    return _trading_hours_cache_result
 
 
 @lru_cache
@@ -149,7 +159,7 @@ def _get_default_fund_codes(config_manager: ConfigManager) -> list[str]:
 
 def _calculate_estimate_change(unit_net: float | None, estimate_net: float | None) -> float | None:
     """计算估算涨跌额"""
-    if unit_net is not None and estimate_net is not None and unit_net != 0:
+    if unit_net is not None and estimate_net is not None:
         return round(estimate_net - unit_net, 4)
     return None
 

@@ -48,9 +48,9 @@ class TestCalculateEstimateChange:
         assert result is None
 
     def test_unit_net_zero(self):
-        """单位净值为 0，返回 None（避免除零）"""
+        """单位净值为 0，减法运算仍然有效"""
         result = _calculate_estimate_change(0, 1.5000)
-        assert result is None
+        assert result == 1.5000
 
     def test_small_change(self):
         """小幅度变化"""

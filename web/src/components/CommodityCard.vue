@@ -78,7 +78,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useCommodityStore } from '@/stores/commodityStore';
 import { getCommodityCategory, getCommodityMarket } from '@/utils/commodityNames';
 import { tradingCalendarApi } from '@/api';
@@ -127,6 +127,12 @@ async function fetchTradingDayStatus(market: string) {
 onMounted(() => {
   const market = getCommodityMarket(props.commodity.symbol);
   fetchTradingDayStatus(market);
+});
+
+onUnmounted(() => {
+  if (priceTimer) window.clearTimeout(priceTimer);
+  if (changeTimer) window.clearTimeout(changeTimer);
+  if (heartTimer) window.clearTimeout(heartTimer);
 });
 
 // 检查该商品是否在关注列表中
@@ -341,20 +347,27 @@ watch(() => props.commodity.changePercent, (newVal, oldVal) => {
   }
 });
 
+let priceTimer: ReturnType<typeof setTimeout> | null = null;
+let changeTimer: ReturnType<typeof setTimeout> | null = null;
+let heartTimer: ReturnType<typeof setTimeout> | null = null;
+
 function triggerPriceAnimation() {
   priceAnimating.value = true;
-  setTimeout(() => priceAnimating.value = false, 500);
+  if (priceTimer) window.clearTimeout(priceTimer);
+  priceTimer = setTimeout(() => priceAnimating.value = false, 500);
 }
 
 function triggerChangeAnimation() {
   changeAnimating.value = true;
-  setTimeout(() => changeAnimating.value = false, 500);
+  if (changeTimer) window.clearTimeout(changeTimer);
+  changeTimer = setTimeout(() => changeAnimating.value = false, 500);
 }
 
 async function toggleWatch() {
   // 触发心跳动画
   isHeartBeating.value = true;
-  setTimeout(() => {
+  if (heartTimer) window.clearTimeout(heartTimer);
+  heartTimer = setTimeout(() => {
     isHeartBeating.value = false;
   }, 600);
 

@@ -586,8 +586,8 @@ class ThsSectorSource(DataSource):
                 "high": 0.0,
                 "low": 0.0,
                 "net_inflow": self._safe_float(row.get("净流入", 0)),
-                "up_count": self._safe_int(row.get("上涨家数", 0)),  # type: ignore
-                "down_count": self._safe_int(row.get("下跌家数", 0)),  # type: ignore
+                "up_count": int(row.get("上涨家数", 0) or 0),
+                "down_count": int(row.get("下跌家数", 0) or 0),
                 "lead_stock": str(row.get("领涨股", "")),
                 "lead_change": self._safe_float(row.get("领涨股-涨跌幅", 0)),
             }

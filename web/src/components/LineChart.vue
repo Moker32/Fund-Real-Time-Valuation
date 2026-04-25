@@ -217,7 +217,7 @@ const getYScaleRange = (data: [number[], (number | null)[]] | null, baseline: nu
   let max = -Infinity;
 
   for (const v of values) {
-    if (v !== null && typeof v === 'number') {
+    if (v !== null && typeof v === 'number' && !isNaN(v)) {
       min = Math.min(min, v);
       max = Math.max(max, v);
     }

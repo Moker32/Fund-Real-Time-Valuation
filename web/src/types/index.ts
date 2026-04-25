@@ -63,6 +63,22 @@ export interface CommodityHistory {
   tradingStatus?: string; // 交易状态: 'open', 'closed'
 }
 
+// Commodity Types
+export interface Commodity {
+  symbol: string;
+  name: string;
+  price: number;
+  currency: string;
+  change: number;
+  changePercent: number;
+  high: number;
+  low: number;
+  open: number;
+  prevClose: number;
+  source: string;
+  timestamp: string;
+}
+
 // Commodity Category Types
 export interface CommodityCategoryItem {
   symbol: string;

@@ -447,13 +447,9 @@ class TradingCalendarSource(DataSource):
         return result
 
     def _next_day(self, d: date) -> date:
-        return (
-            d.replace(day=d.day + 1)
-            if d.day < 28
-            else d.replace(day=1, month=d.month + 1)
-            if d.month < 12
-            else d.replace(year=d.year + 1, month=1, day=1)
-        )
+        from datetime import timedelta
+
+        return d + timedelta(days=1)
 
     def _prev_day(self, d: date) -> date:
         """获取前一天"""

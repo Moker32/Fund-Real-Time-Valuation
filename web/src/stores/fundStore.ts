@@ -47,23 +47,23 @@ export const useFundStore = defineStore('funds', () => {
 
   // Getters
   const risingFunds = computed(() =>
-    funds.value.filter((f) => f.estimateChangePercent > 0)
+    funds.value.filter((f) => (f.estimateChangePercent ?? 0) > 0)
   );
 
   const fallingFunds = computed(() =>
-    funds.value.filter((f) => f.estimateChangePercent < 0)
+    funds.value.filter((f) => (f.estimateChangePercent ?? 0) < 0)
   );
 
   const neutralFunds = computed(() =>
-    funds.value.filter((f) => f.estimateChangePercent === 0)
+    funds.value.filter((f) => (f.estimateChangePercent ?? 0) === 0)
   );
 
   const topGainers = computed(() =>
-    [...funds.value].sort((a, b) => b.estimateChangePercent - a.estimateChangePercent).slice(0, 5)
+    [...funds.value].sort((a, b) => (b.estimateChangePercent ?? 0) - (a.estimateChangePercent ?? 0)).slice(0, 5)
   );
 
   const topLosers = computed(() =>
-    [...funds.value].sort((a, b) => a.estimateChangePercent - b.estimateChangePercent).slice(0, 5)
+    [...funds.value].sort((a, b) => (a.estimateChangePercent ?? 0) - (b.estimateChangePercent ?? 0)).slice(0, 5)
   );
 
   const averageChange = computed(() => {

@@ -300,14 +300,14 @@ class TestCalculateEstimateChange:
 
         assert result == -0.02
 
-    def test_calculate_estimate_change_zero_division(self):
-        """单位净值为 0 时应返回 None"""
+    def test_calculate_estimate_change_zero_unit_net(self):
+        """单位净值为 0 时减法运算仍然有效"""
         from api.routes.funds import _calculate_estimate_change
 
-        # 单位净值为 0
+        # 单位净值为 0（边界值，减法运算仍然有效）
         result = _calculate_estimate_change(unit_net=0.0, estimate_net=1.52)
 
-        assert result is None
+        assert result == 1.52
 
     def test_calculate_estimate_change_none_unit_net(self):
         """单位净值为 None 时应返回 None"""
