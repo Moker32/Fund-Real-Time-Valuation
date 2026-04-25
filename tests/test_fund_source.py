@@ -674,18 +674,19 @@ class TestFund123DataSourceCSRF:
     @pytest.mark.asyncio
     async def test_get_csrf_token_from_cache(self):
         """测试从缓存获取 CSRF token"""
-        from src.datasources.fund_source import Fund123DataSource
+        from src.datasources.fund.fund123_client import Fund123Client
 
-        # 设置缓存的 token
-        Fund123DataSource._csrf_token = "test_token_123"
-        Fund123DataSource._csrf_token_time = time.time()
+        # 设置缓存的 token（通过单例实例）
+        client = Fund123Client.get_instance()
+        client._csrf_token = "test_token_123"
+        client._csrf_token_time = time.time()
 
-        token = await Fund123DataSource._get_csrf_token()
+        token = await Fund123Client._get_csrf_token()
         assert token == "test_token_123"
 
         # 清理
-        Fund123DataSource._csrf_token = None
-        Fund123DataSource._csrf_token_time = 0.0
+        client._csrf_token = None
+        client._csrf_token_time = 0.0
 
 
 # ============================================================================
@@ -822,14 +823,15 @@ class TestCloseClient:
     @pytest.mark.asyncio
     async def test_fund123_data_source_close(self):
         """测试 Fund123DataSource 关闭客户端"""
+        from src.datasources.fund.fund123_client import Fund123Client
         from src.datasources.fund_source import Fund123DataSource
 
         source = Fund123DataSource()
         await source.close()
 
-        # 验证类变量被清理
-        assert Fund123DataSource._client is None
-        assert Fund123DataSource._tiantian_client is None
+        # 验证客户端被关闭（通过 Fund123Client 单例）
+        client = Fund123Client.get_instance()
+        assert client._client is None or client._client.is_closed
 
 
 # ============================================================================

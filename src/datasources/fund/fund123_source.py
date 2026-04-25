@@ -8,16 +8,13 @@
 """
 
 import asyncio
-import json
 import logging
-import os
 import re
 import time
 from typing import Any
 
-import httpx
-
 from ..base import DataSource, DataSourceResult, DataSourceType
+from .fund123_client import Fund123Client
 from .fund_cache_helpers import (
     get_daily_cache_dao,
     get_fund_cache,
@@ -25,15 +22,13 @@ from .fund_cache_helpers import (
 )
 from .fund_info_utils import (
     _get_latest_trading_day,
-    _get_net_value_date_from_akshare,
     _has_real_time_estimate,
     _infer_fund_type_from_name,
-    _is_net_value_cache_valid,
-    _update_net_value_cache,
     get_basic_info_db,
     get_fund_basic_info,
     save_basic_info_to_db,
 )
+from .fund_net_value import NetValueResolver
 
 logger = logging.getLogger(__name__)
 
@@ -49,21 +44,6 @@ class Fund123DataSource(DataSource):
     """
 
     BASE_URL = "https://www.fund123.cn"
-
-    # 全局 Session 和 CSRF token（单例模式）
-    _client: httpx.AsyncClient | None = None
-    _csrf_token: str | None = None
-    _csrf_token_time: float = 0.0
-    _csrf_token_ttl = 1800  # 30 分钟过期
-    # 天天基金专用客户端（单例模式）
-    _tiantian_client: httpx.AsyncClient | None = None
-    # 并发控制：限制同时请求数，防止连接池耗尽或被限流
-    _semaphore: asyncio.Semaphore | None = None
-    # CSRF token 刷新锁：防止多请求同时刷新 token
-    _csrf_lock: asyncio.Lock | None = None
-    # 关闭锁
-    _close_lock: asyncio.Lock | None = None
-    # 最大并发数（提升以加快批量获取速度）
     MAX_CONCURRENT_REQUESTS = 15
 
     def __init__(self, timeout: float = 15.0, max_retries: int = 3, retry_delay: float = 0.5):
@@ -78,136 +58,14 @@ class Fund123DataSource(DataSource):
         super().__init__(name="fund123", source_type=DataSourceType.FUND, timeout=timeout)
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        self._ensure_client()
-
-    @classmethod
-    def _ensure_client(cls):
-        """确保存在全局 AsyncClient"""
-        if cls._client is None:
-            cls._client = httpx.AsyncClient(
-                limits=httpx.Limits(
-                    max_keepalive_connections=10,
-                    max_connections=20,
-                    keepalive_expiry=30.0,  # 30s 后清理空闲 keepalive 连接
-                ),
-                verify=os.environ.get("FUND123_SKIP_SSL_VERIFY", "").lower() in ("1", "true"),
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-                    "Accept": "application/json, text/plain, */*",
-                    "Accept-Language": "zh-CN,zh;q=0.9",
-                    "Referer": "https://www.fund123.cn/fund",
-                    "Origin": "https://www.fund123.cn",
-                    "X-API-Key": "foobar",
-                },
-            )
-
-    @classmethod
-    def _get_semaphore(cls) -> asyncio.Semaphore:
-        """
-        获取并发控制信号量（单例模式）
-
-        Returns:
-            asyncio.Semaphore: 并发控制信号量
-        """
-        if cls._semaphore is None:
-            cls._semaphore = asyncio.Semaphore(cls.MAX_CONCURRENT_REQUESTS)
-        return cls._semaphore
-
-    @classmethod
-    def _get_csrf_lock(cls) -> asyncio.Lock:
-        """
-        获取 CSRF token 刷新锁（单例模式）
-
-        Returns:
-            asyncio.Lock: CSRF token 刷新锁
-        """
-        if cls._csrf_lock is None:
-            cls._csrf_lock = asyncio.Lock()
-        return cls._csrf_lock
-
-    @classmethod
-    def _get_close_lock(cls) -> asyncio.Lock:
-        """
-        获取关闭锁（单例模式）
-
-        Returns:
-            asyncio.Lock: 关闭锁
-        """
-        if cls._close_lock is None:
-            cls._close_lock = asyncio.Lock()
-        return cls._close_lock
-
-    @classmethod
-    def _get_tiantian_client(cls) -> httpx.AsyncClient:
-        """获取天天基金专用客户端（单例模式）"""
-        if cls._tiantian_client is None:
-            cls._tiantian_client = httpx.AsyncClient(
-                limits=httpx.Limits(
-                    max_keepalive_connections=5,
-                    max_connections=10,
-                    keepalive_expiry=30.0,
-                ),
-                timeout=5.0,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-                    "Referer": "http://fundgz.1234567.com.cn/",
-                },
-            )
-        return cls._tiantian_client
-
-    @classmethod
-    async def _get_csrf_token(cls) -> str | None:
-        """
-        获取 CSRF token（带锁保护，防止并发刷新）
-
-        Returns:
-            CSRF token 字符串，获取失败返回 None
-        """
-        now = time.time()
-
-        # 检查缓存的 token 是否有效
-        if cls._csrf_token and (now - cls._csrf_token_time) < cls._csrf_token_ttl:
-            return cls._csrf_token
-
-        # 使用锁保护，防止多个请求同时刷新 token
-        async with cls._get_csrf_lock():
-            # 双重检查：可能在等待锁期间其他协程已经刷新了 token
-            if cls._csrf_token and (now - cls._csrf_token_time) < cls._csrf_token_ttl:
-                return cls._csrf_token
-
-            try:
-                # 访问首页获取 token
-                response = await cls._client.get(f"{cls.BASE_URL}/fund", timeout=15.0)
-                response.raise_for_status()
-
-                # 从响应文本中提取 CSRF
-                csrf_match = re.search(r'"csrf":"([^"]+)"', response.text)
-                if csrf_match:
-                    cls._csrf_token = csrf_match.group(1)
-                    cls._csrf_token_time = time.time()  # 更新为获取成功的时间
-                    logger.debug(f"获取到新的 CSRF token: {cls._csrf_token[:20]}...")
-                    return cls._csrf_token
-
-                logger.warning("无法从响应中提取 CSRF token")
-                return None
-
-            except Exception as e:
-                logger.error(f"获取 CSRF token 失败: {e}")
-                return None
-
-    @classmethod
-    async def _refresh_csrf_token(cls) -> bool:
-        """刷新 CSRF token"""
-        cls._csrf_token = None
-        cls._csrf_token_time = 0
-        token = await cls._get_csrf_token()
-        return token is not None
+        self._net_value_resolver = NetValueResolver()
+        self._client = Fund123Client.get_instance()
 
     async def _get_prev_net_value(self, fund_code: str) -> tuple[float | None, str | None]:
         """
         获取上一交易日净值（用于折线图基准线）
 
-        优先从数据库缓存获取，如果缓存无效或不存在则从 akshare 获取。
+        委托给 NetValueResolver。
 
         Args:
             fund_code: 基金代码
@@ -215,50 +73,7 @@ class Fund123DataSource(DataSource):
         Returns:
             (prev_net_value, prev_net_value_date) 元组，获取失败返回 (None, None)
         """
-        prev_net_value: float | None = None
-        prev_net_value_date: str | None = None
-
-        # 1. 优先从数据库缓存获取
-        try:
-            daily_dao = get_daily_cache_dao()
-            recent_days = daily_dao.get_recent_days(fund_code, 2)
-            if len(recent_days) >= 2:
-                # 第二条记录是上一个交易日
-                prev_record = recent_days[1]
-                prev_net_value = prev_record.unit_net_value
-                prev_net_value_date = prev_record.date
-                logger.debug(
-                    f"从数据库缓存获取前日净值: {fund_code} -> "
-                    f"{prev_net_value}, 日期: {prev_net_value_date}"
-                )
-        except Exception as e:
-            logger.warning(f"获取上一交易日净值失败: {e}")
-
-        # 2. 如果数据库缓存无效或不存在，从天天基金获取（0.1s，替代原来的 akshare 60 页历史）
-        if prev_net_value is None:
-            try:
-                tiantian_url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
-                tiantian_resp = await type(self)._get_tiantian_client().get(tiantian_url)
-                if tiantian_resp.is_success:
-                    text = tiantian_resp.text.strip()
-                    import json
-                    import re
-                    m = re.match(r"jsonpgz\((.+)\)", text, re.DOTALL)
-                    if m:
-                        tiantian_data = json.loads(m.group(1))
-                        tiantian_date = tiantian_data.get("jzrq", "")  # 最近确认净值日期
-                        tiantian_nav = self._safe_float(tiantian_data.get("dwjz"))
-                        if tiantian_date and tiantian_nav:
-                            prev_net_value = tiantian_nav
-                            prev_net_value_date = tiantian_date
-                            logger.debug(
-                                f"从天天基金获取净值: {fund_code} -> "
-                                f"{prev_net_value}, 日期: {prev_net_value_date}"
-                            )
-            except Exception as e:
-                logger.warning(f"从天天基金获取净值失败: {fund_code} - {e}")
-
-        return prev_net_value, prev_net_value_date
+        return await self._net_value_resolver.get_prev_net_value(fund_code)
 
     async def fetch(self, fund_code: str, use_cache: bool = True) -> DataSourceResult:
         """
@@ -408,7 +223,7 @@ class Fund123DataSource(DataSource):
                 else:
                     # 如果失败且还有重试次数，刷新 token 后重试
                     if attempt < self.max_retries - 1:
-                        await self._refresh_csrf_token()
+                        await Fund123Client._refresh_csrf_token()
                         await asyncio.sleep(self.retry_delay * (attempt + 1))
                         continue
                     return result
@@ -430,14 +245,25 @@ class Fund123DataSource(DataSource):
     async def _fetch_fund_data(self, fund_code: str) -> DataSourceResult:
         """获取基金数据（带并发控制）"""
         # 使用 semaphore 限制并发数
-        async with self._get_semaphore():
+        async with Fund123Client._get_semaphore():
             return await self._do_fetch_fund_data(fund_code)
 
     async def _do_fetch_fund_data(self, fund_code: str) -> DataSourceResult:
         """实际获取基金数据的实现"""
+        # 获取 CSRF token
+        csrf_token = await Fund123Client._get_csrf_token()
+        if not csrf_token:
+            return DataSourceResult(
+                success=False,
+                error="获取 CSRF token 失败",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code},
+            )
+
         # 1. 获取基金基本信息（fund_key 和 fund_name）
-        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={type(self)._csrf_token}"
-        search_response = await type(self)._client.post(
+        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={csrf_token}"
+        search_response = await Fund123Client._ensure_client().post(
             search_url, json={"fundCode": fund_code}, timeout=self.timeout
         )
 
@@ -466,10 +292,8 @@ class Fund123DataSource(DataSource):
 
         # 2. 获取日内估值数据
         today = time.strftime("%Y-%m-%d")
-        intraday_url = (
-            f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={type(self)._csrf_token}"
-        )
-        intraday_response = await type(self)._client.post(
+        intraday_url = f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={csrf_token}"
+        intraday_response = await Fund123Client._ensure_client().post(
             intraday_url,
             json={
                 "startTime": today,
@@ -519,83 +343,12 @@ class Fund123DataSource(DataSource):
             except (ValueError, AttributeError):
                 growth_rate = 0.0
 
-        # 3. 获取最新净值信息
-        # 注意：fund123 的 netValue 字段不是真正的已发布净值，需要从外部数据源获取
-        # 重要：净值和净值日期必须来自同一数据源，确保数据关联正确
-        # 天天基金接口的 jzrq 是"估值基准日期"（上一交易日），而非"最新确认净值日期"
-        # 因此优先从 akshare 获取净值和净值日期，天天基金仅用于实时估值
+        # 3. 获取最新净值信息（使用 NetValueResolver 带回退）
         net_value = None
         net_date = ""
 
-        # 1. 先从天天基金获取净值（0.1s，极快）
-        # 天天基金返回 jzrq（上一交易日净值），如果缓存有值可直接用
-        try:
-            tiantian_url = f"http://fundgz.1234567.com.cn/js/{fund_code}.js?rt={int(time.time() * 1000)}"
-            tiantian_resp = await self._get_tiantian_client().get(tiantian_url)
-            if tiantian_resp.is_success:
-                text = tiantian_resp.text.strip()
-                if text not in ("jsonpgz();", "jsonpgz()"):
-                    match = re.match(r"jsonpgz\((.+)\);?", text)
-                    if match:
-                        tiantian_data = json.loads(match.group(1))
-                        tiantian_net_date = tiantian_data.get("jzrq", "")
-                        tiantian_net_value = self._safe_float(tiantian_data.get("dwjz"))
-                        if tiantian_net_date and tiantian_net_value is not None:
-                            net_date = tiantian_net_date
-                            net_value = tiantian_net_value
-                            logger.debug(
-                                f"从天天基金获取净值: {fund_code} -> {net_value}, 日期: {net_date}"
-                            )
-        except Exception as e:
-            logger.warning(f"从天天基金获取净值失败: {fund_code} - {e}")
-
-        # 2. 如果天天基金失败，从 akshare 获取（14s，作为 fallback）
-        if not net_date or net_value is None:
-            cache_valid, cached_date, cached_value = _is_net_value_cache_valid(fund_code)
-            if cache_valid and cached_date and cached_value is not None:
-                net_value = cached_value
-                net_date = cached_date
-                logger.debug(f"使用净值缓存: {fund_code} -> {net_value}, 日期: {net_date}")
-            else:
-                try:
-                    loop = asyncio.get_running_loop()
-                    history_result = await loop.run_in_executor(
-                        None, lambda: _get_net_value_date_from_akshare(fund_code)
-                    )
-                    if history_result:
-                        ak_net_date, ak_nav = history_result
-                        if ak_nav and ak_net_date:
-                            net_value = ak_nav
-                            net_date = ak_net_date
-                            logger.debug(
-                                f"从 akshare 获取净值: {fund_code} -> {net_value}, 日期: {net_date}"
-                            )
-                            _update_net_value_cache(fund_code, net_value, net_date)
-                except Exception as e:
-                    logger.warning(f"从 akshare 获取净值失败: {fund_code} - {e}")
-
-        # 3. 最后尝试使用旧缓存（降级方案）
-        if not net_date or net_value is None:
-            if cached_date and cached_value is not None:
-                net_date = cached_date
-                net_value = cached_value
-                logger.debug(
-                    f"使用旧缓存（降级）: {fund_code} -> {net_value}, 日期: {net_date}"
-                )
-            else:
-                # 尝试从数据库每日缓存获取
-                try:
-                    daily_dao = get_daily_cache_dao()
-                    latest_record = daily_dao.get_latest(fund_code)
-                    if latest_record and latest_record.date:
-                        net_date = latest_record.date
-                        if latest_record.unit_net_value:
-                            net_value = latest_record.unit_net_value
-                            logger.debug(
-                                f"从数据库缓存获取净值（兜底）: {fund_code} -> {net_value}, 日期: {net_date}"
-                            )
-                except Exception as e:
-                    logger.warning(f"从数据库获取净值日期失败: {e}")
+        # 使用 NetValueResolver 获取净值
+        net_date, net_value = await self._net_value_resolver.resolve(fund_code)
 
         # 获取基金类型（优先从 akshare 获取并缓存到数据库）
         fund_type = ""
@@ -775,7 +528,7 @@ class Fund123DataSource(DataSource):
                     return result
                 else:
                     if attempt < self.max_retries - 1:
-                        await self._refresh_csrf_token()
+                        await Fund123Client._refresh_csrf_token()
                         await asyncio.sleep(self.retry_delay * (attempt + 1))
                         continue
                     return result
@@ -797,14 +550,25 @@ class Fund123DataSource(DataSource):
     async def _fetch_intraday_data(self, fund_code: str) -> DataSourceResult:
         """获取基金日内分时数据（带并发控制）"""
         # 使用 semaphore 限制并发数
-        async with self._get_semaphore():
+        async with Fund123Client._get_semaphore():
             return await self._do_fetch_intraday_data(fund_code)
 
     async def _do_fetch_intraday_data(self, fund_code: str) -> DataSourceResult:
         """实际获取基金日内分时数据的实现"""
+        # 获取 CSRF token
+        csrf_token = await Fund123Client._get_csrf_token()
+        if not csrf_token:
+            return DataSourceResult(
+                success=False,
+                error="获取 CSRF token 失败",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code},
+            )
+
         # 1. 获取基金基本信息（fund_key 和 fund_name）
-        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={type(self)._csrf_token}"
-        search_response = await type(self)._client.post(
+        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={csrf_token}"
+        search_response = await Fund123Client._ensure_client().post(
             search_url, json={"fundCode": fund_code}, timeout=self.timeout
         )
 
@@ -833,10 +597,8 @@ class Fund123DataSource(DataSource):
 
         # 2. 获取日内估值数据
         today = time.strftime("%Y-%m-%d")
-        intraday_url = (
-            f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={type(self)._csrf_token}"
-        )
-        intraday_response = await type(self)._client.post(
+        intraday_url = f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={csrf_token}"
+        intraday_response = await Fund123Client._ensure_client().post(
             intraday_url,
             json={
                 "startTime": today,
@@ -953,7 +715,7 @@ class Fund123DataSource(DataSource):
             bool: 健康状态
         """
         try:
-            token = await self._get_csrf_token()
+            token = await Fund123Client._get_csrf_token()
             return token is not None
         except Exception:
             return False
@@ -1006,12 +768,5 @@ class Fund123DataSource(DataSource):
             return None
 
     async def close(self):
-        """关闭全局 AsyncClient"""
-        async with type(self)._get_close_lock():
-            if type(self)._client is not None:
-                await type(self)._client.aclose()
-                type(self)._client = None
-                type(self)._csrf_token = None
-            if type(self)._tiantian_client is not None:
-                await type(self)._tiantian_client.aclose()
-                type(self)._tiantian_client = None
+        """关闭客户端"""
+        await Fund123Client.close()
