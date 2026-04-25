@@ -5,7 +5,7 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.datasources.trading_calendar_source import TradingCalendarSource

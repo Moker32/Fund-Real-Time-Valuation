@@ -22,11 +22,15 @@ from .fund_cache_helpers import (
     get_daily_cache_dao,
     get_fund_cache,
 )
-from .fund_info_utils import (
-    _has_real_time_estimate,
+from .fund_info_db import (
     get_basic_info_db,
-    get_fund_basic_info,
     save_basic_info_to_db,
+)
+from .fund_info_utils import (
+    get_fund_basic_info,
+)
+from .fund_type_inference import (
+    _has_real_time_estimate,
 )
 
 logger = logging.getLogger(__name__)
