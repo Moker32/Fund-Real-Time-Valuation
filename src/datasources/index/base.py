@@ -70,6 +70,9 @@ YAHOO_TICKERS = {
     "dax": "^GDAXI",
     "ftse": "^FTSE",
     "cac40": "^FCHI",
+    # 亚洲（新增）
+    "kospi": "^KS11",    # 韩国 KOSPI
+    "sensex": "^BSESN",  # 印度 SENSEX
 }
 
 # 合并所有 ticker 映射
@@ -108,6 +111,8 @@ INDEX_REGIONS = {
     "hang_seng": "hk",
     "hang_seng_tech": "hk",
     "nikkei225": "asia",
+    "kospi": "asia",
+    "sensex": "asia",
     "dow_jones": "america",
     "nasdaq": "america",
     "sp500": "america",
@@ -130,6 +135,8 @@ INDEX_NAMES = {
     "hang_seng": "恒生指数",
     "hang_seng_tech": "恒生科技",
     "nikkei225": "日经 225",
+    "kospi": "韩国 KOSPI",
+    "sensex": "印度 SENSEX",
     "dow_jones": "道琼斯",
     "nasdaq": "纳斯达克",
     "sp500": "标普 500",

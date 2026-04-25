@@ -118,13 +118,15 @@ const lunchBreak = computed(() => {
     case 'hang_seng':
     case 'hang_seng_tech':
       return { start: 12 * 60, end: 13 * 60 }; // 12:00-13:00
-    // 美股、欧洲市场无午休
+    // 美股、欧洲、韩国、印度市场无午休
     case 'dow_jones':
     case 'nasdaq':
     case 'sp500':
     case 'dax':
     case 'ftse':
     case 'cac40':
+    case 'kospi':
+    case 'sensex':
       return { start: 0, end: 0 }; // 无午休
     default:
       return { start: 11 * 60 + 30, end: 13 * 60 }; // A 股 11:30-13:00
@@ -142,6 +144,8 @@ const marketTimezone: Record<string, string> = {
   'dow_jones': 'America/New_York',
   'nasdaq': 'America/New_York',
   'sp500': 'America/New_York',
+  'kospi': 'Asia/Seoul',
+  'sensex': 'Asia/Kolkata',
 };
 
 const timezone = computed(() => marketTimezone[props.index.index] ?? 'Asia/Shanghai');
