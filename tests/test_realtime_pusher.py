@@ -21,9 +21,11 @@ from src.utils.realtime_pusher import (
     NON_TRADING_COMMODITY_INTERVAL,
     NON_TRADING_FUND_INTERVAL,
     NON_TRADING_INDEX_INTERVAL,
+    NON_TRADING_SECTOR_INTERVAL,
     TRADING_COMMODITY_INTERVAL,
     TRADING_FUND_INTERVAL,
     TRADING_INDEX_INTERVAL,
+    TRADING_SECTOR_INTERVAL,
     RealtimePusher,
     get_realtime_pusher,
     start_realtime_pusher,
@@ -403,20 +405,22 @@ class TestRealtimePusherTradingHours:
     def test_get_intervals_trading(self, pusher):
         """测试获取交易时段间隔"""
         with patch.object(pusher, "_is_trading_hours", return_value=True):
-            fund_int, commodity_int, index_int = pusher._get_intervals()
+            fund_int, commodity_int, index_int, sector_int = pusher._get_intervals()
 
             assert fund_int == TRADING_FUND_INTERVAL
             assert commodity_int == TRADING_COMMODITY_INTERVAL
             assert index_int == TRADING_INDEX_INTERVAL
+            assert sector_int == TRADING_SECTOR_INTERVAL
 
     def test_get_intervals_non_trading(self, pusher):
         """测试获取非交易时段间隔"""
         with patch.object(pusher, "_is_trading_hours", return_value=False):
-            fund_int, commodity_int, index_int = pusher._get_intervals()
+            fund_int, commodity_int, index_int, sector_int = pusher._get_intervals()
 
             assert fund_int == NON_TRADING_FUND_INTERVAL
             assert commodity_int == NON_TRADING_COMMODITY_INTERVAL
             assert index_int == NON_TRADING_INDEX_INTERVAL
+            assert sector_int == NON_TRADING_SECTOR_INTERVAL
 
 
 class TestRealtimePusherFundCodes:
@@ -521,7 +525,7 @@ class TestRealtimePusherStartStop:
         await pusher.start()
 
         assert pusher._running is True
-        assert len(pusher._tasks) == 3
+        assert len(pusher._tasks) == 4  # funds, commodities, indices, sectors
 
         # 清理
         await pusher.stop()

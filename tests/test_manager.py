@@ -103,7 +103,7 @@ class TestDataSourceManager:
         """测试初始化"""
         manager = DataSourceManager()
 
-        assert manager._max_concurrent == 10
+        assert manager._max_concurrent == 20
         assert manager._enable_load_balancing is False
         assert len(manager._sources) == 0
 

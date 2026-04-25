@@ -20,16 +20,12 @@ class TestCommodityCategory:
         """测试分类值"""
         assert CommodityCategory.PRECIOUS_METAL.value == "precious_metal"
         assert CommodityCategory.ENERGY.value == "energy"
-        assert CommodityCategory.BASE_METAL.value == "base_metal"
-        assert CommodityCategory.AGRICULTURE.value == "agriculture"
         assert CommodityCategory.CRYPTO.value == "crypto"
 
     def test_category_names(self):
         """测试分类名称映射"""
         assert CATEGORY_NAMES[CommodityCategory.PRECIOUS_METAL] == "贵金属"
         assert CATEGORY_NAMES[CommodityCategory.ENERGY] == "能源化工"
-        assert CATEGORY_NAMES[CommodityCategory.BASE_METAL] == "基本金属"
-        assert CATEGORY_NAMES[CommodityCategory.AGRICULTURE] == "农产品"
         assert CATEGORY_NAMES[CommodityCategory.CRYPTO] == "加密货币"
 
 
@@ -39,27 +35,15 @@ class TestCommodityCategoryMap:
     def test_gold_mapping(self):
         """测试黄金映射"""
         assert COMMODITY_CATEGORY_MAP["gold"] == CommodityCategory.PRECIOUS_METAL
-        assert COMMODITY_CATEGORY_MAP["gold_cny"] == CommodityCategory.PRECIOUS_METAL
 
     def test_energy_mapping(self):
         """测试能源映射"""
         assert COMMODITY_CATEGORY_MAP["wti"] == CommodityCategory.ENERGY
         assert COMMODITY_CATEGORY_MAP["brent"] == CommodityCategory.ENERGY
 
-    def test_base_metal_mapping(self):
-        """测试基本金属映射"""
-        assert COMMODITY_CATEGORY_MAP["copper"] == CommodityCategory.BASE_METAL
-        assert COMMODITY_CATEGORY_MAP["aluminum"] == CommodityCategory.BASE_METAL
-
-    def test_agriculture_mapping(self):
-        """测试农产品映射"""
-        assert COMMODITY_CATEGORY_MAP["soybean"] == CommodityCategory.AGRICULTURE
-        assert COMMODITY_CATEGORY_MAP["corn"] == CommodityCategory.AGRICULTURE
-
     def test_crypto_mapping(self):
         """测试加密货币映射"""
         assert COMMODITY_CATEGORY_MAP["btc"] == CommodityCategory.CRYPTO
-        assert COMMODITY_CATEGORY_MAP["eth"] == CommodityCategory.CRYPTO
 
 
 class TestCommodityNames:
@@ -68,28 +52,18 @@ class TestCommodityNames:
     def test_precious_metals(self):
         """测试贵金属名称"""
         assert COMMODITY_NAMES["gold"] == "黄金 (COMEX)"
-        assert COMMODITY_NAMES["gold_cny"] == "沪金 Au99.99"
-        assert COMMODITY_NAMES["silver"] == "国际白银"
+        assert COMMODITY_NAMES["silver"] == "白银 (COMEX)"
+        assert COMMODITY_NAMES["platinum"] == "铂金 (伦敦)"
 
     def test_energy(self):
         """测试能源名称"""
-        assert COMMODITY_NAMES["wti"] == "WTI原油"
-        assert COMMODITY_NAMES["brent"] == "布伦特原油"
-
-    def test_base_metals(self):
-        """测试基本金属名称"""
-        assert COMMODITY_NAMES["copper"] == "铜"
-        assert COMMODITY_NAMES["aluminum"] == "铝"
-
-    def test_agriculture(self):
-        """测试农产品名称"""
-        assert COMMODITY_NAMES["soybean"] == "大豆"
-        assert COMMODITY_NAMES["corn"] == "玉米"
+        assert COMMODITY_NAMES["wti"] == "WTI原油 (NYMEX)"
+        assert COMMODITY_NAMES["brent"] == "布伦特原油 (ICE)"
+        assert COMMODITY_NAMES["natural_gas"] == "天然气 (NYMEX)"
 
     def test_crypto(self):
         """测试加密货币名称"""
-        assert COMMODITY_NAMES["btc"] == "比特币"
-        assert COMMODITY_NAMES["eth"] == "以太坊"
+        assert COMMODITY_NAMES["btc"] == "比特币 (Binance)"
 
 
 class TestCommodityCacheRecord:
@@ -153,11 +127,11 @@ class TestGetCategoryInfo:
 
         assert info["name"] == "能源化工"
 
-    def test_base_metal_info(self):
-        """测试基本金属分类信息"""
-        info = get_category_info(CommodityCategory.BASE_METAL)
+    def test_crypto_info(self):
+        """测试加密货币分类信息"""
+        info = get_category_info(CommodityCategory.CRYPTO)
 
-        assert info["name"] == "基本金属"
+        assert info["name"] == "加密货币"
 
 
 class TestGetCommodityInfo:
@@ -175,7 +149,7 @@ class TestGetCommodityInfo:
         """测试 WTI 原油信息"""
         info = get_commodity_info("wti")
 
-        assert info["name"] == "WTI原油"
+        assert info["name"] == "WTI原油 (NYMEX)"
 
     def test_unknown_commodity(self):
         """测试未知商品"""

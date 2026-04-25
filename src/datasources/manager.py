@@ -757,8 +757,8 @@ class DataSourceManager:
                 }
                 for name, s in self._sources.items()
             },
-            "max_concurrent": self._semaphore._value
-            if self._semaphore and hasattr(self._semaphore, "_value")
+            "max_concurrent": list(self._semaphores.values())[0]._value
+            if self._semaphores and hasattr(list(self._semaphores.values())[0], "_value")
             else None,
         }
 

@@ -221,9 +221,9 @@ class TestConfigDAO:
         config_dao.init_default_commodities()
 
         # 检查默认商品是否存在
-        commodity = config_dao.get_commodity("gold_cny")
+        commodity = config_dao.get_commodity("gold")
         assert commodity is not None
-        assert commodity.name == "Au99.99 (上海黄金)"
+        assert commodity.name == "黄金 (COMEX)"
 
 
 class TestFundHistoryDAO:

@@ -167,7 +167,7 @@ class RealtimePusher:
             return []
 
     async def _push_funds_loop(self):
-        fund_interval, _, _ = self._get_intervals()
+        fund_interval, _, _, _ = self._get_intervals()
         logger.info(
             "基金推送循环启动",
             extra={"interval_seconds": fund_interval},
@@ -247,7 +247,7 @@ class RealtimePusher:
             await asyncio.sleep(fund_interval)
 
     async def _push_commodities_loop(self):
-        _, commodity_interval, _ = self._get_intervals()
+        _, commodity_interval, _, _ = self._get_intervals()
         while self._running:
             try:
                 if not self._has_subscribers("commodities"):
@@ -316,7 +316,7 @@ class RealtimePusher:
     ]
 
     async def _push_indices_loop(self):
-        _, _, index_interval = self._get_intervals()
+        _, _, index_interval, _ = self._get_intervals()
         logger.info(f"指数推送循环启动，间隔: {index_interval}s")
         while self._running:
             try:
