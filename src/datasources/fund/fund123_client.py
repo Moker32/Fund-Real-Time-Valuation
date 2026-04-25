@@ -11,7 +11,6 @@
 
 import asyncio
 import logging
-import os
 import re
 import time
 
@@ -52,7 +51,7 @@ class Fund123Client:
                     max_connections=20,
                     keepalive_expiry=30.0,
                 ),
-                verify=os.environ.get("FUND123_SKIP_SSL_VERIFY", "").lower() in ("1", "true"),
+verify=True,  # 始终验证 SSL 证书
                 headers={
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
                     "Accept": "application/json, text/plain, */*",

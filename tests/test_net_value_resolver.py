@@ -240,8 +240,6 @@ class TestNetValueResolverPrevNetValue:
     @pytest.mark.asyncio
     async def test_get_prev_net_value_fallback_to_tiantian(self):
         """测试回退到天天基金"""
-        resolver = NetValueResolver()
-
         with patch(
             "src.datasources.fund.fund_net_value.get_daily_cache_dao",
             return_value=MagicMock(get_recent_days=MagicMock(return_value=[])),

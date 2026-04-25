@@ -124,7 +124,7 @@ class AkshareNetValueSource:
     """
 
     def __init__(self):
-        from .fund_info_utils import _get_net_value_date_from_akshare
+        from .fund_trading_helpers import _get_net_value_date_from_akshare
 
         self._get_net_value_date = _get_net_value_date_from_akshare
 

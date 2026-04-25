@@ -128,24 +128,7 @@ def rate_limit(calls_per_second: float = DEFAULT_RATE_LIMIT) -> Callable[[F], F]
             await limiter.acquire()
             return await func(*args, **kwargs)
 
-        @wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            # 同步函数使用全局锁
-            import threading
-
-            min_interval = 1.0 / calls_per_second
-            lock = threading.Lock()
-
-            with lock:
-                elapsed = time.time() - getattr(sync_wrapper, "_last_call_time", 0)
-                if elapsed < min_interval:
-                    time.sleep(min_interval - elapsed)
-                sync_wrapper._last_call_time = time.time()  # type: ignore
-                return func(*args, **kwargs)
-
-        if asyncio.iscoroutinefunction(func):
-            return async_wrapper  # type: ignore
-        return sync_wrapper  # type: ignore
+        return async_wrapper  # type: ignore
 
     return decorator
 

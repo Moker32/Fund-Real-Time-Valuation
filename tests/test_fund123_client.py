@@ -163,7 +163,7 @@ class TestFund123ClientCSRFToken:
             client._csrf_token = None
             client._csrf_token_time = 0
 
-            token = await client._Fund123Client__csrf_token_getter()
+            await client._Fund123Client__csrf_token_getter()
 
 
 class TestFund123ClientConcurrency:
