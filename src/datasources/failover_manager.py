@@ -1,6 +1,6 @@
 """
-数据源健康检查模块
-提供健康状态管理、故障检测和自动切换功能
+故障转移管理器模块
+负责故障检测、数据源健康状态跟踪和自动切换
 """
 
 import asyncio
@@ -9,56 +9,12 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from typing import Any
 
 from .base import DataSource
+from .health import HealthStatus
 
 logger = logging.getLogger(__name__)
-
-
-class HealthStatus(Enum):
-    """健康状态枚举"""
-
-    HEALTHY = "healthy"
-    DEGRADED = "degraded"
-    UNHEALTHY = "unhealthy"
-    UNKNOWN = "unknown"
-
-
-def get_mini_racer_status() -> dict[str, Any]:
-    """检测 MiniRacer 库状态，用于可观测性"""
-    status: dict[str, Any] = {
-        "installed": False,
-        "version": None,
-        "working": False,
-        "error": None,
-    }
-    try:
-        import importlib.util
-
-        if importlib.util.find_spec("py_mini_racer") is not None:
-            status["installed"] = True
-            try:
-                from py_mini_racer import MiniRacer
-
-                mr = MiniRacer()
-                result = mr.eval("1 + 1")
-                status["working"] = result == 2
-                status["version"] = "py_mini_racer"
-            except Exception as e:
-                status["error"] = f"py_mini_racer init failed: {type(e).__name__}: {str(e)}"
-        elif importlib.util.find_spec("mini_racer") is not None:
-            status["installed"] = True
-            status["version"] = "mini_racer"
-            try:
-                status["working"] = True
-            except Exception as e:
-                status["error"] = f"mini_racer import failed: {type(e).__name__}: {str(e)}"
-    except Exception as e:
-        status["error"] = f"detection failed: {type(e).__name__}: {str(e)}"
-
-    return status
 
 
 @dataclass
@@ -86,15 +42,14 @@ class HealthCheckResult:
         }
 
 
-class DataSourceHealthChecker:
+class FailoverManager:
     """
-    数据源健康检查器
+    故障转移管理器
 
-    功能:
-    - 定期检查数据源健康状态
-    - 记录健康历史
-    - 计算统计数据
-    - 支持自动恢复检测
+    负责：
+    - 故障检测和状态跟踪
+    - 连续失败计数
+    - 自动切换不健康的数据源
     """
 
     MAX_HISTORY = 100
@@ -107,7 +62,7 @@ class DataSourceHealthChecker:
         consecutive_failure_threshold: int = 3,
     ):
         """
-        初始化健康检查器
+        初始化故障转移管理器
 
         Args:
             check_interval: 检查间隔（秒）
@@ -120,7 +75,7 @@ class DataSourceHealthChecker:
         self.max_response_time_ms = max_response_time_ms
         self.consecutive_failure_threshold = consecutive_failure_threshold
 
-        self.health_history: dict[str, deque[HealthCheckResult]] = {}
+        self._health_history: dict[str, deque[HealthCheckResult]] = {}
         self._check_tasks: dict[str, asyncio.Task] = {}
         self._running = False
         self._consecutive_failures: dict[str, int] = {}
@@ -142,14 +97,11 @@ class DataSourceHealthChecker:
         start_time = time.perf_counter()
 
         try:
-            # 执行健康检查
             is_healthy = await asyncio.wait_for(source.health_check(), timeout=self.timeout)
 
             response_time_ms = (time.perf_counter() - start_time) * 1000
 
-            # 判断健康状态
             if is_healthy:
-                # 重置连续失败计数（健康时重置）
                 self._consecutive_failures[source_name] = 0
 
                 if response_time_ms > self.max_response_time_ms:
@@ -191,11 +143,10 @@ class DataSourceHealthChecker:
                     message=message,
                 )
 
-            # 保存到历史记录
             if save_history:
-                if source_name not in self.health_history:
-                    self.health_history[source_name] = deque(maxlen=self.MAX_HISTORY)
-                self.health_history[source_name].append(result)
+                if source_name not in self._health_history:
+                    self._health_history[source_name] = deque(maxlen=self.MAX_HISTORY)
+                self._health_history[source_name].append(result)
 
             return result
 
@@ -222,9 +173,9 @@ class DataSourceHealthChecker:
             )
 
             if save_history:
-                if source_name not in self.health_history:
-                    self.health_history[source_name] = deque(maxlen=self.MAX_HISTORY)
-                self.health_history[source_name].append(result)
+                if source_name not in self._health_history:
+                    self._health_history[source_name] = deque(maxlen=self.MAX_HISTORY)
+                self._health_history[source_name].append(result)
 
             return result
 
@@ -254,9 +205,9 @@ class DataSourceHealthChecker:
             )
 
             if save_history:
-                if source_name not in self.health_history:
-                    self.health_history[source_name] = deque(maxlen=self.MAX_HISTORY)
-                self.health_history[source_name].append(result)
+                if source_name not in self._health_history:
+                    self._health_history[source_name] = deque(maxlen=self.MAX_HISTORY)
+                self._health_history[source_name].append(result)
 
             return result
 
@@ -272,9 +223,8 @@ class DataSourceHealthChecker:
         """
         results = {}
 
-        # 并行执行检查（每个检查会自动保存到历史记录）
         async def check_with_source(source: DataSource) -> tuple[str, HealthCheckResult]:
-            result = await self.check_source(source, save_history=False)  # 避免重复保存
+            result = await self.check_source(source, save_history=False)
             return (source.name, result)
 
         tasks = [check_with_source(source) for source in sources]
@@ -282,7 +232,6 @@ class DataSourceHealthChecker:
 
         for item in checked_results:
             if isinstance(item, BaseException):
-                # 如果出现异常，记录错误
                 continue
 
             source_name, result = item
@@ -291,44 +240,22 @@ class DataSourceHealthChecker:
         return results
 
     def get_source_health(self, source_name: str) -> HealthCheckResult | None:
-        """
-        获取数据源最近健康状态
-
-        Args:
-            source_name: 数据源名称
-
-        Returns:
-            HealthCheckResult: 最近一次检查结果，不存在返回 None
-        """
-        history = self.health_history.get(source_name)
+        """获取数据源最近健康状态"""
+        history = self._health_history.get(source_name)
         if history:
             return history[-1]
         return None
 
     def get_health_history(self, source_name: str, limit: int = 10) -> list[HealthCheckResult]:
-        """
-        获取数据源健康历史
-
-        Args:
-            source_name: 数据源名称
-            limit: 返回记录数量限制
-
-        Returns:
-            List[HealthCheckResult]: 健康检查历史列表
-        """
-        history: deque[HealthCheckResult] = self.health_history.get(source_name, deque())
+        """获取数据源健康历史"""
+        history: deque[HealthCheckResult] = self._health_history.get(source_name, deque())
         return list(history)[-limit:]
 
     def get_statistics(self) -> dict[str, Any]:
-        """
-        获取健康检查统计数据
+        """获取健康检查统计数据"""
+        stats: dict[str, Any] = {"total_sources_checked": len(self._health_history), "sources": {}}
 
-        Returns:
-            Dict: 统计数据字典
-        """
-        stats: dict[str, Any] = {"total_sources_checked": len(self.health_history), "sources": {}}
-
-        for source_name, history in self.health_history.items():
+        for source_name, history in self._health_history.items():
             if not history:
                 continue
 
@@ -347,78 +274,46 @@ class DataSourceHealthChecker:
         return stats
 
     def get_unhealthy_sources(self) -> list[str]:
-        """
-        获取所有不健康的数据源名称
-
-        Returns:
-            List[str]: 不健康的数据源名称列表
-        """
+        """获取所有不健康的数据源名称"""
         unhealthy = []
-        for source_name, history in self.health_history.items():
+        for source_name, history in self._health_history.items():
             if history and history[-1].status in (HealthStatus.UNHEALTHY, HealthStatus.DEGRADED):
                 unhealthy.append(source_name)
         return unhealthy
 
     def get_healthy_sources(self) -> list[str]:
-        """
-        获取所有健康的数据源名称
-
-        Returns:
-            List[str]: 健康的数据源名称列表
-        """
+        """获取所有健康的数据源名称"""
         healthy = []
-        for source_name, history in self.health_history.items():
+        for source_name, history in self._health_history.items():
             if history and history[-1].status == HealthStatus.HEALTHY:
                 healthy.append(source_name)
         return healthy
 
     async def start_background_check(self, sources: list[DataSource]) -> None:
-        """
-        启动后台健康检查任务
-
-        Args:
-            sources: 要监控的数据源列表
-        """
+        """启动后台健康检查任务"""
         if self._running:
             return
 
         self._running = True
 
-        async def periodic_check():
+        async def periodic_check() -> None:
             while self._running:
                 await asyncio.sleep(self.check_interval)
                 await self.check_all_sources(sources)
 
         self._check_task = asyncio.create_task(periodic_check())
 
-    def stop_background_check(self):
+    def stop_background_check(self) -> None:
         """停止后台健康检查任务"""
         self._running = False
         if hasattr(self, "_check_task"):
             self._check_task.cancel()
 
-    def reset(self):
+    def reset(self) -> None:
         """重置所有健康检查状态"""
-        self.health_history.clear()
+        self._health_history.clear()
         self._consecutive_failures.clear()
         self._running = False
-
-
-class HealthCheckInterceptor:
-    """
-    健康检查拦截器
-
-    用于在数据请求前后进行健康检查，实现基于健康状态的故障切换
-    """
-
-    def __init__(self, checker: DataSourceHealthChecker):
-        """
-        初始化拦截器
-
-        Args:
-            checker: 健康检查器实例
-        """
-        self.checker = checker
 
     async def get_healthy_source(
         self, sources: list[DataSource], prefer_healthy: bool = True
@@ -431,7 +326,7 @@ class HealthCheckInterceptor:
             prefer_healthy: 是否优先选择健康的数据源
 
         Returns:
-            DataSource: 选中的数据源，无健康数据源返回 None
+            DataSource | None: 选中的数据源
         """
         if not sources:
             return None
@@ -439,10 +334,8 @@ class HealthCheckInterceptor:
         if not prefer_healthy:
             return sources[0]
 
-        # 检查所有数据源
-        results = await self.checker.check_all_sources(sources)
+        results = await self.check_all_sources(sources)
 
-        # 优先选择健康的数据源
         healthy_sources = [
             s
             for s in sources
@@ -460,7 +353,6 @@ class HealthCheckInterceptor:
         ]
 
         if healthy_sources:
-            # 返回响应时间最短的健康数据源
             return min(
                 healthy_sources,
                 key=lambda s: (
@@ -477,7 +369,6 @@ class HealthCheckInterceptor:
                 ),
             )
 
-        # 没有健康数据源，检查是否有降级的
         degraded_sources = [
             s
             for s in sources
@@ -500,26 +391,12 @@ class HealthCheckInterceptor:
         return None
 
     def should_skip_source(self, source_name: str) -> bool:
-        """
-        判断是否应该跳过某个数据源
-
-        Args:
-            source_name: 数据源名称
-
-        Returns:
-            bool: True 表示应该跳过
-        """
-        result = self.checker.get_source_health(source_name)
+        """判断是否应该跳过某个数据源"""
+        result = self.get_source_health(source_name)
         if result is None:
             return False
         return result.status == HealthStatus.UNHEALTHY
 
 
 # 导出
-__all__ = [
-    "HealthStatus",
-    "HealthCheckResult",
-    "DataSourceHealthChecker",
-    "HealthCheckInterceptor",
-    "get_mini_racer_status",
-]
+__all__ = ["FailoverManager", "HealthCheckResult", "HealthStatus"]

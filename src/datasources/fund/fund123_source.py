@@ -9,12 +9,11 @@
 
 import asyncio
 import logging
-import re
 import time
-from typing import Any
 
-from ..base import DataSource, DataSourceResult, DataSourceType
+from ..base import DataSourceResult, DataSourceType
 from .fund123_client import Fund123Client
+from .fund_base_source import FundDataSourceBase
 from .fund_cache_helpers import (
     get_daily_cache_dao,
     get_fund_cache,
@@ -33,7 +32,7 @@ from .fund_net_value import NetValueResolver
 logger = logging.getLogger(__name__)
 
 
-class Fund123DataSource(DataSource):
+class Fund123DataSource(FundDataSourceBase):
     """fund123.cn 基金数据源
 
     主要数据来源:
@@ -753,19 +752,6 @@ class Fund123DataSource(DataSource):
                 processed_results.append(result)
 
         return processed_results
-
-    def _validate_fund_code(self, fund_code: str) -> bool:
-        """验证基金代码格式"""
-        return bool(re.match(r"^\d{6}$", str(fund_code)))
-
-    def _safe_float(self, value: Any) -> float | None:
-        """安全转换为浮点数"""
-        if value is None:
-            return None
-        try:
-            return float(value)
-        except (ValueError, TypeError):
-            return None
 
     async def close(self):
         """关闭客户端"""

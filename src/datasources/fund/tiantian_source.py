@@ -16,7 +16,8 @@ from typing import Any
 import httpx
 import pandas as pd
 
-from ..base import DataParseError, DataSource, DataSourceResult, DataSourceType
+from ..base import DataParseError, DataSourceResult, DataSourceType
+from .fund_base_source import FundDataSourceBase
 from .fund_cache_helpers import (
     get_daily_cache_dao,
     get_fund_cache,
@@ -31,7 +32,7 @@ from .fund_info_utils import (
 logger = logging.getLogger(__name__)
 
 
-class TiantianFundDataSource(DataSource):
+class TiantianFundDataSource(FundDataSourceBase):
     """天天基金数据源 - 从天天基金接口获取数据
 
     主要数据来源:
@@ -424,18 +425,6 @@ class TiantianFundDataSource(DataSource):
 
         return processed_results
 
-    def _validate_fund_code(self, fund_code: str) -> bool:
-        """
-        验证基金代码格式
-
-        Args:
-            fund_code: 基金代码
-
-        Returns:
-            bool: 是否有效
-        """
-        return bool(re.match(r"^\d{6}$", str(fund_code)))
-
     def _parse_response(self, response_text: str, fund_code: str) -> dict[str, Any] | None:
         """
         解析天天基金返回的 JS 数据
@@ -481,23 +470,6 @@ class TiantianFundDataSource(DataSource):
                 source_type=self.source_type,
                 details={"fund_code": fund_code},
             )
-
-    def _safe_float(self, value: Any) -> float | None:
-        """
-        安全转换为浮点数
-
-        Args:
-            value: 待转换的值
-
-        Returns:
-            Optional[float]: 转换后的值，失败返回 None
-        """
-        if value is None:
-            return None
-        try:
-            return float(value)
-        except (ValueError, TypeError):
-            return None
 
     async def _handle_retry_delay(self, attempt: int):
         """处理重试延迟"""

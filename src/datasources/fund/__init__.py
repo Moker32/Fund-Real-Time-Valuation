@@ -13,6 +13,7 @@
 
 from .fund123_source import Fund123DataSource
 from .fund_backup_sources import EastMoneyFundDataSource, SinaFundDataSource
+from .fund_base_source import FundDataSourceBase
 from .fund_cache_helpers import (
     get_basic_info_dao,
     get_daily_cache_dao,
@@ -46,6 +47,7 @@ __all__ = [
     "FundHistorySource",
     "FundHistoryYFinanceSource",
     "Fund123DataSource",
+    "FundDataSourceBase",
     # 缓存帮助器
     "get_fund_cache",
     "get_fund_cache_stats",

@@ -156,6 +156,8 @@ class DataSource(ABC):
         self._request_count = 0
         self._error_count = 0
         self._cache: dict[str, Any] = {}
+        self._cache_timeout: float = 300.0  # 5 minutes default
+        self._cache_time: float = 0.0
 
     @property
     def error_rate(self) -> float:
@@ -196,7 +198,7 @@ class DataSource(ABC):
         tasks = [fetch_one(key) for key in keys]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        processed_results = []
+        processed_results: list[DataSourceResult] = []
         success_count = 0
         fail_count = 0
         for i, result in enumerate(results):
@@ -212,7 +214,7 @@ class DataSource(ABC):
                 )
                 fail_count += 1
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
                 if result.success:
                     success_count += 1
                 else:
@@ -262,7 +264,7 @@ class DataSource(ABC):
     def clear_cache(self) -> None:
         """清空缓存"""
         if self._cache_type == "list":
-            self._cache = []
+            self._cache = []  # type: ignore[assignment]
             if hasattr(self, "_cache_time"):
                 self._cache_time = 0.0
         else:

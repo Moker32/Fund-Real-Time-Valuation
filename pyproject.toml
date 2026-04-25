@@ -106,15 +106,8 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = "src.datasources.*"
 disable_error_code = [
-    "arg-type",
+    "type-arg",
     "union-attr",
-    "attr-defined",
-    "operator",
-    "index",
-    "misc",
-    "call-arg",
-    "assignment",
-    "return-value",
 ]
 
 [dependency-groups]

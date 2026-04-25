@@ -6,25 +6,14 @@
 import asyncio
 import logging
 import time
-from dataclasses import dataclass, field
 from typing import Any
 
 from .base import DataSource, DataSourceResult, DataSourceType
+from .failover_manager import FailoverManager
 from .health import DataSourceHealthChecker, HealthCheckInterceptor, HealthCheckResult, HealthStatus
+from .source_registry import DataSourceConfig, SourceRegistry
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class DataSourceConfig:
-    """数据源配置"""
-
-    source_class: type[DataSource]
-    name: str
-    source_type: DataSourceType
-    enabled: bool = True
-    priority: int = 0  # 优先级，数值越小优先级越高
-    config: dict[str, Any] = field(default_factory=dict)
 
 
 class DataSourceManager:
@@ -44,6 +33,8 @@ class DataSourceManager:
         max_concurrent: int = 20,
         enable_load_balancing: bool = False,
         health_check_interval: int = 60,
+        _registry: SourceRegistry | None = None,
+        _failover_manager: FailoverManager | None = None,
     ):
         """
         初始化数据源管理器
@@ -52,36 +43,55 @@ class DataSourceManager:
             max_concurrent: 最大并发请求数
             enable_load_balancing: 是否启用负载均衡
             health_check_interval: 健康检查间隔（秒）
+            _registry: 内部注册表实例（用于依赖注入）
+            _failover_manager: 内部故障转移管理器实例（用于依赖注入）
         """
-        self._sources: dict[str, DataSource] = {}
-        self._source_configs: dict[str, DataSourceConfig] = {}
-        self._type_sources: dict[DataSourceType, list[str]] = {
-            DataSourceType.FUND: [],
-            DataSourceType.COMMODITY: [],
-            DataSourceType.NEWS: [],
-            DataSourceType.SECTOR: [],
-            DataSourceType.STOCK: [],  # 指数数据源复用此类型
-        }
-        self._max_concurrent = max_concurrent  # 单个全局 semaphore 的最大并发
-        self._semaphores: dict[DataSourceType, asyncio.Semaphore] = {}  # 按类型分桶，避免跨类型争抢
+        self._registry = _registry if _registry is not None else SourceRegistry()
+        self._failover_manager = _failover_manager if _failover_manager is not None else FailoverManager(
+            check_interval=health_check_interval
+        )
+        self._max_concurrent = max_concurrent
+        self._semaphores: dict[DataSourceType, asyncio.Semaphore] = {}
         self._enable_load_balancing = enable_load_balancing
         self._round_robin_index: dict[DataSourceType, int] = {
             DataSourceType.FUND: 0,
             DataSourceType.COMMODITY: 0,
             DataSourceType.NEWS: 0,
             DataSourceType.SECTOR: 0,
-            DataSourceType.STOCK: 0,  # 指数数据源复用此类型
+            DataSourceType.STOCK: 0,
         }
         self._request_history: list[dict[str, Any]] = []
         self._max_history = 1000
 
-        # 健康检查器
+        # 保留旧的健康检查器以保持向后兼容（健康检查 API 仍使用它）
         self._health_checker = DataSourceHealthChecker(check_interval=health_check_interval)
         self._health_interceptor = HealthCheckInterceptor(self._health_checker)
 
+    # 向后兼容属性 - 委托给 _registry
+    @property
+    def _sources(self) -> dict[str, DataSource]:
+        """向后兼容：数据源字典"""
+        return self._registry.all_sources()
+
+    @property
+    def _source_configs(self) -> dict[str, DataSourceConfig]:
+        """向后兼容：数据源配置字典"""
+        return self._registry.all_configs()
+
+    @property
+    def _type_sources(self) -> dict[DataSourceType, list[str]]:
+        """向后兼容：按类型组织的数据源ID列表"""
+        return {
+            DataSourceType.FUND: self._registry.get_by_type_ids(DataSourceType.FUND),
+            DataSourceType.COMMODITY: self._registry.get_by_type_ids(DataSourceType.COMMODITY),
+            DataSourceType.NEWS: self._registry.get_by_type_ids(DataSourceType.NEWS),
+            DataSourceType.SECTOR: self._registry.get_by_type_ids(DataSourceType.SECTOR),
+            DataSourceType.STOCK: self._registry.get_by_type_ids(DataSourceType.STOCK),
+        }
+
     async def _get_semaphore(self, source_type: DataSourceType | None = None) -> asyncio.Semaphore:
         """延迟初始化 semaphore（按类型分桶，避免跨类型争抢）"""
-        key = source_type or DataSourceType.STOCK  # fetch_with_source 调用时无 type，用 STOCK 作为兜底
+        key = source_type or DataSourceType.STOCK
         if key not in self._semaphores:
             self._semaphores[key] = asyncio.Semaphore(self._max_concurrent)
         return self._semaphores[key]
@@ -94,34 +104,7 @@ class DataSourceManager:
             source: 数据源实例
             config: 可选的配置
         """
-        source_id = source.name
-
-        if source_id in self._sources:
-            raise ValueError(f"数据源 '{source_id}' 已注册")
-
-        self._sources[source_id] = source
-        self._type_sources[source.source_type].append(source_id)
-
-        if config:
-            self._source_configs[source_id] = config
-        else:
-            self._source_configs[source_id] = DataSourceConfig(
-                source_class=type(source),
-                name=source.name,
-                source_type=source.source_type,
-                enabled=True,
-                priority=len(self._type_sources[source.source_type]),
-            )
-
-        logger.info(
-            "数据源注册",
-            extra={
-                "source_id": source_id,
-                "source_type": source.source_type.value,
-                "priority": self._source_configs[source_id].priority,
-                "enabled": self._source_configs[source_id].enabled,
-            },
-        )
+        self._registry.register(source, config)
 
     def unregister(self, source_name: str) -> None:
         """
@@ -130,20 +113,7 @@ class DataSourceManager:
         Args:
             source_name: 数据源名称
         """
-        if source_name not in self._sources:
-            raise ValueError(f"数据源 '{source_name}' 未注册")
-
-        source = self._sources.pop(source_name)
-        self._type_sources[source.source_type].remove(source_name)
-        self._source_configs.pop(source_name, None)
-
-        logger.info(
-            "数据源注销",
-            extra={
-                "source_name": source_name,
-                "source_type": source.source_type.value,
-            },
-        )
+        self._registry.unregister(source_name)
 
     def get_source(self, source_name: str) -> DataSource | None:
         """
@@ -155,7 +125,7 @@ class DataSourceManager:
         Returns:
             DataSource: 数据源实例，不存在返回 None
         """
-        return self._sources.get(source_name)
+        return self._registry.get(source_name)
 
     def get_sources_by_type(self, source_type: DataSourceType) -> list[DataSource]:
         """
@@ -167,7 +137,7 @@ class DataSourceManager:
         Returns:
             List[DataSource]: 数据源列表
         """
-        return [self._sources[name] for name in self._type_sources[source_type]]
+        return self._registry.get_by_type(source_type)
 
     async def fetch(
         self,
@@ -205,12 +175,8 @@ class DataSourceManager:
                     sources = [healthy_source] + [s for s in sources if s != healthy_source]
 
             for source in sources:
-                if not self._source_configs.get(
-                    source.name,
-                    DataSourceConfig(
-                        source_class=type(source), name=source.name, source_type=source.source_type
-                    ),
-                ).enabled:
+                config = self._registry.get_config(source.name)
+                if config and not config.enabled:
                     continue
 
                 # 如果启用健康感知，跳过不健康的数据源
@@ -324,7 +290,7 @@ class DataSourceManager:
         Returns:
             DataSourceResult: 数据源返回结果
         """
-        source = self._sources.get(source_name)
+        source = self._registry.get(source_name)
         if not source:
             logger.warning(
                 "数据源不存在",
@@ -432,7 +398,7 @@ class DataSourceManager:
                 errors = []
                 for source in sources:
                     # 跳过禁用的数据源
-                    config = self._source_configs.get(source.name)
+                    config = self._registry.get_config(source.name)
                     if config and not config.enabled:
                         continue
 
@@ -500,10 +466,10 @@ class DataSourceManager:
         Returns:
             List[DataSource]: 按优先级排序的数据源
         """
-        source_ids = self._type_sources[source_type]
+        source_ids = self._registry.get_by_type_ids(source_type)
 
         if not self._enable_load_balancing or len(source_ids) <= 1:
-            return [self._sources[sid] for sid in source_ids]
+            return [self._registry.get(sid) for sid in source_ids if self._registry.get(sid)]
 
         # 负载均衡模式
         idx = self._round_robin_index[source_type] % len(source_ids)
@@ -511,7 +477,7 @@ class DataSourceManager:
 
         # 轮询选择
         ordered = source_ids[idx:] + source_ids[:idx]
-        return [self._sources[sid] for sid in ordered]
+        return [self._registry.get(sid) for sid in ordered if self._registry.get(sid)]
 
     async def health_check(self, source_name: str | None = None) -> dict[str, Any]:
         """
@@ -528,7 +494,7 @@ class DataSourceManager:
         mini_racer_status = get_mini_racer_status()
 
         if source_name:
-            source = self._sources.get(source_name)
+            source = self._registry.get(source_name)
             if not source:
                 return {"status": "unknown", "error": f"数据源不存在: {source_name}"}
 
@@ -545,7 +511,7 @@ class DataSourceManager:
             }
 
         # 检查所有数据源
-        sources = list(self._sources.values())
+        sources = list(self._registry.all_sources().values())
         results = await self._health_checker.check_all_sources(sources)
 
         healthy_count = sum(1 for r in results.values() if r.status == HealthStatus.HEALTHY)
@@ -568,7 +534,7 @@ class DataSourceManager:
         Returns:
             Dict[str, HealthCheckResult]: 数据源名称到健康检查结果的映射
         """
-        sources = list(self._sources.values())
+        sources = list(self._registry.all_sources().values())
         return await self._health_checker.check_all_sources(sources)
 
     def get_source_health(self, source_name: str) -> HealthCheckResult | None:
@@ -625,7 +591,7 @@ class DataSourceManager:
 
     async def start_background_health_check(self) -> None:
         """启动后台健康检查任务"""
-        sources = list(self._sources.values())
+        sources = list(self._registry.all_sources().values())
         await self._health_checker.start_background_check(sources)
 
     def stop_background_health_check(self) -> None:
@@ -640,19 +606,7 @@ class DataSourceManager:
             source_name: 数据源名称
             enabled: 是否启用
         """
-        if source_name not in self._source_configs:
-            raise ValueError(f"数据源 '{source_name}' 未注册")
-
-        config = self._source_configs[source_name]
-        config.enabled = enabled
-
-        logger.info(
-            "数据源启用/禁用状态变更",
-            extra={
-                "source_name": source_name,
-                "enabled": enabled,
-            },
-        )
+        self._registry.set_enabled(source_name, enabled)
 
     def set_source_priority(self, source_name: str, priority: int) -> None:
         """
@@ -662,20 +616,7 @@ class DataSourceManager:
             source_name: 数据源名称
             priority: 优先级（数值越小优先级越高）
         """
-        if source_name not in self._source_configs:
-            raise ValueError(f"数据源 '{source_name}' 未注册")
-
-        old_priority = self._source_configs[source_name].priority
-        self._source_configs[source_name].priority = priority
-
-        logger.info(
-            "数据源优先级变更",
-            extra={
-                "source_name": source_name,
-                "old_priority": old_priority,
-                "new_priority": priority,
-            },
-        )
+        self._registry.set_priority(source_name, priority)
 
     def _record_request(
         self,
@@ -720,7 +661,8 @@ class DataSourceManager:
 
         # 按数据源统计
         source_stats: dict[str, dict[str, Any]] = {}
-        for source_name in self._sources:
+        all_sources = self._registry.all_sources()
+        for source_name in all_sources:
             source_requests = [r for r in self._request_history if r["source"] == source_name]
             if source_requests:
                 source_stats[source_name] = {
@@ -742,20 +684,18 @@ class DataSourceManager:
             "registered_sources": {
                 name: {
                     "type": s.source_type.value,
-                    "enabled": self._source_configs.get(
-                        name,
-                        DataSourceConfig(
-                            source_class=type(s), name=name, source_type=s.source_type
-                        ),
-                    ).enabled,
-                    "priority": self._source_configs.get(
-                        name,
-                        DataSourceConfig(
-                            source_class=type(s), name=name, source_type=s.source_type
-                        ),
-                    ).priority,
+                    "enabled": (
+                        self._registry.get_config(name).enabled
+                        if self._registry.get_config(name)
+                        else True
+                    ),
+                    "priority": (
+                        self._registry.get_config(name).priority
+                        if self._registry.get_config(name)
+                        else 0
+                    ),
                 }
-                for name, s in self._sources.items()
+                for name, s in all_sources.items()
             },
             "max_concurrent": list(self._semaphores.values())[0]._value
             if self._semaphores and hasattr(list(self._semaphores.values())[0], "_value")
@@ -771,12 +711,12 @@ class DataSourceManager:
         """
         return [
             {"name": name, "type": source.source_type.value, "status": source.get_status()}
-            for name, source in self._sources.items()
+            for name, source in self._registry.all_sources().items()
         ]
 
     async def close_all(self) -> None:
         """关闭所有数据源的连接"""
-        for source in self._sources.values():
+        for source in self._registry.all_sources().values():
             try:
                 await source.close()
             except Exception:

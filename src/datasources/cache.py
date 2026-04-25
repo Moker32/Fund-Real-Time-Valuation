@@ -141,14 +141,14 @@ class DataCache:
         except OSError as e:
             logger.warning(f"批量清除缓存失败 (dir={self.cache_dir}): {e}")
 
-    def get_stats(self) -> dict:
+    def get_stats(self) -> dict[str, Any]:
         """
         获取缓存统计信息
 
         Returns:
             dict: 包含统计信息的字典
         """
-        stats = {
+        stats: dict[str, Any] = {
             "cache_dir": str(self.cache_dir),
             "total_files": 0,
             "valid_files": 0,
