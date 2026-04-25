@@ -35,7 +35,7 @@ class AKShareEconomicNewsDataSource(DataSource):
         super().__init__(
             name="akshare_economic_news", source_type=DataSourceType.NEWS, timeout=timeout
         )
-        self._cache: list[dict[str, Any]] = []
+        self._cache: list[dict[str, Any]] = []  # type: ignore[assignment]
         self._cache_time: float = 0.0
         self._cache_timeout = 300.0  # 缓存5分钟
 
@@ -119,7 +119,7 @@ class AKShareEconomicNewsDataSource(DataSource):
         tasks = [fetch_one(d) for d in dates]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        processed_results = []
+        processed_results: list[DataSourceResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append(
@@ -132,7 +132,7 @@ class AKShareEconomicNewsDataSource(DataSource):
                     )
                 )
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
 
         return processed_results
 
@@ -161,7 +161,7 @@ class AKShareWeiboSentimentDataSource(DataSource):
         super().__init__(
             name="akshare_weibo_sentiment", source_type=DataSourceType.NEWS, timeout=timeout
         )
-        self._cache: list[dict[str, Any]] = []
+        self._cache: list[dict[str, Any]] = []  # type: ignore[assignment]
         self._cache_time: float = 0.0
         self._cache_timeout = 180.0  # 缓存3分钟
 
@@ -246,7 +246,7 @@ class AKShareWeiboSentimentDataSource(DataSource):
         tasks = [fetch_one(p) for p in periods]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        processed_results = []
+        processed_results: list[DataSourceResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append(
@@ -259,7 +259,7 @@ class AKShareWeiboSentimentDataSource(DataSource):
                     )
                 )
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
 
         return processed_results
 
@@ -336,7 +336,21 @@ class AKShareSentimentAggregatorDataSource(DataSource):
             return await self.fetch(dt)
 
         tasks = [fetch_one(dt) for dt in data_types]
-        return await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        processed_results: list[DataSourceResult] = []
+        for result in results:
+            if isinstance(result, Exception):
+                processed_results.append(
+                    DataSourceResult(
+                        success=False,
+                        error=str(result),
+                        timestamp=time.time(),
+                        source=self.name,
+                    )
+                )
+            else:
+                processed_results.append(result)  # type: ignore[arg-type]
+        return processed_results
 
     async def close(self):
         """关闭数据源"""

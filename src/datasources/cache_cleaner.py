@@ -74,7 +74,7 @@ class CacheCleaner:
         except Exception as e:
             error_msg = f"清理基金历史记录失败: {e}"
             logger.error(error_msg)
-            results["errors"].append(error_msg)
+            results["errors"].append(error_msg)  # type: ignore[attr-defined]
 
         try:
             # 2. 清理过期新闻
@@ -84,7 +84,7 @@ class CacheCleaner:
         except Exception as e:
             error_msg = f"清理新闻缓存失败: {e}"
             logger.error(error_msg)
-            results["errors"].append(error_msg)
+            results["errors"].append(error_msg)  # type: ignore[attr-defined]
 
         try:
             # 3. 清理文件缓存
@@ -94,7 +94,7 @@ class CacheCleaner:
         except Exception as e:
             error_msg = f"清理文件缓存失败: {e}"
             logger.error(error_msg)
-            results["errors"].append(error_msg)
+            results["errors"].append(error_msg)  # type: ignore[attr-defined]
 
         try:
             # 4. 清理日内缓存
@@ -104,7 +104,7 @@ class CacheCleaner:
         except Exception as e:
             error_msg = f"清理日内缓存失败: {e}"
             logger.error(error_msg)
-            results["errors"].append(error_msg)
+            results["errors"].append(error_msg)  # type: ignore[attr-defined]
 
         results["completed_at"] = datetime.now().isoformat()
         logger.info(f"启动时缓存清理完成: {results}")

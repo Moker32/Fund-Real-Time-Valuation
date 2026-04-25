@@ -194,7 +194,7 @@ class DataSourceManager:
                 try:
                     # 特殊处理：COMMODITY 类型无参数时调用 fetch_all()（推送循环用）
                     if source_type == DataSourceType.COMMODITY and not args and not kwargs.get("commodity_type"):
-                        result = await source.fetch_all()
+                        result = await source.fetch_all()  # type: ignore[attr-defined]
                     else:
                         result = await source.fetch(*args, **kwargs)
 
@@ -439,7 +439,7 @@ class DataSourceManager:
                 )
                 fail_count += 1
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
                 if result.success:
                     success_count += 1
                 else:
@@ -469,7 +469,7 @@ class DataSourceManager:
         source_ids = self._registry.get_by_type_ids(source_type)
 
         if not self._enable_load_balancing or len(source_ids) <= 1:
-            return [self._registry.get(sid) for sid in source_ids if self._registry.get(sid)]
+            return [self._registry.get(sid) for sid in source_ids if self._registry.get(sid)]  # type: ignore[misc]
 
         # 负载均衡模式
         idx = self._round_robin_index[source_type] % len(source_ids)
@@ -477,7 +477,7 @@ class DataSourceManager:
 
         # 轮询选择
         ordered = source_ids[idx:] + source_ids[:idx]
-        return [self._registry.get(sid) for sid in ordered if self._registry.get(sid)]
+        return [self._registry.get(sid) for sid in ordered if self._registry.get(sid)]  # type: ignore[misc]
 
     async def health_check(self, source_name: str | None = None) -> dict[str, Any]:
         """

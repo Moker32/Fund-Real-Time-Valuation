@@ -58,7 +58,7 @@ class SinaSectorDataSource(DataSource):
                 "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
             },
         )
-        self._cache: list[dict[str, Any]] = []
+        self._cache: list[dict[str, Any]] = []  # type: ignore[assignment]
         self._cache_time: float = 0.0
         self._cache_timeout = 60.0  # 缓存60秒
 

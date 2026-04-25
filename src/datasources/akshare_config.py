@@ -240,7 +240,7 @@ def create_httpx_client(
             "https://": proxy,
         }
 
-    client = httpx.AsyncClient(
+    client = httpx.AsyncClient(  # type: ignore[call-arg]
         headers=merged_headers,
         timeout=timeout_config,
         proxies=proxies,

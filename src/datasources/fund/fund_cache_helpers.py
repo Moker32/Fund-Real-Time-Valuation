@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 # 全局缓存实例（单例模式）
 _fund_cache: DualLayerCache | None = None
 # 基金基本信息缓存（全局 akshare 调用结果）
-_fund_info_cache: dict[str, tuple[dict, float]] = {}  # {code: (info, timestamp)}
+# {code: ((name, type), timestamp)}
+_fund_info_cache: dict[str, tuple[tuple[str, str], float]] = {}
 _fund_info_cache_ttl = 3600  # 1小时缓存
 # 基金信息缓存命中率统计
 _fund_info_hit_count = 0

@@ -86,7 +86,7 @@ class FundHistorySource(DataSource):
                         continue
 
             # 按日期升序排序
-            ohlcv_data.sort(key=lambda x: x["time"])
+            ohlcv_data.sort(key=lambda x: x["time"])  # type: ignore[arg-type, return-value]
 
             # 根据 period 过滤数据
             filtered_data = self._filter_by_period(ohlcv_data, period)
@@ -227,7 +227,7 @@ class FundHistorySource(DataSource):
                     )
                 )
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
 
         return processed_results
 
@@ -320,7 +320,7 @@ class FundHistoryYFinanceSource(DataSource):
     async def fetch_async(self, fund_code: str, period: str = "1y") -> DataSourceResult:
         """异步获取历史数据"""
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: self.fetch(fund_code, period))
+        return await loop.run_in_executor(None, lambda: self.fetch(fund_code, period))  # type: ignore[arg-type, return-value]
 
     async def fetch_batch(self, *args, **kwargs) -> list[DataSourceResult]:
         """

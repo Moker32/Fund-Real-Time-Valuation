@@ -7,7 +7,7 @@ import asyncio
 import logging
 from datetime import datetime
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, Query
 from typing_extensions import TypedDict
@@ -41,6 +41,13 @@ class FundListData(TypedDict):
     total: int
     timestamp: str
     progress: int | None
+
+
+class FundThemeIndustries(TypedDict, total=False):
+    """基金主题和行业配置"""
+
+    sector: str
+    industries: list[dict[str, str | float | None]] | None
 
 
 router = APIRouter(prefix="/api/funds", tags=["基金"])
@@ -211,7 +218,7 @@ _INDUSTRY_SHORT_MAP: dict[str, str] = {
 }
 
 
-def _get_theme_industries(fund_code: str) -> dict:
+def _get_theme_industries(fund_code: str) -> FundThemeIndustries:
     """从数据库获取基金主题和行业配置（缓存读取，无网络请求）
 
     优先级：
@@ -300,6 +307,84 @@ def build_fund_response(
     validated.isHolding = is_holding
 
     return validated.model_dump()
+
+
+def _build_detail_response(
+    data: dict[str, Any], source: str, is_holding: bool
+) -> FundDetailResponse:
+    """
+    构建基金详情响应
+
+    Args:
+        data: 基金数据字典
+        source: 数据源名称
+        is_holding: 是否为持仓
+
+    Returns:
+        FundDetailResponse: 基金详情响应模型
+    """
+    unit_net = data.get("unit_net_value")
+    estimate_net = data.get("estimated_net_value")
+    estimate_change = _calculate_estimate_change(unit_net, estimate_net)
+
+    validated = FundDetailResponse.model_validate(
+        {
+            "fund_code": data.get("fund_code", ""),
+            "name": data.get("name", ""),
+            "type": data.get("type"),
+            "unit_net_value": data.get("unit_net_value"),
+            "net_value_date": data.get("net_value_date"),
+            "prev_net_value": data.get("prev_net_value"),
+            "prev_net_value_date": data.get("prev_net_value_date"),
+            "estimated_net_value": data.get("estimated_net_value"),
+            "estimated_growth_rate": data.get("estimated_growth_rate"),
+            "estimate_time": data.get("estimate_time"),
+            "has_real_time_estimate": data.get("has_real_time_estimate", True),
+        }
+    )
+
+    validated.estimateChange = estimate_change
+    validated.source = source
+    validated.isHolding = is_holding
+    return validated
+
+
+def _build_estimate_response(
+    data: dict[str, Any], is_holding: bool
+) -> FundEstimateResponse:
+    """
+    构建基金估值响应
+
+    Args:
+        data: 基金数据字典
+        is_holding: 是否为持仓
+
+    Returns:
+        FundEstimateResponse: 基金估值响应模型
+    """
+    unit_net = data.get("unit_net_value")
+    estimate_net = data.get("estimated_net_value")
+    estimate_change = _calculate_estimate_change(unit_net, estimate_net)
+
+    validated = FundEstimateResponse.model_validate(
+        {
+            "fund_code": data.get("fund_code", ""),
+            "name": data.get("name", ""),
+            "type": data.get("type"),
+            "unit_net_value": data.get("unit_net_value"),
+            "net_value_date": data.get("net_value_date"),
+            "prev_net_value": data.get("prev_net_value"),
+            "prev_net_value_date": data.get("prev_net_value_date"),
+            "estimated_net_value": data.get("estimated_net_value"),
+            "estimated_growth_rate": data.get("estimated_growth_rate"),
+            "estimate_time": data.get("estimate_time"),
+            "has_real_time_estimate": data.get("has_real_time_estimate", True),
+        }
+    )
+
+    validated.estimateChange = estimate_change
+    validated.isHolding = is_holding
+    return validated
 
 
 # ==================== 搜索和列表 ====================
@@ -480,33 +565,8 @@ async def get_fund_detail(
         error_msg = result.error or "未知错误"
         raise HTTPException(status_code=404 if "不存在" in error_msg else 500, detail=error_msg)
 
-    data = result.data
-
-    unit_net = data.get("unit_net_value")
-    estimate_net = data.get("estimated_net_value")
-    estimate_change = _calculate_estimate_change(unit_net, estimate_net)
     is_holding = _check_is_holding(code, config_manager)
-
-    validated = FundDetailResponse.model_validate(
-        {
-            "fund_code": data.get("fund_code", ""),
-            "name": data.get("name", ""),
-            "type": data.get("type"),
-            "unit_net_value": data.get("unit_net_value"),
-            "net_value_date": data.get("net_value_date"),
-            "prev_net_value": data.get("prev_net_value"),
-            "prev_net_value_date": data.get("prev_net_value_date"),
-            "estimated_net_value": data.get("estimated_net_value"),
-            "estimated_growth_rate": data.get("estimated_growth_rate"),
-            "estimate_time": data.get("estimate_time"),
-            "has_real_time_estimate": data.get("has_real_time_estimate", True),
-        }
-    )
-
-    validated.estimateChange = estimate_change
-    validated.source = result.source
-    validated.isHolding = is_holding
-
+    validated = _build_detail_response(result.data, result.source, is_holding)
     return validated.model_dump()
 
 
@@ -535,30 +595,8 @@ async def get_fund_estimate(
         error_msg = result.error or "未知错误"
         raise HTTPException(status_code=404 if "不存在" in error_msg else 500, detail=error_msg)
 
-    data = result.data
-
-    unit_net = data.get("unit_net_value")
-    estimate_net = data.get("estimated_net_value")
-    estimate_change = _calculate_estimate_change(unit_net, estimate_net)
     is_holding = _check_is_holding(code, config_manager)
-
-    validated = FundEstimateResponse.model_validate(
-        {
-            "fund_code": data.get("fund_code", ""),
-            "name": data.get("name", ""),
-            "type": data.get("type"),
-            "unit_net_value": data.get("unit_net_value"),
-            "net_value_date": data.get("net_value_date"),
-            "estimated_net_value": data.get("estimated_net_value"),
-            "estimated_growth_rate": data.get("estimated_growth_rate"),
-            "estimate_time": data.get("estimate_time"),
-            "has_real_time_estimate": data.get("has_real_time_estimate", True),
-        }
-    )
-
-    validated.estimateChange = estimate_change
-    validated.isHolding = is_holding
-
+    validated = _build_estimate_response(result.data, is_holding)
     return validated.model_dump()
 
 

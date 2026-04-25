@@ -237,7 +237,7 @@ class CommodityRealtimeSource(CommodityDataSource):
         tasks = [fetch_one(ctype) for ctype in commodity_types]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        processed_results = []
+        processed_results: list[DataSourceResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.error(f"批量获取商品 {commodity_types[i]} 失败: {result}")
@@ -251,7 +251,7 @@ class CommodityRealtimeSource(CommodityDataSource):
                     )
                 )
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
 
         return processed_results
 

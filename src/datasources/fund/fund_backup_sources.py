@@ -160,7 +160,7 @@ class SinaFundDataSource(DataSource):
         tasks = [fetch_one(code) for code in fund_codes]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        processed_results = []
+        processed_results: list[DataSourceResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append(
@@ -173,7 +173,7 @@ class SinaFundDataSource(DataSource):
                     )
                 )
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
 
         return processed_results
 
@@ -329,7 +329,7 @@ class EastMoneyFundDataSource(DataSource):
         tasks = [fetch_one(code) for code in fund_codes]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        processed_results = []
+        processed_results: list[DataSourceResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append(
@@ -342,6 +342,6 @@ class EastMoneyFundDataSource(DataSource):
                     )
                 )
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
 
         return processed_results

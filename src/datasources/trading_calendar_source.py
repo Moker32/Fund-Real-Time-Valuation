@@ -411,7 +411,7 @@ class TradingCalendarSource(DataSource):
                     is_wknd = self._is_weekend(current)
                     special_name = special_dates.get(current)
 
-                    is_makeup_day = special_name and "补班" in special_name
+                    is_makeup_day = special_name and "补班" in special_name  # type: ignore[assignment]
                     is_trading = not is_holiday and not is_wknd
                     holiday_name = None
                     if is_holiday:

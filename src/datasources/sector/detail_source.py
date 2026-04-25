@@ -120,7 +120,7 @@ class EastMoneyIndustryDetailSource(DataSource):
         tasks = [fetch_one(name) for name in sector_names]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        processed_results = []
+        processed_results: list[DataSourceResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append(
@@ -133,7 +133,7 @@ class EastMoneyIndustryDetailSource(DataSource):
                     )
                 )
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
         return processed_results
 
     async def health_check(self) -> bool:
@@ -284,7 +284,7 @@ class EastMoneyConceptDetailSource(DataSource):
         tasks = [fetch_one(name) for name in sector_names]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        processed_results = []
+        processed_results: list[DataSourceResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append(
@@ -297,7 +297,7 @@ class EastMoneyConceptDetailSource(DataSource):
                     )
                 )
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
         return processed_results
 
     async def health_check(self) -> bool:

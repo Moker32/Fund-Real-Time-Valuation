@@ -126,7 +126,7 @@ class FundFlowConceptSource(DataSource):
         该检查仅做最基本的可用性测试：导入模块、创建上下文并执行简单表达式。
         """
         try:
-            import importlib
+            import importlib.util
 
             spec = importlib.util.find_spec("py_mini_racer")
             if spec is None:

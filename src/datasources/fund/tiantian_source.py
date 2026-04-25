@@ -245,9 +245,9 @@ class TiantianFundDataSource(FundDataSourceBase):
         # 天天基金失败，回退到 akshare 获取净值
         lof_result = await self._fetch_lof(fund_code, has_real_time_estimate=False)
         if lof_result.success:
-            lof_result.data["type"] = fund_type
-            lof_result.data["name"] = fund_name
-            lof_result.data["has_real_time_estimate"] = _has_real_time_estimate(fund_type, fund_name)
+            lof_result.data["type"] = fund_type  # type: ignore[index]
+            lof_result.data["name"] = fund_name  # type: ignore[index]
+            lof_result.data["has_real_time_estimate"] = _has_real_time_estimate(fund_type, fund_name)  # type: ignore[index]
             return lof_result
 
         return DataSourceResult(
@@ -421,7 +421,7 @@ class TiantianFundDataSource(FundDataSourceBase):
                     )
                 )
             else:
-                processed_results.append(result)
+                processed_results.append(result)  # type: ignore[arg-type]
 
         return processed_results
 

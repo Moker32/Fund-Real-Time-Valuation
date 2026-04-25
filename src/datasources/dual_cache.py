@@ -155,7 +155,7 @@ class DualLayerCache:
 
         if not file_path.exists():
             self._miss_count += 1
-            return None, None
+            return None, None  # type: ignore[return-value]
 
         try:
             with open(file_path, encoding="utf-8") as f:
@@ -167,7 +167,7 @@ class DualLayerCache:
                     # 过期，删除文件
                     file_path.unlink(missing_ok=True)
                     self._miss_count += 1
-                    return None, None
+                    return None, None  # type: ignore[return-value]
 
                 value = cache_data.get("value")
                 # 回填 L1 缓存
@@ -177,7 +177,7 @@ class DualLayerCache:
 
         except (json.JSONDecodeError, KeyError, ValueError, OSError):
             self._miss_count += 1
-            return None, None
+            return None, None  # type: ignore[return-value]
 
     async def set(self, key: str, value: Any, ttl_seconds: int | None = None) -> None:
         """设置缓存"""

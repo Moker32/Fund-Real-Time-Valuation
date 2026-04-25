@@ -233,7 +233,7 @@ class DataGateway:
             tasks = [self.request(req) for req in batch.requests]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
 
-            valid_responses = []
+            valid_responses: list[DataResponse] = []
             for r in responses:
                 if isinstance(r, Exception):
                     valid_responses.append(
@@ -245,7 +245,7 @@ class DataGateway:
                         )
                     )
                 else:
-                    valid_responses.append(r)
+                    valid_responses.append(r)  # type: ignore[arg-type]
         else:
             valid_responses = []
             for req in batch.requests:

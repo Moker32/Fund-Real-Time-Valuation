@@ -27,17 +27,17 @@ SYMBOL_20DAY = "20日排行"
 VALID_SYMBOLS = {SYMBOL_IMMEDIATE, SYMBOL_3DAY, SYMBOL_5DAY, SYMBOL_10DAY, SYMBOL_20DAY}
 
 
-def _check_result_success(result: DataSourceResult | object) -> bool:
+def _check_result_success(result: DataSourceResult) -> bool:
     """
     安全地检查数据源结果是否成功
 
-    处理 MagicMock 在测试中返回 truthy 值导致的问题。
+    Args:
+        result: 数据源结果
+
+    Returns:
+        bool: 是否成功
     """
-    # 如果是 DataSourceResult 类型，检查 success 属性
-    if isinstance(result, DataSourceResult):
-        return bool(result.success) and result.data is not None
-    # 对于其他类型（如 MagicMock），只检查 data 属性
-    return getattr(result, "data", None) is not None
+    return bool(result.success) and result.data is not None
 
 
 class SectorListData(TypedDict):

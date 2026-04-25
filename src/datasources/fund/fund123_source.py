@@ -188,36 +188,37 @@ class Fund123DataSource(FundDataSourceBase):
                 # 直接调用异步方法
                 result = await self._fetch_fund_data(fund_code)
 
-                if result.success:
+                if result.success and result.data is not None:
                     self._record_success()
+                    data = result.data
 
                     # 写入数据库每日缓存
                     daily_dao = get_daily_cache_dao()
-                    daily_dao.save_daily_from_fund_data(fund_code, result.data)
+                    daily_dao.save_daily_from_fund_data(fund_code, data)
 
                     # 保存基金基本信息到数据库（使用已推断的类型）
                     save_basic_info_to_db(
                         fund_code,
                         {
-                            "short_name": result.data.get("name", ""),
-                            "name": result.data.get("name", ""),
-                            "type": result.data.get("type", ""),
-                            "net_value": result.data.get("unit_net_value"),
-                            "net_value_date": result.data.get("net_value_date", ""),
+                            "short_name": data.get("name", ""),
+                            "name": data.get("name", ""),
+                            "type": data.get("type", ""),
+                            "net_value": data.get("unit_net_value"),
+                            "net_value_date": data.get("net_value_date", ""),
                         },
                     )
 
                     # 写入内存/文件缓存
                     cache = get_fund_cache()
-                    await cache.set(cache_key, result.data)
+                    await cache.set(cache_key, data)
 
                     # 保存日内分时数据到数据库缓存
-                    intraday_data = result.data.get("intraday", [])
+                    intraday_data = data.get("intraday", [])
                     if intraday_data:
                         intraday_dao = get_intraday_cache_dao()
                         intraday_dao.save_intraday(fund_code, today, intraday_data)
 
-                    result.data["from_cache"] = "api"
+                    data["from_cache"] = "api"
                     return result
                 else:
                     # 如果失败且还有重试次数，刷新 token 后重试
@@ -249,7 +250,19 @@ class Fund123DataSource(FundDataSourceBase):
 
     async def _do_fetch_fund_data(self, fund_code: str) -> DataSourceResult:
         """实际获取基金数据的实现"""
-        # 获取 CSRF token
+        # 1. 搜索基金获取 fund_key、fund_name 和 dayOfGrowth
+        fund_key, fund_name, day_of_growth = await Fund123Client._search_fund(fund_code, self.timeout)
+        if not fund_key:
+            return DataSourceResult(
+                success=False,
+                error=f"基金不存在: {fund_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code},
+            )
+
+        # 2. 获取日内估值数据
+        today = time.strftime("%Y-%m-%d")
         csrf_token = await Fund123Client._get_csrf_token()
         if not csrf_token:
             return DataSourceResult(
@@ -260,48 +273,10 @@ class Fund123DataSource(FundDataSourceBase):
                 metadata={"fund_code": fund_code},
             )
 
-        # 1. 获取基金基本信息（fund_key 和 fund_name）
-        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={csrf_token}"
-        search_response = await Fund123Client._ensure_client().post(
-            search_url, json={"fundCode": fund_code}, timeout=self.timeout
-        )
-
-        if not search_response.is_success:
-            return DataSourceResult(
-                success=False,
-                error=f"搜索基金失败: {search_response.status_code}",
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-
-        search_data = search_response.json()
-        if not search_data.get("success"):
-            return DataSourceResult(
-                success=False,
-                error=f"基金不存在: {fund_code}",
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-
-        fund_info = search_data.get("fundInfo", {})
-        fund_key = fund_info.get("key")
-        fund_name = fund_info.get("fundName", f"基金 {fund_code}")
-
-        # 2. 获取日内估值数据
-        today = time.strftime("%Y-%m-%d")
         intraday_url = f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={csrf_token}"
         intraday_response = await Fund123Client._ensure_client().post(
             intraday_url,
-            json={
-                "startTime": today,
-                "endTime": today,
-                "limit": 200,
-                "productId": fund_key,
-                "format": True,
-                "source": "WEALTHBFFWEB",
-            },
+            json=Fund123Client._build_intraday_payload(fund_key, today),
             timeout=self.timeout,
         )
 
@@ -334,7 +309,6 @@ class Fund123DataSource(FundDataSourceBase):
             estimate_time = ""
 
         # 4. 如果日内数据为空，尝试从 search 结果中获取 dayOfGrowth（QDII 基金会有这个字段）
-        day_of_growth = fund_info.get("dayOfGrowth", "")
         if not intraday_list and day_of_growth:
             # 解析 "5.59%" -> 5.59
             try:
@@ -343,11 +317,13 @@ class Fund123DataSource(FundDataSourceBase):
                 growth_rate = 0.0
 
         # 3. 获取最新净值信息（使用 NetValueResolver 带回退）
-        net_value = None
-        net_date = ""
+        net_value: float | None = None
+        net_date: str | None = None
 
         # 使用 NetValueResolver 获取净值
-        net_date, net_value = await self._net_value_resolver.resolve(fund_code)
+        _net_date, net_value = await self._net_value_resolver.resolve(fund_code)
+        if _net_date:
+            net_date = _net_date
 
         # 获取基金类型（优先从 akshare 获取并缓存到数据库）
         fund_type = ""
@@ -366,12 +342,12 @@ class Fund123DataSource(FundDataSourceBase):
 
         # 备选方案：从基金名称中识别（akshare 获取失败时）
         if not fund_type:
-            fund_type = _infer_fund_type_from_name(fund_name)
+            fund_type = _infer_fund_type_from_name(fund_name or "")
 
         # 判断是否有实时估值
         # QDII 基金和投资海外的 FOF 无实时估值，因为它们投资海外市场，净值更新延迟
         # ETF-联接和普通 FOF 基金有实时估值，因为它们跟踪的底层资产是国内基金
-        has_real_time = _has_real_time_estimate(fund_type, fund_name) and estimate_value is not None
+        has_real_time = _has_real_time_estimate(fund_type, fund_name or "") and estimate_value is not None
 
         # 获取上一交易日净值（用于折线图基准线）
         prev_net_value, prev_net_value_date = await self._get_prev_net_value(fund_code)
@@ -522,8 +498,9 @@ class Fund123DataSource(FundDataSourceBase):
                     cache = get_fund_cache()
                     await cache.set(cache_key, result.data, ttl_seconds=300)
 
-                    result.data["from_cache"] = "api"
-                    result.data["cache_expired"] = False
+                    if result.data is not None:
+                        result.data["from_cache"] = "api"
+                        result.data["cache_expired"] = False
                     return result
                 else:
                     if attempt < self.max_retries - 1:
@@ -554,7 +531,19 @@ class Fund123DataSource(FundDataSourceBase):
 
     async def _do_fetch_intraday_data(self, fund_code: str) -> DataSourceResult:
         """实际获取基金日内分时数据的实现"""
-        # 获取 CSRF token
+        # 1. 搜索基金获取 fund_key 和 fund_name
+        fund_key, fund_name, _ = await Fund123Client._search_fund(fund_code, self.timeout)
+        if not fund_key:
+            return DataSourceResult(
+                success=False,
+                error=f"基金不存在: {fund_code}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"fund_code": fund_code},
+            )
+
+        # 2. 获取日内估值数据
+        today = time.strftime("%Y-%m-%d")
         csrf_token = await Fund123Client._get_csrf_token()
         if not csrf_token:
             return DataSourceResult(
@@ -565,48 +554,10 @@ class Fund123DataSource(FundDataSourceBase):
                 metadata={"fund_code": fund_code},
             )
 
-        # 1. 获取基金基本信息（fund_key 和 fund_name）
-        search_url = f"{self.BASE_URL}/api/fund/searchFund?_csrf={csrf_token}"
-        search_response = await Fund123Client._ensure_client().post(
-            search_url, json={"fundCode": fund_code}, timeout=self.timeout
-        )
-
-        if not search_response.is_success:
-            return DataSourceResult(
-                success=False,
-                error=f"搜索基金失败: {search_response.status_code}",
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-
-        search_data = search_response.json()
-        if not search_data.get("success"):
-            return DataSourceResult(
-                success=False,
-                error=f"基金不存在: {fund_code}",
-                timestamp=time.time(),
-                source=self.name,
-                metadata={"fund_code": fund_code},
-            )
-
-        fund_info = search_data.get("fundInfo", {})
-        fund_key = fund_info.get("key")
-        fund_name = fund_info.get("fundName", f"基金 {fund_code}")
-
-        # 2. 获取日内估值数据
-        today = time.strftime("%Y-%m-%d")
         intraday_url = f"{self.BASE_URL}/api/fund/queryFundEstimateIntraday?_csrf={csrf_token}"
         intraday_response = await Fund123Client._ensure_client().post(
             intraday_url,
-            json={
-                "startTime": today,
-                "endTime": today,
-                "limit": 200,
-                "productId": fund_key,
-                "format": True,
-                "source": "WEALTHBFFWEB",
-            },
+            json=Fund123Client._build_intraday_payload(fund_key, today),
             timeout=self.timeout,
         )
 
@@ -736,7 +687,7 @@ class Fund123DataSource(FundDataSourceBase):
         tasks = [fetch_one(code) for code in fund_codes]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        processed_results = []
+        processed_results: list[DataSourceResult] = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 processed_results.append(
@@ -749,7 +700,8 @@ class Fund123DataSource(FundDataSourceBase):
                     )
                 )
             else:
-                processed_results.append(result)
+                # result is DataSourceResult here (not BaseException)
+                processed_results.append(result)  # type: ignore[arg-type]
 
         return processed_results
 

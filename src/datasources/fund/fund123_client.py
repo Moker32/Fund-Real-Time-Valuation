@@ -177,3 +177,63 @@ class Fund123Client:
         """向后兼容：关闭客户端"""
         if cls._instance is not None:
             await cls.get_instance().__close_async()
+
+    # ========================================================================
+    # 共享的基金数据获取方法（消除重复代码）
+    # ========================================================================
+
+    @classmethod
+    async def _search_fund(cls, fund_code: str, timeout: float = 15.0) -> tuple[str | None, str | None, str | None]:
+        """
+        搜索基金获取 fund_key、fund_name 和 dayOfGrowth
+
+        Args:
+            fund_code: 基金代码
+            timeout: 请求超时时间
+
+        Returns:
+            (fund_key, fund_name, day_of_growth) 元组，获取失败返回 (None, None, None)
+        """
+        csrf_token = await cls._get_csrf_token()
+        if not csrf_token:
+            return (None, None, None)
+
+        search_url = f"{BASE_URL}/api/fund/searchFund?_csrf={csrf_token}"
+        response = await cls._ensure_client().post(
+            search_url, json={"fundCode": fund_code}, timeout=timeout
+        )
+
+        if not response.is_success:
+            return (None, None, None)
+
+        data = response.json()
+        if not data.get("success"):
+            return (None, None, None)
+
+        fund_info = data.get("fundInfo", {})
+        fund_key = fund_info.get("key")
+        fund_name = fund_info.get("fundName", f"基金 {fund_code}")
+        day_of_growth = fund_info.get("dayOfGrowth", "")
+
+        return (fund_key, fund_name, day_of_growth)
+
+    @classmethod
+    def _build_intraday_payload(cls, fund_key: str, today: str) -> dict:
+        """
+        构建获取日内数据的请求 payload
+
+        Args:
+            fund_key: 基金标识
+            today: 当前日期 (YYYY-MM-DD)
+
+        Returns:
+            请求 payload 字典
+        """
+        return {
+            "startTime": today,
+            "endTime": today,
+            "limit": 200,
+            "productId": fund_key,
+            "format": True,
+            "source": "WEALTHBFFWEB",
+        }

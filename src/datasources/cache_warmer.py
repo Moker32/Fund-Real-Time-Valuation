@@ -129,7 +129,7 @@ class CacheWarmer:
             tasks = [fetch_with_limit(code) for code in fund_codes]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            success_count = sum(1 for r in results if r and r[1])
+            success_count = sum(1 for r in results if r and r[1])  # type: ignore[misc,index]
             logger.info(f"基金信息缓存预热完成: 成功 {success_count}/{len(fund_codes)}")
 
         except Exception as e:
