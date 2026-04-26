@@ -343,6 +343,20 @@ export const commodityApi = {
   }> {
     return api.get(`/api/commodities/by-ticker/${encodeURIComponent(ticker)}`);
   },
+
+  async getIntraday(commodityType: string): Promise<{
+    commodity_type: string;
+    symbol: string;
+    name: string;
+    data: Array<{ time: string; price: number }>;
+    timestamp: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+  }> {
+    return api.get(`/api/commodities/${commodityType}/intraday`);
+  },
 };
 
 export const healthApi = {
