@@ -77,6 +77,7 @@ export interface Commodity {
   prevClose: number;
   source: string;
   timestamp: string;
+  intraday?: FundIntraday[];  // 日内分时数据
 }
 
 // Commodity Category Types
