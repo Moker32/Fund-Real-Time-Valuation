@@ -722,8 +722,10 @@ function formatTime(dateStr: string | undefined | null): string {
 
 .card-body {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-end;
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
 }
 
