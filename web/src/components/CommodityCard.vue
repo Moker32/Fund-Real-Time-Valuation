@@ -167,7 +167,6 @@ const commodityType = computed(() => {
   const typeMap: Record<string, string> = {
     'GC=F': 'gold', 'GC': 'gold',
     'SI=F': 'silver', 'SI': 'silver',
-    'PT=F': 'platinum', 'XPT': 'platinum',
     'CL=F': 'wti', 'CL': 'wti',
     'BZ=F': 'brent', 'OIL': 'brent',
     'NG=F': 'natural_gas', 'NG': 'natural_gas',

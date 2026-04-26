@@ -5,7 +5,6 @@ export const commodityNameMap: Record<string, string> = {
   'SG=F': '沪金 Au99.99',
   'PAXG-USD': 'Pax Gold',
   'SI=F': '白银 (COMEX)',
-  'PT=F': '铂金',
   'PA=F': '钯金',
   'Gold Apr 26': '国际黄金',
   'Silver Mar 26': '国际白银',
@@ -92,7 +91,6 @@ export const commodityCategoryMap: Record<string, string> = {
   'GC=F': 'precious_metal',
   'SG=F': 'precious_metal',
   'SI=F': 'precious_metal',
-  'PT=F': 'precious_metal',
   'PA=F': 'precious_metal',
   'PAXG-USD': 'precious_metal',
   // 能源

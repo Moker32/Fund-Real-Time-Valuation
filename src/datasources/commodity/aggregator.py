@@ -116,7 +116,6 @@ def get_all_commodity_types() -> list[str]:
         # 贵金属
         "gold",
         "silver",
-        "platinum",
         # 能源
         "wti",
         "brent",
@@ -129,7 +128,7 @@ def get_all_commodity_types() -> list[str]:
 def get_commodities_by_category() -> dict[CommodityCategory, list[str]]:
     """获取按分类组织的商品类型"""
     return {
-        CommodityCategory.PRECIOUS_METAL: ["gold", "silver", "platinum"],
+        CommodityCategory.PRECIOUS_METAL: ["gold", "silver"],
         CommodityCategory.ENERGY: ["wti", "brent", "natural_gas"],
         CommodityCategory.CRYPTO: ["btc"],
     }
@@ -148,12 +147,6 @@ SEARCHABLE_COMMODITIES: dict[str, dict[str, str]] = {
         "name": "白银 (COMEX)",
         "category": "precious_metal",
         "exchange": "COMEX",
-        "currency": "USD",
-    },
-    "XPT": {
-        "name": "铂金 (伦敦)",
-        "category": "precious_metal",
-        "exchange": "LBMA",
         "currency": "USD",
     },
     # 能源

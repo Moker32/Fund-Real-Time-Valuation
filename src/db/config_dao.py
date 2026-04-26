@@ -270,7 +270,6 @@ class ConfigDAO:
         default_commodities = [
             ("gold", "黄金 (COMEX)", "akshare"),
             ("silver", "白银 (COMEX)", "akshare"),
-            ("platinum", "铂金 (LONDON)", "akshare"),
             ("wti", "WTI原油 (NYMEX)", "akshare"),
             ("brent", "布伦特原油", "akshare"),
             ("natural_gas", "天然气 (NYMEX)", "akshare"),

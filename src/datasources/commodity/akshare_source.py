@@ -7,7 +7,6 @@
 支持的商品（commodity_type → akshare symbol）：
 - gold → GC (COMEX黄金)
 - silver → SI (COMEX白银)
-- platinum → XPT (伦敦铂金)
 - wti → CL (NYMEX WTI原油)
 - brent → OIL (布伦特原油)
 - natural_gas → NG (NYMEX天然气)
@@ -36,7 +35,6 @@ class CommodityRealtimeSource(CommodityDataSource):
     AKSHARE_SYMBOLS: dict[str, str] = {
         "gold": "GC",
         "silver": "SI",
-        "platinum": "XPT",
         "wti": "CL",
         "brent": "OIL",
         "natural_gas": "NG",
@@ -45,7 +43,6 @@ class CommodityRealtimeSource(CommodityDataSource):
     AKSHARE_NAMES: dict[str, str] = {
         "gold": "黄金 (COMEX)",
         "silver": "白银 (COMEX)",
-        "platinum": "铂金 (伦敦)",
         "wti": "WTI原油 (NYMEX)",
         "brent": "布伦特原油 (ICE)",
         "natural_gas": "天然气 (NYMEX)",
@@ -54,7 +51,6 @@ class CommodityRealtimeSource(CommodityDataSource):
     AKSHARE_EXCHANGES: dict[str, str] = {
         "gold": "COMEX",
         "silver": "COMEX",
-        "platinum": "LBMA",
         "wti": "NYMEX",
         "brent": "ICE",
         "natural_gas": "NYMEX",
@@ -64,7 +60,6 @@ class CommodityRealtimeSource(CommodityDataSource):
     YFINANCE_TICKERS: dict[str, str] = {
         "gold": "GC=F",
         "silver": "SI=F",
-        "platinum": "PT=F",
         "wti": "CL=F",
         "brent": "BZ=F",
         "natural_gas": "NG=F",

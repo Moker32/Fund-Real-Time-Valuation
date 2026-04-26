@@ -53,7 +53,6 @@ class TestCommodityNames:
         """测试贵金属名称"""
         assert COMMODITY_NAMES["gold"] == "黄金 (COMEX)"
         assert COMMODITY_NAMES["silver"] == "白银 (COMEX)"
-        assert COMMODITY_NAMES["platinum"] == "铂金 (伦敦)"
 
     def test_energy(self):
         """测试能源名称"""

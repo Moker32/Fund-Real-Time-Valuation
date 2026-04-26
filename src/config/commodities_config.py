@@ -31,7 +31,6 @@ CATEGORY_MAPPING: dict[str, str] = {
     # 贵金属
     "GC=F": "precious_metal",
     "SI=F": "precious_metal",
-    "PT=F": "precious_metal",
     "PA=F": "precious_metal",
     # 能源
     "CL=F": "energy",
