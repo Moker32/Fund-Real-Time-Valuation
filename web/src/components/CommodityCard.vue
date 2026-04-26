@@ -55,6 +55,21 @@
           </span>
           <span class="change-value font-mono">{{ formatChange(commodity.change) }}</span>
         </div>
+        <Transition name="chart-expand">
+          <LineChart
+            v-if="showChart"
+            :data="chartData"
+            :height="60"
+            :baseline="baseline"
+            :trend="changeClass"
+            :show-axes="false"
+            :show-tooltip="false"
+            :timezone="chartTimezone"
+            :streaming="true"
+            :max-points="500"
+            class="commodity-chart"
+          />
+        </Transition>
       </div>
 
       <div class="card-footer">
@@ -81,6 +96,7 @@
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useCommodityStore } from '@/stores/commodityStore';
 import { getCommodityCategory, getCommodityMarket } from '@/utils/commodityNames';
+import LineChart from './LineChart.vue';
 import { tradingCalendarApi } from '@/api';
 import type { Commodity } from '@/types';
 
@@ -127,6 +143,11 @@ async function fetchTradingDayStatus(market: string) {
 onMounted(() => {
   const market = getCommodityMarket(props.commodity.symbol);
   fetchTradingDayStatus(market);
+  // 加载日内分时数据
+  const ct = commodityType.value;
+  if (ct) {
+    store.fetchCommodityIntraday(ct);
+  }
 });
 
 onUnmounted(() => {
@@ -148,6 +169,56 @@ const changeClass = computed(() => {
   if (props.commodity.changePercent > 0) return 'rising';
   if (props.commodity.changePercent < 0) return 'falling';
   return 'neutral';
+});
+
+// 市场时区映射（用于图表时间轴显示）
+const commodityTimezone: Record<string, string> = {
+  'comex': 'America/New_York',
+  'cme': 'America/Chicago',
+  'lbma': 'Europe/London',
+  'sge': 'Asia/Shanghai',
+  'crypto': 'UTC',
+};
+
+const chartTimezone = computed(() => {
+  const market = getCommodityMarket(props.commodity.symbol);
+  return commodityTimezone[market] || 'Asia/Shanghai';
+});
+
+const commodityType = computed(() => {
+  // 从 symbol 推断 commodity_type（用于 API 调用）
+  const symbol = props.commodity.symbol.toUpperCase();
+  const typeMap: Record<string, string> = {
+    'GC=F': 'gold', 'GC': 'gold',
+    'SI=F': 'silver', 'SI': 'silver',
+    'PT=F': 'platinum', 'XPT': 'platinum',
+    'CL=F': 'wti', 'CL': 'wti',
+    'BZ=F': 'brent', 'OIL': 'brent',
+    'NG=F': 'natural_gas', 'NG': 'natural_gas',
+    'BTCUSDT': 'btc', 'BTC-USD': 'btc', 'BTC=F': 'btc',
+  };
+  return typeMap[symbol] || '';
+});
+
+const chartData = computed(() => {
+  const ct = commodityType.value;
+  if (ct) {
+    const intradayData = store.getCommodityIntraday(ct);
+    if (intradayData.length > 0) return intradayData;
+  }
+  // fallback: 使用 store 中累积的 streaming 数据
+  const streamingData = store.commodityHistory.get(props.commodity.symbol);
+  if (streamingData && streamingData.length > 1) return streamingData;
+  return [];
+});
+
+const showChart = computed(() => chartData.value.length > 1);
+
+const baseline = computed(() => {
+  if (props.commodity.prevClose && props.commodity.prevClose > 0) {
+    return props.commodity.prevClose;
+  }
+  return undefined;
 });
 
 // 判断是否为交易时段 (基于市场)
@@ -811,5 +882,36 @@ function formatTime(dateStr: string | undefined | null): string {
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.commodity-chart {
+  width: 100%;
+  min-height: 60px;
+  margin-top: var(--spacing-sm);
+  will-change: transform, opacity;
+}
+
+// 图表展开动画 (复用 IndexCard 的动画)
+.chart-expand-enter-active,
+.chart-expand-leave-active {
+  transition: all var(--transition-normal) cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 80px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.chart-expand-enter-from,
+.chart-expand-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-10px);
+  margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-expand-enter-active,
+  .chart-expand-leave-active {
+    transition: none;
+  }
 }
 </style>
