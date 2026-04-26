@@ -17,6 +17,7 @@
 """
 
 from src.db.calendar import ExchangeHolidayDAO, TradingCalendarDAO
+from src.db.commodity_intraday_dao import CommodityIntradayCacheDAO
 from src.db.config_dao import ConfigDAO
 from src.db.database import DatabaseManager
 from src.db.fund import (
@@ -34,6 +35,7 @@ from src.db.models import (
     ApiCallStats,
     CacheMetadata,
     CommodityConfig,
+    CommodityIntradayRecord,
     ExchangeHoliday,
     FundBasicInfo,
     FundConfig,
@@ -54,6 +56,7 @@ __all__ = [
     # Models
     "FundConfig",
     "CommodityConfig",
+    "CommodityIntradayRecord",
     "FundHistoryRecord",
     "FundIndustryRecord",
     "NewsRecord",
@@ -80,4 +83,5 @@ __all__ = [
     "TradingCalendarDAO",
     "ExchangeHolidayDAO",
     "CacheMetadataDAO",
+    "CommodityIntradayCacheDAO",
 ]
