@@ -120,20 +120,7 @@ export interface CommodityHistoryItem {
   prevClose: number;
 }
 
-// Watched Commodity Types
-export interface WatchedCommodity {
-  symbol: string;
-  name: string;
-  category: string;
-  addedAt: string;
-}
-
-export interface WatchlistResponse {
-  watchlist: WatchedCommodity[];
-  count: number;
-  timestamp: string;
-}
-
+// CommoditySearchResult Types
 export interface CommoditySearchResult {
   symbol: string;
   name: string;

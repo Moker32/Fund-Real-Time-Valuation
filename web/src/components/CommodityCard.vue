@@ -19,20 +19,6 @@
             <span class="status-dot"></span>
             <span class="status-text">{{ statusText }}</span>
           </div>
-          <button
-            class="action-btn watch-btn"
-            :class="{ active: isWatched, 'heart-beating': isHeartBeating }"
-            :title="isWatched ? '取消关注' : '添加关注'"
-            :aria-label="isWatched ? '取消关注' : '添加关注'"
-            @click.stop="toggleWatch"
-          >
-            <svg v-if="isWatched" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-            </svg>
-          </button>
         </div>
       </div>
 
@@ -95,7 +81,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useCommodityStore } from '@/stores/commodityStore';
-import { getCommodityCategory, getCommodityMarket } from '@/utils/commodityNames';
+import { getCommodityMarket } from '@/utils/commodityNames';
 import LineChart from './LineChart.vue';
 import { tradingCalendarApi } from '@/api';
 import type { Commodity } from '@/types';
@@ -153,18 +139,8 @@ onMounted(() => {
 onUnmounted(() => {
   if (priceTimer) window.clearTimeout(priceTimer);
   if (changeTimer) window.clearTimeout(changeTimer);
-  if (heartTimer) window.clearTimeout(heartTimer);
 });
 
-// 检查该商品是否在关注列表中
- 
-const isWatched = computed(() => {
-  return store.watchedCommodities.some(
-    (item) => item.symbol.toUpperCase() === props.commodity.symbol.toUpperCase()
-  );
-});
-
- 
 const changeClass = computed(() => {
   if (props.commodity.changePercent > 0) return 'rising';
   if (props.commodity.changePercent < 0) return 'falling';
@@ -404,9 +380,6 @@ const statusText = computed(() => {
 const priceAnimating = ref(false);
 const changeAnimating = ref(false);
 
-// 收藏心跳动画状态
-const isHeartBeating = ref(false);
-
 // 监听价格变化触发动画
 watch(() => props.commodity.price, (newVal, oldVal) => {
   if (oldVal !== undefined && newVal !== undefined && newVal !== oldVal) {
@@ -422,7 +395,6 @@ watch(() => props.commodity.changePercent, (newVal, oldVal) => {
 
 let priceTimer: ReturnType<typeof setTimeout> | null = null;
 let changeTimer: ReturnType<typeof setTimeout> | null = null;
-let heartTimer: ReturnType<typeof setTimeout> | null = null;
 
 function triggerPriceAnimation() {
   priceAnimating.value = true;
@@ -434,26 +406,6 @@ function triggerChangeAnimation() {
   changeAnimating.value = true;
   if (changeTimer) window.clearTimeout(changeTimer);
   changeTimer = setTimeout(() => changeAnimating.value = false, 500);
-}
-
-async function toggleWatch() {
-  // 触发心跳动画
-  isHeartBeating.value = true;
-  if (heartTimer) window.clearTimeout(heartTimer);
-  heartTimer = setTimeout(() => {
-    isHeartBeating.value = false;
-  }, 600);
-
-  const category = getCommodityCategory(props.commodity.symbol);
-  if (isWatched.value) {
-    await store.removeFromWatchlist(props.commodity.symbol);
-  } else {
-    await store.addToWatchlist(
-      props.commodity.symbol,
-      props.commodity.name,
-      category
-    );
-  }
 }
 
 function formatPrice(value: number): string {

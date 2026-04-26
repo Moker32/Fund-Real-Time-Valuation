@@ -114,14 +114,7 @@
                   <span class="result-category">{{ formatCategory(result.category) }}</span>
                 </div>
                 <button
-                  v-if="isInWatchlist(result.symbol)"
-                  class="added-badge"
-                  disabled
-                >
-                  已关注
-                </button>
-                <button
-                  v-else-if="addingSymbol === result.symbol"
+                  v-if="addingSymbol === result.symbol"
                   class="add-button loading"
                   disabled
                 >
@@ -390,47 +383,9 @@ function formatCategory(category: string): string {
   return names[category] || category;
 }
 
-// 检查是否已在关注列表
-function isInWatchlist(symbol: string): boolean {
-  return store.watchedCommodities.some(
-    (item) => item.symbol.toUpperCase() === symbol.toUpperCase()
-  );
-}
-
 // 选择商品
-async function handleSelect(result: CommoditySearchResult) {
-  if (isInWatchlist(result.symbol)) {
-    return;
-  }
-
-  // 防止重复点击
-  if (addingSymbol.value) {
-    return;
-  }
-
-  addingSymbol.value = result.symbol;
-
-  try {
-    const success = await store.addToWatchlist(
-      result.symbol,
-      result.name,
-      result.category
-    );
-
-    if (success) {
-      emit('added', result.symbol, result.name);
-      // 可以在这里添加 toast 提示
-    } else {
-      localError.value = store.watchlistError || '添加失败';
-      emit('error', localError.value);
-    }
-  } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : '添加失败';
-    localError.value = errorMsg;
-    emit('error', errorMsg);
-  } finally {
-    addingSymbol.value = null;
-  }
+function handleSelect(result: CommoditySearchResult) {
+  emit('select', result);
 }
 
 // 关闭对话框

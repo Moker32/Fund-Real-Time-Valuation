@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Fund, Commodity, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, IndexHistoryResponse, IndexIntradayResponse, CommodityCategory, CommodityHistoryItem, WatchlistResponse, CommoditySearchResponse, AddWatchedCommodityRequest, AddWatchedCommodityResponse, SectorListResponse, SectorDetailResponse, EconomicEventsData, WeiboSentimentData, SentimentAllData } from '@/types';
+import type { Fund, Commodity, HealthStatus, FundHistory, FundIntraday, MarketIndex, IndexListResponse, IndexHistoryResponse, IndexIntradayResponse, CommodityCategory, CommodityHistoryItem, SectorListResponse, SectorDetailResponse, EconomicEventsData, WeiboSentimentData, SentimentAllData } from '@/types';
 
 // API Configuration
 // 生产环境使用相对路径（同源部署），开发环境可通过环境变量覆盖
@@ -299,49 +299,6 @@ export const commodityApi = {
     timestamp: string;
   }> {
     return api.get('/api/commodities/oil/wti');
-  },
-
-  // 关注列表相关 API
-  async searchCommodities(query: string): Promise<CommoditySearchResponse> {
-    return api.get('/api/commodities/search', { params: { q: query } });
-  },
-
-  async getAvailableCommodities(): Promise<CommoditySearchResponse> {
-    return api.get('/api/commodities/available');
-  },
-
-  async getWatchlist(): Promise<WatchlistResponse> {
-    return api.get('/api/commodities/watchlist');
-  },
-
-  async addToWatchlist(request: AddWatchedCommodityRequest): Promise<AddWatchedCommodityResponse> {
-    return api.post('/api/commodities/watchlist', request);
-  },
-
-  async removeFromWatchlist(symbol: string): Promise<AddWatchedCommodityResponse> {
-    return api.delete(`/api/commodities/watchlist/${encodeURIComponent(symbol)}`);
-  },
-
-  async updateWatchedCommodity(symbol: string, name: string): Promise<AddWatchedCommodityResponse> {
-    return api.put(`/api/commodities/watchlist/${encodeURIComponent(symbol)}`, { name });
-  },
-
-  async getWatchlistByCategory(category: string): Promise<WatchlistResponse> {
-    return api.get(`/api/commodities/watchlist/category/${category}`);
-  },
-
-  async getCommodityByTicker(ticker: string): Promise<{
-    commodity: string;
-    symbol: string;
-    name: string;
-    price: number;
-    currency: string;
-    change: number | null;
-    change_percent: number | null;
-    source: string;
-    timestamp: string;
-  }> {
-    return api.get(`/api/commodities/by-ticker/${encodeURIComponent(ticker)}`);
   },
 
   async getIntraday(commodityType: string): Promise<{

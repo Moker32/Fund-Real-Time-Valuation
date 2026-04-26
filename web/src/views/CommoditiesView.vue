@@ -55,8 +55,6 @@ onMounted(async () => {
   if (commodityStore.categories.length === 0) {
     await commodityStore.fetchCategories({ force: true });
   }
-  // 然后加载关注列表（会在 commodities 中添加关注商品的数据）
-  await commodityStore.fetchWatchedCommodities({ showError: false });
 });
 
 function openSearchDialog() {

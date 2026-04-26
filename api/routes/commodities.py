@@ -12,12 +12,10 @@
 # 重新导出所有内容，保持旧导入路径兼容
 from api.routes.commodities import (
     commodities_data,
-    commodities_watchlist,
     router,
 )
 
 __all__ = [
     "router",
     "commodities_data",
-    "commodities_watchlist",
 ]

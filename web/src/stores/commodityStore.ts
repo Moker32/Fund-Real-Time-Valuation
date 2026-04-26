@@ -1,27 +1,10 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { commodityApi } from '@/api';
-import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHistoryItem, WatchedCommodity, CommoditySearchResult } from '@/types';
+import type { Commodity, CommodityCategory, CommodityCategoryItem, CommodityHistoryItem, CommoditySearchResult } from '@/types';
 import { ApiError } from '@/api';
 import { formatTime } from '@/utils/time';
-import { getCommodityName } from '@/utils/commodityNames';
 import { useWSStore } from './wsStore';
-
-// 商品详情 API 返回类型联合
-type CommodityDetailResponse = {
-  symbol: string;
-  name: string;
-  price: number;
-  currency?: string;
-  change: number | null;
-  changePercent: number | null;
-  high?: number;
-  low?: number;
-  open?: number;
-  prevClose?: number;
-  source: string;
-  timestamp: string;
-};
 
 // WebSocket 商品更新数据类型
 interface WSCommodityUpdate {
@@ -80,7 +63,6 @@ const friendlyErrorMessages: Record<string, string> = {
 export const useCommodityStore = defineStore('commodities', () => {
   // State
   const commodities = ref<Commodity[]>([]);
-  const watchedCommodityData = ref<Commodity[]>([]);  // 关注商品的实际行情数据
   const categories = ref<CommodityCategory[]>([]);
   const activeCategory = ref<string | null>(null);
   const loading = ref(false);
@@ -166,36 +148,8 @@ export const useCommodityStore = defineStore('commodities', () => {
     return categories.value.find(c => c.id === activeCategory.value) || null;
   });
 
-  // 获取当前选中分类的商品列表（包含关注列表 + 行情数据）
+  // 获取当前选中分类的商品列表
   const activeCommodities = computed((): Commodity[] => {
-    // 如果是"我的关注"分类，返回关注商品的实际数据
-    if (activeCategory.value === 'watched') {
-      return watchedCommodities.value
-        .map(watched => {
-          const marketData = watchedCommodityData.value.find(
-            c => c.symbol.toUpperCase() === watched.symbol.toUpperCase()
-          );
-          if (marketData) {
-            return marketData;
-          }
-          // 返回一个有效的 Commodity 对象，使用默认值
-          return {
-            symbol: watched.symbol,
-            name: watched.name,
-            price: 0,
-            currency: 'USD',
-            change: 0,
-            changePercent: 0,
-            high: 0,
-            low: 0,
-            open: 0,
-            prevClose: 0,
-            timestamp: new Date().toISOString(),
-          };
-        });
-    }
-
-    // 其他分类：从 categories 获取并转换为 Commodity 类型
     if (activeCategory.value) {
       const category = categories.value.find(c => c.id === activeCategory.value);
       if (category) {
@@ -203,29 +157,16 @@ export const useCommodityStore = defineStore('commodities', () => {
       }
       return [];
     }
-
-    // 没有选中分类时，返回所有行情数据
     return commodities.value;
   });
 
-  // 获取分类列表（用于Tab显示，包含"我的关注"）
+  // 获取分类列表（用于Tab显示）
   const categoryList = computed(() => {
-    const list = categories.value.map(c => ({
+    return categories.value.map(c => ({
       id: c.id,
       name: c.name,
       icon: c.icon,
     }));
-
-    // 如果有关注商品，添加"我的关注"分类
-    if (watchedCommodities.value.length > 0) {
-      list.unshift({
-        id: 'watched',
-        name: '我的关注',
-        icon: '⭐',
-      });
-    }
-
-    return list;
   });
 
   // 获取所有分类中的商品（用于统计）
@@ -564,160 +505,14 @@ export const useCommodityStore = defineStore('commodities', () => {
     await fetchCategories();
   }
 
-  // ========== 关注列表相关 ==========
+  // ========== 搜索相关 ==========
 
-  // State - 关注列表
-  const watchedCommodities = ref<WatchedCommodity[]>([]);
-  const watchlistLoading = ref(false);
-  const watchlistError = ref<string | null>(null);
-
-  // 搜索相关
+  // State - 搜索相关
   const searchQuery = ref('');
   const searchResults = ref<CommoditySearchResult[]>([]);
   const searchLoading = ref(false);
   const searchError = ref<string | null>(null);
   const lastSearchQuery = ref('');
-
-  // Getters - 关注列表按分类分组
-  const watchedByCategory = computed(() => {
-    const grouped: Record<string, WatchedCommodity[]> = {};
-    for (const item of watchedCommodities.value) {
-      const category = item.category || 'other';
-      if (!grouped[category]) {
-        grouped[category] = [];
-      }
-      grouped[category].push(item);
-    }
-    return grouped;
-  });
-
-  // 关注的分类列表
-  const watchedCategories = computed(() => {
-    return Object.keys(watchedByCategory.value);
-  });
-
-  // 获取某个分类的关注商品
-  function getWatchedByCategory(category: string): WatchedCommodity[] {
-    return watchedByCategory.value[category] || [];
-  }
-
-  // Actions - 关注列表
-
-  // 获取关注列表
-  async function fetchWatchedCommodities(options: FetchOptions = {}) {
-    const { showError = true } = options;
-    watchlistLoading.value = true;
-    watchlistError.value = null;
-
-    try {
-      const response = await commodityApi.getWatchlist();
-      watchedCommodities.value = response.watchlist || [];
-
-      const fetchPromises = watchedCommodities.value.map(async (watched) => {
-        try {
-          let data: CommodityDetailResponse;
-          const symbol = watched.symbol.toUpperCase();
-          if (symbol === 'AU99.99' || symbol === 'SG=F' || symbol.includes('AU99')) {
-            const goldData = await commodityApi.getGoldCNY();
-            data = {
-              symbol: goldData.symbol,
-              name: goldData.name,
-              price: goldData.price,
-              change: goldData.change,
-              changePercent: goldData.changePercent,
-              source: 'akshare',
-              timestamp: goldData.timestamp,
-            };
-          } else {
-            const tickerData = await commodityApi.getCommodityByTicker(watched.symbol);
-            // API 返回 snake_case，转换为 camelCase
-            data = {
-              symbol: tickerData.symbol,
-              name: tickerData.name,
-              price: tickerData.price,
-              currency: tickerData.currency,
-              change: tickerData.change,
-              changePercent: tickerData.change_percent,
-              source: tickerData.source,
-              timestamp: tickerData.timestamp,
-            };
-          }
-          return {
-            symbol: data.symbol,
-            name: getCommodityName(data.symbol, data.name),
-            price: data.price,
-            currency: data.currency,
-            change: data.change ?? (data.changePercent ? (data.price * data.changePercent / 100) : 0),
-            changePercent: data.changePercent ?? 0,
-            high: data.high ?? 0,
-            low: data.low ?? 0,
-            open: data.open ?? 0,
-            prevClose: data.prevClose ?? 0,
-            source: data.source,
-            timestamp: data.timestamp,
-          } as Commodity;
-        } catch (e) {
-          console.warn(`[CommodityStore] Failed to fetch ${watched.symbol}:`, e);
-          return null;
-        }
-      });
-
-      const results = await Promise.all(fetchPromises);
-      watchedCommodityData.value = results.filter((r): r is Commodity => r !== null);
-
-      // 如果有关注的商品且当前没有选中分类，默认选中"我的关注"
-      if (watchedCommodities.value.length > 0 && !activeCategory.value) {
-        activeCategory.value = 'watched';
-      }
-    } catch (err) {
-      watchlistError.value = getFriendlyErrorMessage(err);
-      if (showError) {
-        console.error('[CommodityStore] fetchWatchedCommodities error:', err);
-      }
-    } finally {
-      watchlistLoading.value = false;
-    }
-  }
-
-  // 添加关注
-  async function addToWatchlist(
-    symbol: string,
-    name: string,
-    category?: string
-  ): Promise<boolean> {
-    try {
-      const response = await commodityApi.addToWatchlist({ symbol, name, category });
-      if (response.success) {
-        // 刷新关注列表
-        await fetchWatchedCommodities({ showError: false });
-        return true;
-      }
-      watchlistError.value = response.message;
-      return false;
-    } catch (err) {
-      watchlistError.value = getFriendlyErrorMessage(err);
-      console.error('[CommodityStore] addToWatchlist error:', err);
-      return false;
-    }
-  }
-
-  // 移除关注
-  async function removeFromWatchlist(symbol: string): Promise<boolean> {
-    try {
-      const response = await commodityApi.removeFromWatchlist(symbol);
-      if (response.success) {
-        // 刷新关注列表
-        await fetchWatchedCommodities({ showError: false });
-        return true;
-      }
-      watchlistError.value = response.message;
-      return false;
-    } catch (err) {
-      watchlistError.value = getFriendlyErrorMessage(err);
-      console.error('[CommodityStore] removeFromWatchlist error:', err);
-      return false;
-    }
-  }
 
   // 搜索商品
   async function searchCommodities(query: string): Promise<CommoditySearchResult[]> {
@@ -780,11 +575,6 @@ export const useCommodityStore = defineStore('commodities', () => {
     }
   }
 
-  // 清除关注列表错误
-  function clearWatchlistError() {
-    watchlistError.value = null;
-  }
-
   // 清除搜索错误
   function clearSearchError() {
     searchError.value = null;
@@ -804,28 +594,6 @@ export const useCommodityStore = defineStore('commodities', () => {
       const current = commodities.value[index];
       if (current) {
         commodities.value[index] = {
-          symbol: current.symbol,
-          name: current.name,
-          currency: current.currency,
-          price,
-          change,
-          changePercent,
-          timestamp,
-          high: high ?? current.high,
-          low: low ?? current.low,
-          open: open ?? current.open,
-          prevClose: prevClose ?? current.prevClose,
-          source: current.source,
-        };
-      }
-    }
-
-    // 更新 watchedCommodityData 列表
-    const watchedIndex = watchedCommodityData.value.findIndex((c) => c.symbol === symbol);
-    if (watchedIndex !== -1) {
-      const current = watchedCommodityData.value[watchedIndex];
-      if (current) {
-        watchedCommodityData.value[watchedIndex] = {
           symbol: current.symbol,
           name: current.name,
           currency: current.currency,
@@ -963,10 +731,6 @@ export const useCommodityStore = defineStore('commodities', () => {
     commodityHistory,
     selectedChartSymbol,
     selectedChartHistory,
-    // 关注列表 State
-    watchedCommodities,
-    watchlistLoading,
-    watchlistError,
     // 搜索 State
     searchQuery,
     searchResults,
@@ -986,9 +750,6 @@ export const useCommodityStore = defineStore('commodities', () => {
     categoryRisingCount,
     categoryFallingCount,
     categoryNeutralCount,
-    // 关注列表 Getters
-    watchedByCategory,
-    watchedCategories,
     // Actions
     fetchCommodities,
     fetchCategories,
@@ -998,17 +759,11 @@ export const useCommodityStore = defineStore('commodities', () => {
     fetchOilWTI,
     clearError,
     retry,
-    // 关注列表 Actions
-    fetchWatchedCommodities,
-    addToWatchlist,
-    removeFromWatchlist,
-    getWatchedByCategory,
     // 搜索 Actions
     searchCommodities,
     executeSearch,
     clearSearch,
     fetchAvailableCommodities,
-    clearWatchlistError,
     clearSearchError,
     // WebSocket Actions
     updateCommodity,
