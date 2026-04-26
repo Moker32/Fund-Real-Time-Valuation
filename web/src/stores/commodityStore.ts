@@ -100,7 +100,7 @@ export const useCommodityStore = defineStore('commodities', () => {
   const MAX_HISTORY_POINTS = 500;
 
   // 日内分时数据（从后端 API 获取的完整日数据）
-  const commodityIntraday = ref<Map<string, { time: string; price: number }[]>>(new Map());
+  const commodityIntraday = ref<Record<string, { time: string; price: number }[]>>({});
 
   // Getters
   const risingCommodities = computed(() =>
@@ -135,7 +135,7 @@ export const useCommodityStore = defineStore('commodities', () => {
 
   // 获取指定商品的日内分时数据
   function getCommodityIntraday(commodityType: string) {
-    return commodityIntraday.value.get(commodityType) || [];
+    return commodityIntraday.value[commodityType] || [];
   }
 
   // 选中折线图商品
@@ -425,7 +425,7 @@ export const useCommodityStore = defineStore('commodities', () => {
     try {
       const response = await commodityApi.getIntraday(commodityType);
       if (response.data && response.data.length > 0) {
-        commodityIntraday.value.set(commodityType, response.data);
+        commodityIntraday.value[commodityType] = response.data;
       }
       return response.data || [];
     } catch (err) {

@@ -203,8 +203,9 @@ const commodityType = computed(() => {
 const chartData = computed(() => {
   const ct = commodityType.value;
   if (ct) {
-    const intradayData = store.getCommodityIntraday(ct);
-    if (intradayData.length > 0) return intradayData;
+    // 直接访问 store.commodityIntraday 以确保 Vue 3 正确追踪响应式依赖
+    const intraday = store.commodityIntraday[ct];
+    if (intraday && intraday.length > 0) return intraday;
   }
   // fallback: 使用 store 中累积的 streaming 数据
   const streamingData = store.commodityHistory.get(props.commodity.symbol);
