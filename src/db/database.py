@@ -169,6 +169,19 @@ class DatabaseManager:
                 )
             """)
 
+            # 商品日内分时缓存表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS commodity_intraday_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    commodity_type TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    time TEXT NOT NULL,
+                    price REAL NOT NULL,
+                    fetched_at TEXT,
+                    UNIQUE(commodity_type, date, time)
+                )
+            """)
+
             # 基金每日缓存表（存储近一周的每日基础数据）
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS fund_daily_cache (
@@ -352,6 +365,10 @@ class DatabaseManager:
             )
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_index_intraday_type ON index_intraday_cache(index_type, date)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_commodity_intraday_type "
+                "ON commodity_intraday_cache(commodity_type, date)"
             )
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_fund_daily_code ON fund_daily_cache(fund_code, date)"
