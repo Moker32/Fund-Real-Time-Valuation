@@ -106,6 +106,18 @@ class IndexIntradayRecord:
 
 
 @dataclass
+class CommodityIntradayRecord:
+    """商品日内分时数据记录"""
+
+    id: int | None = None  # 数据库自增ID
+    commodity_type: str = ""  # 商品类型 (gold, silver, wti, btc 等)
+    date: str = ""  # 日期 (YYYY-MM-DD 格式)
+    time: str = ""  # "HH:mm" 格式
+    price: float = 0.0  # 价格
+    fetched_at: str = ""  # 抓取时间
+
+
+@dataclass
 class FundDailyRecord:
     """基金每日缓存数据记录
 
