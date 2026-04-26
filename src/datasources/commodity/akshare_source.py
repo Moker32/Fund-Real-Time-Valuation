@@ -60,6 +60,26 @@ class CommodityRealtimeSource(CommodityDataSource):
         "natural_gas": "NYMEX",
     }
 
+    # commodity_type → yfinance ticker
+    YFINANCE_TICKERS: dict[str, str] = {
+        "gold": "GC=F",
+        "silver": "SI=F",
+        "platinum": "PT=F",
+        "wti": "CL=F",
+        "brent": "BZ=F",
+        "natural_gas": "NG=F",
+        "btc": "BTC-USD",
+    }
+
+    _semaphore: asyncio.Semaphore | None = None
+    YFINANCE_TIMEOUT = 10.0
+
+    @classmethod
+    def _get_semaphore(cls) -> asyncio.Semaphore:
+        if cls._semaphore is None:
+            cls._semaphore = asyncio.Semaphore(3)
+        return cls._semaphore
+
     def __init__(self, timeout: float = 15.0):
         super().__init__(name="commodity_realtime", timeout=timeout)
 
@@ -237,6 +257,146 @@ class CommodityRealtimeSource(CommodityDataSource):
                 timestamp=time.time(),
                 source=self.name,
                 metadata={"commodity_type": "btc", "error_type": type(e).__name__},
+            )
+
+    async def fetch_intraday(self, commodity_type: str) -> DataSourceResult:
+        """获取商品日内分时数据（yfinance 1m K线）"""
+        ticker = self.YFINANCE_TICKERS.get(commodity_type)
+        if not ticker:
+            return DataSourceResult(
+                success=False,
+                error=f"不支持的日内数据类型: {commodity_type}",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"commodity_type": commodity_type},
+            )
+
+        from src.db.commodity_intraday_dao import CommodityIntradayCacheDAO
+        from src.db.database import DatabaseManager
+
+        db = DatabaseManager()
+        cache_dao = CommodityIntradayCacheDAO(db)
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # 检查缓存
+        if not cache_dao.is_expired(commodity_type, today):
+            cached_records = cache_dao.get_intraday(commodity_type, today)
+            if cached_records:
+                intraday_points = [
+                    {"time": r.time, "price": r.price}
+                    for r in cached_records
+                ]
+                prices = [r.price for r in cached_records if r.price > 0]
+                return DataSourceResult(
+                    success=True,
+                    data={
+                        "commodity_type": commodity_type,
+                        "symbol": ticker,
+                        "name": self.AKSHARE_NAMES.get(commodity_type, commodity_type),
+                        "data": intraday_points,
+                        "timestamp": datetime.now().isoformat() + "Z",
+                        "open": cached_records[0].price if cached_records else 0.0,
+                        "high": max(prices) if prices else 0.0,
+                        "low": min(prices) if prices else 0.0,
+                        "close": cached_records[-1].price if cached_records else 0.0,
+                    },
+                    timestamp=time.time(),
+                    source=self.name,
+                    metadata={"commodity_type": commodity_type, "source": "cache",
+                              "count": len(intraday_points)},
+                )
+
+        # 从 yfinance 获取
+        try:
+            import yfinance as yf
+
+            loop = asyncio.get_event_loop()
+
+            async with self._get_semaphore():
+                try:
+                    ticker_obj = yf.Ticker(ticker)
+                    hist = await asyncio.wait_for(
+                        loop.run_in_executor(
+                            None, lambda: ticker_obj.history(period="5d", interval="1m")
+                        ),
+                        timeout=self.YFINANCE_TIMEOUT * 2,
+                    )
+
+                    if hist is None or hist.empty:
+                        return DataSourceResult(
+                            success=False,
+                            error="无法获取日内数据",
+                            timestamp=time.time(),
+                            source=self.name,
+                            metadata={"commodity_type": commodity_type},
+                        )
+
+                    # 保留最近一个交易日
+                    if not hist.empty:
+                        latest_date = hist.index[-1].date()
+                        hist = hist[hist.index.date == latest_date]
+
+                    import pandas as pd
+
+                    intraday_points = []
+                    for idx, row in hist.iterrows():
+                        time_str = idx.strftime("%H:%M")
+                        price = float(row["Close"]) if pd.notna(row["Close"]) else 0.0
+                        intraday_points.append({"time": time_str, "price": round(price, 4)})
+
+                    open_price = float(hist["Open"].iloc[0]) if not hist.empty else 0.0
+                    high_price = float(hist["High"].max()) if not hist.empty else 0.0
+                    low_price = float(hist["Low"].min()) if not hist.empty else 0.0
+                    close_price = float(hist["Close"].iloc[-1]) if not hist.empty else 0.0
+
+                    # 保存到缓存
+                    cache_dao.save_intraday(commodity_type, today, intraday_points)
+
+                    return DataSourceResult(
+                        success=True,
+                        data={
+                            "commodity_type": commodity_type,
+                            "symbol": ticker,
+                            "name": self.AKSHARE_NAMES.get(commodity_type, commodity_type),
+                            "data": intraday_points,
+                            "timestamp": datetime.now().isoformat() + "Z",
+                            "open": open_price,
+                            "high": high_price,
+                            "low": low_price,
+                            "close": close_price,
+                        },
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"commodity_type": commodity_type, "source": "yahoo",
+                                  "count": len(intraday_points)},
+                    )
+
+                except asyncio.TimeoutError:
+                    return DataSourceResult(
+                        success=False,
+                        error=f"获取日内数据超时 ({self.YFINANCE_TIMEOUT * 2}s)",
+                        timestamp=time.time(),
+                        source=self.name,
+                        metadata={"commodity_type": commodity_type},
+                    )
+
+        except ImportError:
+            logger.error("yfinance 未安装")
+            return DataSourceResult(
+                success=False,
+                error="yfinance 未安装",
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"commodity_type": commodity_type},
+            )
+        except Exception as e:
+            logger.error(f"获取 {commodity_type} 日内数据失败: {e}")
+            return DataSourceResult(
+                success=False,
+                error=str(e),
+                timestamp=time.time(),
+                source=self.name,
+                metadata={"commodity_type": commodity_type},
             )
 
     async def fetch_batch(self, commodity_types: list[str]) -> list[DataSourceResult]:
