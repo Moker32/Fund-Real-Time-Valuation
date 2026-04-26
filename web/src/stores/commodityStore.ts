@@ -99,6 +99,9 @@ export const useCommodityStore = defineStore('commodities', () => {
   const selectedChartSymbol = ref<string | null>(null);
   const MAX_HISTORY_POINTS = 500;
 
+  // 日内分时数据（从后端 API 获取的完整日数据）
+  const commodityIntraday = ref<Map<string, { time: string; price: number }[]>>(new Map());
+
   // Getters
   const risingCommodities = computed(() =>
     commodities.value.filter((c) => c.changePercent > 0)
@@ -129,6 +132,11 @@ export const useCommodityStore = defineStore('commodities', () => {
     if (!selectedChartSymbol.value) return [];
     return commodityHistory.value.get(selectedChartSymbol.value) || [];
   });
+
+  // 获取指定商品的日内分时数据
+  function getCommodityIntraday(commodityType: string) {
+    return commodityIntraday.value.get(commodityType) || [];
+  }
 
   // 选中折线图商品
   function selectChartSymbol(symbol: string | null) {
@@ -409,6 +417,20 @@ export const useCommodityStore = defineStore('commodities', () => {
       console.error(`[CommodityStore] fetchHistory error for ${commodityType}:`, err);
       error.value = getFriendlyErrorMessage(err);
       throw err; // 抛出异常，让调用者能够区分"无数据"和"获取失败"
+    }
+  }
+
+  // 获取商品日内分时数据
+  async function fetchCommodityIntraday(commodityType: string) {
+    try {
+      const response = await commodityApi.getIntraday(commodityType);
+      if (response.data && response.data.length > 0) {
+        commodityIntraday.value.set(commodityType, response.data);
+      }
+      return response.data || [];
+    } catch (err) {
+      console.warn(`[CommodityStore] fetchIntraday error for ${commodityType}:`, err);
+      return [];
     }
   }
 
@@ -992,6 +1014,10 @@ export const useCommodityStore = defineStore('commodities', () => {
     unsubscribeWebSocket,
     // 折线图 Actions
     selectChartSymbol,
+    // 日内分时 Actions
+    commodityIntraday,
+    fetchCommodityIntraday,
+    getCommodityIntraday,
   };
 }, {
   persist: {
