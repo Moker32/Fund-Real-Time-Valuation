@@ -368,6 +368,37 @@ async def get_wti_oil() -> dict:
 
 
 @router.get(
+    "/{commodity_type}/intraday",
+    response_model=dict,
+    summary="获取商品日内分时数据",
+    description="根据商品类型获取日内分时行情数据",
+    responses={
+        200: {"description": "成功获取商品日内分时数据"},
+        400: {"model": ErrorResponse, "description": "不支持的商品类型"},
+        500: {"model": ErrorResponse, "description": "服务器错误"},
+    },
+)
+async def get_commodity_intraday(
+    commodity_type: str,
+) -> dict:
+    """获取商品日内分时数据"""
+    if commodity_type not in SUPPORTED_COMMODITIES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的商品类型: {commodity_type}，支持类型: {', '.join(SUPPORTED_COMMODITIES)}",
+        )
+
+    source = _get_realtime_source()
+    result = await source.fetch_intraday(commodity_type)
+
+    if not result.success or result.data is None:
+        error_msg = result.error or "获取日内分时数据失败"
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    return result.data
+
+
+@router.get(
     "/{commodity_type}",
     response_model=CommodityResponse,
     summary="获取单个商品行情",
