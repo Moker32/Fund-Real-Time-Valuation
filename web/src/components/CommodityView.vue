@@ -1,19 +1,5 @@
 <template>
   <div class="commodity-view">
-    <!-- 折线图（选中商品时显示） -->
-    <StreamingChart
-      v-if="selectedChart"
-      type="commodity"
-      :symbol="selectedChart.symbol"
-      :name="selectedChart.name"
-      :current-price="selectedChart.price"
-      :change="selectedChart.change"
-      :change-percent="selectedChart.changePercent"
-      :chart-history="store.selectedChartHistory"
-      :chart-height="160"
-      @close="store.selectChartSymbol(null)"
-    />
-
     <!-- 分类 Tab -->
     <CommodityTabs
       :categories="categoryList"
@@ -60,7 +46,6 @@
           v-for="commodity in activeCommodities"
           :key="commodity.symbol"
           :commodity="commodity"
-          @click="store.selectChartSymbol(commodity.symbol)"
         />
       </div>
     </div>
@@ -77,17 +62,10 @@ import { computed } from 'vue';
 import { useCommodityStore } from '@/stores/commodityStore';
 import CommodityTabs from './CommodityTabs.vue';
 import CommodityCard from './CommodityCard.vue';
-import StreamingChart from './StreamingChart.vue';
 
 const store = useCommodityStore();
 
-// 当前选中显示折线图的商品
-const selectedChart = computed(() => {
-  if (!store.selectedChartSymbol) return null;
-  return store.commodities.find(c => c.symbol === store.selectedChartSymbol) || null;
-});
 
- 
 const categoryList = computed(() => store.categoryList);
 
  
