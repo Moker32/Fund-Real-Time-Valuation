@@ -324,24 +324,66 @@ def _get_fund_name_fallback(fund_code: str) -> list[str]:
         return []
 
 
+async def _fetch_fund_theme_from_em(fund_code: str) -> list[str] | None:
+    """从东方财富 API 获取基金主题标签
+
+    API: https://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx?m=1&key=基金代码
+    返回字段: ZTJJInfo = [{TTYPE: "BK000217", TTYPENAME: "人工智能"}, ...]
+
+    Returns:
+        主题标签列表，获取失败返回 None
+    """
+    import httpx
+
+    try:
+        url = "https://fundsuggest.eastmoney.com/FundSearch/api/FundSearchAPI.ashx"
+        params: dict[str, str] = {"m": "1", "key": fund_code, "r": "1"}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+        if data.get("ErrCode") != 0:
+            logger.debug(f"EM基金主题API返回错误: {data.get('ErrMsg')}")
+            return None
+
+        ztjj_info = data.get("Datas", [{}])[0].get("ZTJJInfo", []) if data.get("Datas") else []
+        if not ztjj_info:
+            return None
+
+        tags = [item.get("TTYPENAME", "") for item in ztjj_info if item.get("TTYPENAME")]
+        return tags if tags else None
+    except Exception as e:
+        logger.debug(f"获取EM基金主题失败: {fund_code} - {e}")
+        return None
+
+
 async def compute_fund_concept_tags(fund_code: str) -> list[str]:
     """计算基金概念标签
 
-    通过重仓股所属概念板块，按持仓权重加权聚合，返回 Top N 标签。
+    优先级：
+    1. 东方财富 API 直接获取主题标签
+    2. 重仓股→概念板块加权聚合
+    3. 基金名称/跟踪标的兜底
 
     Args:
         fund_code: 基金代码
 
     Returns:
-        概念标签列表，如 ["CPO概念", "光通信", "5G"]
+        概念标签列表，如 ["人工智能", "TMT", "CPO概念", "光通信"]
     """
-    stock_concept_dao = _get_stock_concept_dao()
     fund_concept_dao = _get_fund_concept_dao()
 
-    # 1. 获取重仓股
+    # 1. 东方财富 API 直接获取（最快最准）
+    em_tags = await _fetch_fund_theme_from_em(fund_code)
+    if em_tags:
+        fund_concept_dao.save(fund_code, em_tags, "")
+        return em_tags
+
+    # 2. 重仓股→概念板块推断
+    stock_concept_dao = _get_stock_concept_dao()
     holdings = await _get_fund_holdings(fund_code)
     if holdings:
-        # 2. 查每只重仓股的概念标签，加权聚合
         concept_weight: dict[str, float] = {}
 
         for h in holdings:
@@ -352,18 +394,15 @@ async def compute_fund_concept_tags(fund_code: str) -> list[str]:
                     concept_weight[c] = concept_weight.get(c, 0) + weight
 
         if concept_weight:
-            # 3. 按总权重降序排列，取 Top N
             sorted_concepts = sorted(concept_weight.items(), key=lambda x: -x[1])
             top_tags = [name for name, _w in sorted_concepts[:TOP_TAGS_N]]
 
-            # 4. 缓存结果
             if top_tags:
                 report_period = holdings[0].get("report_period", "")
                 fund_concept_dao.save(fund_code, top_tags, report_period)
+                return top_tags
 
-            return top_tags
-
-    # 5. 兜底：sector → 基金名称
+    # 3. 兜底：sector → 基金名称
     sector = _get_fund_sector_fallback(fund_code)
     if sector:
         fund_concept_dao.save(fund_code, [sector])
