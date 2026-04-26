@@ -201,9 +201,10 @@ const commodityType = computed(() => {
 });
 
 const chartData = computed(() => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+  store.intradayVersion; // 显式追踪版本变化，确保 computed 重新计算
   const ct = commodityType.value;
   if (ct) {
-    // 直接访问 store.commodityIntraday 以确保 Vue 3 正确追踪响应式依赖
     const intraday = store.commodityIntraday[ct];
     if (intraday && intraday.length > 0) return intraday;
   }

@@ -101,6 +101,8 @@ export const useCommodityStore = defineStore('commodities', () => {
 
   // 日内分时数据（从后端 API 获取的完整日数据）
   const commodityIntraday = ref<Record<string, { time: string; price: number }[]>>({});
+  // 版本计数器，确保 Pinia 解包 ref<Record> 后 computed 能正确追踪更新
+  const intradayVersion = ref(0);
 
   // Getters
   const risingCommodities = computed(() =>
@@ -426,6 +428,7 @@ export const useCommodityStore = defineStore('commodities', () => {
       const response = await commodityApi.getIntraday(commodityType);
       if (response.data && response.data.length > 0) {
         commodityIntraday.value[commodityType] = response.data;
+        intradayVersion.value++;
       }
       return response.data || [];
     } catch (err) {
@@ -1016,6 +1019,7 @@ export const useCommodityStore = defineStore('commodities', () => {
     selectChartSymbol,
     // 日内分时 Actions
     commodityIntraday,
+    intradayVersion,
     fetchCommodityIntraday,
     getCommodityIntraday,
   };
